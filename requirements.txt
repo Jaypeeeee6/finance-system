@@ -1,1 +1,10 @@
-
+Flask==2.3.3
+Flask-Login==0.6.3
+Flask-SQLAlchemy==3.0.5
+Flask-SocketIO==5.3.6
+Werkzeug==2.3.7
+eventlet==0.33.3
+python-socketio==5.8.0
+python-engineio==4.7.1
+reportlab==4.0.4
+gunicorn==21.2.0

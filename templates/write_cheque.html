@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block title %}Write Cheque{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/write_cheque.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="cheque-container">
+    <div class="cheque-header">
+        <h1><i class="fas fa-file-invoice"></i> Write Cheque</h1>
+        <p>Fill in the fields and preview the cheque</p>
+    </div>
+
+    <div class="cheque-layout">
+        <!-- Left Panel: Form Fields -->
+        <div class="cheque-form-panel">
+            <div class="form-section">
+                <h3><i class="fas fa-edit"></i> Fill in the fields and print</h3>
+                
+                <form id="chequeForm">
+                    <div class="form-group">
+                        <label for="chequeDate">Cheque's date</label>
+                        <input type="date" id="chequeDate" name="chequeDate" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="payeeName">Payee Name</label>
+                        <input type="text" id="payeeName" name="payeeName" class="form-control" placeholder="Enter payee name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="amount">Amount</label>
+                        <div class="amount-input-group">
+                            <input type="number" id="amount" name="amount" class="form-control" placeholder="0.000" step="0.001" required>
+                            <select id="currency" name="currency" class="form-control">
+                                <option value="OMR">OMR</option>
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="amountInWords">Amount in Words</label>
+                        <textarea id="amountInWords" name="amountInWords" class="form-control" rows="3" placeholder="Enter amount in words" required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="purpose">And that for</label>
+                        <textarea id="purpose" name="purpose" class="form-control" rows="3" placeholder="Enter purpose or description" required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="crossing">Crossing</label>
+                        <select id="crossing" name="crossing" class="form-control">
+                            <option value="">Select an option</option>
+                            <option value="General">General Crossing</option>
+                            <option value="Special">Special Crossing</option>
+                            <option value="Account Payee">Account Payee Only</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="chequeNumber">Cheque's number</label>
+                        <input type="text" id="chequeNumber" name="chequeNumber" class="form-control" placeholder="Enter cheque number" required>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" id="previewBtn">
+                            <i class="fas fa-eye"></i> Preview Cheque
+                        </button>
+                        <button type="button" class="btn btn-success" id="printBtn" disabled>
+                            <i class="fas fa-print"></i> Print Cheque
+                        </button>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right Panel: Cheque Preview -->
+        <div class="cheque-preview-panel">
+            <div class="preview-section">
+                <div class="bank-selection">
+                    <div class="form-group">
+                        <label for="bankSelect">Bank</label>
+                        <select id="bankSelect" name="bankSelect" class="form-control">
+                            <option value="dhofar_islamic">Dhofar Islamic Bank</option>
+                            <option value="oman_arab">Oman Arab Bank</option>
+                            <option value="sohar">Sohar Bank</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="templateSelect">Template</label>
+                        <select id="templateSelect" name="templateSelect" class="form-control">
+                            <option value="default">Default</option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-plus"></i> Add Template
+                    </button>
+                </div>
+
+                <div class="cheque-preview">
+                    <div class="cheque-image-container">
+                        <img id="chequeTemplate" src="{{ url_for('static', filename='cheque_templates/DHOFAR-ISLAMIC-BANK.png') }}" alt="Cheque Template" class="cheque-template">
+                        
+                        <!-- Overlay fields that will be positioned over the cheque -->
+                        <div class="cheque-overlay">
+                            <div class="field-overlay" id="dateOverlay" style="position: absolute; top: 40px; left: 290px; font-size: 14px;"></div>
+                            <div class="field-overlay" id="payeeOverlay" style="position: absolute; top: 80px; left: 100px; font-size: 14px;"></div>
+                            <div class="field-overlay" id="amountOverlay" style="position: absolute; top: 120px; left: 300px; font-size: 16px;"></div>
+                            <div class="field-overlay" id="amountWordsOverlay" style="position: absolute; top: 150px; left: 50px; font-size: 12px; max-width: 300px; line-height: 1.2;"></div>
+                            <div class="field-overlay" id="purposeOverlay" style="position: absolute; top: 200px; left: 50px; font-size: 12px; max-width: 300px; line-height: 1.2;"></div>
+                            <div class="field-overlay" id="chequeNumberOverlay" style="position: absolute; top: 250px; left: 400px; font-size: 14px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="preview-actions">
+                    <button type="button" class="btn btn-primary btn-lg" id="printChequeBtn" disabled>
+                        <i class="fas fa-print"></i> Print the cheque
+                    </button>
+                    <div class="info-message">
+                        <i class="fas fa-info-circle"></i>
+                        Any field can be set and moved by double clicking on it
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Cheque field mapping for different banks
+const bankFieldPositions = {
+    'dhofar_islamic': {
+        date: { top: '40px', left: '290px' },
+        payee: { top: '80px', left: '100px' },
+        amount: { top: '120px', left: '300px' },
+        amountWords: { top: '150px', left: '50px' },
+        purpose: { top: '200px', left: '50px' },
+        chequeNumber: { top: '250px', left: '400px' }
+    },
+    'oman_arab': {
+        date: { top: '30px', left: '180px' },
+        payee: { top: '90px', left: '120px' },
+        amount: { top: '130px', left: '320px' },
+        amountWords: { top: '160px', left: '60px' },
+        purpose: { top: '210px', left: '60px' },
+        chequeNumber: { top: '260px', left: '420px' }
+    },
+    'sohar': {
+        date: { top: '55px', left: '190px' },
+        payee: { top: '85px', left: '110px' },
+        amount: { top: '125px', left: '310px' },
+        amountWords: { top: '155px', left: '55px' },
+        purpose: { top: '205px', left: '55px' },
+        chequeNumber: { top: '255px', left: '410px' }
+    }
+};
+
+// Function to update field positions based on selected bank
+function updateFieldPositions(bank) {
+    const positions = bankFieldPositions[bank];
+    if (!positions) return;
+    
+    Object.keys(positions).forEach(field => {
+        const overlay = document.getElementById(field + 'Overlay');
+        if (overlay) {
+            overlay.style.top = positions[field].top;
+            overlay.style.left = positions[field].left;
+        }
+    });
+}
+
+// Function to update cheque template image
+function updateChequeTemplate(bank) {
+    const templateImg = document.getElementById('chequeTemplate');
+    const bankImageMap = {
+        'dhofar_islamic': 'DHOFAR-ISLAMIC-BANK.png',
+        'oman_arab': 'OMAN-ARAB-BANK.png',
+        'sohar': 'SOHAR-BANK.png'
+    };
+    templateImg.src = `{{ url_for('static', filename='cheque_templates/') }}${bankImageMap[bank]}`;
+}
+
+// Function to format date for display
+function formatDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB'); // DD/MM/YYYY format
+}
+
+// Function to format amount
+function formatAmount(amount, currency) {
+    if (!amount) return '';
+    return `${parseFloat(amount).toFixed(3)} ${currency}`;
+}
+
+// Real-time field updates
+function updateChequePreview() {
+    // Update date
+    const dateInput = document.getElementById('chequeDate');
+    const dateOverlay = document.getElementById('dateOverlay');
+    if (dateInput && dateOverlay) {
+        dateOverlay.textContent = formatDate(dateInput.value);
+    }
+    
+    // Update payee
+    const payeeInput = document.getElementById('payeeName');
+    const payeeOverlay = document.getElementById('payeeOverlay');
+    if (payeeInput && payeeOverlay) {
+        payeeOverlay.textContent = payeeInput.value;
+    }
+    
+    // Update amount
+    const amountInput = document.getElementById('amount');
+    const currencySelect = document.getElementById('currency');
+    const amountOverlay = document.getElementById('amountOverlay');
+    if (amountInput && currencySelect && amountOverlay) {
+        amountOverlay.textContent = formatAmount(amountInput.value, currencySelect.value);
+    }
+    
+    // Update amount in words
+    const amountWordsInput = document.getElementById('amountInWords');
+    const amountWordsOverlay = document.getElementById('amountWordsOverlay');
+    if (amountWordsInput && amountWordsOverlay) {
+        amountWordsOverlay.textContent = amountWordsInput.value;
+    }
+    
+    // Update purpose
+    const purposeInput = document.getElementById('purpose');
+    const purposeOverlay = document.getElementById('purposeOverlay');
+    if (purposeInput && purposeOverlay) {
+        purposeOverlay.textContent = purposeInput.value;
+    }
+    
+    // Update cheque number
+    const chequeNumberInput = document.getElementById('chequeNumber');
+    const chequeNumberOverlay = document.getElementById('chequeNumberOverlay');
+    if (chequeNumberInput && chequeNumberOverlay) {
+        chequeNumberOverlay.textContent = chequeNumberInput.value;
+    }
+}
+
+// Initialize the page
+document.addEventListener('DOMContentLoaded', function() {
+    // Set today's date as default
+    const today = new Date().toISOString().split('T')[0];
+    const dateInput = document.getElementById('chequeDate');
+    if (dateInput) {
+        dateInput.value = today;
+    }
+    
+    // Add event listeners to all form fields
+    const formFields = [
+        'chequeDate', 'payeeName', 'amount', 'currency', 
+        'amountInWords', 'purpose', 'chequeNumber'
+    ];
+    
+    formFields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.addEventListener('input', updateChequePreview);
+            field.addEventListener('change', updateChequePreview);
+        }
+    });
+    
+    // Bank selection handler
+    const bankSelect = document.getElementById('bankSelect');
+    if (bankSelect) {
+        bankSelect.addEventListener('change', function() {
+            const selectedBank = this.value;
+            updateFieldPositions(selectedBank);
+            updateChequeTemplate(selectedBank);
+        });
+    }
+    
+    // Preview button handler
+    const previewBtn = document.getElementById('previewBtn');
+    if (previewBtn) {
+        previewBtn.addEventListener('click', function() {
+            updateChequePreview();
+            // Enable print button after preview
+            const printBtn = document.getElementById('printBtn');
+            const printChequeBtn = document.getElementById('printChequeBtn');
+            if (printBtn) printBtn.disabled = false;
+            if (printChequeBtn) printChequeBtn.disabled = false;
+        });
+    }
+    
+    // Print button handlers
+    const printBtn = document.getElementById('printBtn');
+    const printChequeBtn = document.getElementById('printChequeBtn');
+    
+    if (printBtn) {
+        printBtn.addEventListener('click', function() {
+            alert('Print functionality will be implemented later.');
+        });
+    }
+    
+    if (printChequeBtn) {
+        printChequeBtn.addEventListener('click', function() {
+            alert('Print functionality will be implemented later.');
+        });
+    }
+    
+    // Initial field positions for default bank
+    updateFieldPositions('dhofar_islamic');
+    
+    // Initial preview update
+    updateChequePreview();
+});
+</script>
+{% endblock %}

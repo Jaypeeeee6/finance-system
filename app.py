@@ -59,7 +59,7 @@ app.jinja_env.globals.update(format_recurring_schedule=format_recurring_schedule
 db.init_app(app)
 
 # Initialize SocketIO for real-time updates
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 @socketio.on('connect')
 def handle_connect():
@@ -755,6 +755,24 @@ def new_request():
     # Pass today's date to template for display
     today = datetime.utcnow().date().strftime('%Y-%m-%d')
     return render_template('new_request.html', user=current_user, today=today)
+
+
+@app.route('/write-cheque', methods=['GET', 'POST'])
+@login_required
+@role_required('GM', 'Operation Manager')
+def write_cheque():
+    """Write a cheque for approved payment requests"""
+    if request.method == 'POST':
+        # Handle cheque writing logic here
+        flash('Cheque written successfully!', 'success')
+        return redirect(url_for('dashboard'))
+    
+    # Get approved payment requests that need cheques
+    approved_requests = PaymentRequest.query.filter_by(status='Approved').all()
+    
+    return render_template('write_cheque.html', 
+                         user=current_user, 
+                         approved_requests=approved_requests)
 
 
 @app.route('/request/<int:request_id>')
@@ -1484,5 +1502,5 @@ def internal_error(error):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5001)
 

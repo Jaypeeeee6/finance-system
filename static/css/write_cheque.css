@@ -1,0 +1,321 @@
+/* ==================== WRITE CHEQUE PAGE STYLES ==================== */
+
+/* Main container */
+.cheque-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1rem;
+    background: #f8f9fa;
+    min-height: calc(100vh - 120px);
+    overflow-x: hidden;
+}
+
+.cheque-header {
+    text-align: center;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.cheque-header h1 {
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.cheque-header p {
+    color: #6c757d;
+    font-size: 1.1rem;
+}
+
+/* Two-panel layout */
+.cheque-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    height: calc(100vh - 250px);
+    max-height: calc(100vh - 250px);
+}
+
+/* Left Panel: Form Fields */
+.cheque-form-panel {
+    background: white;
+    border-radius: 10px;
+    padding: 1rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
+    max-height: 100%;
+}
+
+.form-section h3 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e9ecef;
+    font-size: 1.1rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #495057;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e9ecef;
+    border-radius: 5px;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.amount-input-group {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1rem;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+}
+
+/* Right Panel: Cheque Preview */
+.cheque-preview-panel {
+    background: white;
+    border-radius: 10px;
+    padding: 1rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.preview-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.bank-selection {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 0.5rem;
+    align-items: end;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.bank-selection .form-group {
+    margin-bottom: 0;
+}
+
+.cheque-preview {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 1rem 0;
+    overflow: hidden;
+}
+
+.cheque-image-container {
+    position: relative;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.cheque-template {
+    max-width: 100%;
+    max-height: 400px;
+    width: auto;
+    height: auto;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    object-fit: contain;
+}
+
+.cheque-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.field-overlay {
+    position: absolute;
+    background: transparent;
+    padding: 2px 4px;
+    border-radius: 3px;
+    word-wrap: break-word;
+    max-width: 200px;
+    line-height: 1.2;
+    font-weight: normal;
+    color: #000;
+}
+
+.preview-actions {
+    text-align: center;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 2px solid #e9ecef;
+    flex-shrink: 0;
+}
+
+.preview-actions .btn {
+    margin-bottom: 1rem;
+}
+
+.info-message {
+    background: #e3f2fd;
+    border: 1px solid #bbdefb;
+    border-radius: 5px;
+    padding: 1rem;
+    color: #1565c0;
+    font-size: 0.9rem;
+}
+
+.info-message i {
+    margin-right: 0.5rem;
+}
+
+/* Button styles */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 5px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #0056b3;
+    transform: translateY(-1px);
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background: #218838;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.btn-outline-primary {
+    background: transparent;
+    color: #007bff;
+    border: 2px solid #007bff;
+}
+
+.btn-outline-primary:hover {
+    background: #007bff;
+    color: white;
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+.btn-lg {
+    padding: 1rem 2rem;
+    font-size: 1.125rem;
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+    .cheque-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+        max-height: none;
+    }
+    
+    .cheque-preview-panel {
+        order: -1;
+        max-height: 60vh;
+    }
+    
+    .bank-selection {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .cheque-container {
+        padding: 0.5rem;
+        min-height: calc(100vh - 100px);
+    }
+    
+    .cheque-form-panel,
+    .cheque-preview-panel {
+        padding: 0.5rem;
+    }
+    
+    .cheque-layout {
+        height: auto;
+        max-height: none;
+    }
+    
+    .amount-input-group {
+        grid-template-columns: 1fr;
+    }
+    
+    .bank-selection {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .cheque-template {
+        max-height: 300px;
+    }
+}
