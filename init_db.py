@@ -4,7 +4,7 @@ This script creates the database tables and populates them with initial data.
 """
 
 from app import app
-from models import db, User, PaymentRequest, AuditLog
+from models import db, User, PaymentRequest, AuditLog, RecurringPaymentSchedule
 from datetime import datetime, date
 
 def init_database():

@@ -6,7 +6,7 @@ from functools import wraps
 import os
 from datetime import datetime, date, timedelta
 import re
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification
+from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule
 from config import Config
 
 # Initialize Flask app
@@ -138,6 +138,34 @@ def create_notification(user_id, title, message, notification_type, request_id=N
     db.session.commit()
     return notification
 
+def create_recurring_payment_schedule(request_id, total_amount, payment_schedule_data):
+    """Create a recurring payment schedule with variable amounts"""
+    try:
+        # Clear any existing schedule for this request
+        RecurringPaymentSchedule.query.filter_by(request_id=request_id).delete()
+        
+        # Create new schedule entries
+        for i, payment_data in enumerate(payment_schedule_data, 1):
+            schedule_entry = RecurringPaymentSchedule(
+                request_id=request_id,
+                payment_date=datetime.strptime(payment_data['date'], '%Y-%m-%d').date(),
+                amount=payment_data['amount'],
+                payment_order=i
+            )
+            db.session.add(schedule_entry)
+        
+        db.session.commit()
+        return True
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creating payment schedule: {e}")
+        return False
+
+def get_payment_schedule(request_id):
+    """Get the payment schedule for a specific request"""
+    schedules = RecurringPaymentSchedule.query.filter_by(request_id=request_id).order_by(RecurringPaymentSchedule.payment_order).all()
+    return [schedule.to_dict() for schedule in schedules]
+
 def check_recurring_payments_due():
     """Check for recurring payments due today and create notifications"""
     today = date.today()
@@ -149,42 +177,89 @@ def check_recurring_payments_due():
     ).all()
     
     for request in recurring_requests:
-        if is_payment_due_today(request, today):
-            # Check if payment was already marked as paid today
-            paid_today = PaidNotification.query.filter_by(
-                request_id=request.request_id,
-                paid_date=today
-            ).first()
-            
-            if paid_today:
-                continue  # Skip this payment - already marked as paid today
-            
-            # Check if notification already exists for today (more robust check)
-            start_of_day = datetime.combine(today, datetime.min.time())
-            end_of_day = datetime.combine(today, datetime.max.time())
-            
-            existing_notification = Notification.query.filter_by(
-                request_id=request.request_id,
-                notification_type='recurring_due'
-            ).filter(
-                Notification.created_at >= start_of_day,
-                Notification.created_at <= end_of_day
-            ).first()
-            
-            if not existing_notification:
-                # Create notification for all admin and project users
-                admin_users = User.query.filter(User.role.in_(['Admin', 'Project'])).all()
-                for user in admin_users:
-                    create_notification(
-                        user_id=user.user_id,
-                        title="Recurring Payment Due",
-                        message=f'Recurring payment due today for {request.request_type} - {request.purpose}',
-                        notification_type='recurring_due',
-                        request_id=request.request_id
-                    )
+        # Check if this request has a custom payment schedule
+        payment_schedules = RecurringPaymentSchedule.query.filter_by(
+            request_id=request.request_id,
+            is_paid=False
+        ).order_by(RecurringPaymentSchedule.payment_order).all()
+        
+        if payment_schedules:
+            # Handle variable amount recurring payments
+            for schedule in payment_schedules:
+                if schedule.payment_date == today:
+                    # Check if payment was already marked as paid today
+                    paid_today = PaidNotification.query.filter_by(
+                        request_id=request.request_id,
+                        paid_date=today
+                    ).first()
+                    
+                    if paid_today:
+                        continue  # Skip this payment - already marked as paid today
+                    
+                    # Check if notification already exists for today
+                    start_of_day = datetime.combine(today, datetime.min.time())
+                    end_of_day = datetime.combine(today, datetime.max.time())
+                    
+                    existing_notification = Notification.query.filter_by(
+                        request_id=request.request_id,
+                        notification_type='recurring_due'
+                    ).filter(
+                        Notification.created_at >= start_of_day,
+                        Notification.created_at <= end_of_day
+                    ).first()
+                    
+                    if not existing_notification:
+                        # Create notifications for all users in the department
+                        department_users = User.query.filter_by(department=request.department).all()
+                        for user in department_users:
+                            create_notification(
+                                user_id=user.user_id,
+                                title="Recurring Payment Due",
+                                message=f'Recurring payment due today for {request.request_type} - {request.purpose} (Amount: {schedule.amount} OMR)',
+                                notification_type='recurring_due',
+                                request_id=request.request_id
+                            )
+                        
+                        # Log the action
+                        log_action(f"Recurring payment due notification created for request #{request.request_id} - Payment {schedule.payment_order}")
+        else:
+            # Handle traditional recurring payments (single amount)
+            if is_payment_due_today(request, today):
+                # Check if payment was already marked as paid today
+                paid_today = PaidNotification.query.filter_by(
+                    request_id=request.request_id,
+                    paid_date=today
+                ).first()
                 
-                # Log the action
-                log_action(f"Recurring payment due notification created for request #{request.request_id}")
+                if paid_today:
+                    continue  # Skip this payment - already marked as paid today
+                
+                # Check if notification already exists for today (more robust check)
+                start_of_day = datetime.combine(today, datetime.min.time())
+                end_of_day = datetime.combine(today, datetime.max.time())
+                
+                existing_notification = Notification.query.filter_by(
+                    request_id=request.request_id,
+                    notification_type='recurring_due'
+                ).filter(
+                    Notification.created_at >= start_of_day,
+                    Notification.created_at <= end_of_day
+                ).first()
+                
+                if not existing_notification:
+                    # Create notification for all admin and project users
+                    admin_users = User.query.filter(User.role.in_(['Admin', 'Project'])).all()
+                    for user in admin_users:
+                        create_notification(
+                            user_id=user.user_id,
+                            title="Recurring Payment Due",
+                            message=f'Recurring payment due today for {request.request_type} - {request.purpose}',
+                            notification_type='recurring_due',
+                            request_id=request.request_id
+                        )
+                    
+                    # Log the action
+                    log_action(f"Recurring payment due notification created for request #{request.request_id}")
 
 def is_payment_due_today(request, today):
     """Check if a recurring payment is due today based on its configuration"""
@@ -728,6 +803,29 @@ def new_request():
         db.session.add(new_req)
         db.session.commit()
         
+        # Handle variable amount recurring payments
+        if recurring == 'Recurring' and request.form.get('variable_amounts') == 'true':
+            try:
+                # Get the payment schedule data from the form
+                payment_schedule_data = []
+                schedule_data = request.form.get('payment_schedule', '[]')
+                import json
+                schedule_list = json.loads(schedule_data)
+                
+                for payment in schedule_list:
+                    payment_schedule_data.append({
+                        'date': payment['date'],
+                        'amount': payment['amount']
+                    })
+                
+                # Create the payment schedule
+                if payment_schedule_data:
+                    create_recurring_payment_schedule(new_req.request_id, amount, payment_schedule_data)
+                    log_action(f"Created variable amount payment schedule for request #{new_req.request_id}")
+            except Exception as e:
+                print(f"Error creating payment schedule: {e}")
+                flash('Payment request created but schedule configuration failed. Please contact admin.', 'warning')
+        
         log_action(f"Created payment request #{new_req.request_id} - {request_type}")
         
         # Create notifications for Finance and Admin users
@@ -755,6 +853,23 @@ def new_request():
     # Pass today's date to template for display
     today = datetime.utcnow().date().strftime('%Y-%m-%d')
     return render_template('new_request.html', user=current_user, today=today)
+
+
+@app.route('/api/payment-schedule/<int:request_id>')
+@login_required
+def get_payment_schedule_api(request_id):
+    """API endpoint to get payment schedule for a request"""
+    try:
+        schedule = get_payment_schedule(request_id)
+        return jsonify({'success': True, 'schedule': schedule})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/favicon.ico')
+def favicon():
+    """Serve favicon to prevent 404 errors"""
+    return '', 204  # No content response
 
 
 @app.route('/write-cheque', methods=['GET', 'POST'])

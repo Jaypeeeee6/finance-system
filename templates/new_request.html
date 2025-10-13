@@ -117,6 +117,10 @@
                         <!-- Hidden field to store the custom recurring interval -->
                         <input type="hidden" name="recurring_interval" id="recurring_interval" value="">
                         
+                        <!-- Hidden fields for variable amounts -->
+                        <input type="hidden" name="variable_amounts" id="variable_amounts" value="false">
+                        <input type="hidden" name="payment_schedule" id="payment_schedule" value="[]">
+                        
                         <!-- Show current configuration if set -->
                         <div id="currentConfig" class="current-config" style="display: none;">
                             <div class="config-display">
@@ -410,6 +414,49 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- Variable Amount Configuration -->
+                                <div class="config-section">
+                                    <h3><i class="fas fa-money-bill-wave"></i> Variable Amounts</h3>
+                                    <div class="variable-amount-config">
+                                        <div class="amount-toggle">
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="variableAmountsToggle" onchange="toggleVariableAmounts()">
+                                                <span class="toggle-slider"></span>
+                                            </label>
+                                            <span class="toggle-label">Use different amounts for each payment</span>
+                                        </div>
+                                        
+                                        <div id="variableAmountsSection" class="variable-amounts-section" style="display: none;">
+                                            <div class="total-amount-display">
+                                                <label>Total Amount: <span id="totalAmountDisplay">0</span> OMR</label>
+                                            </div>
+                                            
+                                            <div class="payment-amounts-container">
+                                                <div id="paymentAmountsList" class="payment-amounts-list">
+                                                    <!-- Payment amount inputs will be generated here -->
+                                                </div>
+                                                
+                                                <div class="add-payment-section">
+                                                    <button type="button" id="addPaymentBtn" class="btn-add-payment" onclick="addNewPayment()">
+                                                        <i class="fas fa-plus"></i> Add Payment
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="amount-summary">
+                                                <div class="summary-row">
+                                                    <span>Total Allocated:</span>
+                                                    <span id="totalAllocated">0.000</span> OMR
+                                                </div>
+                                                <div class="summary-row">
+                                                    <span>Remaining:</span>
+                                                    <span id="remainingAmount">0.000</span> OMR
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             
                             <div class="recurring-modal-footer">
@@ -440,8 +487,24 @@
 
 {% block extra_js %}
 <script>
-// Set today's date as default
-document.getElementById('date').valueAsDate = new Date();
+// Date is already set to today's date in the template, no need to set it here
+
+// Add event listener for amount field changes
+const amountField = document.getElementById('amount');
+if (amountField) {
+    amountField.addEventListener('input', function() {
+        // If variable amounts are enabled, update the total amount display
+        const variableAmountsToggle = document.getElementById('variableAmountsToggle');
+        if (variableAmountsToggle && variableAmountsToggle.checked) {
+            const totalAmount = parseFloat(this.value) || 0;
+            const totalAmountDisplay = document.getElementById('totalAmountDisplay');
+            if (totalAmountDisplay) {
+                totalAmountDisplay.textContent = totalAmount.toFixed(3);
+            }
+            updateAmountSummary();
+        }
+    });
+}
 
 // New Recurring Modal JavaScript
 document.addEventListener('DOMContentLoaded', function() {
@@ -603,6 +666,14 @@ function updateCalendarDays() {
 function toggleCalendarDay(dayElement) {
     dayElement.classList.toggle('selected');
     updateSchedulePreview();
+    
+    // If variable amounts are enabled, refresh the payment inputs
+    const variableAmountsToggle = document.getElementById('variableAmountsToggle');
+    if (variableAmountsToggle && variableAmountsToggle.checked) {
+        console.log('Date selection changed, refreshing variable amounts...');
+        generatePaymentAmountInputs();
+        updateAmountSummary();
+    }
 }
 
 function openRecurringModal() {
@@ -711,6 +782,14 @@ function toggleDay(button) {
 function toggleCalendarDay(dayElement) {
     dayElement.classList.toggle('selected');
     updateSchedulePreview();
+    
+    // If variable amounts are enabled, refresh the payment inputs
+    const variableAmountsToggle = document.getElementById('variableAmountsToggle');
+    if (variableAmountsToggle && variableAmountsToggle.checked) {
+        console.log('Date selection changed, refreshing variable amounts...');
+        generatePaymentAmountInputs();
+        updateAmountSummary();
+    }
 }
 
 function updateSchedulePreview() {
@@ -719,6 +798,9 @@ function updateSchedulePreview() {
     const unit = document.getElementById('intervalUnit').textContent;
     
     let preview = `Every ${interval} ${unit}`;
+    
+    // Save configuration to hidden field in real-time
+    saveConfigurationToHiddenField();
     
     if (frequency === 'daily') {
         const time = document.getElementById('dailyTime').value;
@@ -768,9 +850,17 @@ function updateSchedulePreview() {
     }
     
     document.getElementById('schedulePreview').textContent = preview;
+    
+    // If variable amounts are enabled, refresh the payment inputs
+    const variableAmountsToggle = document.getElementById('variableAmountsToggle');
+    if (variableAmountsToggle && variableAmountsToggle.checked) {
+        console.log('Schedule preview updated, refreshing variable amounts...');
+        generatePaymentAmountInputs();
+        updateAmountSummary();
+    }
 }
 
-function saveRecurringConfig() {
+function saveConfigurationToHiddenField() {
     const frequency = document.querySelector('input[name="frequency"]:checked').value;
     const interval = document.getElementById('intervalValue').value;
     
@@ -789,26 +879,106 @@ function saveRecurringConfig() {
         const selectedDays = Array.from(document.querySelectorAll('#monthlyOptions .calendar-day.selected'))
             .map(day => day.dataset.day);
         if (selectedDays.length > 0) {
-            config += `:days:${selectedDays.join(',')}`;
+            const selectedMonth = parseInt(document.getElementById('monthSelect').value) + 1; // Convert 0-based to 1-based
+            const selectedYear = document.getElementById('yearSelect').value;
+            config += `:days:${selectedDays.join(',')}:${selectedYear}:${selectedMonth}`;
         }
     } else if (frequency === 'quarterly') {
-        const selectedMonths = Array.from(document.querySelectorAll('#quarterlyOptions input[type="checkbox"]:checked'))
-            .map(input => input.value);
-        if (selectedMonths.length > 0) {
-            config += `:months:${selectedMonths.join(',')}`;
+        const selectedDays = Array.from(document.querySelectorAll('#quarterlyOptions .calendar-day.selected'))
+            .map(day => day.dataset.day);
+        if (selectedDays.length > 0) {
+            const selectedMonth = parseInt(document.getElementById('monthSelect').value) + 1; // Convert 0-based to 1-based
+            const selectedYear = document.getElementById('yearSelect').value;
+            config += `:days:${selectedDays.join(',')}:${selectedYear}:${selectedMonth}`;
         }
     } else if (frequency === 'yearly') {
         const selectedMonths = Array.from(document.querySelectorAll('#yearlyOptions input[type="checkbox"]:checked'))
             .map(input => input.value);
         if (selectedMonths.length > 0) {
-            config += `:months:${selectedMonths.join(',')}`;
+            const selectedYear = document.getElementById('yearSelect').value;
+            config += `:months:${selectedMonths.join(',')}:${selectedYear}`;
         }
     }
     
+    console.log('Real-time config being saved:', config);
     document.getElementById('recurring_interval').value = config;
+}
+
+function saveRecurringConfig() {
+    const frequency = document.querySelector('input[name="frequency"]:checked').value;
+    const interval = document.getElementById('intervalValue').value;
+    
+    let config = `${frequency}:${interval}`;
+    
+    console.log('Saving recurring config - frequency:', frequency, 'interval:', interval);
+    
+    if (frequency === 'daily') {
+        const time = document.getElementById('dailyTime').value;
+        config += `:time:${time}`;
+    } else if (frequency === 'weekly') {
+        const selectedDays = Array.from(document.querySelectorAll('#weeklyOptions input[type="checkbox"]:checked'))
+            .map(input => input.value);
+        if (selectedDays.length > 0) {
+            config += `:days:${selectedDays.join(',')}`;
+        }
+    } else if (frequency === 'monthly') {
+        const selectedDays = Array.from(document.querySelectorAll('#monthlyOptions .calendar-day.selected'))
+            .map(day => day.dataset.day);
+        console.log('Selected days:', selectedDays);
+        
+        if (selectedDays.length > 0) {
+            const selectedMonth = document.getElementById('monthSelect').value;
+            const selectedYear = document.getElementById('yearSelect').value;
+            console.log('Selected month:', selectedMonth, 'Selected year:', selectedYear);
+            
+            config += `:days:${selectedDays.join(',')}:${selectedYear}:${selectedMonth}`;
+            console.log('Monthly config with date:', config);
+        }
+    } else if (frequency === 'quarterly') {
+        const selectedMonths = Array.from(document.querySelectorAll('#quarterlyOptions input[type="checkbox"]:checked'))
+            .map(input => input.value);
+        console.log('Selected quarterly months:', selectedMonths);
+        
+        if (selectedMonths.length > 0) {
+            const selectedYear = document.getElementById('yearSelect') ? document.getElementById('yearSelect').value : new Date().getFullYear();
+            config += `:months:${selectedMonths.join(',')}:${selectedYear}`;
+            console.log('Quarterly config with year:', config);
+        }
+    } else if (frequency === 'yearly') {
+        const selectedMonths = Array.from(document.querySelectorAll('#yearlyOptions input[type="checkbox"]:checked'))
+            .map(input => input.value);
+        console.log('Selected yearly months:', selectedMonths);
+        
+        if (selectedMonths.length > 0) {
+            const selectedYear = document.getElementById('yearSelect') ? document.getElementById('yearSelect').value : new Date().getFullYear();
+            config += `:months:${selectedMonths.join(',')}:${selectedYear}`;
+            console.log('Yearly config with year:', config);
+        }
+    }
+    
+    console.log('Final config being saved:', config);
+    document.getElementById('recurring_interval').value = config;
+    
+    // Verify the config was saved
+    setTimeout(() => {
+        const savedConfig = document.getElementById('recurring_interval').value;
+        console.log('Config verification after save:', savedConfig);
+        console.log('Config verification length:', savedConfig ? savedConfig.length : 0);
+    }, 50);
     
     // Show the current configuration
     showCurrentConfig();
+    
+    // If variable amounts are enabled, regenerate the payment inputs
+    const variableAmountsToggle = document.getElementById('variableAmountsToggle');
+    if (variableAmountsToggle && variableAmountsToggle.checked) {
+        console.log('Regenerating payment inputs after config save...');
+        // Add a small delay to ensure the configuration is properly saved
+        setTimeout(() => {
+            generatePaymentAmountInputs();
+            updateAmountSummary();
+        }, 100);
+    }
     
     closeRecurringModal();
 }
@@ -862,6 +1032,583 @@ function showCurrentConfig() {
         document.getElementById('currentConfig').style.display = 'block';
     } else {
         document.getElementById('currentConfig').style.display = 'none';
+    }
+}
+
+// Variable Amount Functions
+function toggleVariableAmounts() {
+    const toggle = document.getElementById('variableAmountsToggle');
+    const section = document.getElementById('variableAmountsSection');
+    const variableAmountsField = document.getElementById('variable_amounts');
+    
+    console.log('Toggle variable amounts clicked:', toggle.checked);
+    console.log('Section element:', section);
+    console.log('Variable amounts field:', variableAmountsField);
+    
+    if (toggle.checked) {
+        section.style.display = 'block';
+        variableAmountsField.value = 'true';
+        console.log('Variable amounts enabled, generating inputs...');
+        
+        // Get the current amount
+        const currentAmount = document.getElementById('amount').value;
+        console.log('Current amount:', currentAmount);
+        
+        // Check if we have a recurring configuration
+        const recurringConfig = document.getElementById('recurring_interval').value;
+        console.log('Recurring config when toggling:', recurringConfig);
+        console.log('Recurring config length:', recurringConfig ? recurringConfig.length : 0);
+        console.log('Recurring config type:', typeof recurringConfig);
+        
+        generatePaymentAmountInputs();
+        updateAmountSummary();
+    } else {
+        section.style.display = 'none';
+        variableAmountsField.value = 'false';
+        document.getElementById('payment_schedule').value = '[]';
+    }
+}
+
+function generatePaymentAmountInputs() {
+    const container = document.getElementById('paymentAmountsList');
+    const totalAmount = parseFloat(document.getElementById('amount').value) || 0;
+    
+    console.log('Generating payment amount inputs...');
+    console.log('Container element:', container);
+    console.log('Total amount:', totalAmount);
+    
+    if (!container) {
+        console.error('Payment amounts list container not found!');
+        return;
+    }
+    
+    // Get the selected dates from the schedule
+    const scheduleDates = getScheduleDates();
+    console.log('Schedule dates:', scheduleDates);
+    console.log('Schedule dates length:', scheduleDates ? scheduleDates.length : 0);
+    
+    container.innerHTML = '';
+    
+    if (scheduleDates.length === 0) {
+        // If no schedule dates are available, generate some default dates
+        console.log('No schedule dates found, generating default dates...');
+        const defaultDates = generateDefaultDates();
+        console.log('Default dates generated:', defaultDates);
+        
+        defaultDates.forEach((date, index) => {
+            const paymentDiv = document.createElement('div');
+            paymentDiv.className = 'payment-amount-item';
+            paymentDiv.innerHTML = `
+                <div class="payment-info">
+                    <label>Payment ${index + 1}:</label>
+                    <span class="payment-date">${date}</span>
+                </div>
+                <div class="amount-input-container">
+                    <span class="currency-symbol">OMR</span>
+                    <input type="number" 
+                           class="payment-amount-input" 
+                           step="0.001" 
+                           min="0" 
+                           max="${totalAmount}"
+                           placeholder="0.000"
+                           onchange="validateAndUpdateAmount(this)"
+                           data-payment-index="${index}"
+                           data-payment-date="${date}">
+                </div>
+                <div class="payment-actions">
+                    <button type="button" class="btn-remove-payment" onclick="removePayment(this)" title="Remove Payment">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(paymentDiv);
+        });
+    } else {
+        scheduleDates.forEach((date, index) => {
+            const paymentDiv = document.createElement('div');
+            paymentDiv.className = 'payment-amount-item';
+            paymentDiv.innerHTML = `
+                <div class="payment-info">
+                    <label>Payment ${index + 1}:</label>
+                    <span class="payment-date">${date}</span>
+                </div>
+                <div class="amount-input-container">
+                    <span class="currency-symbol">OMR</span>
+                    <input type="number" 
+                           class="payment-amount-input" 
+                           step="0.001" 
+                           min="0" 
+                           max="${totalAmount}"
+                           placeholder="0.000"
+                           onchange="validateAndUpdateAmount(this)"
+                           data-payment-index="${index}"
+                           data-payment-date="${date}">
+                </div>
+                <div class="payment-actions">
+                    <button type="button" class="btn-remove-payment" onclick="removePayment(this)" title="Remove Payment">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(paymentDiv);
+        });
+    }
+    
+    // Update total amount display
+    const totalAmountDisplay = document.getElementById('totalAmountDisplay');
+    if (totalAmountDisplay) {
+        totalAmountDisplay.textContent = totalAmount.toFixed(3);
+    }
+    
+    // Update add button state
+    updateAddButtonState();
+    
+    console.log('Payment amount inputs generated successfully');
+}
+
+function generateDefaultDates() {
+    // Generate default dates for the case where schedule isn't configured yet
+    const dates = [];
+    
+    // Try to get the actual configured date from the recurring interval
+    const config = document.getElementById('recurring_interval').value;
+    console.log('Current config:', config);
+    
+    let startDate;
+    
+    if (config) {
+        // Parse the configuration to get the actual selected date
+        const parts = config.split(':');
+        console.log('Config parts:', parts);
+        
+        // Try to extract date information from any configuration type
+        startDate = extractStartDateFromConfig(parts);
+        
+        if (startDate) {
+            console.log('Using configured start date:', startDate.toISOString().split('T')[0]);
+        } else {
+            console.log('Could not extract date from config, using current date');
+            startDate = new Date();
+        }
+    } else {
+        // Fallback to current date
+        console.log('No config found, using current date');
+        startDate = new Date();
+    }
+    
+    // Start with just one payment date
+    dates.push(startDate.toISOString().split('T')[0]);
+    console.log('Generated default dates:', dates);
+    
+    return dates;
+}
+
+function extractStartDateFromConfig(parts) {
+    const frequency = parts[0];
+    
+    if (frequency === 'monthly' && parts.length > 2 && parts[2] === 'days') {
+        // Monthly configuration with specific days
+        const days = parts[3].split(',').map(d => parseInt(d.trim()));
+        const year = parseInt(parts[4]) || new Date().getFullYear();
+        const month = parseInt(parts[5]) - 1 || new Date().getMonth(); // Convert 1-based to 0-based
+        
+        // Use the earliest day as the start date
+        const earliestDay = Math.min(...days);
+        
+        console.log('Monthly config - days:', days, 'earliest day:', earliestDay, 'year:', year, 'month:', month);
+        const date = new Date(year, month, earliestDay);
+        console.log('Created date object:', date);
+        console.log('Date ISO string:', date.toISOString());
+        console.log('Date local string:', date.toLocaleDateString());
+        return date;
+    }
+    else if (frequency === 'quarterly' && parts.length > 2 && parts[2] === 'months') {
+        // Quarterly configuration - use first selected month
+        const months = parts[3].split(',');
+        const firstMonth = parseInt(months[0]) - 1; // Convert to 0-based month
+        const year = parseInt(parts[4]) || new Date().getFullYear();
+        
+        console.log('Quarterly config - month:', firstMonth, 'year:', year);
+        return new Date(year, firstMonth, 1); // Use 1st day of the month
+    }
+    else if (frequency === 'yearly' && parts.length > 2 && parts[2] === 'months') {
+        // Yearly configuration - use first selected month
+        const months = parts[3].split(',');
+        const firstMonth = parseInt(months[0]) - 1; // Convert to 0-based month
+        const year = parseInt(parts[4]) || new Date().getFullYear();
+        
+        console.log('Yearly config - month:', firstMonth, 'year:', year);
+        return new Date(year, firstMonth, 1); // Use 1st day of the month
+    }
+    else if (frequency === 'weekly' && parts.length > 2 && parts[2] === 'days') {
+        // Weekly configuration - use current week with selected days
+        const days = parts[3].split(',');
+        const firstDay = days[0];
+        
+        // Find next occurrence of the selected day
+        const today = new Date();
+        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const targetDayIndex = dayNames.indexOf(firstDay);
+        
+        if (targetDayIndex !== -1) {
+            const daysUntilTarget = (targetDayIndex - today.getDay() + 7) % 7;
+            const targetDate = new Date(today);
+            targetDate.setDate(today.getDate() + daysUntilTarget);
+            
+            console.log('Weekly config - day:', firstDay, 'target date:', targetDate.toISOString().split('T')[0]);
+            return targetDate;
+        }
+    }
+    else if (frequency === 'daily') {
+        // Daily configuration - use today or tomorrow based on time
+        const today = new Date();
+        if (parts.length > 2 && parts[2] === 'time') {
+            const time = parts[3];
+            const [hours, minutes] = time.split(':').map(Number);
+            const scheduledTime = new Date(today);
+            scheduledTime.setHours(hours, minutes, 0, 0);
+            
+            // If scheduled time has passed today, use tomorrow
+            if (scheduledTime <= today) {
+                scheduledTime.setDate(scheduledTime.getDate() + 1);
+            }
+            
+            console.log('Daily config - time:', time, 'scheduled date:', scheduledTime.toISOString().split('T')[0]);
+            return scheduledTime;
+        }
+        return today;
+    }
+    
+    return null;
+}
+
+function getScheduleDates() {
+    // This function should extract dates from the current schedule configuration
+    const config = document.getElementById('recurring_interval').value;
+    if (!config) return [];
+    
+    // Parse the configuration and generate dates
+    const parts = config.split(':');
+    const frequency = parts[0];
+    const interval = parseInt(parts[1]);
+    
+    const dates = [];
+    
+    // Get the start date from the specific settings using the flexible extractor
+    let startDate = extractStartDateFromConfig(parts);
+    
+    if (!startDate) {
+        console.log('Could not extract start date, using current date');
+        startDate = new Date();
+    }
+    
+    // Use local date formatting to avoid timezone issues
+    const startDateString = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
+    console.log('Using start date for schedule:', startDateString);
+    
+    // Generate payment dates based on the configuration
+    if (frequency === 'monthly' && parts.length > 2 && parts[2] === 'days') {
+        // Handle multiple days for monthly payments
+        const days = parts[3].split(',').map(d => parseInt(d.trim()));
+        const year = parseInt(parts[4]) || new Date().getFullYear();
+        const month = parseInt(parts[5]) - 1 || new Date().getMonth(); // Convert 1-based to 0-based
+        
+        console.log('Generating dates for multiple days:', days, 'year:', year, 'month:', month);
+        
+        // Generate dates for all selected days in the first month only (one payment per day)
+        for (const day of days) {
+            const paymentDate = new Date(year, month, day);
+            // Use local date formatting to avoid timezone issues
+            const dateString = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, '0')}-${String(paymentDate.getDate()).padStart(2, '0')}`;
+            dates.push(dateString);
+        }
+    } else {
+        // Generate payment dates based on the configuration (original logic)
+        // Generate 4 payment dates as an example
+        for (let i = 0; i < 4; i++) {
+            const paymentDate = new Date(startDate);
+            
+            if (frequency === 'monthly') {
+                paymentDate.setMonth(paymentDate.getMonth() + (interval * i));
+            } else if (frequency === 'quarterly') {
+                paymentDate.setMonth(paymentDate.getMonth() + (interval * 3 * i));
+            } else if (frequency === 'yearly') {
+                paymentDate.setFullYear(paymentDate.getFullYear() + (interval * i));
+            } else if (frequency === 'weekly') {
+                paymentDate.setDate(paymentDate.getDate() + (interval * 7 * i));
+            } else if (frequency === 'daily') {
+                paymentDate.setDate(paymentDate.getDate() + (interval * i));
+            }
+            
+            // Use local date formatting to avoid timezone issues
+            const dateString = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, '0')}-${String(paymentDate.getDate()).padStart(2, '0')}`;
+            dates.push(dateString);
+        }
+    }
+    
+    console.log('Generated schedule dates:', dates);
+    return dates;
+}
+
+function updateAmountSummary() {
+    const inputs = document.querySelectorAll('.payment-amount-input');
+    let totalAllocated = 0;
+    
+    inputs.forEach(input => {
+        const amount = parseFloat(input.value) || 0;
+        totalAllocated += amount;
+    });
+    
+    const totalAmount = parseFloat(document.getElementById('amount').value) || 0;
+    const remaining = totalAmount - totalAllocated;
+    
+    document.getElementById('totalAllocated').textContent = totalAllocated.toFixed(3);
+    document.getElementById('remainingAmount').textContent = remaining.toFixed(3);
+    
+    // Update the payment schedule data
+    updatePaymentSchedule();
+    
+    // Update the add button state
+    updateAddButtonState();
+}
+
+function updatePaymentSchedule() {
+    const inputs = document.querySelectorAll('.payment-amount-input');
+    const schedule = [];
+    
+    inputs.forEach(input => {
+        const amount = parseFloat(input.value) || 0;
+        if (amount > 0) {
+            schedule.push({
+                date: input.dataset.paymentDate,
+                amount: amount
+            });
+        }
+    });
+    
+    document.getElementById('payment_schedule').value = JSON.stringify(schedule);
+}
+
+// New functions for dynamic payment management
+
+function addNewPayment() {
+    const totalAmount = parseFloat(document.getElementById('amount').value) || 0;
+    const remainingAmount = getRemainingAmount();
+    
+    // Check if there's remaining amount to allocate
+    if (remainingAmount <= 0) {
+        alert('Cannot add more payments. All amount has been allocated.');
+        return;
+    }
+    
+    // Get the recurring configuration to determine selected days
+    const config = document.getElementById('recurring_interval').value;
+    if (!config) {
+        alert('No recurring configuration found. Please configure recurring payment first.');
+        return;
+    }
+    
+    const parts = config.split(':');
+    if (parts.length > 2 && parts[2] === 'days') {
+        // Handle multiple days for monthly payments
+        const days = parts[3].split(',').map(d => parseInt(d.trim()));
+        const year = parseInt(parts[4]) || new Date().getFullYear();
+        const month = parseInt(parts[5]) - 1 || new Date().getMonth(); // Convert 1-based to 0-based
+        
+        // Get the current number of payments to determine the next payment number
+        const existingPayments = document.querySelectorAll('.payment-amount-item');
+        const nextPaymentNumber = existingPayments.length + 1;
+        
+        // Calculate how many payment rounds we've had (each round includes all selected days)
+        const paymentRounds = Math.floor((nextPaymentNumber - 1) / days.length);
+        const nextMonth = month + (paymentRounds + 1); // Add 1 for the next round
+        
+        // Generate new payment dates for all selected days
+        const container = document.getElementById('paymentAmountsList');
+        
+        for (let i = 0; i < days.length; i++) {
+            const day = days[i];
+            const paymentDate = new Date(year, nextMonth, day);
+            const dateString = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, '0')}-${String(paymentDate.getDate()).padStart(2, '0')}`;
+            
+            const paymentDiv = document.createElement('div');
+            paymentDiv.className = 'payment-amount-item';
+            paymentDiv.innerHTML = `
+                <div class="payment-info">
+                    <label>Payment ${nextPaymentNumber + i}:</label>
+                    <span class="payment-date">${dateString}</span>
+                </div>
+                <div class="amount-input-container">
+                    <span class="currency-symbol">OMR</span>
+                    <input type="number" 
+                           class="payment-amount-input" 
+                           step="0.001" 
+                           min="0" 
+                           max="${remainingAmount}"
+                           placeholder="0.000"
+                           onchange="validateAndUpdateAmount(this)"
+                           data-payment-index="${nextPaymentNumber + i - 1}"
+                           data-payment-date="${dateString}">
+                </div>
+                <div class="payment-actions">
+                    <button type="button" class="btn-remove-payment" onclick="removePayment(this)" title="Remove Payment">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            
+            container.appendChild(paymentDiv);
+        }
+    } else {
+        // Handle single day or other frequencies (original logic)
+        const nextDate = generateNextPaymentDate();
+        
+        // Get the current number of payments to determine the next payment number
+        const existingPayments = document.querySelectorAll('.payment-amount-item');
+        const nextPaymentNumber = existingPayments.length + 1;
+        
+        // Create the new payment element
+        const container = document.getElementById('paymentAmountsList');
+        const paymentDiv = document.createElement('div');
+        paymentDiv.className = 'payment-amount-item';
+        paymentDiv.innerHTML = `
+            <div class="payment-info">
+                <label>Payment ${nextPaymentNumber}:</label>
+                <span class="payment-date">${nextDate}</span>
+            </div>
+            <div class="amount-input-container">
+                <span class="currency-symbol">OMR</span>
+                <input type="number" 
+                       class="payment-amount-input" 
+                       step="0.001" 
+                       min="0" 
+                       max="${remainingAmount}"
+                       placeholder="0.000"
+                       onchange="validateAndUpdateAmount(this)"
+                       data-payment-index="${nextPaymentNumber - 1}"
+                       data-payment-date="${nextDate}">
+            </div>
+            <div class="payment-actions">
+                <button type="button" class="btn-remove-payment" onclick="removePayment(this)" title="Remove Payment">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+        
+        container.appendChild(paymentDiv);
+    }
+    
+    // Update the add button state
+    updateAddButtonState();
+}
+
+function generateNextPaymentDate() {
+    // Get the last payment date and add 2 months
+    const existingDates = Array.from(document.querySelectorAll('.payment-date')).map(el => el.textContent);
+    if (existingDates.length === 0) {
+        return '2025-10-14'; // First payment date
+    }
+    
+    const lastDate = new Date(existingDates[existingDates.length - 1]);
+    const nextDate = new Date(lastDate);
+    nextDate.setMonth(nextDate.getMonth() + 2); // Add 2 months
+    
+    return nextDate.toISOString().split('T')[0];
+}
+
+function removePayment(button) {
+    const paymentItem = button.closest('.payment-amount-item');
+    paymentItem.remove();
+    
+    // Renumber the remaining payments
+    renumberPayments();
+    updateAmountSummary();
+    updateAddButtonState();
+}
+
+function renumberPayments() {
+    const paymentItems = document.querySelectorAll('.payment-amount-item');
+    paymentItems.forEach((item, index) => {
+        const label = item.querySelector('label');
+        if (label) {
+            label.textContent = `Payment ${index + 1}:`;
+        }
+    });
+}
+
+function validateAndUpdateAmount(input) {
+    const enteredAmount = parseFloat(input.value) || 0;
+    const totalAmount = parseFloat(document.getElementById('amount').value) || 0;
+    
+    // First, get the remaining amount BEFORE this input is considered
+    const otherInputs = Array.from(document.querySelectorAll('.payment-amount-input')).filter(inp => inp !== input);
+    let otherAllocated = 0;
+    otherInputs.forEach(inp => {
+        otherAllocated += parseFloat(inp.value) || 0;
+    });
+    const remainingAmount = totalAmount - otherAllocated;
+    
+    // Check if the entered amount exceeds the total amount
+    if (enteredAmount > totalAmount) {
+        alert(`Cannot allocate more than the total amount (${totalAmount.toFixed(3)} OMR).`);
+        input.value = totalAmount.toFixed(3);
+        updateInputMaxValues();
+        updateAmountSummary();
+        return;
+    }
+    
+    // Check if the entered amount exceeds the remaining amount (allowing for small floating point differences)
+    if (enteredAmount > remainingAmount + 0.001) {
+        alert(`Cannot allocate more than the remaining amount (${remainingAmount.toFixed(3)} OMR).`);
+        input.value = remainingAmount.toFixed(3);
+    }
+    
+    // Update the max attribute for all inputs
+    updateInputMaxValues();
+    updateAmountSummary();
+}
+
+function getRemainingAmount() {
+    const totalAmount = parseFloat(document.getElementById('amount').value) || 0;
+    const inputs = document.querySelectorAll('.payment-amount-input');
+    let totalAllocated = 0;
+    
+    inputs.forEach(input => {
+        totalAllocated += parseFloat(input.value) || 0;
+    });
+    
+    return totalAmount - totalAllocated;
+}
+
+function updateInputMaxValues() {
+    const totalAmount = parseFloat(document.getElementById('amount').value) || 0;
+    const inputs = document.querySelectorAll('.payment-amount-input');
+    
+    inputs.forEach(input => {
+        // Calculate remaining amount excluding this specific input
+        const otherInputs = Array.from(inputs).filter(inp => inp !== input);
+        let otherAllocated = 0;
+        otherInputs.forEach(inp => {
+            otherAllocated += parseFloat(inp.value) || 0;
+        });
+        const remainingAmount = totalAmount - otherAllocated;
+        
+        input.max = Math.max(0, remainingAmount);
+    });
+}
+
+function updateAddButtonState() {
+    const addButton = document.getElementById('addPaymentBtn');
+    const remainingAmount = getRemainingAmount();
+    
+    if (remainingAmount <= 0) {
+        addButton.disabled = true;
+        addButton.innerHTML = '<i class="fas fa-plus"></i> All Amount Allocated';
+        addButton.style.opacity = '0.5';
+    } else {
+        addButton.disabled = false;
+        addButton.innerHTML = '<i class="fas fa-plus"></i> Add Payment';
+        addButton.style.opacity = '1';
     }
 }
 

@@ -157,3 +157,36 @@ class PaidNotification(db.Model):
         return f'<PaidNotification {self.id} - Request {self.request_id} paid on {self.paid_date}>'
 
 
+class RecurringPaymentSchedule(db.Model):
+    """Store variable amounts for recurring payments"""
+    __tablename__ = 'recurring_payment_schedules'
+    
+    schedule_id = db.Column(db.Integer, primary_key=True)
+    request_id = db.Column(db.Integer, db.ForeignKey('payment_requests.request_id'), nullable=False)
+    payment_date = db.Column(db.Date, nullable=False)  # When this specific payment is due
+    amount = db.Column(db.Numeric(12, 3), nullable=False)  # Amount for this specific payment
+    payment_order = db.Column(db.Integer, nullable=False)  # Order of this payment (1st, 2nd, etc.)
+    is_paid = db.Column(db.Boolean, default=False)  # Whether this specific payment has been made
+    paid_date = db.Column(db.Date)  # When this payment was actually made
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationship to the main payment request
+    request = db.relationship('PaymentRequest', backref='payment_schedules')
+    
+    def to_dict(self):
+        """Convert schedule to dictionary"""
+        return {
+            'schedule_id': self.schedule_id,
+            'request_id': self.request_id,
+            'payment_date': self.payment_date.strftime('%Y-%m-%d') if self.payment_date else None,
+            'amount': float(self.amount),
+            'payment_order': self.payment_order,
+            'is_paid': self.is_paid,
+            'paid_date': self.paid_date.strftime('%Y-%m-%d') if self.paid_date else None,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
+    
+    def __repr__(self):
+        return f'<RecurringPaymentSchedule {self.schedule_id} - Request {self.request_id} - Payment {self.payment_order} - {self.amount} OMR>'
+
+
