@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Reports{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-chart-bar"></i> Payment Reports</h1>
+        <p>Filter and analyze payment requests</p>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-filter"></i> Filters</h2>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('reports') }}" class="filter-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="department">Department</label>
+                        <select name="department" id="department">
+                            <option value="">All Departments</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept }}" {% if request.args.get('department') == dept %}selected{% endif %}>{{ dept }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="status">Status</label>
+                        <select name="status" id="status">
+                            <option value="">All Statuses</option>
+                            <option value="Pending" {% if request.args.get('status') == 'Pending' %}selected{% endif %}>⏳ Pending</option>
+                            <option value="Send Proof" {% if request.args.get('status') == 'Send Proof' %}selected{% endif %}>📤 Send Proof</option>
+                            <option value="Received Proof" {% if request.args.get('status') == 'Received Proof' %}selected{% endif %}>📥 Received Proof</option>
+                            <option value="Approved" {% if request.args.get('status') == 'Approved' %}selected{% endif %}>✓ Approved</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="request_type">Request Type</label>
+                        <select name="request_type" id="request_type">
+                            <option value="">All Types</option>
+                            <option value="Item" {% if request.args.get('request_type') == 'Item' %}selected{% endif %}>Item</option>
+                            <option value="Person" {% if request.args.get('request_type') == 'Person' %}selected{% endif %}>Person</option>
+                            <option value="Supplier/Rental" {% if request.args.get('request_type') == 'Supplier/Rental' %}selected{% endif %}>Supplier/Rental</option>
+                            <option value="Company" {% if request.args.get('request_type') == 'Company' %}selected{% endif %}>Company</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="date_from">Date From</label>
+                        <input type="date" name="date_from" id="date_from" value="{{ request.args.get('date_from', '') }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="date_to">Date To</label>
+                        <input type="date" name="date_to" id="date_to" value="{{ request.args.get('date_to', '') }}">
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Apply Filters
+                    </button>
+                    <a href="{{ url_for('reports') }}" class="btn btn-secondary">
+                        <i class="fas fa-redo"></i> Clear Filters
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #2196F3;">
+                <i class="fas fa-file-invoice"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ requests|length }}</h3>
+                <p>Total Results</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #4CAF50;">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ requests|selectattr('status', 'equalto', 'Approved')|list|length }}</h3>
+                <p>Approved</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #FF9800;">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ requests|selectattr('status', 'equalto', 'Pending')|list|length }}</h3>
+                <p>Pending</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #9C27B0;">
+                <i class="fas fa-money-bill-wave"></i>
+            </div>
+            <div class="stat-info">
+                {% if user.role == 'IT' %}
+                    <h3 style="color: #999;">***</h3>
+                {% else %}
+                    <h3>OMR {{ "%.3f"|format(requests|selectattr('status', 'equalto', 'Approved')|map(attribute='amount')|sum) }}</h3>
+                {% endif %}
+                <p>Total Amount</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-table"></i> Report Results</h2>
+            {% if requests and requests|length > 0 %}
+            <div class="header-actions">
+                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf', department=request.args.get('department',''), status=request.args.get('status',''), request_type=request.args.get('request_type',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to','')) }}" onclick="showExportLoading()">
+                    <i class="fas fa-file-pdf"></i> <span id="export-text">Export PDF</span>
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if requests %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Type</th>
+                                <th>Requestor</th>
+                                <th>Department</th>
+                                <th>Submission Date</th>
+                                <th>Approval Date</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Approver</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in requests %}
+                            <tr>
+                                <td>#{{ req.request_id }}</td>
+                                <td><span class="badge badge-info">{{ req.request_type }}</span></td>
+                                <td>{{ req.requestor_name }}</td>
+                                <td>{{ req.department }}</td>
+                                <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    {% if req.approval_date %}
+                                        {{ req.approval_date.strftime('%Y-%m-%d') }}
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.role == 'IT' %}
+                                        <span style="color: #999;">***</span>
+                                    {% else %}
+                                        OMR {{ "%.3f"|format(req.amount) }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if req.status == 'Approved' %}
+                                        <span class="badge badge-success">✓ {{ req.status }}</span>
+                                    {% elif req.status == 'Send Proof' %}
+                                        <span class="badge" style="background: #FF9800; color: white;">📤 {{ req.status }}</span>
+                                    {% elif req.status == 'Received Proof' %}
+                                        <span class="badge" style="background: #2196F3; color: white;">📥 {{ req.status }}</span>
+                                    {% elif req.status == 'Action Required' %}
+                                        <span class="badge" style="background: #f57c00; color: white;">⚠️ {{ req.status }}</span>
+                                    {% else %}
+                                        <span class="badge badge-warning">⏳ {{ req.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ req.approver or 'N/A' }}</td>
+                                <td>
+                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-search"></i>
+                    <p>No results found for the selected filters.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showExportLoading() {
+    const btn = document.getElementById('export-pdf-btn');
+    const text = document.getElementById('export-text');
+    if (btn && text) {
+        btn.style.pointerEvents = 'none';
+        text.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
+    }
+}
+
+// Reset button state after a delay (in case of errors)
+setTimeout(function() {
+    const btn = document.getElementById('export-pdf-btn');
+    const text = document.getElementById('export-text');
+    if (btn && text) {
+        btn.style.pointerEvents = 'auto';
+        text.innerHTML = 'Export PDF';
+    }
+}, 10000); // Reset after 10 seconds
+</script>
+{% endblock %}
+

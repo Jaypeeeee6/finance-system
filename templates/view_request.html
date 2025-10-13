@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}View Request #{{ request.request_id }}{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-file-invoice"></i> Payment Request #{{ request.request_id }}</h1>
+        <a href="javascript:history.back()" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Request Details</h2>
+            {% if request.status == 'Approved' %}
+                <span class="badge badge-success" style="font-size: 1rem; padding: 0.5rem 1rem;">✓ {{ request.status }}</span>
+            {% elif request.status == 'Send Proof' %}
+                <span class="badge" style="background: #FF9800; color: white; font-size: 1rem; padding: 0.5rem 1rem;">📤 {{ request.status }}</span>
+            {% elif request.status == 'Received Proof' %}
+                <span class="badge" style="background: #2196F3; color: white; font-size: 1rem; padding: 0.5rem 1rem;">📥 {{ request.status }}</span>
+            {% elif request.status == 'Action Required' %}
+                <span class="badge" style="background: #f57c00; color: white; font-size: 1rem; padding: 0.5rem 1rem;">⚠️ {{ request.status }}</span>
+            {% else %}
+                <span class="badge badge-warning" style="font-size: 1rem; padding: 0.5rem 1rem;">⏳ {{ request.status }}</span>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <!-- Form layout matching new_request.html but with readonly fields -->
+            <form>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="request_type">Request Type</label>
+                        <input type="text" id="request_type" value="{{ request.request_type }}" readonly style="background: #f5f5f5;">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="requestor_name">Requestor Name</label>
+                        <input type="text" id="requestor_name" value="{{ request.requestor_name }}" readonly style="background: #f5f5f5;">
+                    </div>
+                </div>
+
+                <!-- Dynamic fields based on request type -->
+                {% if request.item_name %}
+                <div class="form-group">
+                    <label for="item_name">Item Name</label>
+                    <input type="text" id="item_name" value="{{ request.item_name }}" readonly style="background: #f5f5f5;">
+                </div>
+                {% endif %}
+
+                {% if request.person_company %}
+                <div class="form-group">
+                    <label for="person_company">Person/Company</label>
+                    <input type="text" id="person_company" value="{{ request.person_company }}" readonly style="background: #f5f5f5;">
+                </div>
+                {% endif %}
+
+                {% if request.company_name %}
+                <div class="form-group">
+                    <label for="company_name">Company Name</label>
+                    <input type="text" id="company_name" value="{{ request.company_name }}" readonly style="background: #f5f5f5;">
+                </div>
+                {% endif %}
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="department">Department</label>
+                        <input type="text" id="department" value="{{ request.department }}" readonly style="background: #f5f5f5;">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="date">Date of Submission</label>
+                        <input type="text" id="date" value="{{ request.date.strftime('%Y-%m-%d') }}" readonly style="background: #f5f5f5;">
+                    </div>
+                </div>
+
+                {% if request.approval_date %}
+                <div class="form-group">
+                    <label for="approval_date">Approval Date</label>
+                    <input type="text" id="approval_date" value="{{ request.approval_date.strftime('%Y-%m-%d') }}" readonly style="background: #e8f5e9; color: #2e7d32; font-weight: bold;">
+                </div>
+                {% endif %}
+
+                <div class="form-group">
+                    <label for="purpose">Purpose/Description</label>
+                    <textarea id="purpose" rows="4" readonly style="background: #f5f5f5;">{{ request.purpose }}</textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="account_name">Account Name</label>
+                        <input type="text" id="account_name" value="{{ request.account_name }}" readonly style="background: #f5f5f5;">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="account_number">Account Number</label>
+                        <input type="text" id="account_number" value="{{ request.account_number }}" readonly style="background: #f5f5f5;">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="amount">Amount (OMR)</label>
+                    {% if user.role == 'IT' %}
+                        <input type="text" id="amount" value="***" readonly style="background: #f5f5f5; color: #999; font-size: 1.2rem;">
+                    {% else %}
+                        <div style="position: relative;">
+                            <span style="position: absolute; left: 12px; top: 12px; color: #666; font-weight: 600;">OMR</span>
+                            <input type="text" id="amount" value="{{ '%.3f'|format(request.amount) }}" readonly style="background: #f5f5f5; padding-left: 55px; font-weight: bold;">
+                        </div>
+                    {% endif %}
+                </div>
+
+                {% if request.request_type == 'Supplier/Rental' %}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="recurring">Payment Type</label>
+                        <input type="text" id="recurring" value="{{ request.recurring }}" readonly style="background: #f5f5f5;">
+                    </div>
+
+                    {% if request.recurring_interval %}
+                    <div class="form-group">
+                        <label for="recurring_interval">Recurring Interval</label>
+                        <input type="text" id="recurring_interval" value="{{ request.recurring_interval }}" readonly style="background: #f5f5f5;">
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                {% if request.status != 'Pending' %}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="approver">Approver</label>
+                        <input type="text" id="approver" value="{{ request.approver or 'Not assigned' }}" readonly style="background: #f5f5f5;">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="proof_required">Proof Required</label>
+                        <input type="text" id="proof_required" value="{{ 'Yes' if request.proof_required else 'No' }}" readonly style="background: #f5f5f5;">
+                    </div>
+                </div>
+
+                {% if request.receipt_path %}
+                <div class="form-group">
+                    <label for="receipt">Receipt</label>
+                    <a href="{{ url_for('uploaded_file', filename=request.receipt_path) }}" target="_blank" class="btn btn-info">
+                        <i class="fas fa-download"></i> View Receipt
+                    </a>
+                </div>
+                {% endif %}
+
+                {% if request.proof_of_payment %}
+                <div class="form-group">
+                    <label for="proof">Proof of Payment</label>
+                    <a href="{{ url_for('uploaded_file', filename=request.proof_of_payment) }}" target="_blank" class="btn btn-info">
+                        <i class="fas fa-eye"></i> View Proof of Payment
+                    </a>
+                </div>
+                {% endif %}
+                {% endif %}
+
+                {% if request.reason_pending %}
+                <div class="form-group">
+                    <label for="reason_pending" style="color: #f57c00;">Action Required Reason</label>
+                    <textarea id="reason_pending" rows="2" readonly style="background: #fff3e0; border-color: #f57c00;">{{ request.reason_pending }}</textarea>
+                </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- Department User: Upload Proof of Payment -->
+    {% if request.status == 'Send Proof' and request.user_id == user.user_id %}
+    <div class="card" style="margin-top: 2rem;">
+        <div class="card-header" style="background: #4CAF50; color: white;">
+            <h3><i class="fas fa-upload"></i> Upload Proof of Payment</h3>
+        </div>
+        <div class="card-body">
+            <p style="margin-bottom: 1rem; color: #4CAF50; font-weight: bold;">
+                <i class="fas fa-info-circle"></i> Your request has been approved! Please upload proof of payment.
+            </p>
+            <form method="POST" action="{{ url_for('upload_proof', request_id=request.request_id) }}" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="proof_file">Upload Proof Image *</label>
+                    <input type="file" name="proof_file" id="proof_file" accept=".jpg,.jpeg,.png,.gif,.pdf" required>
+                    <small>Accepted formats: JPG, PNG, GIF, PDF</small>
+                </div>
+                
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-upload"></i> Submit Proof of Payment
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Admin: Initial Approval -->
+    {% if user.role == 'Admin' and request.status == 'Pending' %}
+    <div class="card" style="margin-top: 2rem;">
+        <div class="card-header">
+            <h3><i class="fas fa-check-circle"></i> Approve Request</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('approve_request', request_id=request.request_id) }}" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="approver">Select Approver *</label>
+                    <select name="approver" id="approver" required>
+                        <option value="">-- Select Approver --</option>
+                        <option value="Mahmoud">Mahmoud</option>
+                        <option value="Abdulaziz">Abdulaziz</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="receipt">Upload Receipt *</label>
+                    <input type="file" name="receipt" id="receipt" accept=".jpg,.jpeg,.png,.pdf" required>
+                </div>
+                
+                <div class="form-group checkbox-group">
+                    <label>
+                        <input type="checkbox" name="proof_required" id="proof_required">
+                        <span>Require Proof of Payment from Department</span>
+                    </label>
+                    <small style="color: #666; margin-left: 25px; display: block; margin-top: 5px;">
+                        ✓ If checked: Status → "Send Proof" (Department uploads proof → Admin final approval)<br>
+                        ✗ If not checked: Status → "Approved" (Directly approved)
+                    </small>
+                </div>
+                
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-check"></i> Approve Request
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top: 2rem;">
+        <div class="card-header" style="background: #f57c00; color: white;">
+            <h3><i class="fas fa-exclamation-triangle"></i> Action Required</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('mark_pending', request_id=request.request_id) }}">
+                <div class="form-group">
+                    <label for="reason_pending">Reason for Action Required *</label>
+                    <textarea name="reason_pending" id="reason_pending" rows="3" required placeholder="Explain what action is required from the requestor..."></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-warning">
+                    <i class="fas fa-exclamation-triangle"></i> Mark as Action Required
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Admin: Final Approval After Proof Received -->
+    {% if user.role == 'Admin' and request.status == 'Received Proof' %}
+    <div class="card" style="margin-top: 2rem;">
+        <div class="card-header" style="background: #2196F3; color: white;">
+            <h3><i class="fas fa-check-double"></i> Final Approval</h3>
+        </div>
+        <div class="card-body">
+            <p style="margin-bottom: 1rem; color: #2196F3; font-weight: bold;">
+                <i class="fas fa-info-circle"></i> Proof of payment has been received. Review and give final approval.
+            </p>
+            
+            {% if request.proof_of_payment %}
+            <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f5f5f5; border-radius: 5px;">
+                <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">
+                    <i class="fas fa-file-image"></i> Uploaded Proof:
+                </label>
+                <a href="{{ url_for('uploaded_file', filename=request.proof_of_payment) }}" target="_blank" class="btn btn-info">
+                    <i class="fas fa-eye"></i> View Proof of Payment
+                </a>
+            </div>
+            {% endif %}
+            
+            <form method="POST" action="{{ url_for('final_approve_request', request_id=request.request_id) }}">
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-check-double"></i> Final Approve
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Update notification count when viewing a request
+document.addEventListener('DOMContentLoaded', function() {
+    // Only update for Finance and Admin users
+    const userRole = document.body.getAttribute('data-user-role');
+    if (userRole === 'Finance' || userRole === 'Admin') {
+        // Update notification count in navigation
+        fetch('/api/notifications/unread_count')
+            .then(response => response.json())
+            .then(data => {
+                // Update notification badge in navigation
+                const navLink = document.querySelector('a[href*="notifications"]');
+                if (navLink) {
+                    let badge = navLink.querySelector('.notification-badge');
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'notification-badge';
+                        navLink.appendChild(badge);
+                    }
+                    
+                    if (data.count > 0) {
+                        badge.textContent = data.count;
+                        badge.style.display = 'inline';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error updating notification count:', error);
+            });
+    }
+});
+</script>
+{% endblock %}

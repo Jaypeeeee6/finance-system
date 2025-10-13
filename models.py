@@ -1,0 +1,159 @@
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
+
+db = SQLAlchemy()
+
+class User(UserMixin, db.Model):
+    """User model for authentication and authorization"""
+    __tablename__ = 'users'
+    
+    user_id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password = db.Column(db.String(255), nullable=False)
+    department = db.Column(db.String(100), nullable=False)
+    role = db.Column(db.String(50), nullable=False)  # Admin, Finance, GM, IT, Department User, Project
+    email = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def get_id(self):
+        return str(self.user_id)
+    
+    def set_password(self, password):
+        """Hash and set password"""
+        self.password = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Verify password"""
+        return check_password_hash(self.password, password)
+    
+    def __repr__(self):
+        return f'<User {self.username} ({self.role})>'
+
+
+class PaymentRequest(db.Model):
+    """Payment request model"""
+    __tablename__ = 'payment_requests'
+    
+    request_id = db.Column(db.Integer, primary_key=True)
+    request_type = db.Column(db.String(50), nullable=False)  # Item, Person, Supplier/Rental, Company
+    requestor_name = db.Column(db.String(100), nullable=False)
+    
+    # Dynamic fields based on request type
+    item_name = db.Column(db.String(200))  # For Item type
+    person_company = db.Column(db.String(200))  # For Person/Company type
+    company_name = db.Column(db.String(200))  # For Supplier/Rental type
+    
+    department = db.Column(db.String(100), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    purpose = db.Column(db.Text, nullable=False)
+    account_name = db.Column(db.String(100), nullable=False)
+    account_number = db.Column(db.String(50), nullable=False)
+    amount = db.Column(db.Numeric(12, 3), nullable=False)  # OMR supports 3 decimal places
+    recurring = db.Column(db.String(20))  # One-Time, Recurring
+    recurring_interval = db.Column(db.String(50))  # Monthly, Quarterly, Annually
+    status = db.Column(db.String(20), default='Pending')  # Pending, Send Proof, Received Proof, Approved
+    reason_pending = db.Column(db.Text)
+    receipt_path = db.Column(db.String(255))
+    approver = db.Column(db.String(50))  # Mahmoud, Abdulaziz
+    proof_required = db.Column(db.Boolean, default=False)  # Whether proof is required
+    proof_of_payment = db.Column(db.String(255))  # File path for proof uploaded by department
+    approval_date = db.Column(db.Date)  # Date when request was approved
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Additional field for tracking who created the request
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'))
+    
+    def to_dict(self):
+        """Convert request to dictionary"""
+        return {
+            'request_id': self.request_id,
+            'request_type': self.request_type,
+            'requestor_name': self.requestor_name,
+            'department': self.department,
+            'date': self.date.strftime('%Y-%m-%d') if self.date else None,
+            'purpose': self.purpose,
+            'account_name': self.account_name,
+            'account_number': self.account_number,
+            'amount': float(self.amount),
+            'recurring': self.recurring,
+            'recurring_interval': self.recurring_interval,
+            'status': self.status,
+            'reason_pending': self.reason_pending,
+            'receipt_path': self.receipt_path,
+            'approver': self.approver,
+            'proof_of_payment': self.proof_of_payment,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
+    
+    def __repr__(self):
+        return f'<PaymentRequest {self.request_id} - {self.request_type} - {self.status}>'
+
+
+class AuditLog(db.Model):
+    """Audit log for tracking all actions"""
+    __tablename__ = 'audit_logs'
+    
+    log_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)  # Allow NULL for deleted users
+    action = db.Column(db.String(255), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    username_snapshot = db.Column(db.String(50))  # Store username for deleted users
+    
+    user = db.relationship('User', backref='audit_logs')
+    
+    def __repr__(self):
+        return f'<AuditLog {self.log_id} - {self.action}>'
+
+
+class Notification(db.Model):
+    """Notification model for system notifications"""
+    __tablename__ = 'notifications'
+    
+    notification_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    title = db.Column(db.String(255), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    notification_type = db.Column(db.String(50), nullable=False)  # new_submission, approval, etc.
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Related request ID for notifications about specific requests
+    request_id = db.Column(db.Integer, db.ForeignKey('payment_requests.request_id'), nullable=True)
+    
+    user = db.relationship('User', backref='notifications')
+    request = db.relationship('PaymentRequest', backref='notifications')
+    
+    def to_dict(self):
+        """Convert notification to dictionary"""
+        return {
+            'notification_id': self.notification_id,
+            'title': self.title,
+            'message': self.message,
+            'notification_type': self.notification_type,
+            'is_read': self.is_read,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'request_id': self.request_id
+        }
+    
+    def __repr__(self):
+        return f'<Notification {self.notification_id} - {self.title}>'
+
+
+class PaidNotification(db.Model):
+    """Track when recurring payment notifications were marked as paid"""
+    __tablename__ = 'paid_notifications'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    request_id = db.Column(db.Integer, db.ForeignKey('payment_requests.request_id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    paid_date = db.Column(db.Date, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<PaidNotification {self.id} - Request {self.request_id} paid on {self.paid_date}>'
+
+

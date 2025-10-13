@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Edit User{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-user-edit"></i> Edit User</h1>
+        <a href="{{ url_for('manage_users') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Users
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Edit User: {{ user_to_edit.username }}</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info" style="margin-bottom: 1.5rem;">
+                <strong>Note:</strong> Username cannot be changed. Leave password field empty to keep current password.
+            </div>
+
+            <form method="POST" action="{{ url_for('edit_user', user_id=user_to_edit.user_id) }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" name="username" id="username" value="{{ user_to_edit.username }}" readonly>
+                        <small>Username cannot be changed</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">New Password (Optional)</label>
+                        <input type="password" name="password" id="password" minlength="6">
+                        <small>Leave empty to keep current password. Minimum 6 characters if changing.</small>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="department">Department *</label>
+                        <select name="department" id="department" required>
+                            <option value="">-- Select Department --</option>
+                            <option value="HR" {% if user_to_edit.department == 'HR' %}selected{% endif %}>HR</option>
+                            <option value="Finance" {% if user_to_edit.department == 'Finance' %}selected{% endif %}>Finance</option>
+                            <option value="IT" {% if user_to_edit.department == 'IT' %}selected{% endif %}>IT</option>
+                            <option value="Purchasing" {% if user_to_edit.department == 'Purchasing' %}selected{% endif %}>Purchasing</option>
+                            <option value="PR" {% if user_to_edit.department == 'PR' %}selected{% endif %}>PR</option>
+                            <option value="Auditing" {% if user_to_edit.department == 'Auditing' %}selected{% endif %}>Auditing</option>
+                            <option value="Customer Service" {% if user_to_edit.department == 'Customer Service' %}selected{% endif %}>Customer Service</option>
+                            <option value="Marketing" {% if user_to_edit.department == 'Marketing' %}selected{% endif %}>Marketing</option>
+                            <option value="Operation" {% if user_to_edit.department == 'Operation' %}selected{% endif %}>Operation</option>
+                            <option value="Quality Control" {% if user_to_edit.department == 'Quality Control' %}selected{% endif %}>Quality Control</option>
+                            <option value="Project Department" {% if user_to_edit.department == 'Project Department' %}selected{% endif %}>Project Department</option>
+                            <option value="Research and Development" {% if user_to_edit.department == 'Research and Development' %}selected{% endif %}>Research and Development</option>
+                            <option value="Office" {% if user_to_edit.department == 'Office' %}selected{% endif %}>Office</option>
+                            <option value="Maintenance" {% if user_to_edit.department == 'Maintenance' %}selected{% endif %}>Maintenance</option>
+                        </select>
+                        <small>Multiple accounts can be created for the same department</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="role">Role *</label>
+                        <select name="role" id="role" required>
+                            <option value="">-- Select Role --</option>
+                            <option value="Admin" {% if user_to_edit.role == 'Admin' %}selected{% endif %}>Admin</option>
+                            <option value="Finance" {% if user_to_edit.role == 'Finance' %}selected{% endif %}>Finance</option>
+                            <option value="GM" {% if user_to_edit.role == 'GM' %}selected{% endif %}>General Manager</option>
+                            <option value="IT" {% if user_to_edit.role == 'IT' %}selected{% endif %}>IT</option>
+                            <option value="Project" {% if user_to_edit.role == 'Project' %}selected{% endif %}>Project</option>
+                            <option value="Operation Manager" {% if user_to_edit.role == 'Operation Manager' %}selected{% endif %}>Operation Manager</option>
+                            <option value="Department User" {% if user_to_edit.role == 'Department User' %}selected{% endif %}>Department User</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email (Optional)</label>
+                    <input type="email" name="email" id="email" value="{{ user_to_edit.email or '' }}" placeholder="user@company.com">
+                </div>
+
+                <div class="details-grid" style="margin: 1.5rem 0;">
+                    <div class="detail-item">
+                        <label><i class="fas fa-calendar"></i> Account Created:</label>
+                        <span>{{ user_to_edit.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label><i class="fas fa-hashtag"></i> User ID:</label>
+                        <span>#{{ user_to_edit.user_id }}</span>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Update User
+                    </button>
+                    <a href="{{ url_for('manage_users') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+

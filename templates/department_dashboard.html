@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Department Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-tachometer-alt"></i> Department Dashboard</h1>
+        <p>Welcome, <strong>{{ user.username }}</strong> from <strong>{{ user.department }}</strong></p>
+    </div>
+
+    <div class="dashboard-actions">
+        <a href="{{ url_for('new_request') }}" class="btn btn-primary">
+            <i class="fas fa-plus-circle"></i> New Payment Request
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-list"></i> My Payment Requests</h2>
+        </div>
+        <div class="card-body">
+            {% if requests %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Type</th>
+                                <th>Requestor</th>
+                                <th>Submission Date</th>
+                                <th>Approval Date</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in requests %}
+                            <tr>
+                                <td>#{{ req.request_id }}</td>
+                                <td><span class="badge badge-info">{{ req.request_type }}</span></td>
+                                <td>{{ req.requestor_name }}</td>
+                                <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    {% if req.approval_date %}
+                                        {{ req.approval_date.strftime('%Y-%m-%d') }}
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                <td>
+                                    {% if req.status == 'Approved' %}
+                                        <span class="badge badge-success">✓ {{ req.status }}</span>
+                                    {% elif req.status == 'Send Proof' %}
+                                        <span class="badge" style="background: #4CAF50; color: white;">📤 {{ req.status }}</span>
+                                    {% elif req.status == 'Received Proof' %}
+                                        <span class="badge" style="background: #2196F3; color: white;">⏳ Waiting Approval</span>
+                                    {% elif req.status == 'Action Required' %}
+                                        <span class="badge" style="background: #f57c00; color: white;">⚠️ {{ req.status }}</span>
+                                    {% else %}
+                                        <span class="badge badge-warning">⏳ {{ req.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                    {% if req.status == 'Send Proof' %}
+                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-success">
+                                        <i class="fas fa-upload"></i> Upload Proof
+                                    </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <p>No payment requests yet. Click "New Payment Request" to submit one.</p>
+                </div>
+            {% endif %}
+            
+            <!-- Pagination Controls -->
+            {% if pagination %}
+            <div class="pagination-container">
+                <div class="pagination-left">
+                    <div class="pagination-info">
+                        Showing {{ pagination.per_page * (pagination.page - 1) + 1 }} to 
+                        {{ pagination.per_page * (pagination.page - 1) + pagination.items|length }} 
+                        of {{ pagination.total }} requests
+                    </div>
+                    <div class="items-per-page">
+                        <label for="per_page">Show:</label>
+                        <select id="per_page" onchange="changeItemsPerPage(this.value)">
+                            <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10</option>
+                            <option value="20" {% if pagination.per_page == 20 %}selected{% endif %}>20</option>
+                            <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50</option>
+                            <option value="100" {% if pagination.per_page == 100 %}selected{% endif %}>100</option>
+                        </select>
+                        <span>per page</span>
+                    </div>
+                </div>
+                {% if pagination.pages > 1 %}
+                <div class="pagination">
+                    {% if pagination.has_prev %}
+                        <a href="{{ url_for('department_dashboard', page=pagination.prev_num, per_page=pagination.per_page) }}" class="btn btn-sm btn-secondary">
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </a>
+                    {% endif %}
+                    
+                    {% for page_num in pagination.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != pagination.page %}
+                                <a href="{{ url_for('department_dashboard', page=page_num, per_page=pagination.per_page) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
+                            {% else %}
+                                <span class="btn btn-sm btn-primary">{{ page_num }}</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="pagination-ellipsis">...</span>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if pagination.has_next %}
+                        <a href="{{ url_for('department_dashboard', page=pagination.next_num, per_page=pagination.per_page) }}" class="btn btn-sm btn-secondary">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function changeItemsPerPage(perPage) {
+    // Redirect to page 1 with new per_page value
+    const url = new URL(window.location);
+    url.searchParams.set('per_page', perPage);
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}
+</script>
+{% endblock %}
+

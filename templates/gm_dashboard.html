@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+
+{% block title %}General Manager Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-crown"></i> General Manager Dashboard</h1>
+        <p>Overview of all financial activities</p>
+    </div>
+
+    <div class="dashboard-actions">
+        <a href="{{ url_for('new_request') }}" class="btn btn-primary">
+            <i class="fas fa-plus-circle"></i> New Payment Request
+        </a>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #2196F3;">
+                <i class="fas fa-file-invoice"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ stats.total_requests }}</h3>
+                <p>Total Requests</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #4CAF50;">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ stats.approved }}</h3>
+                <p>Approved</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #FF9800;">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ stats.pending }}</h3>
+                <p>Pending Review</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #9C27B0;">
+                <i class="fas fa-money-bill-wave"></i>
+            </div>
+            <div class="stat-info">
+                <h3>OMR {{ "%.3f"|format(stats.total_amount) }}</h3>
+                <p>Total Approved Amount</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-actions">
+        <a href="{{ url_for('reports') }}" class="btn btn-primary">
+            <i class="fas fa-chart-bar"></i> View Detailed Reports
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-list"></i> 
+                {% if department_filter %}
+                    {{ department_filter }} Requests
+                {% else %}
+                    Recent Payment Requests
+                {% endif %}
+            </h2>
+            <div class="card-header-actions">
+                <div class="filter-controls">
+                    <select id="departmentFilter" onchange="filterByDepartment(this.value)" class="form-select">
+                        <option value="">All Departments</option>
+                        <option value="HR" {% if department_filter == 'HR' %}selected{% endif %}>HR</option>
+                        <option value="Finance" {% if department_filter == 'Finance' %}selected{% endif %}>Finance</option>
+                        <option value="IT" {% if department_filter == 'IT' %}selected{% endif %}>IT</option>
+                        <option value="Purchasing" {% if department_filter == 'Purchasing' %}selected{% endif %}>Purchasing</option>
+                        <option value="PR" {% if department_filter == 'PR' %}selected{% endif %}>PR</option>
+                        <option value="Auditing" {% if department_filter == 'Auditing' %}selected{% endif %}>Auditing</option>
+                        <option value="Customer Service" {% if department_filter == 'Customer Service' %}selected{% endif %}>Customer Service</option>
+                        <option value="Marketing" {% if department_filter == 'Marketing' %}selected{% endif %}>Marketing</option>
+                        <option value="Operation" {% if department_filter == 'Operation' %}selected{% endif %}>Operation</option>
+                        <option value="Quality Control" {% if department_filter == 'Quality Control' %}selected{% endif %}>Quality Control</option>
+                        <option value="Project Department" {% if department_filter == 'Project Department' %}selected{% endif %}>Project Department</option>
+                        <option value="Research and Development" {% if department_filter == 'Research and Development' %}selected{% endif %}>Research and Development</option>
+                        <option value="Office" {% if department_filter == 'Office' %}selected{% endif %}>Office</option>
+                        <option value="Maintenance" {% if department_filter == 'Maintenance' %}selected{% endif %}>Maintenance</option>
+                    </select>
+                </div>
+                {% if department_filter %}
+                <div class="filter-indicator">
+                    <span class="badge" style="background: #f57c00; color: white;">
+                        <i class="fas fa-filter"></i> {{ department_filter }}
+                    </span>
+                    <a href="{{ url_for('gm_dashboard') }}" class="btn btn-sm btn-outline">
+                        <i class="fas fa-times"></i> Clear Filter
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card-body">
+            {% if requests %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Type</th>
+                                <th>Requestor</th>
+                                <th>Department</th>
+                                <th>Submission Date</th>
+                                <th>Approval Date</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Approver</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in requests[:20] %}
+                            <tr>
+                                <td>#{{ req.request_id }}</td>
+                                <td><span class="badge badge-info">{{ req.request_type }}</span></td>
+                                <td>{{ req.requestor_name }}</td>
+                                <td>{{ req.department }}</td>
+                                <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    {% if req.approval_date %}
+                                        {{ req.approval_date.strftime('%Y-%m-%d') }}
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                <td>
+                                    {% if req.status == 'Approved' %}
+                                        <span class="badge badge-success">✓ {{ req.status }}</span>
+                                    {% elif req.status == 'Send Proof' %}
+                                        <span class="badge" style="background: #FF9800; color: white;">📤 {{ req.status }}</span>
+                                    {% elif req.status == 'Received Proof' %}
+                                        <span class="badge" style="background: #2196F3; color: white;">📥 {{ req.status }}</span>
+                                    {% elif req.status == 'Action Required' %}
+                                        <span class="badge" style="background: #f57c00; color: white;">⚠️ {{ req.status }}</span>
+                                    {% else %}
+                                        <span class="badge badge-warning">⏳ {{ req.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ req.approver or 'N/A' }}</td>
+                                <td>
+                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <p>No payment requests found.</p>
+                </div>
+            {% endif %}
+            
+            <!-- Pagination Controls -->
+            {% if pagination %}
+            <div class="pagination-container">
+                <div class="pagination-left">
+                    <div class="pagination-info">
+                        Showing {{ pagination.per_page * (pagination.page - 1) + 1 }} to 
+                        {{ pagination.per_page * (pagination.page - 1) + pagination.items|length }} 
+                        of {{ pagination.total }} requests
+                    </div>
+                    <div class="items-per-page">
+                        <label for="per_page">Show:</label>
+                        <select id="per_page" onchange="changeItemsPerPage(this.value)">
+                            <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10</option>
+                            <option value="20" {% if pagination.per_page == 20 %}selected{% endif %}>20</option>
+                            <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50</option>
+                            <option value="100" {% if pagination.per_page == 100 %}selected{% endif %}>100</option>
+                        </select>
+                        <span>per page</span>
+                    </div>
+                </div>
+                {% if pagination.pages > 1 %}
+                <div class="pagination">
+                    {% if pagination.has_prev %}
+                        <a href="{{ url_for('gm_dashboard', page=pagination.prev_num, per_page=pagination.per_page) }}" class="btn btn-sm btn-secondary">
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </a>
+                    {% endif %}
+                    
+                    {% for page_num in pagination.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != pagination.page %}
+                                <a href="{{ url_for('gm_dashboard', page=page_num, per_page=pagination.per_page) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
+                            {% else %}
+                                <span class="btn btn-sm btn-primary">{{ page_num }}</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="pagination-ellipsis">...</span>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if pagination.has_next %}
+                        <a href="{{ url_for('gm_dashboard', page=pagination.next_num, per_page=pagination.per_page) }}" class="btn btn-sm btn-secondary">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function changeItemsPerPage(perPage) {
+    // Redirect to page 1 with new per_page value
+    const url = new URL(window.location);
+    url.searchParams.set('per_page', perPage);
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}
+
+function filterByDepartment(department) {
+    // Redirect to dashboard with department filter
+    const url = new URL(window.location);
+    if (department) {
+        url.searchParams.set('department', department);
+    } else {
+        url.searchParams.delete('department');
+    }
+    url.searchParams.set('page', '1'); // Reset to page 1 when filtering
+    window.location.href = url.toString();
+}
+</script>
+{% endblock %}
+

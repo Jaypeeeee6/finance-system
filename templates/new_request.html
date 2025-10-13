@@ -1,0 +1,899 @@
+{% extends "base.html" %}
+
+{% block title %}New Payment Request{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-plus-circle"></i> New Payment Request</h1>
+        <p>Submit a new payment request</p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('new_request') }}" id="requestForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="request_type">Request Type *</label>
+                        <select name="request_type" id="request_type" required onchange="handleRequestTypeChange()">
+                            <option value="">-- Select Type --</option>
+                            <option value="Item">Item</option>
+                            <option value="Person">Person</option>
+                            
+                            {% if user.role == 'Finance' %}
+                            <!-- Finance can access Item, Person, Supplier/Rental -->
+                            <option value="Supplier/Rental">Supplier/Rental</option>
+                            {% endif %}
+                            
+                            {% if user.role == 'Project' %}
+                            <!-- Project role can access Item or Company -->
+                            <option value="Company">Company</option>
+                            {% endif %}
+                        </select>
+                        <small>
+                            {% if user.role == 'Finance' %}
+                                Available: Item, Person, Supplier/Rental
+                            {% elif user.role == 'Project' %}
+                                Available: Item, Company
+                            {% else %}
+                                Available: Item, Person
+                            {% endif %}
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="requestor_name">Requestor Name *</label>
+                        <input type="text" name="requestor_name" id="requestor_name" required>
+                    </div>
+                </div>
+
+                <!-- Dynamic field based on request type -->
+                <div id="itemNameGroup" class="form-group" style="display: none;">
+                    <label for="item_name">Item Name *</label>
+                    <input type="text" name="item_name" id="item_name">
+                </div>
+
+                <div id="personCompanyGroup" class="form-group" style="display: none;">
+                    <label for="person_company">Person/Company *</label>
+                    <input type="text" name="person_company" id="person_company">
+                </div>
+
+                <div id="companyNameGroup" class="form-group" style="display: none;">
+                    <label for="company_name">Company Name *</label>
+                    <input type="text" name="company_name" id="company_name">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="department">Department *</label>
+                        <input type="text" name="department" id="department" value="{{ user.department }}" readonly>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="date">Date of Submission</label>
+                        <input type="text" name="date" id="date" value="{{ today }}" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                        <small style="color: #666;">Automatically set to today's date</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="purpose">Purpose/Description *</label>
+                    <textarea name="purpose" id="purpose" rows="4" required></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="account_name">Account Name *</label>
+                        <input type="text" name="account_name" id="account_name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="account_number">Account Number *</label>
+                        <input type="text" name="account_number" id="account_number" pattern="[0-9]+" title="Please enter numbers only" required inputmode="numeric">
+                        <small>Numbers only</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="amount">Amount (OMR) *</label>
+                    <div style="position: relative;">
+                        <span style="position: absolute; left: 12px; top: 12px; color: #666; font-weight: 600;">OMR</span>
+                        <input type="number" name="amount" id="amount" step="0.001" min="0" required style="padding-left: 55px;" placeholder="0.000">
+                    </div>
+                    <small>Omani Rials (OMR) - Numbers only</small>
+                </div>
+
+                <!-- Show only for Supplier/Rental type -->
+                <div id="recurringFields" style="display: none;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="recurring">Payment Type</label>
+                            <select name="recurring" id="recurring" onchange="handleRecurringChange()">
+                                <option value="One-Time">One-Time</option>
+                                <option value="Recurring">Recurring</option>
+                            </select>
+                        </div>
+
+                        <!-- Hidden field to store the custom recurring interval -->
+                        <input type="hidden" name="recurring_interval" id="recurring_interval" value="">
+                        
+                        <!-- Show current configuration if set -->
+                        <div id="currentConfig" class="current-config" style="display: none;">
+                            <div class="config-display">
+                                <i class="fas fa-calendar-check"></i>
+                                <div class="config-text">
+                                    <strong>Current Schedule:</strong>
+                                    <span id="currentScheduleText">Not configured</span>
+                                </div>
+                                <button type="button" class="btn-edit-config" onclick="openRecurringModal()">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- New Custom Repeat Modal -->
+                    <div id="recurringModal" class="recurring-modal" style="display: none;">
+                        <div class="recurring-modal-overlay" onclick="closeRecurringModal()"></div>
+                        <div class="recurring-modal-container">
+                            <div class="recurring-modal-header">
+                                <div class="header-content">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    <h2>Configure Recurring Payment</h2>
+                                </div>
+                                <button class="close-btn" onclick="closeRecurringModal()">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            
+                            <div class="recurring-modal-body">
+                                <!-- Frequency Selection -->
+                                <div class="config-section">
+                                    <h3><i class="fas fa-clock"></i> Frequency</h3>
+                                    <div class="frequency-options">
+                                        <label class="frequency-option">
+                                            <input type="radio" name="frequency" value="daily" onchange="updateFrequencyOptions()">
+                                            <div class="option-card">
+                                                <i class="fas fa-calendar-day"></i>
+                                                <span>Daily</span>
+                                            </div>
+                                        </label>
+                                        <label class="frequency-option">
+                                            <input type="radio" name="frequency" value="weekly" onchange="updateFrequencyOptions()">
+                                            <div class="option-card">
+                                                <i class="fas fa-calendar-week"></i>
+                                                <span>Weekly</span>
+                                            </div>
+                                        </label>
+                                        <label class="frequency-option">
+                                            <input type="radio" name="frequency" value="monthly" onchange="updateFrequencyOptions()" checked>
+                                            <div class="option-card active">
+                                                <i class="fas fa-calendar"></i>
+                                                <span>Monthly</span>
+                                            </div>
+                                        </label>
+                                        <label class="frequency-option">
+                                            <input type="radio" name="frequency" value="quarterly" onchange="updateFrequencyOptions()">
+                                            <div class="option-card">
+                                                <i class="fas fa-calendar-alt"></i>
+                                                <span>Quarterly</span>
+                                            </div>
+                                        </label>
+                                        <label class="frequency-option">
+                                            <input type="radio" name="frequency" value="yearly" onchange="updateFrequencyOptions()">
+                                            <div class="option-card">
+                                                <i class="fas fa-calendar-check"></i>
+                                                <span>Yearly</span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    </div>
+
+                                <!-- Interval Configuration -->
+                                <div class="config-section">
+                                    <h3><i class="fas fa-repeat"></i> Interval</h3>
+                                    <div class="interval-config">
+                                        <label>Every</label>
+                                        <input type="number" id="intervalValue" value="1" min="1" max="99" onchange="updateSchedulePreview()">
+                                        <span id="intervalUnit">month(s)</span>
+                                    </div>
+                                </div>
+
+                                <!-- Specific Options -->
+                                <div class="config-section" id="specificOptions">
+                                    <h3><i class="fas fa-cog"></i> Specific Settings</h3>
+                                    
+                                    <!-- Daily Options -->
+                                    <div id="dailyOptions" class="specific-options" style="display: none;">
+                                        <div class="time-selection">
+                                            <label>Time of day:</label>
+                                            <input type="time" id="dailyTime" value="09:00" onchange="updateSchedulePreview()">
+                                        </div>
+                                    </div>
+
+                                    <!-- Weekly Options -->
+                                    <div id="weeklyOptions" class="specific-options" style="display: none;">
+                                        <div class="day-selection">
+                                            <label>Days of the week:</label>
+                                            <div class="weekday-grid">
+                                                <label class="weekday-option">
+                                                    <input type="checkbox" value="monday" onchange="updateSchedulePreview()">
+                                                    <span>Mon</span>
+                                                </label>
+                                                <label class="weekday-option">
+                                                    <input type="checkbox" value="tuesday" onchange="updateSchedulePreview()">
+                                                    <span>Tue</span>
+                                                </label>
+                                                <label class="weekday-option">
+                                                    <input type="checkbox" value="wednesday" onchange="updateSchedulePreview()">
+                                                    <span>Wed</span>
+                                                </label>
+                                                <label class="weekday-option">
+                                                    <input type="checkbox" value="thursday" onchange="updateSchedulePreview()">
+                                                    <span>Thu</span>
+                                                </label>
+                                                <label class="weekday-option">
+                                                    <input type="checkbox" value="friday" onchange="updateSchedulePreview()">
+                                                    <span>Fri</span>
+                                                </label>
+                                                <label class="weekday-option">
+                                                    <input type="checkbox" value="saturday" onchange="updateSchedulePreview()">
+                                                    <span>Sat</span>
+                                                </label>
+                                                <label class="weekday-option">
+                                                    <input type="checkbox" value="sunday" onchange="updateSchedulePreview()">
+                                                    <span>Sun</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Monthly Options -->
+                                    <div id="monthlyOptions" class="specific-options">
+                                        <div class="monthly-config">
+                                            <div class="month-year-selector">
+                                                <label>Select month and year:</label>
+                                                <div class="date-selector">
+                                                    <select id="monthSelect" onchange="updateCalendarDays()">
+                                                        <option value="0">January</option>
+                                                        <option value="1">February</option>
+                                                        <option value="2">March</option>
+                                                        <option value="3">April</option>
+                                                        <option value="4">May</option>
+                                                        <option value="5">June</option>
+                                                        <option value="6">July</option>
+                                                        <option value="7">August</option>
+                                                        <option value="8">September</option>
+                                                        <option value="9">October</option>
+                                                        <option value="10">November</option>
+                                                        <option value="11">December</option>
+                                                    </select>
+                                                    <select id="yearSelect" onchange="updateCalendarDays()">
+                                                        <!-- Years will be populated by JavaScript -->
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="calendar-container">
+                                                <label>Select day(s) of the month:</label>
+                                                <div id="calendarGrid" class="calendar-grid">
+                                                    <!-- Calendar will be generated by JavaScript -->
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Quarterly Options -->
+                                    <div id="quarterlyOptions" class="specific-options" style="display: none;">
+                                        <div class="quarterly-config">
+                                            <label>Months:</label>
+                                            <div class="month-grid">
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="1" onchange="updateSchedulePreview()">
+                                                    <span>Jan</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="2" onchange="updateSchedulePreview()">
+                                                    <span>Feb</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="3" onchange="updateSchedulePreview()">
+                                                    <span>Mar</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="4" onchange="updateSchedulePreview()">
+                                                    <span>Apr</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="5" onchange="updateSchedulePreview()">
+                                                    <span>May</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="6" onchange="updateSchedulePreview()">
+                                                    <span>Jun</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="7" onchange="updateSchedulePreview()">
+                                                    <span>Jul</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="8" onchange="updateSchedulePreview()">
+                                                    <span>Aug</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="9" onchange="updateSchedulePreview()">
+                                                    <span>Sep</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="10" onchange="updateSchedulePreview()">
+                                                    <span>Oct</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="11" onchange="updateSchedulePreview()">
+                                                    <span>Nov</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="12" onchange="updateSchedulePreview()">
+                                                    <span>Dec</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Yearly Options -->
+                                    <div id="yearlyOptions" class="specific-options" style="display: none;">
+                                        <div class="yearly-config">
+                                            <label>Months:</label>
+                                            <div class="month-grid">
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="1" onchange="updateSchedulePreview()">
+                                                    <span>Jan</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="2" onchange="updateSchedulePreview()">
+                                                    <span>Feb</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="3" onchange="updateSchedulePreview()">
+                                                    <span>Mar</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="4" onchange="updateSchedulePreview()">
+                                                    <span>Apr</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="5" onchange="updateSchedulePreview()">
+                                                    <span>May</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="6" onchange="updateSchedulePreview()">
+                                                    <span>Jun</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="7" onchange="updateSchedulePreview()">
+                                                    <span>Jul</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="8" onchange="updateSchedulePreview()">
+                                                    <span>Aug</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="9" onchange="updateSchedulePreview()">
+                                                    <span>Sep</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="10" onchange="updateSchedulePreview()">
+                                                    <span>Oct</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="11" onchange="updateSchedulePreview()">
+                                                    <span>Nov</span>
+                                                </label>
+                                                <label class="month-option">
+                                                    <input type="checkbox" value="12" onchange="updateSchedulePreview()">
+                                                    <span>Dec</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Schedule Preview -->
+                                <div class="config-section">
+                                    <h3><i class="fas fa-eye"></i> Preview</h3>
+                                    <div class="schedule-preview">
+                                        <div class="preview-content">
+                                            <i class="fas fa-calendar-check"></i>
+                                            <div class="preview-text">
+                                                <strong>Payment Schedule:</strong>
+                                                <span id="schedulePreview">Every month</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="recurring-modal-footer">
+                                <button type="button" class="btn-cancel" onclick="closeRecurringModal()">
+                                    <i class="fas fa-times"></i> Cancel
+                                </button>
+                                <button type="button" class="btn-save" onclick="saveRecurringConfig()">
+                                    <i class="fas fa-check"></i> Save Configuration
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane"></i> Submit Request
+                    </button>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Set today's date as default
+document.getElementById('date').valueAsDate = new Date();
+
+// New Recurring Modal JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize the modal
+    initializeRecurringModal();
+});
+
+function handleRequestTypeChange() {
+    const requestType = document.getElementById('request_type').value;
+    const recurringFields = document.getElementById('recurringFields');
+    
+    // Hide all dynamic fields first
+    document.getElementById('itemNameGroup').style.display = 'none';
+    document.getElementById('personCompanyGroup').style.display = 'none';
+    document.getElementById('companyNameGroup').style.display = 'none';
+    
+    // Remove required attribute from all dynamic fields
+    document.getElementById('item_name').required = false;
+    document.getElementById('person_company').required = false;
+    document.getElementById('company_name').required = false;
+    
+    // Show appropriate field based on request type
+    if (requestType === 'Item') {
+        document.getElementById('itemNameGroup').style.display = 'block';
+        document.getElementById('item_name').required = true;
+        recurringFields.style.display = 'none';
+    } else if (requestType === 'Person') {
+        document.getElementById('personCompanyGroup').style.display = 'block';
+        document.getElementById('person_company').required = true;
+        recurringFields.style.display = 'none';
+    } else if (requestType === 'Company') {
+        document.getElementById('personCompanyGroup').style.display = 'block';
+        document.getElementById('person_company').required = true;
+        recurringFields.style.display = 'none';
+    } else if (requestType === 'Supplier/Rental') {
+        document.getElementById('companyNameGroup').style.display = 'block';
+        document.getElementById('company_name').required = true;
+        recurringFields.style.display = 'block';
+    } else {
+        recurringFields.style.display = 'none';
+    }
+    
+    // Reset recurring fields if not Supplier/Rental
+    if (requestType !== 'Supplier/Rental') {
+        document.getElementById('recurring').value = 'One-Time';
+        document.getElementById('recurring_interval').value = '';
+        closeRecurringModal();
+    }
+}
+
+function handleRecurringChange() {
+    const recurring = document.getElementById('recurring').value;
+    
+    if (recurring === 'Recurring') {
+        openRecurringModal();
+    } else {
+        document.getElementById('recurring_interval').value = '';
+        closeRecurringModal();
+    }
+}
+
+function initializeRecurringModal() {
+    // Set default values
+    updateFrequencyOptions();
+    updateSchedulePreview();
+    initializeCalendar();
+}
+
+function initializeCalendar() {
+    // Set current month and year as default
+    const now = new Date();
+    document.getElementById('monthSelect').value = now.getMonth();
+    
+    // Clear existing options first
+    const yearSelect = document.getElementById('yearSelect');
+    yearSelect.innerHTML = '';
+    
+    // Populate years (current year ± 5 years)
+    const currentYear = now.getFullYear();
+    for (let i = currentYear - 2; i <= currentYear + 3; i++) {
+        const option = document.createElement('option');
+        option.value = i;
+        option.textContent = i;
+        if (i === currentYear) {
+            option.selected = true;
+        }
+        yearSelect.appendChild(option);
+    }
+    
+    updateCalendarDays();
+    highlightCurrentDate();
+}
+
+function highlightCurrentDate() {
+    const now = new Date();
+    const currentDay = now.getDate();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    const selectedMonth = parseInt(document.getElementById('monthSelect').value);
+    const selectedYear = parseInt(document.getElementById('yearSelect').value);
+    
+    // Only highlight if we're viewing the current month and year
+    if (selectedMonth === currentMonth && selectedYear === currentYear) {
+        const calendarDays = document.querySelectorAll('.calendar-day');
+        calendarDays.forEach(day => {
+            if (parseInt(day.dataset.day) === currentDay) {
+                day.classList.add('current-date');
+            }
+        });
+    }
+}
+
+function updateCalendarDays() {
+    const monthSelect = document.getElementById('monthSelect');
+    const yearSelect = document.getElementById('yearSelect');
+    const calendarGrid = document.getElementById('calendarGrid');
+    
+    if (!monthSelect || !yearSelect || !calendarGrid) {
+        console.error('Calendar elements not found');
+        return;
+    }
+    
+    const month = parseInt(monthSelect.value);
+    const year = parseInt(yearSelect.value);
+    
+    // Validate year and month
+    if (isNaN(year) || isNaN(month)) {
+        console.error('Invalid year or month');
+        return;
+    }
+    
+    // Get first day of month and number of days
+    // JavaScript getDay() returns: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
+    // Our header is: Sun(0), Mon(1), Tue(2), Wed(3), Thu(4), Fri(5), Sat(6)
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    calendarGrid.innerHTML = '';
+    
+    // Add empty cells for days before the first day of the month
+    // firstDay already matches our header order (0=Sunday, 1=Monday, etc.)
+    for (let i = 0; i < firstDay; i++) {
+        const emptyCell = document.createElement('div');
+        emptyCell.className = 'calendar-day empty';
+        calendarGrid.appendChild(emptyCell);
+    }
+    
+    // Add days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayCell = document.createElement('div');
+        dayCell.className = 'calendar-day';
+        dayCell.textContent = day;
+        dayCell.dataset.day = day;
+        dayCell.onclick = function() { toggleCalendarDay(this); };
+        calendarGrid.appendChild(dayCell);
+    }
+    
+    updateSchedulePreview();
+    highlightCurrentDate();
+}
+
+function toggleCalendarDay(dayElement) {
+    dayElement.classList.toggle('selected');
+    updateSchedulePreview();
+}
+
+function openRecurringModal() {
+    document.getElementById('recurringModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    
+    // Initialize calendar when modal opens
+    initializeCalendar();
+    
+    // Load existing configuration if any
+    loadExistingConfig();
+    
+    updateSchedulePreview();
+}
+
+function loadExistingConfig() {
+    const config = document.getElementById('recurring_interval').value;
+    if (config) {
+        const parts = config.split(':');
+        const frequency = parts[0];
+        const interval = parts[1];
+        
+        // Set frequency
+        document.querySelector(`input[name="frequency"][value="${frequency}"]`).checked = true;
+        updateFrequencyOptions();
+        
+        // Set interval
+        document.getElementById('intervalValue').value = interval;
+        
+        // Load specific settings based on frequency
+        if (frequency === 'daily' && parts[2] === 'time') {
+            document.getElementById('dailyTime').value = parts[3];
+        } else if (frequency === 'weekly' && parts[2] === 'days') {
+            const days = parts[3].split(',');
+            days.forEach(day => {
+                const checkbox = document.querySelector(`#weeklyOptions input[value="${day}"]`);
+                if (checkbox) checkbox.checked = true;
+            });
+        } else if (frequency === 'monthly' && parts[2] === 'days') {
+            const days = parts[3].split(',');
+            days.forEach(day => {
+                const dayElement = document.querySelector(`#monthlyOptions .calendar-day[data-day="${day}"]`);
+                if (dayElement) dayElement.classList.add('selected');
+            });
+        } else if (frequency === 'quarterly' && parts[2] === 'months') {
+            const months = parts[3].split(',');
+            months.forEach(month => {
+                const checkbox = document.querySelector(`#quarterlyOptions input[value="${month}"]`);
+                if (checkbox) checkbox.checked = true;
+            });
+        } else if (frequency === 'yearly' && parts[2] === 'months') {
+            const months = parts[3].split(',');
+            months.forEach(month => {
+                const checkbox = document.querySelector(`#yearlyOptions input[value="${month}"]`);
+                if (checkbox) checkbox.checked = true;
+            });
+        }
+    }
+}
+
+function closeRecurringModal() {
+    document.getElementById('recurringModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+function updateFrequencyOptions() {
+    const frequency = document.querySelector('input[name="frequency"]:checked').value;
+    const intervalUnit = document.getElementById('intervalUnit');
+    
+    // Update interval unit
+    const units = {
+        'daily': 'day(s)',
+        'weekly': 'week(s)',
+        'monthly': 'month(s)',
+        'quarterly': 'quarter(s)',
+        'yearly': 'year(s)'
+    };
+    intervalUnit.textContent = units[frequency];
+    
+    // Show/hide specific options
+    document.querySelectorAll('.specific-options').forEach(option => {
+        option.style.display = 'none';
+    });
+    
+    // Show relevant options
+    if (frequency === 'daily') {
+        document.getElementById('dailyOptions').style.display = 'block';
+    } else if (frequency === 'weekly') {
+        document.getElementById('weeklyOptions').style.display = 'block';
+    } else if (frequency === 'monthly') {
+        document.getElementById('monthlyOptions').style.display = 'block';
+    } else if (frequency === 'quarterly') {
+        document.getElementById('quarterlyOptions').style.display = 'block';
+    } else if (frequency === 'yearly') {
+        document.getElementById('yearlyOptions').style.display = 'block';
+    }
+    
+    updateSchedulePreview();
+}
+
+function toggleDay(button) {
+    button.classList.toggle('selected');
+    updateSchedulePreview();
+}
+
+function toggleCalendarDay(dayElement) {
+    dayElement.classList.toggle('selected');
+    updateSchedulePreview();
+}
+
+function updateSchedulePreview() {
+    const frequency = document.querySelector('input[name="frequency"]:checked').value;
+    const interval = document.getElementById('intervalValue').value;
+    const unit = document.getElementById('intervalUnit').textContent;
+    
+    let preview = `Every ${interval} ${unit}`;
+    
+    if (frequency === 'daily') {
+        const time = document.getElementById('dailyTime').value;
+        preview += ` at ${time}`;
+    } else if (frequency === 'weekly') {
+        const selectedDays = Array.from(document.querySelectorAll('#weeklyOptions input[type="checkbox"]:checked'))
+            .map(input => input.value);
+        if (selectedDays.length > 0) {
+            preview += ` on ${selectedDays.join(', ')}`;
+        }
+    } else if (frequency === 'monthly') {
+        const selectedDays = Array.from(document.querySelectorAll('#monthlyOptions .calendar-day.selected'))
+            .map(day => {
+                const dayNum = day.dataset.day;
+                const month = parseInt(document.getElementById('monthSelect').value);
+                const year = parseInt(document.getElementById('yearSelect').value);
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                return `${monthNames[month]} ${dayNum}, ${year}`;
+            })
+            .sort((a, b) => {
+                // Sort by actual date
+                const dateA = new Date(a);
+                const dateB = new Date(b);
+                return dateA - dateB;
+            });
+        if (selectedDays.length > 0) {
+            preview += ` on ${selectedDays.join(', ')}`;
+        }
+    } else if (frequency === 'quarterly') {
+        const selectedMonths = Array.from(document.querySelectorAll('#quarterlyOptions input[type="checkbox"]:checked'))
+            .map(input => {
+                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                return monthNames[parseInt(input.value) - 1];
+            });
+        if (selectedMonths.length > 0) {
+            preview += ` in ${selectedMonths.join(', ')}`;
+        }
+    } else if (frequency === 'yearly') {
+        const selectedMonths = Array.from(document.querySelectorAll('#yearlyOptions input[type="checkbox"]:checked'))
+            .map(input => {
+                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                return monthNames[parseInt(input.value) - 1];
+            });
+        if (selectedMonths.length > 0) {
+            preview += ` in ${selectedMonths.join(', ')}`;
+        }
+    }
+    
+    document.getElementById('schedulePreview').textContent = preview;
+}
+
+function saveRecurringConfig() {
+    const frequency = document.querySelector('input[name="frequency"]:checked').value;
+    const interval = document.getElementById('intervalValue').value;
+    
+    let config = `${frequency}:${interval}`;
+    
+    if (frequency === 'daily') {
+        const time = document.getElementById('dailyTime').value;
+        config += `:time:${time}`;
+    } else if (frequency === 'weekly') {
+        const selectedDays = Array.from(document.querySelectorAll('#weeklyOptions input[type="checkbox"]:checked'))
+            .map(input => input.value);
+        if (selectedDays.length > 0) {
+            config += `:days:${selectedDays.join(',')}`;
+        }
+    } else if (frequency === 'monthly') {
+        const selectedDays = Array.from(document.querySelectorAll('#monthlyOptions .calendar-day.selected'))
+            .map(day => day.dataset.day);
+        if (selectedDays.length > 0) {
+            config += `:days:${selectedDays.join(',')}`;
+        }
+    } else if (frequency === 'quarterly') {
+        const selectedMonths = Array.from(document.querySelectorAll('#quarterlyOptions input[type="checkbox"]:checked'))
+            .map(input => input.value);
+        if (selectedMonths.length > 0) {
+            config += `:months:${selectedMonths.join(',')}`;
+        }
+    } else if (frequency === 'yearly') {
+        const selectedMonths = Array.from(document.querySelectorAll('#yearlyOptions input[type="checkbox"]:checked'))
+            .map(input => input.value);
+        if (selectedMonths.length > 0) {
+            config += `:months:${selectedMonths.join(',')}`;
+        }
+    }
+    
+    document.getElementById('recurring_interval').value = config;
+    
+    // Show the current configuration
+    showCurrentConfig();
+    
+    closeRecurringModal();
+}
+
+function showCurrentConfig() {
+    const config = document.getElementById('recurring_interval').value;
+    if (config) {
+        // Parse the configuration to show a readable format
+        const parts = config.split(':');
+        const frequency = parts[0];
+        const interval = parts[1];
+        
+        let displayText = `Every ${interval} `;
+        
+        if (frequency === 'daily') {
+            displayText += 'day(s)';
+            if (parts[2] && parts[2] === 'time') {
+                displayText += ` at ${parts[3]}`;
+            }
+        } else if (frequency === 'weekly') {
+            displayText += 'week(s)';
+            if (parts[2] && parts[2] === 'days') {
+                const days = parts[3].split(',');
+                displayText += ` on ${days.join(', ')}`;
+            }
+        } else if (frequency === 'monthly') {
+            displayText += 'month(s)';
+            if (parts[2] && parts[2] === 'days') {
+                const days = parts[3].split(',');
+                displayText += ` on day ${days.join(', ')}`;
+            }
+        } else if (frequency === 'quarterly') {
+            displayText += 'quarter(s)';
+            if (parts[2] && parts[2] === 'months') {
+                const months = parts[3].split(',');
+                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const monthNamesList = months.map(m => monthNames[parseInt(m) - 1]).join(', ');
+                displayText += ` in ${monthNamesList}`;
+            }
+        } else if (frequency === 'yearly') {
+            displayText += 'year(s)';
+            if (parts[2] && parts[2] === 'months') {
+                const months = parts[3].split(',');
+                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const monthNamesList = months.map(m => monthNames[parseInt(m) - 1]).join(', ');
+                displayText += ` in ${monthNamesList}`;
+            }
+        }
+        
+        document.getElementById('currentScheduleText').textContent = displayText;
+        document.getElementById('currentConfig').style.display = 'block';
+    } else {
+        document.getElementById('currentConfig').style.display = 'none';
+    }
+}
+
+// Form validation
+document.getElementById('requestForm').addEventListener('submit', function(e) {
+    const accountNumber = document.getElementById('account_number').value;
+    if (!/^\d+$/.test(accountNumber)) {
+        e.preventDefault();
+        alert('Account number must contain only numbers.');
+        return false;
+    }
+    
+    const amount = parseFloat(document.getElementById('amount').value);
+    if (amount <= 0) {
+        e.preventDefault();
+        alert('Amount must be greater than 0.');
+        return false;
+    }
+    
+    // Check if recurring is selected but no interval is set
+    const recurring = document.getElementById('recurring').value;
+    const recurringInterval = document.getElementById('recurring_interval').value;
+    if (recurring === 'Recurring' && !recurringInterval) {
+        e.preventDefault();
+        alert('Please configure the recurring payment schedule.');
+        return false;
+    }
+});
+</script>
+{% endblock %}
+

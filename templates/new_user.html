@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Add New User{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-user-plus"></i> Add New User</h1>
+        <a href="{{ url_for('manage_users') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Users
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Create New Account</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info" style="margin-bottom: 1.5rem;">
+                <strong>Note:</strong> Multiple accounts can be created for the same department.
+            </div>
+
+            <form method="POST" action="{{ url_for('new_user') }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="username">Username *</label>
+                        <input type="text" name="username" id="username" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password *</label>
+                        <input type="password" name="password" id="password" required minlength="6">
+                        <small>Minimum 6 characters</small>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="department">Department *</label>
+                        <select name="department" id="department" required>
+                            <option value="">-- Select Department --</option>
+                            <option value="HR">HR</option>
+                            <option value="Finance">Finance</option>
+                            <option value="IT">IT</option>
+                            <option value="Purchasing">Purchasing</option>
+                            <option value="PR">PR</option>
+                            <option value="Auditing">Auditing</option>
+                            <option value="Customer Service">Customer Service</option>
+                            <option value="Marketing">Marketing</option>
+                            <option value="Operation">Operation</option>
+                            <option value="Quality Control">Quality Control</option>
+                            <option value="Project Department">Project Department</option>
+                            <option value="Research and Development">Research and Development</option>
+                            <option value="Office">Office</option>
+                            <option value="Maintenance">Maintenance</option>
+                        </select>
+                        <small>Multiple accounts can be created for the same department</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="role">Role *</label>
+                        <select name="role" id="role" required>
+                            <option value="">-- Select Role --</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Finance">Finance</option>
+                            <option value="GM">General Manager</option>
+                            <option value="IT">IT</option>
+                            <option value="Project">Project</option>
+                            <option value="Operation Manager">Operation Manager</option>
+                            <option value="Department User">Department User</option>
+                        </select>
+                        <small>Only IT can create users</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email (Optional)</label>
+                    <input type="email" name="email" id="email" placeholder="user@company.com">
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Create User
+                    </button>
+                    <a href="{{ url_for('manage_users') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
