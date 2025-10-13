@@ -981,18 +981,24 @@ def delete_request(request_id):
 
 @app.route('/reports')
 @login_required
-@role_required('Admin', 'Finance', 'GM', 'IT')
+@role_required('Admin', 'Finance', 'GM', 'IT', 'Operation Manager')
 def reports():
     """View reports page"""
     # Get filter parameters
     department_filter = request.args.get('department', '')
     status_filter = request.args.get('status', '')
     request_type_filter = request.args.get('request_type', '')
+    company_filter = request.args.get('company', '')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
     
     # Build query
     query = PaymentRequest.query
+    
+    # Role-based department filtering
+    if current_user.role == 'Operation Manager':
+        # Operation Manager can only see Maintenance, Operation, and Project Department
+        query = query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project Department']))
     
     if department_filter:
         query = query.filter_by(department=department_filter)
@@ -1000,6 +1006,9 @@ def reports():
         query = query.filter_by(status=status_filter)
     if request_type_filter:
         query = query.filter_by(request_type=request_type_filter)
+    if company_filter:
+        # Only filter by company name for approved requests with company_name
+        query = query.filter(PaymentRequest.company_name.ilike(f'%{company_filter}%'))
     
     # Date filtering and sorting based on status
     if status_filter == 'Approved':
@@ -1018,19 +1027,34 @@ def reports():
         requests = query.order_by(PaymentRequest.date.desc()).all()
     
     # Get unique departments for filter
-    departments = db.session.query(PaymentRequest.department).distinct().all()
-    departments = [d[0] for d in departments]
+    if current_user.role == 'Operation Manager':
+        # Operation Manager can only see specific departments
+        departments = ['Maintenance', 'Operation', 'Project Department']
+    else:
+        # Other roles can see all departments
+        departments = db.session.query(PaymentRequest.department).distinct().all()
+        departments = [d[0] for d in departments]
+    
+    # Get unique companies for filter (only for approved requests with company_name)
+    companies = db.session.query(PaymentRequest.company_name).filter(
+        PaymentRequest.status == 'Approved',
+        PaymentRequest.company_name.isnot(None),
+        PaymentRequest.company_name != ''
+    ).distinct().all()
+    companies = [c[0] for c in companies if c[0]]
     
     return render_template('reports.html', 
                          requests=requests, 
                          departments=departments,
+                         companies=companies,
+                         company_filter=company_filter,
                          user=current_user)
 
 
 
 @app.route('/reports/export/pdf')
 @login_required
-@role_required('Admin', 'Finance', 'GM', 'IT')
+@role_required('Admin', 'Finance', 'GM', 'IT', 'Operation Manager')
 def export_reports_pdf():
     """Export filtered reports to a PDF including total amount and full list"""
     # Lazy imports to avoid hard dependency during app startup
@@ -1050,16 +1074,26 @@ def export_reports_pdf():
     department_filter = request.args.get('department', '')
     status_filter = request.args.get('status', '')
     request_type_filter = request.args.get('request_type', '')
+    company_filter = request.args.get('company', '')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
 
     query = PaymentRequest.query
+    
+    # Role-based department filtering
+    if current_user.role == 'Operation Manager':
+        # Operation Manager can only see Maintenance, Operation, and Project Department
+        query = query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project Department']))
+    
     if department_filter:
         query = query.filter_by(department=department_filter)
     if status_filter:
         query = query.filter_by(status=status_filter)
     if request_type_filter:
         query = query.filter_by(request_type=request_type_filter)
+    if company_filter:
+        # Only filter by company name for approved requests with company_name
+        query = query.filter(PaymentRequest.company_name.ilike(f'%{company_filter}%'))
 
     if status_filter == 'Approved':
         if date_from:

@@ -26,15 +26,15 @@
                             {% endif %}
                             
                             {% if user.role == 'Project' %}
-                            <!-- Project role can access Item or Company -->
-                            <option value="Company">Company</option>
+                            <!-- Project role can access Item or Supplier/Rental -->
+                            <option value="Supplier/Rental">Supplier/Rental</option>
                             {% endif %}
                         </select>
                         <small>
                             {% if user.role == 'Finance' %}
                                 Available: Item, Person, Supplier/Rental
                             {% elif user.role == 'Project' %}
-                                Available: Item, Company
+                                Available: Item, Supplier/Rental
                             {% else %}
                                 Available: Item, Person
                             {% endif %}
@@ -472,10 +472,6 @@ function handleRequestTypeChange() {
         document.getElementById('personCompanyGroup').style.display = 'block';
         document.getElementById('person_company').required = true;
         recurringFields.style.display = 'none';
-    } else if (requestType === 'Company') {
-        document.getElementById('personCompanyGroup').style.display = 'block';
-        document.getElementById('person_company').required = true;
-        recurringFields.style.display = 'none';
     } else if (requestType === 'Supplier/Rental') {
         document.getElementById('companyNameGroup').style.display = 'block';
         document.getElementById('company_name').required = true;
@@ -895,5 +891,6 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
     }
 });
 </script>
+
 {% endblock %}
 

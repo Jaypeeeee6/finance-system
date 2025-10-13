@@ -47,6 +47,17 @@
                             <option value="Company" {% if request.args.get('request_type') == 'Company' %}selected{% endif %}>Company</option>
                         </select>
                     </div>
+
+                    <div class="form-group">
+                        <label for="company">Company Name</label>
+                        <select name="company" id="company">
+                            <option value="">All Companies</option>
+                            {% for company in companies %}
+                            <option value="{{ company }}" {% if company_filter == company %}selected{% endif %}>{{ company }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Only available for approved requests</small>
+                    </div>
                 </div>
 
                 <div class="form-row">
@@ -121,7 +132,7 @@
             <h2><i class="fas fa-table"></i> Report Results</h2>
             {% if requests and requests|length > 0 %}
             <div class="header-actions">
-                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf', department=request.args.get('department',''), status=request.args.get('status',''), request_type=request.args.get('request_type',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to','')) }}" onclick="showExportLoading()">
+                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf', department=request.args.get('department',''), status=request.args.get('status',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to','')) }}" onclick="showExportLoading()">
                     <i class="fas fa-file-pdf"></i> <span id="export-text">Export PDF</span>
                 </a>
             </div>
@@ -137,6 +148,7 @@
                                 <th>Type</th>
                                 <th>Requestor</th>
                                 <th>Department</th>
+                                <th>Company Name</th>
                                 <th>Submission Date</th>
                                 <th>Approval Date</th>
                                 <th>Amount</th>
@@ -152,6 +164,13 @@
                                 <td><span class="badge badge-info">{{ req.request_type }}</span></td>
                                 <td>{{ req.requestor_name }}</td>
                                 <td>{{ req.department }}</td>
+                                <td>
+                                    {% if req.company_name %}
+                                        <span class="badge badge-secondary">{{ req.company_name }}</span>
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
                                 <td>
                                     {% if req.approval_date %}
