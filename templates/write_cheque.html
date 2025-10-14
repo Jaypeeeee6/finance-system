@@ -43,22 +43,13 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="amountInWords">Amount in Words</label>
-                        <textarea id="amountInWords" name="amountInWords" class="form-control" rows="3" placeholder="Enter amount in words" required></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="purpose">And that for</label>
-                        <textarea id="purpose" name="purpose" class="form-control" rows="3" placeholder="Enter purpose or description" required></textarea>
-                    </div>
-
-                    <div class="form-group">
                         <label for="crossing">Crossing</label>
                         <select id="crossing" name="crossing" class="form-control">
                             <option value="">Select an option</option>
-                            <option value="General">General Crossing</option>
-                            <option value="Special">Special Crossing</option>
-                            <option value="Account Payee">Account Payee Only</option>
+                            <option value="Cancelled">Cancelled</option>
+                            <option value="A/C Payee">A/C Payee</option>
+                            <option value="Not Negotiable">Not Negotiable</option>
+                            <option value="Cash Only">Cash Only</option>
                         </select>
                     </div>
 
@@ -111,10 +102,11 @@
                         
                         <!-- Overlay fields that will be positioned over the cheque -->
                         <div class="cheque-overlay">
-                            <div class="field-overlay" id="dateOverlay" style="position: absolute; top: 40px; left: 290px; font-size: 14px;"></div>
-                            <div class="field-overlay" id="payeeOverlay" style="position: absolute; top: 103px; left: 160px; font-size: 14px;"></div>
-                            <div class="field-overlay" id="amountOverlay" style="position: absolute; top: 120px; left: 300px; font-size: 16px;"></div>
-                            <div class="field-overlay" id="amountWordsOverlay" style="position: absolute; top: 150px; left: 50px; font-size: 12px; max-width: 300px; line-height: 1.2;"></div>
+                            <div class="field-overlay" id="dateOverlay" style="position: absolute; top: 50px; left: 355px; font-size: 14px;"></div>
+                            <div class="field-overlay" id="payeeOverlay" style="position: absolute; top: 127px; left: 180px; font-size: 16px; max-width: 400px;"></div>
+                            <div class="field-overlay" id="amountOverlay" style="position: absolute; top: 175px; left: 578px; font-size: 16px;"></div>
+                            <div class="field-overlay" id="amountWordsOverlay" style="position: absolute; top: 160px; left: 98px; font-size: 14px; max-width: 300px; line-height: 2.0;"></div>
+                            <div class="field-overlay" id="crossingOverlay" style="position: absolute; top: 20px; left: 60px; font-size: 18px; font-weight: 700; text-transform: uppercase; transform: rotate(-25deg); color: rgba(200, 0, 0, 0.6);"></div>
                             <div class="field-overlay" id="purposeOverlay" style="position: absolute; top: 200px; left: 50px; font-size: 12px; max-width: 300px; line-height: 1.2;"></div>
                             <div class="field-overlay" id="chequeNumberOverlay" style="position: absolute; top: 250px; left: 400px; font-size: 14px;"></div>
                         </div>
@@ -134,6 +126,41 @@
         </div>
     </div>
 </div>
+
+<!-- Cheque Preview Modal -->
+<div id="chequePreviewModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-eye"></i> Cheque Preview</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="cheque-modal-container">
+                <div class="cheque-modal-image-container">
+                    <img id="modalChequeTemplate" src="{{ url_for('static', filename='cheque_templates/DHOFAR-ISLAMIC-BANK.png') }}" alt="Cheque Template" class="modal-cheque-template">
+                    
+                    <!-- Modal overlay fields -->
+                    <div class="modal-cheque-overlay">
+                        <div class="modal-field-overlay" id="modalDateOverlay"></div>
+                        <div class="modal-field-overlay" id="modalPayeeOverlay"></div>
+                        <div class="modal-field-overlay" id="modalAmountOverlay"></div>
+                        <div class="modal-field-overlay" id="modalAmountWordsOverlay"></div>
+                        <div class="modal-field-overlay" id="modalCrossingOverlay"></div>
+                        <div class="modal-field-overlay" id="modalChequeNumberOverlay"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-primary" id="printFromModal">
+                <i class="fas fa-print"></i> Print Cheque
+            </button>
+            <button type="button" class="btn btn-secondary" id="closeModal">
+                <i class="fas fa-times"></i> Close
+            </button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -141,26 +168,29 @@
 // Cheque field mapping for different banks
 const bankFieldPositions = {
     'dhofar_islamic': {
-        date: { top: '40px', left: '290px' },
-        payee: { top: '103px', left: '160px' },
-        amount: { top: '120px', left: '300px' },
-        amountWords: { top: '150px', left: '50px' },
+        date: { top: '50px', left: '355px' },
+        payee: { top: '127px', left: '180px' },
+        amount: { top: '175px', left: '578px' },
+        amountWords: { top: '160px', left: '98px' },
+        crossing: { top: '20px', left: '60px' },
         purpose: { top: '200px', left: '50px' },
         chequeNumber: { top: '250px', left: '400px' }
     },
     'oman_arab': {
-        date: { top: '30px', left: '180px' },
-        payee: { top: '90px', left: '120px' },
-        amount: { top: '130px', left: '320px' },
-        amountWords: { top: '160px', left: '60px' },
+        date: { top: '13px', left: '580px' },
+        payee: { top: '120px', left: '150px' },
+        amount: { top: '130px', left: '617px' },
+        amountWords: { top: '160px', left: '95px' },
+        crossing: { top: '15px', left: '40px' },
         purpose: { top: '210px', left: '60px' },
         chequeNumber: { top: '260px', left: '420px' }
     },
     'sohar': {
-        date: { top: '55px', left: '190px' },
-        payee: { top: '85px', left: '110px' },
-        amount: { top: '125px', left: '310px' },
-        amountWords: { top: '155px', left: '55px' },
+        date: { top: '52px', left: '555px' },
+        payee: { top: '116px', left: '115px' },
+        amount: { top: '163px', left: '568px' },
+        amountWords: { top: '153px', left: '80px' },
+        crossing: { top: '25px', left: '70px' },
         purpose: { top: '205px', left: '55px' },
         chequeNumber: { top: '255px', left: '410px' }
     }
@@ -201,7 +231,65 @@ function formatDate(dateString) {
 // Function to format amount
 function formatAmount(amount, currency) {
     if (!amount) return '';
-    return `${parseFloat(amount).toFixed(3)} ${currency}`;
+    const numeric = Number(amount);
+    const formatted = isNaN(numeric)
+        ? ''
+        : numeric.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+    // Show currency only when it's not OMR per requirements
+    return currency && currency !== 'OMR' ? `${formatted} ${currency}` : formatted;
+}
+
+// Convert integers to English words (supports up to trillions)
+function numberToWords(n) {
+    const ones = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
+    const tens = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
+    if (n < 20) return ones[n];
+    if (n < 100) {
+        const t = Math.floor(n / 10);
+        const r = n % 10;
+        return r ? `${tens[t]}-${ones[r]}` : tens[t];
+    }
+    if (n < 1000) {
+        const h = Math.floor(n / 100);
+        const r = n % 100;
+        return r ? `${ones[h]} hundred ${numberToWords(r)}` : `${ones[h]} hundred`;
+    }
+    const units = [
+        { v: 1_000_000_000_000, w: 'trillion' },
+        { v: 1_000_000_000, w: 'billion' },
+        { v: 1_000_000, w: 'million' },
+        { v: 1_000, w: 'thousand' }
+    ];
+    for (const u of units) {
+        if (n >= u.v) {
+            const q = Math.floor(n / u.v);
+            const r = n % u.v;
+            return r ? `${numberToWords(q)} ${u.w} ${numberToWords(r)}` : `${numberToWords(q)} ${u.w}`;
+        }
+    }
+    return '';
+}
+
+// Convert numeric amount to words (simple generic format)
+function amountToWords(amount) {
+    if (!amount && amount !== 0) return '';
+    const numeric = Number(amount);
+    if (!isFinite(numeric)) return '';
+    const fixed = numeric.toFixed(3); // keep three decimals to match input precision
+    const [intStr, decStr] = fixed.split('.');
+    const intNum = parseInt(intStr, 10);
+    let words = numberToWords(Math.abs(intNum));
+    if (intNum === 0) words = 'zero';
+    if (decStr && Number(decStr) > 0) {
+        const decWords = decStr.split('').map(d => numberToWords(parseInt(d, 10))).join(' ');
+        words = `${words} point ${decWords}`;
+    }
+    if (numeric < 0) words = `minus ${words}`;
+    // Capitalize first letter of each word and append "Omani Rials Only"
+    const capitalizedWords = words.split(' ').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+    return capitalizedWords + ' Omani Rials Only';
 }
 
 // Real-time field updates
@@ -228,19 +316,22 @@ function updateChequePreview() {
         amountOverlay.textContent = formatAmount(amountInput.value, currencySelect.value);
     }
     
-    // Update amount in words
-    const amountWordsInput = document.getElementById('amountInWords');
+    // Update amount in words (overlay only)
     const amountWordsOverlay = document.getElementById('amountWordsOverlay');
-    if (amountWordsInput && amountWordsOverlay) {
-        amountWordsOverlay.textContent = amountWordsInput.value;
+    if (amountInput && amountWordsOverlay) {
+        const words = amountToWords(amountInput.value);
+        amountWordsOverlay.textContent = words;
+    }
+
+    // Update crossing (slanted stamp on upper-left)
+    const crossingSelect = document.getElementById('crossing');
+    const crossingOverlay = document.getElementById('crossingOverlay');
+    if (crossingSelect && crossingOverlay) {
+        const text = crossingSelect.value ? crossingSelect.value.toUpperCase() : '';
+        crossingOverlay.textContent = text;
     }
     
-    // Update purpose
-    const purposeInput = document.getElementById('purpose');
-    const purposeOverlay = document.getElementById('purposeOverlay');
-    if (purposeInput && purposeOverlay) {
-        purposeOverlay.textContent = purposeInput.value;
-    }
+    // Purpose input removed; overlay is static for now
     
     // Update cheque number
     const chequeNumberInput = document.getElementById('chequeNumber');
@@ -261,8 +352,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add event listeners to all form fields
     const formFields = [
-        'chequeDate', 'payeeName', 'amount', 'currency', 
-        'amountInWords', 'purpose', 'chequeNumber'
+        'chequeDate', 'payeeName', 'amount', 'currency', 'crossing',
+        'chequeNumber'
     ];
     
     formFields.forEach(fieldId => {
@@ -272,6 +363,8 @@ document.addEventListener('DOMContentLoaded', function() {
             field.addEventListener('change', updateChequePreview);
         }
     });
+
+    // No amount-in-words input; overlay is auto-generated from amount
     
     // Bank selection handler
     const bankSelect = document.getElementById('bankSelect');
@@ -288,6 +381,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (previewBtn) {
         previewBtn.addEventListener('click', function() {
             updateChequePreview();
+            openChequeModal();
             // Enable print button after preview
             const printBtn = document.getElementById('printBtn');
             const printChequeBtn = document.getElementById('printChequeBtn');
@@ -311,6 +405,135 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Print functionality will be implemented later.');
         });
     }
+    
+    // Modal functionality
+    const modal = document.getElementById('chequePreviewModal');
+    const closeBtn = document.querySelector('.close');
+    const closeModalBtn = document.getElementById('closeModal');
+    const printFromModalBtn = document.getElementById('printFromModal');
+    
+    // Open modal function
+    function openChequeModal() {
+        if (modal) {
+            modal.style.display = 'block';
+            updateModalChequePreview();
+        }
+    }
+    
+    // Close modal function
+    function closeChequeModal() {
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+    
+    // Update modal cheque preview
+    function updateModalChequePreview() {
+        // Update modal template image
+        const bankSelect = document.getElementById('bankSelect');
+        const modalTemplate = document.getElementById('modalChequeTemplate');
+        if (bankSelect && modalTemplate) {
+            const bankImageMap = {
+                'dhofar_islamic': 'DHOFAR-ISLAMIC-BANK.png',
+                'oman_arab': 'OMAN-ARAB-BANK.png',
+                'sohar': 'SOHAR-BANK.png'
+            };
+            modalTemplate.src = `{{ url_for('static', filename='cheque_templates/') }}${bankImageMap[bankSelect.value]}`;
+        }
+        
+        // Update modal field positions
+        const selectedBank = bankSelect ? bankSelect.value : 'dhofar_islamic';
+        const positions = bankFieldPositions[selectedBank];
+        if (positions) {
+            Object.keys(positions).forEach(field => {
+                const modalOverlay = document.getElementById('modal' + field.charAt(0).toUpperCase() + field.slice(1) + 'Overlay');
+                if (modalOverlay) {
+                    modalOverlay.style.top = positions[field].top;
+                    modalOverlay.style.left = positions[field].left;
+                }
+            });
+        }
+        
+        // Update modal field content
+        const dateInput = document.getElementById('chequeDate');
+        const payeeInput = document.getElementById('payeeName');
+        const amountInput = document.getElementById('amount');
+        const currencySelect = document.getElementById('currency');
+        const crossingSelect = document.getElementById('crossing');
+        const chequeNumberInput = document.getElementById('chequeNumber');
+        
+        // Date
+        const modalDateOverlay = document.getElementById('modalDateOverlay');
+        if (dateInput && modalDateOverlay) {
+            modalDateOverlay.textContent = formatDate(dateInput.value);
+        }
+        
+        // Payee
+        const modalPayeeOverlay = document.getElementById('modalPayeeOverlay');
+        if (payeeInput && modalPayeeOverlay) {
+            modalPayeeOverlay.textContent = payeeInput.value;
+        }
+        
+        // Amount
+        const modalAmountOverlay = document.getElementById('modalAmountOverlay');
+        if (amountInput && currencySelect && modalAmountOverlay) {
+            modalAmountOverlay.textContent = formatAmount(amountInput.value, currencySelect.value);
+        }
+        
+        // Amount in words
+        const modalAmountWordsOverlay = document.getElementById('modalAmountWordsOverlay');
+        if (amountInput && modalAmountWordsOverlay) {
+            const words = amountToWords(amountInput.value);
+            modalAmountWordsOverlay.textContent = words;
+        }
+        
+        // Crossing
+        const modalCrossingOverlay = document.getElementById('modalCrossingOverlay');
+        if (crossingSelect && modalCrossingOverlay) {
+            const text = crossingSelect.value ? crossingSelect.value.toUpperCase() : '';
+            modalCrossingOverlay.textContent = text;
+            modalCrossingOverlay.style.transform = 'rotate(-25deg)';
+            modalCrossingOverlay.style.fontWeight = '700';
+            modalCrossingOverlay.style.color = 'rgba(200, 0, 0, 0.6)';
+        }
+        
+        // Cheque number
+        const modalChequeNumberOverlay = document.getElementById('modalChequeNumberOverlay');
+        if (chequeNumberInput && modalChequeNumberOverlay) {
+            modalChequeNumberOverlay.textContent = chequeNumberInput.value;
+        }
+    }
+    
+    // Modal event listeners
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeChequeModal);
+    }
+    
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', closeChequeModal);
+    }
+    
+    if (printFromModalBtn) {
+        printFromModalBtn.addEventListener('click', function() {
+            alert('Print functionality will be implemented later.');
+        });
+    }
+    
+    // Close modal when clicking outside
+    if (modal) {
+        modal.addEventListener('click', function(event) {
+            if (event.target === modal) {
+                closeChequeModal();
+            }
+        });
+    }
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && modal && modal.style.display === 'block') {
+            closeChequeModal();
+        }
+    });
     
     // Initial field positions for default bank
     updateFieldPositions('dhofar_islamic');
