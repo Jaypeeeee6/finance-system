@@ -121,18 +121,11 @@
                         <input type="hidden" name="variable_amounts" id="variable_amounts" value="false">
                         <input type="hidden" name="payment_schedule" id="payment_schedule" value="[]">
                         
-                        <!-- Show current configuration if set -->
-                        <div id="currentConfig" class="current-config" style="display: none;">
-                            <div class="config-display">
-                                <i class="fas fa-calendar-check"></i>
-                                <div class="config-text">
-                                    <strong>Current Schedule:</strong>
-                                    <span id="currentScheduleText">Not configured</span>
-                                </div>
-                                <button type="button" class="btn-edit-config" onclick="openRecurringModal()">
-                                    <i class="fas fa-edit"></i> Edit
-                                </button>
-                            </div>
+                        <!-- Edit button - shown when Recurring is selected -->
+                        <div id="configureButton" class="form-group" style="display: none; margin-top: 35px;">
+                            <button type="button" class="btn btn-outline-primary" onclick="openRecurringModal()">
+                                <i class="fas fa-edit"></i> Edit Payment Schedule
+                            </button>
                         </div>
                     </div>
 
@@ -145,61 +138,20 @@
                                     <i class="fas fa-calendar-alt"></i>
                                     <h2>Configure Recurring Payment</h2>
                                 </div>
-                                <button class="close-btn" onclick="closeRecurringModal()">
+                                <button type="button" class="close-btn" onclick="closeRecurringModal()">
                                     <i class="fas fa-times"></i>
                                 </button>
                             </div>
                             
                             <div class="recurring-modal-body">
-                                <!-- Frequency Selection -->
-                                <div class="config-section">
-                                    <h3><i class="fas fa-clock"></i> Frequency</h3>
-                                    <div class="frequency-options">
-                                        <label class="frequency-option">
-                                            <input type="radio" name="frequency" value="daily" onchange="updateFrequencyOptions()">
-                                            <div class="option-card">
-                                                <i class="fas fa-calendar-day"></i>
-                                                <span>Daily</span>
-                                            </div>
-                                        </label>
-                                        <label class="frequency-option">
-                                            <input type="radio" name="frequency" value="weekly" onchange="updateFrequencyOptions()">
-                                            <div class="option-card">
-                                                <i class="fas fa-calendar-week"></i>
-                                                <span>Weekly</span>
-                                            </div>
-                                        </label>
-                                        <label class="frequency-option">
-                                            <input type="radio" name="frequency" value="monthly" onchange="updateFrequencyOptions()" checked>
-                                            <div class="option-card active">
-                                                <i class="fas fa-calendar"></i>
-                                                <span>Monthly</span>
-                                            </div>
-                                        </label>
-                                        <label class="frequency-option">
-                                            <input type="radio" name="frequency" value="quarterly" onchange="updateFrequencyOptions()">
-                                            <div class="option-card">
-                                                <i class="fas fa-calendar-alt"></i>
-                                                <span>Quarterly</span>
-                                            </div>
-                                        </label>
-                                        <label class="frequency-option">
-                                            <input type="radio" name="frequency" value="yearly" onchange="updateFrequencyOptions()">
-                                            <div class="option-card">
-                                                <i class="fas fa-calendar-check"></i>
-                                                <span>Yearly</span>
-                                            </div>
-                                        </label>
-                                    </div>
-                                    </div>
 
                                 <!-- Interval Configuration -->
                                 <div class="config-section">
-                                    <h3><i class="fas fa-repeat"></i> Interval</h3>
+                                    <h3><i class="fas fa-repeat"></i> Payment Schedule</h3>
                                     <div class="interval-config">
                                         <label>Every</label>
                                         <input type="number" id="intervalValue" value="1" min="1" max="99" onchange="updateSchedulePreview()">
-                                        <span id="intervalUnit">month(s)</span>
+                                        <span>month(s)</span>
                                     </div>
                                 </div>
 
@@ -207,50 +159,6 @@
                                 <div class="config-section" id="specificOptions">
                                     <h3><i class="fas fa-cog"></i> Specific Settings</h3>
                                     
-                                    <!-- Daily Options -->
-                                    <div id="dailyOptions" class="specific-options" style="display: none;">
-                                        <div class="time-selection">
-                                            <label>Time of day:</label>
-                                            <input type="time" id="dailyTime" value="09:00" onchange="updateSchedulePreview()">
-                                        </div>
-                                    </div>
-
-                                    <!-- Weekly Options -->
-                                    <div id="weeklyOptions" class="specific-options" style="display: none;">
-                                        <div class="day-selection">
-                                            <label>Days of the week:</label>
-                                            <div class="weekday-grid">
-                                                <label class="weekday-option">
-                                                    <input type="checkbox" value="monday" onchange="updateSchedulePreview()">
-                                                    <span>Mon</span>
-                                                </label>
-                                                <label class="weekday-option">
-                                                    <input type="checkbox" value="tuesday" onchange="updateSchedulePreview()">
-                                                    <span>Tue</span>
-                                                </label>
-                                                <label class="weekday-option">
-                                                    <input type="checkbox" value="wednesday" onchange="updateSchedulePreview()">
-                                                    <span>Wed</span>
-                                                </label>
-                                                <label class="weekday-option">
-                                                    <input type="checkbox" value="thursday" onchange="updateSchedulePreview()">
-                                                    <span>Thu</span>
-                                                </label>
-                                                <label class="weekday-option">
-                                                    <input type="checkbox" value="friday" onchange="updateSchedulePreview()">
-                                                    <span>Fri</span>
-                                                </label>
-                                                <label class="weekday-option">
-                                                    <input type="checkbox" value="saturday" onchange="updateSchedulePreview()">
-                                                    <span>Sat</span>
-                                                </label>
-                                                <label class="weekday-option">
-                                                    <input type="checkbox" value="sunday" onchange="updateSchedulePreview()">
-                                                    <span>Sun</span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
 
                                     <!-- Monthly Options -->
                                     <div id="monthlyOptions" class="specific-options">
@@ -278,7 +186,7 @@
                                                 </div>
                                             </div>
                                             <div class="calendar-container">
-                                                <label>Select day(s) of the month:</label>
+                                                <label>Select starting date:</label>
                                                 <div id="calendarGrid" class="calendar-grid">
                                                     <!-- Calendar will be generated by JavaScript -->
                                                 </div>
@@ -286,119 +194,6 @@
                                         </div>
                                     </div>
 
-                                    <!-- Quarterly Options -->
-                                    <div id="quarterlyOptions" class="specific-options" style="display: none;">
-                                        <div class="quarterly-config">
-                                            <label>Months:</label>
-                                            <div class="month-grid">
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="1" onchange="updateSchedulePreview()">
-                                                    <span>Jan</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="2" onchange="updateSchedulePreview()">
-                                                    <span>Feb</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="3" onchange="updateSchedulePreview()">
-                                                    <span>Mar</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="4" onchange="updateSchedulePreview()">
-                                                    <span>Apr</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="5" onchange="updateSchedulePreview()">
-                                                    <span>May</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="6" onchange="updateSchedulePreview()">
-                                                    <span>Jun</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="7" onchange="updateSchedulePreview()">
-                                                    <span>Jul</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="8" onchange="updateSchedulePreview()">
-                                                    <span>Aug</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="9" onchange="updateSchedulePreview()">
-                                                    <span>Sep</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="10" onchange="updateSchedulePreview()">
-                                                    <span>Oct</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="11" onchange="updateSchedulePreview()">
-                                                    <span>Nov</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="12" onchange="updateSchedulePreview()">
-                                                    <span>Dec</span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Yearly Options -->
-                                    <div id="yearlyOptions" class="specific-options" style="display: none;">
-                                        <div class="yearly-config">
-                                            <label>Months:</label>
-                                            <div class="month-grid">
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="1" onchange="updateSchedulePreview()">
-                                                    <span>Jan</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="2" onchange="updateSchedulePreview()">
-                                                    <span>Feb</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="3" onchange="updateSchedulePreview()">
-                                                    <span>Mar</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="4" onchange="updateSchedulePreview()">
-                                                    <span>Apr</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="5" onchange="updateSchedulePreview()">
-                                                    <span>May</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="6" onchange="updateSchedulePreview()">
-                                                    <span>Jun</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="7" onchange="updateSchedulePreview()">
-                                                    <span>Jul</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="8" onchange="updateSchedulePreview()">
-                                                    <span>Aug</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="9" onchange="updateSchedulePreview()">
-                                                    <span>Sep</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="10" onchange="updateSchedulePreview()">
-                                                    <span>Oct</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="11" onchange="updateSchedulePreview()">
-                                                    <span>Nov</span>
-                                                </label>
-                                                <label class="month-option">
-                                                    <input type="checkbox" value="12" onchange="updateSchedulePreview()">
-                                                    <span>Dec</span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
 
                                 <!-- Schedule Preview -->
@@ -460,8 +255,8 @@
                             </div>
                             
                             <div class="recurring-modal-footer">
-                                <button type="button" class="btn-cancel" onclick="closeRecurringModal()">
-                                    <i class="fas fa-times"></i> Cancel
+                                <button type="button" class="btn-start-fresh" onclick="clearSavedPreferences()" style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; margin-right: 10px;">
+                                    <i class="fas fa-refresh"></i> Start Fresh
                                 </button>
                                 <button type="button" class="btn-save" onclick="saveRecurringConfig()">
                                     <i class="fas fa-check"></i> Save Configuration
@@ -555,18 +350,29 @@ function handleRecurringChange() {
     const recurring = document.getElementById('recurring').value;
     
     if (recurring === 'Recurring') {
+        // Show the edit button
+        document.getElementById('configureButton').style.display = 'block';
+        // Clear any existing configuration to start fresh
+        document.getElementById('recurring_interval').value = '';
+        // Open the modal automatically
         openRecurringModal();
     } else {
         document.getElementById('recurring_interval').value = '';
         closeRecurringModal();
+        // Hide the edit button
+        document.getElementById('configureButton').style.display = 'none';
     }
 }
 
 function initializeRecurringModal() {
+    console.log('🔧 DEBUG: initializeRecurringModal - starting');
+    
     // Set default values
     updateFrequencyOptions();
     updateSchedulePreview();
     initializeCalendar();
+    
+    console.log('🔧 DEBUG: initializeRecurringModal - completed');
 }
 
 function initializeCalendar() {
@@ -594,6 +400,7 @@ function initializeCalendar() {
     highlightCurrentDate();
 }
 
+
 function highlightCurrentDate() {
     const now = new Date();
     const currentDay = now.getDate();
@@ -613,6 +420,8 @@ function highlightCurrentDate() {
         });
     }
 }
+
+
 
 function updateCalendarDays() {
     const monthSelect = document.getElementById('monthSelect');
@@ -641,6 +450,15 @@ function updateCalendarDays() {
     
     calendarGrid.innerHTML = '';
     
+    // Create calendar header
+    const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    dayHeaders.forEach(day => {
+        const dayHeader = document.createElement('div');
+        dayHeader.className = 'calendar-header';
+        dayHeader.textContent = day;
+        calendarGrid.appendChild(dayHeader);
+    });
+    
     // Add empty cells for days before the first day of the month
     // firstDay already matches our header order (0=Sunday, 1=Monday, etc.)
     for (let i = 0; i < firstDay; i++) {
@@ -657,6 +475,16 @@ function updateCalendarDays() {
         dayCell.dataset.day = day;
         dayCell.onclick = function() { toggleCalendarDay(this); };
         calendarGrid.appendChild(dayCell);
+    }
+    
+    // Highlight current date if viewing current month
+    const now = new Date();
+    if (month === now.getMonth() && year === now.getFullYear()) {
+        const currentDay = now.getDate();
+        const currentDayElement = document.querySelector(`#calendarGrid .calendar-day[data-day="${currentDay}"]`);
+        if (currentDayElement) {
+            currentDayElement.classList.add('current-date');
+        }
     }
     
     updateSchedulePreview();
@@ -683,93 +511,117 @@ function openRecurringModal() {
     // Initialize calendar when modal opens
     initializeCalendar();
     
-    // Load existing configuration if any
+    // Load existing configuration if any, or load temporary config
     loadExistingConfig();
     
     updateSchedulePreview();
 }
 
+function clearSavedPreferences() {
+    // Clear saved preferences from localStorage
+    localStorage.removeItem('paymentScheduleInterval');
+    localStorage.removeItem('paymentScheduleStartDate');
+    
+    // Reset the form to defaults
+    document.getElementById('intervalValue').value = '1';
+    document.getElementById('yearSelect').value = new Date().getFullYear();
+    document.getElementById('monthSelect').value = new Date().getMonth();
+    updateCalendarDays();
+    
+    // Clear any selected days
+    document.querySelectorAll('#monthlyOptions .calendar-day.selected').forEach(day => {
+        day.classList.remove('selected');
+    });
+    
+    updateSchedulePreview();
+    
+    console.log('🔧 DEBUG: clearSavedPreferences - cleared all saved preferences');
+}
+
+// Temporary storage for unsaved configuration
+let tempRecurringConfig = '';
+
+function saveTempConfig() {
+    const interval = document.getElementById('intervalValue').value;
+    let config = `monthly:${interval}`;
+    
+    // Handle monthly options
+    const selectedDays = Array.from(document.querySelectorAll('#monthlyOptions .calendar-day.selected'))
+        .map(day => day.dataset.day);
+    if (selectedDays.length > 0) {
+        const selectedMonth = document.getElementById('monthSelect').value;
+        const selectedYear = document.getElementById('yearSelect').value;
+        config += `:days:${selectedDays.join(',')}:${selectedYear}:${selectedMonth}`;
+    }
+    
+    console.log('Saving temp config:', config);
+    tempRecurringConfig = config;
+}
+
 function loadExistingConfig() {
-    const config = document.getElementById('recurring_interval').value;
-    if (config) {
+    const config = document.getElementById('recurring_interval').value || tempRecurringConfig;
+    console.log('Loading config:', config);
+    
+    // Only load saved preferences if there's no existing configuration
+    // This prevents new payment requests from inheriting previous choices
+    if (!config) {
+        console.log('No existing config, starting fresh...');
+        
+        // Don't automatically load saved preferences for new requests
+        // User can click "Start Fresh" if they want to use saved preferences
+        console.log('Starting with default values - no saved preferences loaded');
+    } else {
+        console.log('Existing config found, loading from config...');
+        
+        // Load from existing configuration
         const parts = config.split(':');
         const frequency = parts[0];
         const interval = parts[1];
         
-        // Set frequency
-        document.querySelector(`input[name="frequency"][value="${frequency}"]`).checked = true;
+        // All configurations are monthly now
         updateFrequencyOptions();
         
-        // Set interval
+        // Set interval from config
         document.getElementById('intervalValue').value = interval;
         
-        // Load specific settings based on frequency
-        if (frequency === 'daily' && parts[2] === 'time') {
-            document.getElementById('dailyTime').value = parts[3];
-        } else if (frequency === 'weekly' && parts[2] === 'days') {
+        // Load monthly settings
+        if (frequency === 'monthly' && parts[2] === 'days') {
             const days = parts[3].split(',');
-            days.forEach(day => {
-                const checkbox = document.querySelector(`#weeklyOptions input[value="${day}"]`);
-                if (checkbox) checkbox.checked = true;
-            });
-        } else if (frequency === 'monthly' && parts[2] === 'days') {
-            const days = parts[3].split(',');
-            days.forEach(day => {
-                const dayElement = document.querySelector(`#monthlyOptions .calendar-day[data-day="${day}"]`);
-                if (dayElement) dayElement.classList.add('selected');
-            });
-        } else if (frequency === 'quarterly' && parts[2] === 'months') {
-            const months = parts[3].split(',');
-            months.forEach(month => {
-                const checkbox = document.querySelector(`#quarterlyOptions input[value="${month}"]`);
-                if (checkbox) checkbox.checked = true;
-            });
-        } else if (frequency === 'yearly' && parts[2] === 'months') {
-            const months = parts[3].split(',');
-            months.forEach(month => {
-                const checkbox = document.querySelector(`#yearlyOptions input[value="${month}"]`);
-                if (checkbox) checkbox.checked = true;
-            });
+            // Set the correct month and year first if they exist
+            if (parts.length > 5) {
+                const year = parts[5];
+                const month = parts[4];
+                document.getElementById('yearSelect').value = year;
+                document.getElementById('monthSelect').value = month;
+                updateCalendarDays();
+            }
+            // Then select the days
+            setTimeout(() => {
+                days.forEach(day => {
+                    const dayElement = document.querySelector(`#monthlyOptions .calendar-day[data-day="${day}"]`);
+                    if (dayElement) {
+                        dayElement.classList.add('selected');
+                        console.log('Selected day:', day);
+                    }
+                });
+                updateSchedulePreview();
+            }, 100);
         }
     }
 }
 
 function closeRecurringModal() {
+    // Save current configuration to temporary storage before closing
+    saveTempConfig();
+    
     document.getElementById('recurringModal').style.display = 'none';
     document.body.style.overflow = 'auto';
 }
 
 function updateFrequencyOptions() {
-    const frequency = document.querySelector('input[name="frequency"]:checked').value;
-    const intervalUnit = document.getElementById('intervalUnit');
-    
-    // Update interval unit
-    const units = {
-        'daily': 'day(s)',
-        'weekly': 'week(s)',
-        'monthly': 'month(s)',
-        'quarterly': 'quarter(s)',
-        'yearly': 'year(s)'
-    };
-    intervalUnit.textContent = units[frequency];
-    
-    // Show/hide specific options
-    document.querySelectorAll('.specific-options').forEach(option => {
-        option.style.display = 'none';
-    });
-    
-    // Show relevant options
-    if (frequency === 'daily') {
-        document.getElementById('dailyOptions').style.display = 'block';
-    } else if (frequency === 'weekly') {
-        document.getElementById('weeklyOptions').style.display = 'block';
-    } else if (frequency === 'monthly') {
-        document.getElementById('monthlyOptions').style.display = 'block';
-    } else if (frequency === 'quarterly') {
-        document.getElementById('quarterlyOptions').style.display = 'block';
-    } else if (frequency === 'yearly') {
-        document.getElementById('yearlyOptions').style.display = 'block';
-    }
+    // All recurring payments are monthly by default
+    // Show monthly options
+    document.getElementById('monthlyOptions').style.display = 'block';
     
     updateSchedulePreview();
 }
@@ -793,167 +645,106 @@ function toggleCalendarDay(dayElement) {
 }
 
 function updateSchedulePreview() {
-    const frequency = document.querySelector('input[name="frequency"]:checked').value;
     const interval = document.getElementById('intervalValue').value;
-    const unit = document.getElementById('intervalUnit').textContent;
+    console.log('🔧 DEBUG: updateSchedulePreview - interval:', interval);
     
-    let preview = `Every ${interval} ${unit}`;
+    let preview = `Every ${interval} month(s)`;
     
     // Save configuration to hidden field in real-time
     saveConfigurationToHiddenField();
     
-    if (frequency === 'daily') {
-        const time = document.getElementById('dailyTime').value;
-        preview += ` at ${time}`;
-    } else if (frequency === 'weekly') {
-        const selectedDays = Array.from(document.querySelectorAll('#weeklyOptions input[type="checkbox"]:checked'))
-            .map(input => input.value);
-        if (selectedDays.length > 0) {
-            preview += ` on ${selectedDays.join(', ')}`;
-        }
-    } else if (frequency === 'monthly') {
-        const selectedDays = Array.from(document.querySelectorAll('#monthlyOptions .calendar-day.selected'))
-            .map(day => {
-                const dayNum = day.dataset.day;
-                const month = parseInt(document.getElementById('monthSelect').value);
-                const year = parseInt(document.getElementById('yearSelect').value);
-                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                return `${monthNames[month]} ${dayNum}, ${year}`;
-            })
-            .sort((a, b) => {
-                // Sort by actual date
-                const dateA = new Date(a);
-                const dateB = new Date(b);
-                return dateA - dateB;
-            });
-        if (selectedDays.length > 0) {
-            preview += ` on ${selectedDays.join(', ')}`;
-        }
-    } else if (frequency === 'quarterly') {
-        const selectedMonths = Array.from(document.querySelectorAll('#quarterlyOptions input[type="checkbox"]:checked'))
-            .map(input => {
-                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                return monthNames[parseInt(input.value) - 1];
-            });
-        if (selectedMonths.length > 0) {
-            preview += ` in ${selectedMonths.join(', ')}`;
-        }
-    } else if (frequency === 'yearly') {
-        const selectedMonths = Array.from(document.querySelectorAll('#yearlyOptions input[type="checkbox"]:checked'))
-            .map(input => {
-                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                return monthNames[parseInt(input.value) - 1];
-            });
-        if (selectedMonths.length > 0) {
-            preview += ` in ${selectedMonths.join(', ')}`;
-        }
+    // Handle monthly options
+    const selectedDays = Array.from(document.querySelectorAll('#monthlyOptions .calendar-day.selected'))
+        .map(day => {
+            const dayNum = day.dataset.day;
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            return `${monthNames[month]} ${dayNum}, ${year}`;
+        })
+        .sort((a, b) => {
+            // Sort by actual date
+            const dateA = new Date(a);
+            const dateB = new Date(b);
+            return dateA - dateB;
+        });
+    
+    console.log('🔧 DEBUG: updateSchedulePreview - selected days:', selectedDays);
+    
+    if (selectedDays.length > 0) {
+        preview += ` starting on ${selectedDays.join(', ')}`;
     }
     
+    console.log('🔧 DEBUG: updateSchedulePreview - final preview:', preview);
     document.getElementById('schedulePreview').textContent = preview;
     
     // If variable amounts are enabled, refresh the payment inputs
     const variableAmountsToggle = document.getElementById('variableAmountsToggle');
     if (variableAmountsToggle && variableAmountsToggle.checked) {
-        console.log('Schedule preview updated, refreshing variable amounts...');
+        console.log('🔧 DEBUG: updateSchedulePreview - schedule preview updated, refreshing variable amounts...');
         generatePaymentAmountInputs();
         updateAmountSummary();
     }
 }
 
 function saveConfigurationToHiddenField() {
-    const frequency = document.querySelector('input[name="frequency"]:checked').value;
     const interval = document.getElementById('intervalValue').value;
+    console.log('🔧 DEBUG: saveConfigurationToHiddenField - interval value:', interval);
     
-    let config = `${frequency}:${interval}`;
+    let config = `monthly:${interval}`;
     
-    if (frequency === 'daily') {
-        const time = document.getElementById('dailyTime').value;
-        config += `:time:${time}`;
-    } else if (frequency === 'weekly') {
-        const selectedDays = Array.from(document.querySelectorAll('#weeklyOptions input[type="checkbox"]:checked'))
-            .map(input => input.value);
-        if (selectedDays.length > 0) {
-            config += `:days:${selectedDays.join(',')}`;
-        }
-    } else if (frequency === 'monthly') {
-        const selectedDays = Array.from(document.querySelectorAll('#monthlyOptions .calendar-day.selected'))
-            .map(day => day.dataset.day);
-        if (selectedDays.length > 0) {
-            const selectedMonth = parseInt(document.getElementById('monthSelect').value) + 1; // Convert 0-based to 1-based
-            const selectedYear = document.getElementById('yearSelect').value;
-            config += `:days:${selectedDays.join(',')}:${selectedYear}:${selectedMonth}`;
-        }
-    } else if (frequency === 'quarterly') {
-        const selectedDays = Array.from(document.querySelectorAll('#quarterlyOptions .calendar-day.selected'))
-            .map(day => day.dataset.day);
-        if (selectedDays.length > 0) {
-            const selectedMonth = parseInt(document.getElementById('monthSelect').value) + 1; // Convert 0-based to 1-based
-            const selectedYear = document.getElementById('yearSelect').value;
-            config += `:days:${selectedDays.join(',')}:${selectedYear}:${selectedMonth}`;
-        }
-    } else if (frequency === 'yearly') {
-        const selectedMonths = Array.from(document.querySelectorAll('#yearlyOptions input[type="checkbox"]:checked'))
-            .map(input => input.value);
-        if (selectedMonths.length > 0) {
-            const selectedYear = document.getElementById('yearSelect').value;
-            config += `:months:${selectedMonths.join(',')}:${selectedYear}`;
-        }
+    // Handle monthly options
+    const selectedDays = Array.from(document.querySelectorAll('#monthlyOptions .calendar-day.selected'))
+        .map(day => day.dataset.day);
+    console.log('🔧 DEBUG: saveConfigurationToHiddenField - selected days:', selectedDays);
+    
+    if (selectedDays.length > 0) {
+        const selectedMonth = parseInt(document.getElementById('monthSelect').value) + 1; // Convert 0-based to 1-based
+        const selectedYear = document.getElementById('yearSelect').value;
+        console.log('🔧 DEBUG: saveConfigurationToHiddenField - selected month (1-based):', selectedMonth, 'selected year:', selectedYear);
+        config += `:days:${selectedDays.join(',')}:${selectedYear}:${selectedMonth}`;
     }
     
-    console.log('Real-time config being saved:', config);
+    console.log('🔧 DEBUG: saveConfigurationToHiddenField - final config:', config);
     document.getElementById('recurring_interval').value = config;
+    
+    // Save the user's choice for payment schedule as default
+    localStorage.setItem('paymentScheduleInterval', interval);
+    console.log('🔧 DEBUG: saveConfigurationToHiddenField - saved interval to localStorage:', interval);
+    
+    // Save the user's choice for starting date
+    if (selectedDays.length > 0) {
+        const selectedMonth = parseInt(document.getElementById('monthSelect').value);
+        const selectedYear = parseInt(document.getElementById('yearSelect').value);
+        const startDate = {
+            year: selectedYear,
+            month: selectedMonth,
+            days: selectedDays.map(d => parseInt(d))
+        };
+        localStorage.setItem('paymentScheduleStartDate', JSON.stringify(startDate));
+        console.log('🔧 DEBUG: saveConfigurationToHiddenField - saved start date to localStorage:', startDate);
+    }
 }
 
 function saveRecurringConfig() {
-    const frequency = document.querySelector('input[name="frequency"]:checked').value;
     const interval = document.getElementById('intervalValue').value;
     
-    let config = `${frequency}:${interval}`;
+    let config = `monthly:${interval}`;
     
-    console.log('Saving recurring config - frequency:', frequency, 'interval:', interval);
+    console.log('Saving recurring config - frequency: monthly, interval:', interval);
     
-    if (frequency === 'daily') {
-        const time = document.getElementById('dailyTime').value;
-        config += `:time:${time}`;
-    } else if (frequency === 'weekly') {
-        const selectedDays = Array.from(document.querySelectorAll('#weeklyOptions input[type="checkbox"]:checked'))
-            .map(input => input.value);
-        if (selectedDays.length > 0) {
-            config += `:days:${selectedDays.join(',')}`;
-        }
-    } else if (frequency === 'monthly') {
-        const selectedDays = Array.from(document.querySelectorAll('#monthlyOptions .calendar-day.selected'))
-            .map(day => day.dataset.day);
-        console.log('Selected days:', selectedDays);
+    // Handle monthly options
+    const selectedDays = Array.from(document.querySelectorAll('#monthlyOptions .calendar-day.selected'))
+        .map(day => day.dataset.day);
+    console.log('Selected days:', selectedDays);
+    
+    if (selectedDays.length > 0) {
+        const selectedMonth = parseInt(document.getElementById('monthSelect').value) + 1; // Convert 0-based to 1-based
+        const selectedYear = document.getElementById('yearSelect').value;
+        console.log('Selected month (1-based):', selectedMonth, 'Selected year:', selectedYear);
         
-        if (selectedDays.length > 0) {
-            const selectedMonth = document.getElementById('monthSelect').value;
-            const selectedYear = document.getElementById('yearSelect').value;
-            console.log('Selected month:', selectedMonth, 'Selected year:', selectedYear);
-            
-            config += `:days:${selectedDays.join(',')}:${selectedYear}:${selectedMonth}`;
-            console.log('Monthly config with date:', config);
-        }
-    } else if (frequency === 'quarterly') {
-        const selectedMonths = Array.from(document.querySelectorAll('#quarterlyOptions input[type="checkbox"]:checked'))
-            .map(input => input.value);
-        console.log('Selected quarterly months:', selectedMonths);
-        
-        if (selectedMonths.length > 0) {
-            const selectedYear = document.getElementById('yearSelect') ? document.getElementById('yearSelect').value : new Date().getFullYear();
-            config += `:months:${selectedMonths.join(',')}:${selectedYear}`;
-            console.log('Quarterly config with year:', config);
-        }
-    } else if (frequency === 'yearly') {
-        const selectedMonths = Array.from(document.querySelectorAll('#yearlyOptions input[type="checkbox"]:checked'))
-            .map(input => input.value);
-        console.log('Selected yearly months:', selectedMonths);
-        
-        if (selectedMonths.length > 0) {
-            const selectedYear = document.getElementById('yearSelect') ? document.getElementById('yearSelect').value : new Date().getFullYear();
-            config += `:months:${selectedMonths.join(',')}:${selectedYear}`;
-            console.log('Yearly config with year:', config);
-        }
+        config += `:days:${selectedDays.join(',')}:${selectedYear}:${selectedMonth}`;
+        console.log('Monthly config with date:', config);
     }
     
     console.log('Final config being saved:', config);
@@ -980,59 +771,15 @@ function saveRecurringConfig() {
         }, 100);
     }
     
+    // Clear temporary storage since config is now saved
+    tempRecurringConfig = '';
+    
     closeRecurringModal();
 }
 
 function showCurrentConfig() {
-    const config = document.getElementById('recurring_interval').value;
-    if (config) {
-        // Parse the configuration to show a readable format
-        const parts = config.split(':');
-        const frequency = parts[0];
-        const interval = parts[1];
-        
-        let displayText = `Every ${interval} `;
-        
-        if (frequency === 'daily') {
-            displayText += 'day(s)';
-            if (parts[2] && parts[2] === 'time') {
-                displayText += ` at ${parts[3]}`;
-            }
-        } else if (frequency === 'weekly') {
-            displayText += 'week(s)';
-            if (parts[2] && parts[2] === 'days') {
-                const days = parts[3].split(',');
-                displayText += ` on ${days.join(', ')}`;
-            }
-        } else if (frequency === 'monthly') {
-            displayText += 'month(s)';
-            if (parts[2] && parts[2] === 'days') {
-                const days = parts[3].split(',');
-                displayText += ` on day ${days.join(', ')}`;
-            }
-        } else if (frequency === 'quarterly') {
-            displayText += 'quarter(s)';
-            if (parts[2] && parts[2] === 'months') {
-                const months = parts[3].split(',');
-                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                const monthNamesList = months.map(m => monthNames[parseInt(m) - 1]).join(', ');
-                displayText += ` in ${monthNamesList}`;
-            }
-        } else if (frequency === 'yearly') {
-            displayText += 'year(s)';
-            if (parts[2] && parts[2] === 'months') {
-                const months = parts[3].split(',');
-                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                const monthNamesList = months.map(m => monthNames[parseInt(m) - 1]).join(', ');
-                displayText += ` in ${monthNamesList}`;
-            }
-        }
-        
-        document.getElementById('currentScheduleText').textContent = displayText;
-        document.getElementById('currentConfig').style.display = 'block';
-    } else {
-        document.getElementById('currentConfig').style.display = 'none';
-    }
+    // Always show the edit button when this function is called
+    document.getElementById('configureButton').style.display = 'block';
 }
 
 // Variable Amount Functions
@@ -1041,24 +788,24 @@ function toggleVariableAmounts() {
     const section = document.getElementById('variableAmountsSection');
     const variableAmountsField = document.getElementById('variable_amounts');
     
-    console.log('Toggle variable amounts clicked:', toggle.checked);
-    console.log('Section element:', section);
-    console.log('Variable amounts field:', variableAmountsField);
+    console.log('🔧 DEBUG: toggleVariableAmounts - toggle checked:', toggle.checked);
+    console.log('🔧 DEBUG: toggleVariableAmounts - section element:', section);
+    console.log('🔧 DEBUG: toggleVariableAmounts - variable amounts field:', variableAmountsField);
     
     if (toggle.checked) {
         section.style.display = 'block';
         variableAmountsField.value = 'true';
-        console.log('Variable amounts enabled, generating inputs...');
+        console.log('🔧 DEBUG: toggleVariableAmounts - variable amounts enabled, generating inputs...');
         
         // Get the current amount
         const currentAmount = document.getElementById('amount').value;
-        console.log('Current amount:', currentAmount);
+        console.log('🔧 DEBUG: toggleVariableAmounts - current amount:', currentAmount);
         
         // Check if we have a recurring configuration
         const recurringConfig = document.getElementById('recurring_interval').value;
-        console.log('Recurring config when toggling:', recurringConfig);
-        console.log('Recurring config length:', recurringConfig ? recurringConfig.length : 0);
-        console.log('Recurring config type:', typeof recurringConfig);
+        console.log('🔧 DEBUG: toggleVariableAmounts - recurring config when toggling:', recurringConfig);
+        console.log('🔧 DEBUG: toggleVariableAmounts - recurring config length:', recurringConfig ? recurringConfig.length : 0);
+        console.log('🔧 DEBUG: toggleVariableAmounts - recurring config type:', typeof recurringConfig);
         
         generatePaymentAmountInputs();
         updateAmountSummary();
@@ -1090,10 +837,10 @@ function generatePaymentAmountInputs() {
     container.innerHTML = '';
     
     if (scheduleDates.length === 0) {
-        // If no schedule dates are available, generate some default dates
-        console.log('No schedule dates found, generating default dates...');
-        const defaultDates = generateDefaultDates();
-        console.log('Default dates generated:', defaultDates);
+        // If no schedule dates are available, generate some default dates using user's saved choices
+        console.log('No schedule dates found, generating default dates using user choices...');
+        const defaultDates = generateDefaultDatesWithUserChoices();
+        console.log('Default dates generated with user choices:', defaultDates);
         
         defaultDates.forEach((date, index) => {
             const paymentDiv = document.createElement('div');
@@ -1203,6 +950,66 @@ function generateDefaultDates() {
     return dates;
 }
 
+function generateDefaultDatesWithUserChoices() {
+    console.log('🔧 DEBUG: generateDefaultDatesWithUserChoices - starting');
+    
+    // Generate default dates using the user's saved choices
+    const dates = [];
+    
+    // Get saved user choices
+    const savedInterval = localStorage.getItem('paymentScheduleInterval');
+    const savedStartDate = localStorage.getItem('paymentScheduleStartDate');
+    console.log('🔧 DEBUG: generateDefaultDatesWithUserChoices - saved interval:', savedInterval, 'saved start date:', savedStartDate);
+    
+    let startDate;
+    let interval = 1; // Default interval
+    
+    // Use saved interval if available
+    if (savedInterval) {
+        interval = parseInt(savedInterval);
+        console.log('🔧 DEBUG: generateDefaultDatesWithUserChoices - using saved interval:', interval);
+    } else {
+        console.log('🔧 DEBUG: generateDefaultDatesWithUserChoices - no saved interval, using default:', interval);
+    }
+    
+    // Use saved start date if available
+    if (savedStartDate) {
+        try {
+            const startDateData = JSON.parse(savedStartDate);
+            console.log('🔧 DEBUG: generateDefaultDatesWithUserChoices - parsed start date data:', startDateData);
+            // Use the earliest day as the start date
+            const earliestDay = Math.min(...startDateData.days);
+            startDate = new Date(startDateData.year, startDateData.month, earliestDay);
+            console.log('🔧 DEBUG: generateDefaultDatesWithUserChoices - using saved start date:', startDate.toISOString().split('T')[0]);
+        } catch (e) {
+            console.error('🔧 DEBUG: generateDefaultDatesWithUserChoices - error parsing saved start date:', e);
+            startDate = new Date();
+        }
+    } else {
+        console.log('🔧 DEBUG: generateDefaultDatesWithUserChoices - no saved start date, checking config');
+        // Try to get from current configuration
+        const config = document.getElementById('recurring_interval').value;
+        console.log('🔧 DEBUG: generateDefaultDatesWithUserChoices - config:', config);
+        if (config) {
+            const parts = config.split(':');
+            startDate = extractStartDateFromConfig(parts);
+            console.log('🔧 DEBUG: generateDefaultDatesWithUserChoices - extracted start date from config:', startDate);
+        }
+        
+        if (!startDate) {
+            console.log('🔧 DEBUG: generateDefaultDatesWithUserChoices - no start date found, using current date');
+            startDate = new Date();
+        }
+    }
+    
+    // Generate the first payment date (always the starting date)
+    const firstDate = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
+    dates.push(firstDate);
+    
+    console.log('🔧 DEBUG: generateDefaultDatesWithUserChoices - final dates:', dates);
+    return dates;
+}
+
 function extractStartDateFromConfig(parts) {
     const frequency = parts[0];
     
@@ -1222,62 +1029,6 @@ function extractStartDateFromConfig(parts) {
         console.log('Date local string:', date.toLocaleDateString());
         return date;
     }
-    else if (frequency === 'quarterly' && parts.length > 2 && parts[2] === 'months') {
-        // Quarterly configuration - use first selected month
-        const months = parts[3].split(',');
-        const firstMonth = parseInt(months[0]) - 1; // Convert to 0-based month
-        const year = parseInt(parts[4]) || new Date().getFullYear();
-        
-        console.log('Quarterly config - month:', firstMonth, 'year:', year);
-        return new Date(year, firstMonth, 1); // Use 1st day of the month
-    }
-    else if (frequency === 'yearly' && parts.length > 2 && parts[2] === 'months') {
-        // Yearly configuration - use first selected month
-        const months = parts[3].split(',');
-        const firstMonth = parseInt(months[0]) - 1; // Convert to 0-based month
-        const year = parseInt(parts[4]) || new Date().getFullYear();
-        
-        console.log('Yearly config - month:', firstMonth, 'year:', year);
-        return new Date(year, firstMonth, 1); // Use 1st day of the month
-    }
-    else if (frequency === 'weekly' && parts.length > 2 && parts[2] === 'days') {
-        // Weekly configuration - use current week with selected days
-        const days = parts[3].split(',');
-        const firstDay = days[0];
-        
-        // Find next occurrence of the selected day
-        const today = new Date();
-        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        const targetDayIndex = dayNames.indexOf(firstDay);
-        
-        if (targetDayIndex !== -1) {
-            const daysUntilTarget = (targetDayIndex - today.getDay() + 7) % 7;
-            const targetDate = new Date(today);
-            targetDate.setDate(today.getDate() + daysUntilTarget);
-            
-            console.log('Weekly config - day:', firstDay, 'target date:', targetDate.toISOString().split('T')[0]);
-            return targetDate;
-        }
-    }
-    else if (frequency === 'daily') {
-        // Daily configuration - use today or tomorrow based on time
-        const today = new Date();
-        if (parts.length > 2 && parts[2] === 'time') {
-            const time = parts[3];
-            const [hours, minutes] = time.split(':').map(Number);
-            const scheduledTime = new Date(today);
-            scheduledTime.setHours(hours, minutes, 0, 0);
-            
-            // If scheduled time has passed today, use tomorrow
-            if (scheduledTime <= today) {
-                scheduledTime.setDate(scheduledTime.getDate() + 1);
-            }
-            
-            console.log('Daily config - time:', time, 'scheduled date:', scheduledTime.toISOString().split('T')[0]);
-            return scheduledTime;
-        }
-        return today;
-    }
     
     return null;
 }
@@ -1285,26 +1036,33 @@ function extractStartDateFromConfig(parts) {
 function getScheduleDates() {
     // This function should extract dates from the current schedule configuration
     const config = document.getElementById('recurring_interval').value;
-    if (!config) return [];
+    console.log('🔧 DEBUG: getScheduleDates - config:', config);
+    
+    if (!config) {
+        console.log('🔧 DEBUG: getScheduleDates - no config found, returning empty array');
+        return [];
+    }
     
     // Parse the configuration and generate dates
     const parts = config.split(':');
     const frequency = parts[0];
     const interval = parseInt(parts[1]);
+    console.log('🔧 DEBUG: getScheduleDates - frequency:', frequency, 'interval:', interval);
     
     const dates = [];
     
     // Get the start date from the specific settings using the flexible extractor
     let startDate = extractStartDateFromConfig(parts);
+    console.log('🔧 DEBUG: getScheduleDates - extracted start date:', startDate);
     
     if (!startDate) {
-        console.log('Could not extract start date, using current date');
+        console.log('🔧 DEBUG: getScheduleDates - could not extract start date, using current date');
         startDate = new Date();
     }
     
     // Use local date formatting to avoid timezone issues
     const startDateString = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
-    console.log('Using start date for schedule:', startDateString);
+    console.log('🔧 DEBUG: getScheduleDates - using start date for schedule:', startDateString);
     
     // Generate payment dates based on the configuration
     if (frequency === 'monthly' && parts.length > 2 && parts[2] === 'days') {
@@ -1313,7 +1071,7 @@ function getScheduleDates() {
         const year = parseInt(parts[4]) || new Date().getFullYear();
         const month = parseInt(parts[5]) - 1 || new Date().getMonth(); // Convert 1-based to 0-based
         
-        console.log('Generating dates for multiple days:', days, 'year:', year, 'month:', month);
+        console.log('🔧 DEBUG: getScheduleDates - generating dates for multiple days:', days, 'year:', year, 'month:', month);
         
         // Generate dates for all selected days in the first month only (one payment per day)
         for (const day of days) {
@@ -1323,30 +1081,23 @@ function getScheduleDates() {
             dates.push(dateString);
         }
     } else {
-        // Generate payment dates based on the configuration (original logic)
+        // Generate payment dates based on the configuration (monthly only)
         // Generate 4 payment dates as an example
+        console.log('🔧 DEBUG: getScheduleDates - generating 4 payment dates with interval:', interval);
         for (let i = 0; i < 4; i++) {
             const paymentDate = new Date(startDate);
             
-            if (frequency === 'monthly') {
-                paymentDate.setMonth(paymentDate.getMonth() + (interval * i));
-            } else if (frequency === 'quarterly') {
-                paymentDate.setMonth(paymentDate.getMonth() + (interval * 3 * i));
-            } else if (frequency === 'yearly') {
-                paymentDate.setFullYear(paymentDate.getFullYear() + (interval * i));
-            } else if (frequency === 'weekly') {
-                paymentDate.setDate(paymentDate.getDate() + (interval * 7 * i));
-            } else if (frequency === 'daily') {
-                paymentDate.setDate(paymentDate.getDate() + (interval * i));
-            }
+            // All payments are monthly - use the user's chosen interval
+            paymentDate.setMonth(paymentDate.getMonth() + (interval * i));
             
             // Use local date formatting to avoid timezone issues
             const dateString = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, '0')}-${String(paymentDate.getDate()).padStart(2, '0')}`;
+            console.log(`🔧 DEBUG: getScheduleDates - payment ${i + 1} date:`, dateString, '(added', interval * i, 'months)');
             dates.push(dateString);
         }
     }
     
-    console.log('Generated schedule dates:', dates);
+    console.log('🔧 DEBUG: getScheduleDates - final generated dates:', dates);
     return dates;
 }
 
@@ -1392,8 +1143,11 @@ function updatePaymentSchedule() {
 // New functions for dynamic payment management
 
 function addNewPayment() {
+    console.log('🔧 DEBUG: addNewPayment - starting to add new payment');
+    
     const totalAmount = parseFloat(document.getElementById('amount').value) || 0;
     const remainingAmount = getRemainingAmount();
+    console.log('🔧 DEBUG: addNewPayment - total amount:', totalAmount, 'remaining amount:', remainingAmount);
     
     // Check if there's remaining amount to allocate
     if (remainingAmount <= 0) {
@@ -1403,25 +1157,37 @@ function addNewPayment() {
     
     // Get the recurring configuration to determine selected days
     const config = document.getElementById('recurring_interval').value;
+    console.log('🔧 DEBUG: addNewPayment - config:', config);
+    
     if (!config) {
         alert('No recurring configuration found. Please configure recurring payment first.');
         return;
     }
     
     const parts = config.split(':');
+    const interval = parseInt(parts[1]); // Get the user's chosen interval
+    console.log('🔧 DEBUG: addNewPayment - parsed interval:', interval);
+    
     if (parts.length > 2 && parts[2] === 'days') {
+        console.log('🔧 DEBUG: addNewPayment - handling multiple days');
         // Handle multiple days for monthly payments
         const days = parts[3].split(',').map(d => parseInt(d.trim()));
         const year = parseInt(parts[4]) || new Date().getFullYear();
         const month = parseInt(parts[5]) - 1 || new Date().getMonth(); // Convert 1-based to 0-based
         
+        console.log('🔧 DEBUG: addNewPayment - days:', days, 'year:', year, 'month:', month);
+        
         // Get the current number of payments to determine the next payment number
         const existingPayments = document.querySelectorAll('.payment-amount-item');
         const nextPaymentNumber = existingPayments.length + 1;
         
-        // Calculate how many payment rounds we've had (each round includes all selected days)
-        const paymentRounds = Math.floor((nextPaymentNumber - 1) / days.length);
-        const nextMonth = month + (paymentRounds + 1); // Add 1 for the next round
+        // Calculate how many complete payment cycles we've had
+        // Each cycle includes all selected days
+        const paymentCycles = Math.floor((nextPaymentNumber - 1) / days.length);
+        // Add the interval for the next cycle (paymentCycles already represents completed cycles)
+        const nextMonth = month + (interval * paymentCycles);
+        
+        console.log('🔧 DEBUG: addNewPayment - payment cycles:', paymentCycles, 'next payment number:', nextPaymentNumber, 'next month:', nextMonth);
         
         // Generate new payment dates for all selected days
         const container = document.getElementById('paymentAmountsList');
@@ -1430,6 +1196,8 @@ function addNewPayment() {
             const day = days[i];
             const paymentDate = new Date(year, nextMonth, day);
             const dateString = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, '0')}-${String(paymentDate.getDate()).padStart(2, '0')}`;
+            
+            console.log('🔧 DEBUG: addNewPayment - creating payment for day:', day, 'date:', dateString);
             
             const paymentDiv = document.createElement('div');
             paymentDiv.className = 'payment-amount-item';
@@ -1460,12 +1228,15 @@ function addNewPayment() {
             container.appendChild(paymentDiv);
         }
     } else {
-        // Handle single day or other frequencies (original logic)
-        const nextDate = generateNextPaymentDate();
+        console.log('🔧 DEBUG: addNewPayment - handling single day with interval:', interval);
+        // Handle single day or other frequencies using dynamic interval
+        const nextDate = generateNextPaymentDateWithInterval(interval);
         
         // Get the current number of payments to determine the next payment number
         const existingPayments = document.querySelectorAll('.payment-amount-item');
         const nextPaymentNumber = existingPayments.length + 1;
+        
+        console.log('🔧 DEBUG: addNewPayment - next payment number:', nextPaymentNumber, 'next date:', nextDate);
         
         // Create the new payment element
         const container = document.getElementById('paymentAmountsList');
@@ -1500,10 +1271,11 @@ function addNewPayment() {
     
     // Update the add button state
     updateAddButtonState();
+    console.log('🔧 DEBUG: addNewPayment - completed');
 }
 
 function generateNextPaymentDate() {
-    // Get the last payment date and add 2 months
+    // Get the last payment date and add 2 months (fallback for backward compatibility)
     const existingDates = Array.from(document.querySelectorAll('.payment-date')).map(el => el.textContent);
     if (existingDates.length === 0) {
         return '2025-10-14'; // First payment date
@@ -1514,6 +1286,42 @@ function generateNextPaymentDate() {
     nextDate.setMonth(nextDate.getMonth() + 2); // Add 2 months
     
     return nextDate.toISOString().split('T')[0];
+}
+
+function generateNextPaymentDateWithInterval(interval) {
+    console.log('🔧 DEBUG: generateNextPaymentDateWithInterval - interval:', interval);
+    
+    // Get the last payment date and add the user's chosen interval
+    const existingDates = Array.from(document.querySelectorAll('.payment-date')).map(el => el.textContent);
+    console.log('🔧 DEBUG: generateNextPaymentDateWithInterval - existing dates:', existingDates);
+    
+    if (existingDates.length === 0) {
+        // If no existing dates, get the start date from the configuration
+        const config = document.getElementById('recurring_interval').value;
+        console.log('🔧 DEBUG: generateNextPaymentDateWithInterval - no existing dates, checking config:', config);
+        
+        if (config) {
+            const parts = config.split(':');
+            const startDate = extractStartDateFromConfig(parts);
+            if (startDate) {
+                const dateString = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
+                console.log('🔧 DEBUG: generateNextPaymentDateWithInterval - using start date from config:', dateString);
+                return dateString;
+            }
+        }
+        console.log('🔧 DEBUG: generateNextPaymentDateWithInterval - using fallback date');
+        return '2025-10-14'; // Fallback first payment date
+    }
+    
+    const lastDate = new Date(existingDates[existingDates.length - 1]);
+    const nextDate = new Date(lastDate);
+    console.log('🔧 DEBUG: generateNextPaymentDateWithInterval - last date:', lastDate, 'adding', interval, 'months');
+    
+    nextDate.setMonth(nextDate.getMonth() + interval); // Add the user's chosen interval
+    
+    const result = nextDate.toISOString().split('T')[0];
+    console.log('🔧 DEBUG: generateNextPaymentDateWithInterval - result:', result);
+    return result;
 }
 
 function removePayment(button) {

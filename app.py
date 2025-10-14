@@ -17,13 +17,59 @@ app.config.from_object(Config)
 from datetime import timedelta
 app.jinja_env.globals.update(timedelta=timedelta)
 
-def format_recurring_schedule(interval):
+def format_recurring_schedule(interval, payment_schedule=None):
     """Format recurring interval into human-readable text"""
     try:
         parts = interval.split(':')
         frequency = parts[0]
         interval_value = int(parts[1])
         
+        # Handle the new format with specific dates
+        if frequency == 'monthly' and len(parts) > 2 and parts[2] == 'days':
+            # Extract specific days and dates
+            days = parts[3].split(',')
+            year = parts[4] if len(parts) > 4 else None
+            month = parts[5] if len(parts) > 5 else None
+            
+            # Format the starting dates using the exact same logic as the preview
+            if year and month:
+                month_names = ['January', 'February', 'March', 'April', 'May', 'June', 
+                             'July', 'August', 'September', 'October', 'November', 'December']
+                # The stored month is 1-based, but preview uses 0-based, so convert back
+                month_int = int(month) - 1  # Convert from 1-based to 0-based
+                month_name = month_names[month_int] if 0 <= month_int <= 11 else str(month)
+                starting_dates = [f"{month_name} {day}, {year}" for day in days]
+                starting_text = ", ".join(starting_dates)
+            else:
+                starting_text = f"days {', '.join(days)}"
+            
+            # Create the base schedule text using the exact same format as the preview
+            if interval_value == 1:
+                schedule_text = f"Every month starting on {starting_text}"
+            else:
+                schedule_text = f"Every {interval_value} months starting on {starting_text}"
+            
+            # Add payment schedule information if available
+            if payment_schedule:
+                try:
+                    import json
+                    schedule_data = json.loads(payment_schedule)
+                    if schedule_data:
+                        payment_details = []
+                        for payment in schedule_data:
+                            date = payment.get('date', '')
+                            amount = payment.get('amount', 0)
+                            if date and amount > 0:
+                                payment_details.append(f"{date}: {amount:.3f} OMR")
+                        
+                        if payment_details:
+                            schedule_text += f"\n\nPayment Schedule:\n" + "\n".join(payment_details)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            
+            return schedule_text
+        
+        # Handle legacy formats
         if frequency == 'daily':
             if interval_value == 1:
                 return "Daily"
@@ -1617,5 +1663,5 @@ def internal_error(error):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    socketio.run(app, debug=True, host='0.0.0.0', port=5001)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5005)
 
