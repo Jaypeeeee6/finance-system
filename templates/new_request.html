@@ -679,13 +679,27 @@ function saveTempConfig() {
     const interval = document.getElementById('intervalValue').value;
     let config = `monthly:${interval}`;
     
-    // Handle monthly options
-    const selectedDays = Array.from(document.querySelectorAll('#monthlyOptions .calendar-day.selected'))
-        .map(day => day.dataset.day);
-    if (selectedDays.length > 0) {
-        const selectedMonth = parseInt(document.getElementById('monthSelect').value) + 1; // Convert 0-based to 1-based
-        const selectedYear = document.getElementById('yearSelect').value;
-        config += `:days:${selectedDays.join(',')}:${selectedYear}:${selectedMonth}`;
+    // Handle monthly options - store the single selected date
+    if (selectedDates && selectedDates.length > 0) {
+        // Get the first (and only) selected date
+        const date = selectedDates[0];
+        const monthNum = String(date.month + 1).padStart(2, '0'); // Convert 0-based to 1-based and pad
+        const dayNum = String(date.day).padStart(2, '0');
+        const dateString = `${date.year}-${monthNum}-${dayNum}`;
+        
+        // Store the single date in the config
+        config += `:date:${dateString}`;
+        console.log('saveTempConfig - Selected date for config:', dateString);
+    }
+    
+    // Add end date if set
+    const endDateToggle = document.getElementById('endDateToggle');
+    if (endDateToggle && endDateToggle.checked) {
+        const endDate = getSelectedEndDate();
+        if (endDate) {
+            config += `:end:${endDate}`;
+            console.log('saveTempConfig - Added end date to config:', endDate);
+        }
     }
     
     console.log('Saving temp config:', config);
@@ -1045,6 +1059,16 @@ function saveRecurringConfig() {
         // Store the single date in the config
         config += `:date:${dateString}`;
         console.log('Selected date for config:', dateString);
+    }
+    
+    // Add end date if set
+    const endDateToggle = document.getElementById('endDateToggle');
+    if (endDateToggle && endDateToggle.checked) {
+        const endDate = getSelectedEndDate();
+        if (endDate) {
+            config += `:end:${endDate}`;
+            console.log('Added end date to config:', endDate);
+        }
     }
     
     console.log('Final config being saved:', config);

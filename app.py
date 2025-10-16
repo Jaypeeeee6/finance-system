@@ -24,8 +24,57 @@ def format_recurring_schedule(interval, payment_schedule=None):
         frequency = parts[0]
         interval_value = int(parts[1])
         
-        # Handle the new format with specific dates
-        if frequency == 'monthly' and len(parts) > 2 and parts[2] == 'days':
+        # Handle the new single date format
+        if frequency == 'monthly' and len(parts) > 2 and parts[2] == 'date':
+            # Extract the date (format: YYYY-MM-DD)
+            date_str = parts[3]
+            
+            try:
+                from datetime import datetime
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                formatted_date = date_obj.strftime('%B %d, %Y')
+            except ValueError:
+                formatted_date = date_str
+            
+            # Create the base schedule text
+            if interval_value == 1:
+                schedule_text = f"Every month starting on {formatted_date}"
+            else:
+                schedule_text = f"Every {interval_value} months starting on {formatted_date}"
+            
+            # Check for end date
+            end_date_index = parts.index('end') if 'end' in parts else -1
+            if end_date_index != -1 and end_date_index + 1 < len(parts):
+                end_date = parts[end_date_index + 1]
+                try:
+                    end_date_obj = datetime.strptime(end_date, '%Y-%m-%d')
+                    formatted_end_date = end_date_obj.strftime('%B %d, %Y')
+                    schedule_text += f" until {formatted_end_date}"
+                except ValueError:
+                    schedule_text += f" until {end_date}"
+            
+            # Add payment schedule information if available
+            if payment_schedule:
+                try:
+                    import json
+                    schedule_data = json.loads(payment_schedule)
+                    if schedule_data:
+                        payment_details = []
+                        for payment in schedule_data:
+                            date = payment.get('date', '')
+                            amount = payment.get('amount', 0)
+                            if date and amount > 0:
+                                payment_details.append(f"{date}: {amount:.3f} OMR")
+                        
+                        if payment_details:
+                            schedule_text += f"\n\nPayment Schedule:\n" + "\n".join(payment_details)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            
+            return schedule_text
+        
+        # Handle the old format with specific days (for backward compatibility)
+        elif frequency == 'monthly' and len(parts) > 2 and parts[2] == 'days':
             # Extract specific days and dates
             days = parts[3].split(',')
             year = parts[4] if len(parts) > 4 else None
@@ -35,8 +84,8 @@ def format_recurring_schedule(interval, payment_schedule=None):
             if year and month:
                 month_names = ['January', 'February', 'March', 'April', 'May', 'June', 
                              'July', 'August', 'September', 'October', 'November', 'December']
-                # The stored month is 0-based, so use it directly for array indexing
-                month_int = int(month)  # Month is already 0-based
+                # The stored month is 1-based (1-12), so convert to 0-based for array indexing
+                month_int = int(month) - 1  # Convert 1-based to 0-based
                 month_name = month_names[month_int] if 0 <= month_int <= 11 else str(month)
                 starting_dates = [f"{month_name} {day}, {year}" for day in days]
                 starting_text = ", ".join(starting_dates)
@@ -1704,21 +1753,28 @@ def internal_error(error):
 
 
 @app.route('/admin/calendar')
-@role_required('Admin')
+@role_required('Admin', 'Project')
 def admin_calendar():
-    """Admin calendar view for recurring payments"""
+    """Calendar view for recurring payments (Admin and Project roles)"""
     return render_template('admin_calendar.html')
 
 @app.route('/api/admin/recurring-events')
-@role_required('Admin')
+@role_required('Admin', 'Project')
 def api_admin_recurring_events():
-    """API endpoint for calendar events"""
+    """API endpoint for calendar events (Admin and Project roles)"""
     try:
-        # Get all recurring payment requests
-        recurring_requests = PaymentRequest.query.filter(
+        # Build query for approved recurring payment requests
+        query = PaymentRequest.query.filter(
             PaymentRequest.recurring_interval.isnot(None),
-            PaymentRequest.recurring_interval != ''
-        ).all()
+            PaymentRequest.recurring_interval != '',
+            PaymentRequest.status == 'Approved'
+        )
+        
+        # Project users can only see their department's requests
+        if current_user.role == 'Project':
+            query = query.filter(PaymentRequest.department == current_user.department)
+        
+        recurring_requests = query.all()
         
         events = []
         today = date.today()
@@ -1830,6 +1886,14 @@ def api_admin_recurring_events():
         print(f"Error generating calendar events: {e}")
         return jsonify([])
 
+def add_months(source_date, months):
+    """Add months to a date, handling month overflow correctly"""
+    month = source_date.month - 1 + months
+    year = source_date.year + month // 12
+    month = month % 12 + 1
+    day = min(source_date.day, [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1])
+    return date(year, month, day)
+
 def generate_future_due_dates(req, start_date, end_date):
     """Generate future due dates for a recurring request"""
     if not req.recurring_interval:
@@ -1847,8 +1911,46 @@ def generate_future_due_dates(req, start_date, end_date):
         if frequency == 'monthly':
             due_dates = []
             
-            # Check if specific days are configured
-            if len(parts) > 2 and parts[2] == 'days':
+            # Check for new :date: format (e.g., monthly:1:date:2025-10-18:end:2026-01-30)
+            if len(parts) > 2 and parts[2] == 'date':
+                # Parse the start date
+                try:
+                    base_date_str = parts[3]
+                    base_date = datetime.strptime(base_date_str, '%Y-%m-%d').date()
+                    
+                    # Parse end date if present
+                    config_end_date = None
+                    if 'end' in parts:
+                        end_index = parts.index('end')
+                        if end_index + 1 < len(parts):
+                            config_end_date = datetime.strptime(parts[end_index + 1], '%Y-%m-%d').date()
+                    
+                    # Use the earlier of the two end dates
+                    effective_end_date = end_date
+                    if config_end_date:
+                        effective_end_date = min(end_date, config_end_date)
+                    
+                    # Generate recurring dates starting from base_date
+                    current_date = base_date
+                    if current_date < start_date:
+                        # If base_date is before start_date, advance to the first occurrence after start_date
+                        months_diff = (start_date.year - base_date.year) * 12 + (start_date.month - base_date.month)
+                        cycles = (months_diff // interval) + 1
+                        current_date = add_months(base_date, cycles * interval)
+                    
+                    # Generate dates
+                    while current_date <= effective_end_date:
+                        if current_date >= start_date:
+                            due_dates.append((current_date, req.amount))
+                        # Move to next occurrence
+                        current_date = add_months(current_date, interval)
+                    
+                except (ValueError, IndexError) as e:
+                    print(f"Error parsing date format: {e}")
+                    return []
+            
+            # Check if old specific days format is configured
+            elif len(parts) > 2 and parts[2] == 'days':
                 # Parse specific days from the interval
                 days = [int(day) for day in parts[3].split(',')]
                 year = int(parts[4]) if len(parts) > 4 else start_date.year
