@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Calendar{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-calendar-alt"></i> Upcoming Due Calendar</h1>
+        <p>All upcoming recurring due dates across departments</p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="calendar-toolbar">
+                <div class="legend">
+                    <span class="legend-item"><span class="legend-dot" style="background:#8e24aa"></span> Due</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#2e7d32"></span> Paid</span>
+                </div>
+            </div>
+            <div id="calendar"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const calendarEl = document.getElementById('calendar');
+  const calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'dayGridMonth',
+    height: 'auto',
+    fixedWeekCount: false, // don't force 6 weeks; match actual month length
+    showNonCurrentDates: false, // hide prev/next month days in current view
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,timeGridDay'
+    },
+    dayMaxEventRows: true,
+    moreLinkClick: 'popover',
+    eventOrder: 'title',
+    events: '/api/admin/recurring-events',
+    eventContent: function(arg) {
+      // Custom content: show amount (title) large, then a small subtitle
+      const amount = arg.event.title;
+      const type = arg.event.extendedProps.requestType || '';
+      const company = arg.event.extendedProps.companyName || '';
+      const dept = arg.event.extendedProps.department || '';
+      const baseAmount = arg.event.extendedProps.baseAmount;
+      const remainingAmount = arg.event.extendedProps.remainingAmount;
+      const parts = [];
+      if (type) parts.push(type);
+      if (company) parts.push(company);
+      if (dept) parts.push(dept);
+      if (baseAmount && remainingAmount) parts.push(`Base: ${baseAmount} · Remaining: ${remainingAmount}`);
+      const subtitle = parts.join(' · ');
+      let innerHtml = `<div class=\"fc-event-main-custom\"><div class=\"amount\">${amount}</div><div class=\"meta\">${subtitle}</div></div>`;
+      return { html: innerHtml };
+    },
+    eventDidMount: function(info) {
+      // Native tooltip with full content
+      const ep = info.event.extendedProps || {};
+      const amount = info.event.title;
+      const parts = [];
+      if (ep.requestType) parts.push(ep.requestType);
+      if (ep.companyName) parts.push(ep.companyName);
+      if (ep.department) parts.push(ep.department);
+      if (ep.purpose) parts.push(ep.purpose);
+      if (ep.baseAmount && ep.remainingAmount) parts.push(`Base: ${ep.baseAmount} • Remaining: ${ep.remainingAmount}`);
+      info.el.title = `${amount} | ${parts.join(' • ')}`;
+    },
+    eventClick: function(info) {
+      if (info.event.url) {
+        // allow navigating to request view
+      }
+    }
+  });
+  calendar.render();
+});
+</script>
+<style>
+#calendar { width: 100%; }
+.calendar-toolbar { display:flex; justify-content:flex-end; margin-bottom:10px; }
+.legend { display:flex; gap:12px; align-items:center; }
+.legend-item { font-size: 12px; color:#555; }
+.legend-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; }
+.fc .fc-daygrid-event { padding: 0 2px; }
+.fc .paid-event .fc-event-main { opacity: 0.95; }
+.fc-event-main-custom { display:flex; flex-direction:column; line-height:1.15; padding:2px 0; }
+.fc-event-main-custom .amount { font-weight:600; font-size:12px; }
+.fc-event-main-custom .meta { font-size:10px; opacity:0.85; }
+</style>
+{% endblock %}
+
+

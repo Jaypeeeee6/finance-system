@@ -2261,3 +2261,25 @@ input:checked + .toggle-slider:before {
     margin-bottom: 0;
 }
 
+/* ==================== CALENDAR DATE VALIDATION ==================== */
+.calendar-day.disabled {
+    opacity: 0.3 !important;
+    cursor: not-allowed !important;
+    background-color: #f5f5f5 !important;
+    color: #999 !important;
+    pointer-events: none;
+}
+
+.calendar-day.disabled:hover {
+    background-color: #f5f5f5 !important;
+    color: #999 !important;
+    transform: none !important;
+}
+
+/* Ensure disabled days don't get selected styling */
+.calendar-day.disabled.selected {
+    background-color: #f5f5f5 !important;
+    color: #999 !important;
+    border: 1px solid #ddd !important;
+}
+

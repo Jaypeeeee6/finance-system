@@ -35,8 +35,8 @@ def format_recurring_schedule(interval, payment_schedule=None):
             if year and month:
                 month_names = ['January', 'February', 'March', 'April', 'May', 'June', 
                              'July', 'August', 'September', 'October', 'November', 'December']
-                # The stored month is 1-based, but preview uses 0-based, so convert back
-                month_int = int(month) - 1  # Convert from 1-based to 0-based
+                # The stored month is 0-based, so use it directly for array indexing
+                month_int = int(month)  # Month is already 0-based
                 month_name = month_names[month_int] if 0 <= month_int <= 11 else str(month)
                 starting_dates = [f"{month_name} {day}, {year}" for day in days]
                 starting_text = ", ".join(starting_dates)
@@ -48,6 +48,18 @@ def format_recurring_schedule(interval, payment_schedule=None):
                 schedule_text = f"Every month starting on {starting_text}"
             else:
                 schedule_text = f"Every {interval_value} months starting on {starting_text}"
+            
+            # Check for end date
+            end_date_index = parts.index('end') if 'end' in parts else -1
+            if end_date_index != -1 and end_date_index + 1 < len(parts):
+                end_date = parts[end_date_index + 1]
+                try:
+                    from datetime import datetime
+                    end_date_obj = datetime.strptime(end_date, '%Y-%m-%d')
+                    formatted_end_date = end_date_obj.strftime('%B %d, %Y')
+                    schedule_text += f" until {formatted_end_date}"
+                except ValueError:
+                    schedule_text += f" until {end_date}"
             
             # Add payment schedule information if available
             if payment_schedule:
@@ -255,9 +267,9 @@ def check_recurring_payments_due():
                     ).first()
                     
                     if not existing_notification:
-                        # Create notifications for all users in the department
-                        department_users = User.query.filter_by(department=request.department).all()
-                        for user in department_users:
+                        # Create notifications for all admin and project users
+                        admin_users = User.query.filter(User.role.in_(['Admin', 'Project'])).all()
+                        for user in admin_users:
                             create_notification(
                                 user_id=user.user_id,
                                 title="Recurring Payment Due",
@@ -957,7 +969,38 @@ def view_request(request_id):
         ).update({'is_read': True})
         db.session.commit()
     
-    return render_template('view_request.html', request=req, user=current_user)
+    # Get schedule rows for variable payments - show for Admin review, but only allow payments when approved
+    schedule_rows = []
+    total_paid_amount = 0
+    if req.recurring_interval and 'monthly' in req.recurring_interval:
+        # Get variable payment schedule if exists
+        schedule = RecurringPaymentSchedule.query.filter_by(
+            request_id=request_id
+        ).order_by(RecurringPaymentSchedule.payment_order).all()
+        
+        if schedule:
+            # Calculate total paid and remaining amounts
+            total_paid_amount = 0
+            paid_notifications = PaidNotification.query.filter_by(request_id=request_id).all()
+            
+            for entry in schedule:
+                # Check if this installment is already paid
+                is_paid = any(
+                    paid_notif.paid_date == entry.payment_date 
+                    for paid_notif in paid_notifications
+                )
+                
+                # If this installment is paid, add its amount to total paid
+                if is_paid:
+                    total_paid_amount += entry.amount
+                
+                schedule_rows.append({
+                    'date': entry.payment_date,
+                    'amount': entry.amount,
+                    'is_paid': is_paid
+                })
+    
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount))
 
 
 @app.route('/request/<int:request_id>/approve', methods=['POST'])
@@ -1658,6 +1701,331 @@ def internal_error(error):
 
 # ==================== MAIN ====================
 
+
+
+@app.route('/admin/calendar')
+@role_required('Admin')
+def admin_calendar():
+    """Admin calendar view for recurring payments"""
+    return render_template('admin_calendar.html')
+
+@app.route('/api/admin/recurring-events')
+@role_required('Admin')
+def api_admin_recurring_events():
+    """API endpoint for calendar events"""
+    try:
+        # Get all recurring payment requests
+        recurring_requests = PaymentRequest.query.filter(
+            PaymentRequest.recurring_interval.isnot(None),
+            PaymentRequest.recurring_interval != ''
+        ).all()
+        
+        events = []
+        today = date.today()
+        
+        for req in recurring_requests:
+            # Check if this is a variable payment with installments
+            schedule = RecurringPaymentSchedule.query.filter_by(request_id=req.request_id).all()
+            
+            if schedule:
+                # For variable payments, calculate remaining amount
+                total_paid_amount = 0
+                paid_notifications = PaidNotification.query.filter_by(request_id=req.request_id).all()
+                
+                for installment in schedule:
+                    # Check if this specific installment is paid
+                    is_paid = any(
+                        paid_notif.paid_date == installment.payment_date 
+                        for paid_notif in paid_notifications
+                    )
+                    
+                    # If this installment is paid, add its amount to total paid
+                    if is_paid:
+                        total_paid_amount += float(installment.amount)
+                
+                # Calculate remaining amount
+                remaining_amount = float(req.amount) - total_paid_amount
+                
+                # If remaining amount is 0 or less, skip this request
+                if remaining_amount <= 0:
+                    continue
+            else:
+                # For regular recurring payments, check if there are any paid notifications
+                paid_notifications_count = PaidNotification.query.filter_by(request_id=req.request_id).count()
+                
+                # If there are paid notifications, skip this request entirely
+                if paid_notifications_count > 0:
+                    continue
+            
+            if schedule:
+                # For variable payments, show only the specific installment dates
+                for installment in schedule:
+                    # Check if this specific installment is paid
+                    paid_notification = PaidNotification.query.filter_by(
+                        request_id=req.request_id,
+                        paid_date=installment.payment_date
+                    ).first()
+                    
+                    # Determine event color
+                    event_color = '#2e7d32' if paid_notification else '#8e24aa'
+                    
+                    # Calculate remaining amount
+                    total_paid = sum(
+                        pn.amount if hasattr(pn, 'amount') else 0 
+                        for pn in PaidNotification.query.filter_by(request_id=req.request_id).all()
+                    )
+                    remaining_amount = req.amount - total_paid
+                    
+                    events.append({
+                        'title': f'OMR {installment.amount:.3f}',
+                        'start': installment.payment_date.isoformat(),
+                        'color': event_color,
+                        'url': f'/request/{req.request_id}',
+                        'extendedProps': {
+                            'requestId': req.request_id,
+                            'requestType': req.request_type,
+                            'companyName': req.company_name,
+                            'department': req.department,
+                            'purpose': req.purpose,
+                            'baseAmount': f'OMR {req.amount:.3f}',
+                            'remainingAmount': f'OMR {remaining_amount:.3f}'
+                        }
+                    })
+            else:
+                # For regular recurring payments, generate future due dates
+                start_date = today
+                end_date = today + timedelta(days=365)
+                
+                due_dates = generate_future_due_dates(req, start_date, end_date)
+                
+                for due_date, amount in due_dates:
+                    # Check if this payment is already marked as paid
+                    paid_notification = PaidNotification.query.filter_by(
+                        request_id=req.request_id,
+                        paid_date=due_date
+                    ).first()
+                    
+                    # Determine event color
+                    event_color = '#2e7d32' if paid_notification else '#8e24aa'
+                    
+                    events.append({
+                        'title': f'OMR {amount:.3f}',
+                        'start': due_date.isoformat(),
+                        'color': event_color,
+                        'url': f'/request/{req.request_id}',
+                        'extendedProps': {
+                            'requestId': req.request_id,
+                            'requestType': req.request_type,
+                            'companyName': req.company_name,
+                            'department': req.department,
+                            'purpose': req.purpose,
+                            'baseAmount': None,
+                            'remainingAmount': None
+                        }
+                    })
+        
+        return jsonify(events)
+        
+    except Exception as e:
+        print(f"Error generating calendar events: {e}")
+        return jsonify([])
+
+def generate_future_due_dates(req, start_date, end_date):
+    """Generate future due dates for a recurring request"""
+    if not req.recurring_interval:
+        return []
+    
+    try:
+        # Parse the recurring interval
+        parts = req.recurring_interval.split(':')
+        if len(parts) < 2:
+            return []
+        
+        frequency = parts[0]
+        interval = int(parts[1])
+        
+        if frequency == 'monthly':
+            due_dates = []
+            
+            # Check if specific days are configured
+            if len(parts) > 2 and parts[2] == 'days':
+                # Parse specific days from the interval
+                days = [int(day) for day in parts[3].split(',')]
+                year = int(parts[4]) if len(parts) > 4 else start_date.year
+                month = int(parts[5]) if len(parts) > 5 else start_date.month
+                
+                # Generate dates for the specific days
+                current_date = start_date
+                month_count = 0
+                
+                while current_date <= end_date:
+                    if month_count % interval == 0:
+                        # Generate dates for each specific day in this month
+                        for day in days:
+                            try:
+                                # Create date for this specific day
+                                due_date = date(current_date.year, current_date.month, day)
+                                if due_date >= start_date and due_date <= end_date:
+                                    due_dates.append((due_date, req.amount))
+                            except ValueError:
+                                # Skip invalid dates (like Feb 30)
+                                continue
+                    
+                    # Move to next month
+                    if current_date.month == 12:
+                        current_date = date(current_date.year + 1, 1, 1)
+                    else:
+                        current_date = date(current_date.year, current_date.month + 1, 1)
+                    month_count += 1
+            else:
+                # Fallback to original logic for simple monthly intervals
+                current_date = start_date
+                month_count = 0
+                while current_date <= end_date:
+                    if month_count % interval == 0:
+                        due_dates.append((current_date, req.amount))
+                    current_date = current_date + timedelta(days=1)
+                    if current_date.day == 1:  # New month
+                        month_count += 1
+            
+            return due_dates[:12]  # Limit to 12 months
+        
+        return []
+        
+    except Exception as e:
+        print(f"Error generating due dates: {e}")
+        return []
+
+
+@app.route('/api/requests/mark_paid', methods=['POST'])
+@role_required('Admin')
+def mark_request_paid():
+    """Mark an entire request as paid"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+        
+        request_id = data.get('request_id')
+        amount = data.get('amount')
+        
+        if not request_id or not amount:
+            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+        
+        # Get the payment request
+        payment_request = PaymentRequest.query.get(request_id)
+        if not payment_request:
+            return jsonify({'success': False, 'message': 'Request not found'}), 404
+        
+        # Check if request is approved
+        if payment_request.status != 'Approved':
+            return jsonify({'success': False, 'message': 'Request must be approved before marking as paid'}), 400
+        
+        # Check if request is recurring
+        if not payment_request.recurring_interval:
+            return jsonify({'success': False, 'message': 'This endpoint is only for recurring payments'}), 400
+        
+        # Check if this request is already paid
+        existing_paid = PaidNotification.query.filter_by(request_id=request_id).first()
+        
+        if existing_paid:
+            return jsonify({'success': False, 'message': 'This request is already marked as paid'}), 400
+        
+        # Create paid notification for the entire request
+        paid_notification = PaidNotification(
+            request_id=request_id,
+            user_id=current_user.user_id,
+            paid_date=date.today()
+        )
+        
+        db.session.add(paid_notification)
+        db.session.commit()
+        
+        # Log the action
+        audit_log = AuditLog(
+            user_id=current_user.user_id,
+            action='Mark Request Paid',
+            details=f'Marked entire request #{request_id} (OMR {amount}) as paid',
+            ip_address=request.remote_addr
+        )
+        db.session.add(audit_log)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Request marked as paid successfully'})
+        
+    except Exception as e:
+        print(f"Error marking request as paid: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'An error occurred while marking request as paid'}), 500
+
+
+@app.route('/api/installments/mark_paid', methods=['POST'])
+@role_required('Admin', 'Finance')
+def mark_installment_paid():
+    """Mark a specific installment as paid"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+        
+        request_id = data.get('request_id')
+        payment_date = data.get('payment_date')
+        amount = data.get('amount')
+        
+        if not request_id or not payment_date or not amount:
+            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+        
+        # Convert payment_date string to date object
+        from datetime import datetime
+        try:
+            payment_date_obj = datetime.strptime(payment_date, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'success': False, 'message': 'Invalid date format'}), 400
+        
+        # Get the payment request
+        payment_request = PaymentRequest.query.get(request_id)
+        if not payment_request:
+            return jsonify({'success': False, 'message': 'Request not found'}), 404
+        
+        # Check if request is approved
+        if payment_request.status != 'Approved':
+            return jsonify({'success': False, 'message': 'Request must be approved before marking as paid'}), 400
+        
+        # Check if this installment is already paid
+        existing_paid = PaidNotification.query.filter_by(
+            request_id=request_id,
+            paid_date=payment_date_obj
+        ).first()
+        
+        if existing_paid:
+            return jsonify({'success': False, 'message': 'This installment is already marked as paid'}), 400
+        
+        # Create paid notification
+        paid_notification = PaidNotification(
+            request_id=request_id,
+            user_id=current_user.user_id,
+            paid_date=payment_date_obj
+        )
+        
+        db.session.add(paid_notification)
+        db.session.commit()
+        
+        # Log the action
+        audit_log = AuditLog(
+            user_id=current_user.user_id,
+            action='Mark Installment Paid',
+            details=f'Marked installment of OMR {amount} due on {payment_date} as paid for request #{request_id}',
+            ip_address=request.remote_addr
+        )
+        db.session.add(audit_log)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Installment marked as paid successfully'})
+        
+    except Exception as e:
+        print(f"Error marking installment as paid: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'An error occurred while marking installment as paid'}), 500
 
 
 if __name__ == '__main__':

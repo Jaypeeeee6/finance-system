@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Payment Schedule - Request #{{ request.request_id }}{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-calendar-edit"></i> Edit Payment Schedule - Request #{{ request.request_id }}</h1>
+        <a href="{{ url_for('view_request', request_id=request.request_id) }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Request
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Payment Schedule Configuration</h2>
+            <p>Configure variable payment amounts and dates for this recurring request.</p>
+        </div>
+        <div class="card-body">
+            <form method="POST" id="scheduleForm">
+                <!-- Hidden fields for form data -->
+                <input type="hidden" name="payment_schedule" id="payment_schedule" value="">
+                
+                <div class="form-group">
+                    <label>Base Amount: <strong>OMR {{ '%.3f'|format(request.amount) }}</strong></label>
+                </div>
+                
+                <div class="form-group">
+                    <label>Current Schedule:</label>
+                    <div id="schedulePreview" style="background: #f8f9fa; padding: 1rem; border-radius: 5px; margin-bottom: 1rem;">
+                        {% if existing_schedule %}
+                            {% for item in existing_schedule %}
+                                <div style="margin-bottom: 0.5rem;">
+                                    <strong>{{ item.payment_date }}</strong> - OMR {{ '%.3f'|format(item.amount) }}
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            No schedule configured
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Total Allocated: <span id="totalAllocated">0.000</span> OMR</label>
+                </div>
+                
+                <div class="form-group">
+                    <label>Remaining: <span id="remainingAmount">{{ '%.3f'|format(request.amount) }}</span> OMR</label>
+                </div>
+                
+                <div id="paymentInputs">
+                    <!-- Payment inputs will be generated here -->
+                </div>
+                
+                <div class="form-group">
+                    <button type="button" class="btn btn-outline-primary" onclick="addNewPayment()" id="addPaymentBtn">
+                        <i class="fas fa-plus"></i> Add Payment
+                    </button>
+                </div>
+                
+                <div class="form-group" style="margin-top: 2rem;">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i> Save Schedule
+                    </button>
+                    <button type="button" class="btn btn-warning" onclick="clearAllPayments()">
+                        <i class="fas fa-trash"></i> Clear All
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let paymentCounter = 0;
+const baseAmount = {{ request.amount }};
+
+// Initialize with existing schedule
+document.addEventListener('DOMContentLoaded', function() {
+    const existingSchedule = {{ existing_schedule | tojson }};
+    if (existingSchedule && existingSchedule.length > 0) {
+        existingSchedule.forEach(item => {
+            addPaymentInput(item.payment_date, item.amount);
+        });
+    } else {
+        // Add one empty payment input
+        addPaymentInput('', 0);
+    }
+    updateAmountSummary();
+});
+
+function addPaymentInput(date = '', amount = 0) {
+    paymentCounter++;
+    const container = document.getElementById('paymentInputs');
+    
+    const paymentDiv = document.createElement('div');
+    paymentDiv.className = 'payment-input-group';
+    paymentDiv.style.cssText = 'display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; padding: 1rem; border: 1px solid #ddd; border-radius: 5px; background: #f9f9f9;';
+    
+    paymentDiv.innerHTML = `
+        <div style="flex: 1;">
+            <label>Payment Date:</label>
+            <input type="date" class="payment-date-input" value="${date}" onchange="updatePaymentSchedule()" required>
+        </div>
+        <div style="flex: 1;">
+            <label>Amount (OMR):</label>
+            <input type="number" class="payment-amount-input" value="${amount}" step="0.001" min="0" max="${baseAmount}" onchange="updateAmountSummary()" required>
+        </div>
+        <div style="flex: 0;">
+            <button type="button" class="btn btn-danger btn-sm" onclick="removePayment(this)" style="margin-top: 1.5rem;">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `;
+    
+    container.appendChild(paymentDiv);
+    updateAmountSummary();
+}
+
+function removePayment(button) {
+    button.closest('.payment-input-group').remove();
+    updateAmountSummary();
+}
+
+function addNewPayment() {
+    addPaymentInput('', 0);
+}
+
+function clearAllPayments() {
+    if (confirm('Are you sure you want to clear all payments?')) {
+        document.getElementById('paymentInputs').innerHTML = '';
+        addPaymentInput('', 0);
+        updateAmountSummary();
+    }
+}
+
+function updateAmountSummary() {
+    const inputs = document.querySelectorAll('.payment-amount-input');
+    let totalAllocated = 0;
+    
+    inputs.forEach(input => {
+        const amount = parseFloat(input.value) || 0;
+        totalAllocated += amount;
+    });
+    
+    const remaining = baseAmount - totalAllocated;
+    
+    document.getElementById('totalAllocated').textContent = totalAllocated.toFixed(3);
+    document.getElementById('remainingAmount').textContent = remaining.toFixed(3);
+    
+    // Update the payment schedule data
+    updatePaymentSchedule();
+    
+    // Update the add button state
+    updateAddButtonState();
+}
+
+function updatePaymentSchedule() {
+    const inputs = document.querySelectorAll('.payment-amount-input');
+    const schedule = [];
+    
+    inputs.forEach(input => {
+        const amount = parseFloat(input.value) || 0;
+        const dateInput = input.closest('.payment-input-group').querySelector('.payment-date-input');
+        const date = dateInput.value;
+        
+        if (amount > 0 && date) {
+            schedule.push({
+                date: date,
+                amount: amount
+            });
+        }
+    });
+    
+    document.getElementById('payment_schedule').value = JSON.stringify(schedule);
+    
+    // Update preview
+    updateSchedulePreview();
+}
+
+function updateSchedulePreview() {
+    const schedule = JSON.parse(document.getElementById('payment_schedule').value || '[]');
+    let preview = '';
+    
+    if (schedule.length === 0) {
+        preview = 'No schedule configured';
+    } else {
+        schedule.forEach(item => {
+            preview += `<div style="margin-bottom: 0.5rem;"><strong>${item.date}</strong> - OMR ${parseFloat(item.amount).toFixed(3)}</div>`;
+        });
+    }
+    
+    document.getElementById('schedulePreview').innerHTML = preview;
+}
+
+function updateAddButtonState() {
+    const remaining = parseFloat(document.getElementById('remainingAmount').textContent);
+    const addBtn = document.getElementById('addPaymentBtn');
+    
+    if (remaining <= 0) {
+        addBtn.disabled = true;
+        addBtn.innerHTML = '<i class="fas fa-plus"></i> Add Payment (Fully Allocated)';
+    } else {
+        addBtn.disabled = false;
+        addBtn.innerHTML = '<i class="fas fa-plus"></i> Add Payment';
+    }
+}
+</script>
+{% endblock %}
+
