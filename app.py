@@ -6,7 +6,7 @@ from functools import wraps
 import os
 from datetime import datetime, date, timedelta
 import re
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule
+from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment
 from config import Config
 
 # Initialize Flask app
@@ -1038,6 +1038,11 @@ def view_request(request_id):
                     paid_notif.paid_date == entry.payment_date 
                     for paid_notif in paid_notifications
                 )
+                # Check if this installment is marked late
+                is_late = LateInstallment.query.filter_by(
+                    request_id=request_id,
+                    payment_date=entry.payment_date
+                ).first() is not None
                 
                 # If this installment is paid, add its amount to total paid
                 if is_paid:
@@ -1046,7 +1051,8 @@ def view_request(request_id):
                 schedule_rows.append({
                     'date': entry.payment_date,
                     'amount': entry.amount,
-                    'is_paid': is_paid
+                    'is_paid': is_paid,
+                    'is_late': is_late
                 })
     
     return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount))
@@ -1822,8 +1828,12 @@ def api_admin_recurring_events():
                         paid_date=installment.payment_date
                     ).first()
                     
-                    # Determine event color
-                    event_color = '#2e7d32' if paid_notification else '#8e24aa'
+                    # Determine event color (red if marked late)
+                    is_late = LateInstallment.query.filter_by(
+                        request_id=req.request_id,
+                        payment_date=installment.payment_date
+                    ).first() is not None
+                    event_color = '#2e7d32' if paid_notification else ('#d32f2f' if is_late else '#8e24aa')
                     
                     # Calculate remaining amount
                     total_paid = sum(
@@ -1861,8 +1871,12 @@ def api_admin_recurring_events():
                         paid_date=due_date
                     ).first()
                     
-                    # Determine event color
-                    event_color = '#2e7d32' if paid_notification else '#8e24aa'
+                    # Determine event color (red if marked late)
+                    is_late = LateInstallment.query.filter_by(
+                        request_id=req.request_id,
+                        payment_date=due_date
+                    ).first() is not None
+                    event_color = '#2e7d32' if paid_notification else ('#d32f2f' if is_late else '#8e24aa')
                     
                     events.append({
                         'title': f'OMR {amount:.3f}',
@@ -2128,6 +2142,73 @@ def mark_installment_paid():
         print(f"Error marking installment as paid: {e}")
         db.session.rollback()
         return jsonify({'success': False, 'message': 'An error occurred while marking installment as paid'}), 500
+
+
+@app.route('/api/installments/mark_late', methods=['POST'])
+@role_required('Admin')
+def mark_installment_late():
+    """Mark a specific installment as late (Admin only)"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+        
+        request_id = data.get('request_id')
+        payment_date = data.get('payment_date')
+        
+        if not request_id or not payment_date:
+            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+        
+        # Convert payment_date string to date object
+        from datetime import datetime
+        try:
+            payment_date_obj = datetime.strptime(payment_date, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'success': False, 'message': 'Invalid date format'}), 400
+        
+        # Get the payment request
+        payment_request = PaymentRequest.query.get(request_id)
+        if not payment_request:
+            return jsonify({'success': False, 'message': 'Request not found'}), 404
+        
+        # Check if request is approved
+        if payment_request.status != 'Approved':
+            return jsonify({'success': False, 'message': 'Request must be approved before marking installments as late'}), 400
+        
+        # If already paid, cannot be marked late
+        existing_paid = PaidNotification.query.filter_by(
+            request_id=request_id,
+            paid_date=payment_date_obj
+        ).first()
+        if existing_paid:
+            return jsonify({'success': False, 'message': 'This installment is already marked as paid'}), 400
+        
+        # Check if already marked late
+        from models import LateInstallment
+        existing_late = LateInstallment.query.filter_by(
+            request_id=request_id,
+            payment_date=payment_date_obj
+        ).first()
+        if existing_late:
+            return jsonify({'success': True, 'message': 'Installment already marked as late'})
+        
+        # Create late installment record
+        late = LateInstallment(
+            request_id=request_id,
+            payment_date=payment_date_obj,
+            marked_by_user_id=current_user.user_id
+        )
+        db.session.add(late)
+        db.session.commit()
+        
+        # Log the action
+        log_action(f"Marked installment due on {payment_date} as LATE for request #{request_id}")
+        
+        return jsonify({'success': True, 'message': 'Installment marked as late'})
+    except Exception as e:
+        print(f"Error marking installment as late: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'An error occurred while marking installment as late'}), 500
 
 
 if __name__ == '__main__':

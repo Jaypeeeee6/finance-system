@@ -158,7 +158,7 @@
                                         <th style="border: none; padding: 0.75rem; font-weight: 600; color: #495057;">Due Date</th>
                                         <th style="border: none; padding: 0.75rem; font-weight: 600; color: #495057; text-align: right;">Amount</th>
                                         <th style="border: none; padding: 0.75rem; font-weight: 600; color: #495057; text-align: center; width: 100px;">Status</th>
-                                        <th style="border: none; padding: 0.75rem; font-weight: 600; color: #495057; text-align: center; width: 120px;">Action</th>
+                                        <th style="border: none; padding: 0.75rem; font-weight: 600; color: #495057; text-align: center; width: 220px;">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -171,6 +171,10 @@
                                             {% if row.is_paid %}
                                                 <span class="badge" style="background: #28a745; color: white; padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500;">
                                                     <i class="fas fa-check"></i> Paid
+                                                </span>
+                                            {% elif row.is_late %}
+                                                <span class="badge" style="background: #d32f2f; color: #fff; padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500;">
+                                                    <i class="fas fa-exclamation-circle"></i> Late
                                                 </span>
                                             {% else %}
                                                 <span class="badge" style="background: #ffc107; color: #212529; padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500;">
@@ -192,6 +196,15 @@
                                                         title="Mark this installment as paid">
                                                     <i class="fas fa-check"></i> Mark Paid
                                                 </button>
+                                                {% if user.role == 'Admin' %}
+                                                <button class="btn btn-sm mark-late-btn" 
+                                                        data-request-id="{{ request.request_id }}" 
+                                                        data-payment-date="{{ row.date.strftime('%Y-%m-%d') }}"
+                                                        style="background: #d32f2f; color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 15px; font-size: 0.7rem; font-weight: 500; cursor: pointer; margin-left: 0.5rem;"
+                                                        title="Mark this installment as late">
+                                                    <i class="fas fa-exclamation-circle"></i> Mark as Late
+                                                </button>
+                                                {% endif %}
                                             {% else %}
                                                 <span style="color: #ffc107; font-size: 0.8rem; font-weight: 500;">
                                                     <i class="fas fa-clock"></i> Pending Approval
@@ -514,6 +527,37 @@ document.addEventListener('DOMContentLoaded', function() {
             const amount = this.getAttribute('data-amount');
             
             markInstallmentPaid(requestId, paymentDate, amount);
+        });
+    });
+    document.querySelectorAll('.mark-late-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const requestId = this.getAttribute('data-request-id');
+            const paymentDate = this.getAttribute('data-payment-date');
+            
+            if (confirm(`Mark installment due on ${paymentDate} as LATE?`)) {
+                fetch(`/api/installments/mark_late`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        request_id: requestId,
+                        payment_date: paymentDate
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + (data.message || 'Failed to mark as late'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error marking installment as late');
+                });
+            }
         });
     });
 });

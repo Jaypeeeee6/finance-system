@@ -190,3 +190,16 @@ class RecurringPaymentSchedule(db.Model):
         return f'<RecurringPaymentSchedule {self.schedule_id} - Request {self.request_id} - Payment {self.payment_order} - {self.amount} OMR>'
 
 
+class LateInstallment(db.Model):
+    """Track installments that were marked as late (by Admin)"""
+    __tablename__ = 'late_installments'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    request_id = db.Column(db.Integer, db.ForeignKey('payment_requests.request_id'), nullable=False)
+    payment_date = db.Column(db.Date, nullable=False)
+    marked_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<LateInstallment {self.id} - Request {self.request_id} - {self.payment_date}>'
+
