@@ -17,17 +17,25 @@
         </div>
         <div class="card-body">
             <div class="alert alert-info" style="margin-bottom: 1.5rem;">
-                <strong>Note:</strong> Username cannot be changed. Leave password field empty to keep current password.
+                <strong>Note:</strong> Email address cannot be changed. Leave password field empty to keep current password.
             </div>
 
             <form method="POST" action="{{ url_for('edit_user', user_id=user_to_edit.user_id) }}">
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="username">Username</label>
-                        <input type="text" name="username" id="username" value="{{ user_to_edit.username }}" readonly>
-                        <small>Username cannot be changed</small>
+                        <label for="name">Full Name *</label>
+                        <input type="text" name="name" id="name" value="{{ user_to_edit.name }}" required>
+                        <small>User's full name as it will appear in the system</small>
                     </div>
 
+                    <div class="form-group">
+                        <label for="username">Email Address</label>
+                        <input type="email" name="username" id="username" value="{{ user_to_edit.username }}" readonly>
+                        <small>Email address cannot be changed</small>
+                    </div>
+                </div>
+
+                <div class="form-row">
                     <div class="form-group">
                         <label for="password">New Password (Optional)</label>
                         <input type="password" name="password" id="password" minlength="6">
@@ -74,9 +82,14 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="email">Email (Optional)</label>
-                    <input type="email" name="email" id="email" value="{{ user_to_edit.email or '' }}" placeholder="user@company.com">
+                    <label for="manager_display">Manager</label>
+                    <div id="manager_display" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; background-color: #f8f9fa; min-height: 38px; display: flex; align-items: center;">
+                        <span id="manager-text">Select a department to see assigned manager</span>
+                    </div>
+                    <input type="hidden" name="manager_id" id="manager_id" value="">
+                    <small id="manager-info">Manager will be automatically assigned based on department</small>
                 </div>
+
 
                 <div class="details-grid" style="margin: 1.5rem 0;">
                     <div class="detail-item">
@@ -101,6 +114,130 @@
         </div>
     </div>
 </div>
+
+<script>
+// Auto-assign manager based on department selection
+document.getElementById('department').addEventListener('change', function() {
+    const department = this.value;
+    const managerDisplay = document.getElementById('manager_display');
+    const managerText = document.getElementById('manager-text');
+    const managerIdInput = document.getElementById('manager_id');
+    const managerInfo = document.getElementById('manager-info');
+    
+    // Department to Manager mapping
+    const departmentManagers = {
+        'IT': 'Nada'
+        // Add other departments when managers are available
+    };
+    
+    if (department && departmentManagers[department]) {
+        const managerName = departmentManagers[department];
+        
+        // Find the manager in the available users list
+        const managerOption = Array.from(document.querySelectorAll('option')).find(option => 
+            option.text.includes(managerName)
+        );
+        
+        if (managerOption) {
+            managerIdInput.value = managerOption.value;
+            managerText.textContent = `${managerName} (${department} Manager)`;
+            managerDisplay.style.backgroundColor = '#d4edda';
+            managerDisplay.style.borderColor = '#c3e6cb';
+            managerInfo.textContent = `Auto-assigned: ${managerName}`;
+            managerInfo.style.color = '#28a745';
+        } else {
+            // If not found in options, try to find by name in the users data
+            const users = [
+                {% for user in all_users %}
+                {id: {{ user.user_id }}, name: "{{ user.name }}", department: "{{ user.department }}", role: "{{ user.role }}"},
+                {% endfor %}
+            ];
+            
+            const foundManager = users.find(user => user.name === managerName);
+            
+            if (foundManager) {
+                managerIdInput.value = foundManager.id;
+                managerText.textContent = `${foundManager.name} (${department} Manager)`;
+                managerDisplay.style.backgroundColor = '#d4edda';
+                managerDisplay.style.borderColor = '#c3e6cb';
+                managerInfo.textContent = `Auto-assigned: ${foundManager.name}`;
+                managerInfo.style.color = '#28a745';
+            } else {
+                managerIdInput.value = '';
+                managerText.textContent = `Manager ${managerName} not found in system`;
+                managerDisplay.style.backgroundColor = '#f8d7da';
+                managerDisplay.style.borderColor = '#f5c6cb';
+                managerInfo.textContent = `Manager ${managerName} not found in system`;
+                managerInfo.style.color = '#dc3545';
+            }
+        }
+    } else if (department) {
+        managerIdInput.value = '';
+        managerText.textContent = `No manager available for ${department} department yet`;
+        managerDisplay.style.backgroundColor = '#fff3cd';
+        managerDisplay.style.borderColor = '#ffeaa7';
+        managerInfo.textContent = `No manager available for ${department} department yet`;
+        managerInfo.style.color = '#ffc107';
+    } else {
+        managerIdInput.value = '';
+        managerText.textContent = 'Select a department to see assigned manager';
+        managerDisplay.style.backgroundColor = '#f8f9fa';
+        managerDisplay.style.borderColor = '#ddd';
+        managerInfo.textContent = 'Manager will be automatically assigned based on department';
+        managerInfo.style.color = '#6c757d';
+    }
+});
+
+// Initialize manager info on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const department = document.getElementById('department').value;
+    const managerDisplay = document.getElementById('manager_display');
+    const managerText = document.getElementById('manager-text');
+    const managerIdInput = document.getElementById('manager_id');
+    const managerInfo = document.getElementById('manager-info');
+    
+    if (department === 'IT') {
+        const managerName = 'Nada';
+        const managerOption = Array.from(document.querySelectorAll('option')).find(option => 
+            option.text.includes(managerName)
+        );
+        
+        if (managerOption) {
+            managerIdInput.value = managerOption.value;
+            managerText.textContent = `${managerName} (${department} Manager)`;
+            managerDisplay.style.backgroundColor = '#d4edda';
+            managerDisplay.style.borderColor = '#c3e6cb';
+            managerInfo.textContent = `Auto-assigned: ${managerName}`;
+            managerInfo.style.color = '#28a745';
+        } else {
+            // If not found in options, try to find by name in the users data
+            const users = [
+                {% for user in all_users %}
+                {id: {{ user.user_id }}, name: "{{ user.name }}", department: "{{ user.department }}", role: "{{ user.role }}"},
+                {% endfor %}
+            ];
+            
+            const foundManager = users.find(user => user.name === managerName);
+            
+            if (foundManager) {
+                managerIdInput.value = foundManager.id;
+                managerText.textContent = `${foundManager.name} (${department} Manager)`;
+                managerDisplay.style.backgroundColor = '#d4edda';
+                managerDisplay.style.borderColor = '#c3e6cb';
+                managerInfo.textContent = `Auto-assigned: ${foundManager.name}`;
+                managerInfo.style.color = '#28a745';
+            }
+        }
+    } else if (department) {
+        managerIdInput.value = '';
+        managerText.textContent = `No manager available for ${department} department yet`;
+        managerDisplay.style.backgroundColor = '#fff3cd';
+        managerDisplay.style.borderColor = '#ffeaa7';
+        managerInfo.textContent = `No manager available for ${department} department yet`;
+        managerInfo.style.color = '#ffc107';
+    }
+});
+</script>
 {% endblock %}
 
 

@@ -11,7 +11,7 @@
 
     <div class="card">
         <div class="card-body">
-            <form method="POST" action="{{ url_for('new_request') }}" id="requestForm">
+            <form method="POST" action="{{ url_for('new_request') }}" id="requestForm" enctype="multipart/form-data">
                 <div class="form-row">
                     <div class="form-group">
                         <label for="request_type">Request Type *</label>
@@ -81,6 +81,27 @@
                     <textarea name="purpose" id="purpose" rows="4" required></textarea>
                 </div>
 
+                <div class="form-group">
+                    <label for="bank_name">Bank Name *</label>
+                    <select name="bank_name" id="bank_name" required onchange="showSwiftCode()">
+                        <option value="">-- Select Bank --</option>
+                        <option value="Bank Muscat">Bank Muscat</option>
+                        <option value="National Bank of Oman">National Bank of Oman</option>
+                        <option value="HSBC Bank Oman">HSBC Bank Oman</option>
+                        <option value="Standard Chartered Bank">Standard Chartered Bank</option>
+                        <option value="Ahli Bank">Ahli Bank</option>
+                        <option value="Bank Dhofar">Bank Dhofar</option>
+                        <option value="Bank Sohar">Bank Sohar</option>
+                        <option value="Oman Arab Bank">Oman Arab Bank</option>
+                        <option value="Bank Nizwa">Bank Nizwa</option>
+                        <option value="Alizz Islamic Bank">Alizz Islamic Bank</option>
+                        <option value="Meethaq Islamic Banking">Meethaq Islamic Banking</option>
+                    </select>
+                    <div id="swift-code-display" style="margin-top: 8px; padding: 10px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; display: none;">
+                        <strong>SWIFT Code:</strong> <span id="swift-code-text"></span>
+                    </div>
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label for="account_name">Account Name *</label>
@@ -89,8 +110,8 @@
 
                     <div class="form-group">
                         <label for="account_number">Account Number *</label>
-                        <input type="text" name="account_number" id="account_number" pattern="[0-9]+" title="Please enter numbers only" required inputmode="numeric">
-                        <small>Numbers only</small>
+                        <input type="text" name="account_number" id="account_number" pattern="[0-9]+" title="Please enter numbers only (maximum 16 digits)" required maxlength="16">
+                        <small>Numbers only (maximum 16 digits)</small>
                     </div>
                 </div>
 
@@ -98,9 +119,15 @@
                     <label for="amount">Amount (OMR) *</label>
                     <div style="position: relative;">
                         <span style="position: absolute; left: 12px; top: 12px; color: #666; font-weight: 600;">OMR</span>
-                        <input type="number" name="amount" id="amount" step="0.001" min="0" required style="padding-left: 55px;" placeholder="0.000">
+                        <input type="text" name="amount" id="amount" required style="padding-left: 55px;" placeholder="0.000">
                     </div>
-                    <small>Omani Rials (OMR) - Numbers only</small>
+                    <small>Omani Rials (OMR) - Numbers only (automatically formatted with commas)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="receipt_file">Receipt/Proof of Payment (Optional)</label>
+                    <input type="file" name="receipt_file" id="receipt_file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 100%;">
+                    <small>Upload receipt or proof of payment (PDF, JPG, PNG, DOC, DOCX - Max 10MB)</small>
                 </div>
 
                 <!-- Show only for Supplier/Rental type -->
@@ -1993,6 +2020,67 @@ function updateAddButtonState() {
     }
 }
 
+// Add real-time validation for account number
+document.getElementById('account_number').addEventListener('input', function(e) {
+    const value = e.target.value;
+    // Remove any non-numeric characters as user types
+    const numericValue = value.replace(/[^0-9]/g, '');
+    if (value !== numericValue) {
+        e.target.value = numericValue;
+    }
+    // Limit to 16 digits
+    if (numericValue.length > 16) {
+        e.target.value = numericValue.substring(0, 16);
+    }
+});
+
+// Add comma formatting for amount field
+document.getElementById('amount').addEventListener('input', function(e) {
+    let value = e.target.value;
+    
+    // Remove any non-numeric characters except decimal point
+    const cleanValue = value.replace(/[^0-9.]/g, '');
+    
+    // Handle multiple decimal points - keep only the first one
+    const parts = cleanValue.split('.');
+    if (parts.length > 2) {
+        value = parts[0] + '.' + parts.slice(1).join('');
+    } else {
+        value = cleanValue;
+    }
+    
+    // Format with commas for thousands
+    if (value) {
+        const parts = value.split('.');
+        const integerPart = parts[0];
+        const decimalPart = parts.length > 1 ? '.' + parts[1] : '';
+        
+        // Add commas to integer part
+        const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        
+        e.target.value = formattedInteger + decimalPart;
+    }
+});
+
+// Allow only numbers and decimal point in amount field
+document.getElementById('amount').addEventListener('keydown', function(e) {
+    // Allow: backspace, delete, tab, escape, enter, decimal point
+    if ([46, 8, 9, 27, 13, 110, 190].indexOf(e.keyCode) !== -1 ||
+        // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+        (e.keyCode === 65 && e.ctrlKey === true) ||
+        (e.keyCode === 67 && e.ctrlKey === true) ||
+        (e.keyCode === 86 && e.ctrlKey === true) ||
+        (e.keyCode === 88 && e.ctrlKey === true) ||
+        // Allow: home, end, left, right, down, up
+        (e.keyCode >= 35 && e.keyCode <= 40)) {
+        return;
+    }
+    // Ensure that it is a number and stop the keypress
+    if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+        e.preventDefault();
+    }
+});
+
 // Form validation
 document.getElementById('requestForm').addEventListener('submit', function(e) {
     const accountNumber = document.getElementById('account_number').value;
@@ -2002,10 +2090,18 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
         return false;
     }
     
-    const amount = parseFloat(document.getElementById('amount').value);
-    if (amount <= 0) {
+    if (accountNumber.length > 16) {
         e.preventDefault();
-        alert('Amount must be greater than 0.');
+        alert('Account number cannot exceed 16 digits.');
+        return false;
+    }
+    
+    // Handle comma-formatted amount
+    const amountValue = document.getElementById('amount').value.replace(/,/g, '');
+    const amount = parseFloat(amountValue);
+    if (isNaN(amount) || amount <= 0) {
+        e.preventDefault();
+        alert('Amount must be a valid number greater than 0.');
         return false;
     }
     
@@ -2013,11 +2109,39 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
     const recurring = document.getElementById('recurring').value;
     const recurringInterval = document.getElementById('recurring_interval').value;
     if (recurring === 'Recurring' && !recurringInterval) {
-        e.preventDefault();
-        alert('Please configure the recurring payment schedule.');
-        return false;
-    }
+    e.preventDefault();
+    alert('Please configure the recurring payment schedule.');
+    return false;
+}
 });
+
+// Function to show SWIFT code when bank is selected
+function showSwiftCode() {
+    const bankSelect = document.getElementById('bank_name');
+    const swiftDisplay = document.getElementById('swift-code-display');
+    const swiftText = document.getElementById('swift-code-text');
+    
+    const swiftCodes = {
+        'Bank Muscat': 'BMUSOMRX',
+        'National Bank of Oman': 'NBOAOMRX',
+        'HSBC Bank Oman': 'HBMSOMRX',
+        'Standard Chartered Bank': 'SCBLOMRX',
+        'Ahli Bank': 'ABOMOMRX',
+        'Bank Dhofar': 'BDOFOMRX',
+        'Bank Sohar': 'BSOHOMRX',
+        'Oman Arab Bank': 'OABKOMRX',
+        'Bank Nizwa': 'BNIZOMRX',
+        'Alizz Islamic Bank': 'ALIZOMRX',
+        'Meethaq Islamic Banking': 'MEETOMRX'
+    };
+    
+    if (bankSelect.value && swiftCodes[bankSelect.value]) {
+        swiftText.textContent = swiftCodes[bankSelect.value];
+        swiftDisplay.style.display = 'block';
+    } else {
+        swiftDisplay.style.display = 'none';
+    }
+}
 </script>
 
 {% endblock %}

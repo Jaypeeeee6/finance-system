@@ -19,7 +19,7 @@
             <ul class="nav-menu">
                 <li><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="fas fa-home"></i> Dashboard</a></li>
                 
-                {% if current_user.role in ['Department User', 'Finance', 'Project'] %}
+                {% if current_user.role in ['Department User', 'Finance', 'Project', 'IT'] %}
                 <li><a href="{{ url_for('new_request') }}" class="nav-link"><i class="fas fa-plus-circle"></i> New Request</a></li>
                 {% endif %}
                 
@@ -35,7 +35,7 @@
                 <li class="nav-user">
                     <span class="user-info">
                         <i class="fas fa-user-circle"></i>
-                        <span>{{ current_user.username }}</span>
+                        <span>{{ current_user.name }}</span>
                         <span class="user-role">{{ current_user.role }}</span>
                     </span>
                 </li>

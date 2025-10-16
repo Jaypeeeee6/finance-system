@@ -22,6 +22,12 @@
                 <span class="badge" style="background: #2196F3; color: white; font-size: 1rem; padding: 0.5rem 1rem;">📥 {{ request.status }}</span>
             {% elif request.status == 'Action Required' %}
                 <span class="badge" style="background: #f57c00; color: white; font-size: 1rem; padding: 0.5rem 1rem;">⚠️ {{ request.status }}</span>
+            {% elif request.status == 'Pending Manager Approval' %}
+                <span class="badge" style="background: #17a2b8; color: white; font-size: 1rem; padding: 0.5rem 1rem;">👤 {{ request.status }}</span>
+            {% elif request.status == 'Pending Finance Approval' %}
+                <span class="badge" style="background: #6f42c1; color: white; font-size: 1rem; padding: 0.5rem 1rem;">💰 {{ request.status }}</span>
+            {% elif request.status == 'Rejected by Manager' %}
+                <span class="badge" style="background: #dc3545; color: white; font-size: 1rem; padding: 0.5rem 1rem;">❌ {{ request.status }}</span>
             {% else %}
                 <span class="badge badge-warning" style="font-size: 1rem; padding: 0.5rem 1rem;">⏳ {{ request.status }}</span>
             {% endif %}
@@ -264,6 +270,24 @@
         </div>
     </div>
 
+    <!-- Rejection Reason Display -->
+    {% if request.status == 'Rejected by Manager' and request.rejection_reason %}
+    <div class="card" style="margin-top: 2rem; border-left: 4px solid #dc3545;">
+        <div class="card-header" style="background: #f8d7da; color: #721c24;">
+            <h3><i class="fas fa-times-circle"></i> Request Rejected by Manager</h3>
+        </div>
+        <div class="card-body">
+            <div class="rejection-info">
+                <p><strong>Rejection Date:</strong> {{ request.manager_rejection_date.strftime('%Y-%m-%d') if request.manager_rejection_date else 'N/A' }}</p>
+                <p><strong>Reason:</strong></p>
+                <div style="background: #f8f9fa; padding: 1rem; border-radius: 4px; border-left: 3px solid #dc3545;">
+                    <p style="margin: 0; font-style: italic;">{{ request.rejection_reason }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Department User: Upload Proof of Payment -->
     {% if request.status == 'Send Proof' and request.user_id == user.user_id %}
     <div class="card" style="margin-top: 2rem;">
@@ -289,8 +313,52 @@
     </div>
     {% endif %}
 
-    <!-- Admin: Initial Approval -->
-    {% if user.role == 'Admin' and request.status == 'Pending' %}
+    <!-- Manager: Approval -->
+    {% if request.status == 'Pending Manager Approval' and request.user and request.user.manager_id == user.user_id %}
+    <div class="card" style="margin-top: 2rem;">
+        <div class="card-header">
+            <h3><i class="fas fa-user-tie"></i> Manager Approval Required</h3>
+            <p>As the manager of {{ request.user.name }}, please review and approve this request.</p>
+        </div>
+        <div class="card-body">
+            <div class="approval-actions" style="display: flex; gap: 1rem; align-items: center;">
+                <form method="POST" action="{{ url_for('manager_approve_request', request_id=request.request_id) }}" style="display: inline;">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check"></i> Approve
+                    </button>
+                </form>
+                
+                <button type="button" class="btn btn-danger" onclick="showRejectionForm()">
+                    <i class="fas fa-times"></i> Reject
+                </button>
+            </div>
+            
+            <!-- Rejection Form (Hidden by default) -->
+            <div id="rejectionForm" style="display: none; margin-top: 1rem; padding: 1rem; border: 1px solid #dc3545; border-radius: 4px; background-color: #f8d7da;">
+                <h4 style="color: #721c24; margin-bottom: 1rem;">Reject Request</h4>
+                <form method="POST" action="{{ url_for('manager_reject_request', request_id=request.request_id) }}">
+                    <div class="form-group">
+                        <label for="rejection_reason">Reason for Rejection *</label>
+                        <textarea name="rejection_reason" id="rejection_reason" rows="3" required 
+                                  placeholder="Please provide a clear reason for rejecting this request..." 
+                                  style="width: 100%; padding: 8px; border: 1px solid #dc3545; border-radius: 4px;"></textarea>
+                    </div>
+                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-times"></i> Confirm Rejection
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="hideRejectionForm()">
+                            <i class="fas fa-arrow-left"></i> Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Admin: Finance Approval -->
+    {% if user.role == 'Admin' and request.status in ['Pending', 'Pending Finance Approval'] %}
     <div class="card" style="margin-top: 2rem;">
         <div class="card-header">
             <h3><i class="fas fa-check-circle"></i> Approve Request</h3>
@@ -561,5 +629,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+// Manager rejection form functions
+function showRejectionForm() {
+    document.getElementById('rejectionForm').style.display = 'block';
+}
+
+function hideRejectionForm() {
+    document.getElementById('rejectionForm').style.display = 'none';
+    document.getElementById('rejection_reason').value = '';
+}
 </script>
 {% endblock %}

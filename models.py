@@ -12,8 +12,10 @@ class User(UserMixin, db.Model):
     user_id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
+    name = db.Column(db.String(100), nullable=False)  # User's full name
     department = db.Column(db.String(100), nullable=False)
     role = db.Column(db.String(50), nullable=False)  # Admin, Finance, GM, IT, Department User, Project
+    manager_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)  # Manager reference
     email = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -27,6 +29,9 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         """Verify password"""
         return check_password_hash(self.password, password)
+    
+    # Relationships
+    manager = db.relationship('User', remote_side=[user_id], backref='subordinates')
     
     def __repr__(self):
         return f'<User {self.username} ({self.role})>'
@@ -50,6 +55,7 @@ class PaymentRequest(db.Model):
     purpose = db.Column(db.Text, nullable=False)
     account_name = db.Column(db.String(100), nullable=False)
     account_number = db.Column(db.String(50), nullable=False)
+    bank_name = db.Column(db.String(100), nullable=False)
     amount = db.Column(db.Numeric(12, 3), nullable=False)  # OMR supports 3 decimal places
     recurring = db.Column(db.String(20))  # One-Time, Recurring
     recurring_interval = db.Column(db.String(50))  # Monthly, Quarterly, Annually
@@ -60,11 +66,17 @@ class PaymentRequest(db.Model):
     proof_required = db.Column(db.Boolean, default=False)  # Whether proof is required
     proof_of_payment = db.Column(db.String(255))  # File path for proof uploaded by department
     approval_date = db.Column(db.Date)  # Date when request was approved
+    manager_approval_date = db.Column(db.Date)  # Date when manager approved
+    manager_rejection_date = db.Column(db.Date)  # Date when manager rejected
+    rejection_reason = db.Column(db.Text)  # Reason for manager rejection
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Additional field for tracking who created the request
     user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'))
+    
+    # Relationship to User
+    user = db.relationship('User', backref='payment_requests')
     
     def to_dict(self):
         """Convert request to dictionary"""
@@ -77,6 +89,7 @@ class PaymentRequest(db.Model):
             'purpose': self.purpose,
             'account_name': self.account_name,
             'account_number': self.account_number,
+            'bank_name': self.bank_name,
             'amount': float(self.amount),
             'recurring': self.recurring,
             'recurring_interval': self.recurring_interval,
@@ -114,7 +127,7 @@ class Notification(db.Model):
     __tablename__ = 'notifications'
     
     notification_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
     title = db.Column(db.String(255), nullable=False)
     message = db.Column(db.Text, nullable=False)
     notification_type = db.Column(db.String(50), nullable=False)  # new_submission, approval, etc.
@@ -162,7 +175,7 @@ class RecurringPaymentSchedule(db.Model):
     __tablename__ = 'recurring_payment_schedules'
     
     schedule_id = db.Column(db.Integer, primary_key=True)
-    request_id = db.Column(db.Integer, db.ForeignKey('payment_requests.request_id'), nullable=False)
+    request_id = db.Column(db.Integer, db.ForeignKey('payment_requests.request_id'), nullable=True)
     payment_date = db.Column(db.Date, nullable=False)  # When this specific payment is due
     amount = db.Column(db.Numeric(12, 3), nullable=False)  # Amount for this specific payment
     payment_order = db.Column(db.Integer, nullable=False)  # Order of this payment (1st, 2nd, etc.)

@@ -548,10 +548,10 @@ def login():
         if user and user.check_password(password):
             login_user(user, remember=True)
             log_action(f"User {username} logged in")
-            flash(f'Welcome back, {user.username}!', 'success')
+            flash(f'Welcome back, {user.name}!', 'success')
             return redirect(url_for('dashboard'))
         else:
-            flash('Invalid username or password', 'danger')
+            flash('Invalid email address or password', 'danger')
     
     return render_template('login.html')
 
@@ -879,9 +879,72 @@ def new_request():
         purpose = request.form.get('purpose')
         account_name = request.form.get('account_name')
         account_number = request.form.get('account_number')
+        bank_name = request.form.get('bank_name')
         amount = request.form.get('amount')
         recurring = request.form.get('recurring', 'One-Time')
         recurring_interval = request.form.get('recurring_interval')
+        
+        # Validate account number length (maximum 16 digits)
+        if account_number and len(account_number) > 16:
+            flash('Account number cannot exceed 16 digits.', 'error')
+            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+        
+        # Validate account number contains only digits
+        if account_number and not account_number.isdigit():
+            flash('Account number must contain only numbers.', 'error')
+            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+        
+        # Validate bank name is selected
+        if not bank_name:
+            flash('Please select a bank name.', 'error')
+            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+        
+        # Handle comma-formatted amount
+        if amount:
+            # Remove commas from amount for processing
+            amount_clean = amount.replace(',', '')
+            try:
+                amount_float = float(amount_clean)
+                if amount_float <= 0:
+                    flash('Amount must be greater than 0.', 'error')
+                    return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+            except ValueError:
+                flash('Invalid amount format.', 'error')
+                return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+        
+        # Handle file upload for receipt
+        receipt_path = None
+        if 'receipt_file' in request.files:
+            receipt_file = request.files['receipt_file']
+            if receipt_file and receipt_file.filename:
+                # Validate file size (10MB max)
+                if len(receipt_file.read()) > 10 * 1024 * 1024:  # 10MB
+                    flash('Receipt file is too large. Maximum size is 10MB.', 'error')
+                    return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+                
+                # Reset file pointer
+                receipt_file.seek(0)
+                
+                # Validate file extension
+                allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+                file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
+                if file_extension not in allowed_extensions:
+                    flash('Invalid file type. Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
+                    return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+                
+                # Generate unique filename
+                import uuid
+                filename = f"{uuid.uuid4()}_{receipt_file.filename}"
+                
+                # Create uploads directory if it doesn't exist
+                import os
+                upload_folder = os.path.join(app.root_path, 'uploads', 'receipts')
+                os.makedirs(upload_folder, exist_ok=True)
+                
+                # Save file
+                full_path = os.path.join(upload_folder, filename)
+                receipt_file.save(full_path)
+                receipt_path = filename  # Store only the filename, not the full path
         
         # Get dynamic fields based on request type
         item_name = request.form.get('item_name')
@@ -900,10 +963,12 @@ def new_request():
             purpose=purpose,
             account_name=account_name,
             account_number=account_number,
-            amount=amount,
+            bank_name=bank_name,
+            amount=amount_clean if amount else amount,  # Use cleaned amount without commas
             recurring=recurring,
             recurring_interval=recurring_interval if recurring == 'Recurring' else None,
-            status='Pending',
+            status='Pending Manager Approval',
+            receipt_path=receipt_path,  # Add receipt path if file was uploaded
             user_id=current_user.user_id
         )
         
@@ -927,7 +992,7 @@ def new_request():
                 
                 # Create the payment schedule
                 if payment_schedule_data:
-                    create_recurring_payment_schedule(new_req.request_id, amount, payment_schedule_data)
+                    create_recurring_payment_schedule(new_req.request_id, amount_clean if amount else amount, payment_schedule_data)
                     log_action(f"Created variable amount payment schedule for request #{new_req.request_id}")
             except Exception as e:
                 print(f"Error creating payment schedule: {e}")
@@ -1062,8 +1127,13 @@ def view_request(request_id):
 @login_required
 @role_required('Admin')
 def approve_request(request_id):
-    """Approve a payment request"""
+    """Approve a payment request (Finance approval)"""
     req = PaymentRequest.query.get_or_404(request_id)
+    
+    # Check if request is in correct status for Finance approval
+    if req.status not in ['Pending', 'Pending Finance Approval']:
+        flash('This request is not ready for Finance approval.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
     
     approver = request.form.get('approver')
     proof_required = request.form.get('proof_required') == 'on'
@@ -1231,6 +1301,85 @@ def final_approve_request(request_id):
     
     flash(f'Payment request #{request_id} has been finally approved.', 'success')
     return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/request/<int:request_id>/manager_approve', methods=['POST'])
+@login_required
+def manager_approve_request(request_id):
+    """Manager approves a payment request"""
+    req = PaymentRequest.query.get_or_404(request_id)
+    
+    # Check if current user is the manager of the request submitter
+    if not req.user.manager_id or req.user.manager_id != current_user.user_id:
+        flash('You are not authorized to approve this request.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Check if request is in correct status
+    if req.status != 'Pending Manager Approval':
+        flash('This request is not pending manager approval.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Manager approves - move to Finance for final approval
+    req.status = 'Pending Finance Approval'
+    req.manager_approval_date = datetime.utcnow().date()
+    req.updated_at = datetime.utcnow()
+    
+    db.session.commit()
+    
+    log_action(f"Manager approved payment request #{request_id}")
+    
+    # Emit real-time update
+    socketio.emit('request_updated', {
+        'request_id': request_id,
+        'status': 'Pending Finance Approval',
+        'manager_approved': True
+    })
+    
+    flash(f'Payment request #{request_id} has been approved by manager. Sent to Finance for final approval.', 'success')
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/request/<int:request_id>/manager_reject', methods=['POST'])
+@login_required
+def manager_reject_request(request_id):
+    """Manager rejects a payment request"""
+    req = PaymentRequest.query.get_or_404(request_id)
+    
+    # Check if current user is the manager of the request submitter
+    if not req.user.manager_id or req.user.manager_id != current_user.user_id:
+        flash('You are not authorized to reject this request.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Check if request is in correct status
+    if req.status != 'Pending Manager Approval':
+        flash('This request is not pending manager approval.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get rejection reason
+    reason = request.form.get('rejection_reason', '').strip()
+    if not reason:
+        flash('Please provide a reason for rejection.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Manager rejects - request is rejected
+    req.status = 'Rejected by Manager'
+    req.rejection_reason = reason
+    req.manager_rejection_date = datetime.utcnow().date()
+    req.updated_at = datetime.utcnow()
+    
+    db.session.commit()
+    
+    log_action(f"Manager rejected payment request #{request_id} - Reason: {reason}")
+    
+    # Emit real-time update
+    socketio.emit('request_updated', {
+        'request_id': request_id,
+        'status': 'Rejected by Manager',
+        'manager_rejected': True
+    })
+    
+    flash(f'Payment request #{request_id} has been rejected by manager.', 'success')
+    return redirect(url_for('dashboard'))
 
 
 @app.route('/request/<int:request_id>/delete', methods=['POST'])
@@ -1493,25 +1642,37 @@ def manage_users():
 def new_user():
     """Create a new user - IT ONLY"""
     if request.method == 'POST':
-        username = request.form.get('username')
+        name = request.form.get('name')
+        username = request.form.get('username')  # This is now the email
         password = request.form.get('password')
         department = request.form.get('department')
         role = request.form.get('role')
-        email = request.form.get('email')
+        manager_id = request.form.get('manager_id')
         
-        # Check if username already exists
+        # Check if username (email) already exists
         existing_user = User.query.filter_by(username=username).first()
         if existing_user:
-            flash('Username already exists.', 'danger')
+            flash('Email address already exists.', 'danger')
             return redirect(url_for('new_user'))
         
         # Department restriction removed - multiple accounts per department allowed
         
+        # Auto-assign manager based on department
+        auto_manager = None
+        if department == 'IT':
+            # Find Nada as IT manager
+            auto_manager = User.query.filter_by(name='Nada').first()
+        
+        # Use manually selected manager if provided, otherwise use auto-assigned manager
+        final_manager_id = manager_id if manager_id else (auto_manager.user_id if auto_manager else None)
+        
         new_user = User(
-            username=username,
+            name=name,
+            username=username,  # Store email as username
             department=department,
             role=role,
-            email=email
+            manager_id=final_manager_id,
+            email=username  # Store email in both username and email fields
         )
         new_user.set_password(password)
         
@@ -1522,7 +1683,9 @@ def new_user():
         flash(f'User {username} created successfully for {department} department!', 'success')
         return redirect(url_for('manage_users'))
     
-    return render_template('new_user.html', user=current_user)
+    # Get all users for manager selection
+    all_users = User.query.all()
+    return render_template('new_user.html', user=current_user, all_users=all_users)
 
 
 @app.route('/users/<int:user_id>/edit', methods=['GET', 'POST'])
@@ -1533,17 +1696,29 @@ def edit_user(user_id):
     user_to_edit = User.query.get_or_404(user_id)
     
     if request.method == 'POST':
+        new_name = request.form.get('name')
         new_password = request.form.get('password')
         new_department = request.form.get('department')
         new_role = request.form.get('role')
-        new_email = request.form.get('email')
+        new_manager_id = request.form.get('manager_id')
         
         # Department restriction removed - multiple accounts per department allowed
         
+        # Auto-assign manager based on department
+        auto_manager = None
+        if new_department == 'IT':
+            # Find Nada as IT manager
+            auto_manager = User.query.filter_by(name='Nada').first()
+        
+        # Use manually selected manager if provided, otherwise use auto-assigned manager
+        final_manager_id = new_manager_id if new_manager_id else (auto_manager.user_id if auto_manager else None)
+        
         # Update user information
+        user_to_edit.name = new_name
         user_to_edit.department = new_department
         user_to_edit.role = new_role
-        user_to_edit.email = new_email
+        user_to_edit.manager_id = final_manager_id
+        # Email is stored in username field, so no need to update email separately
         
         # Only update password if provided
         if new_password:
@@ -1555,7 +1730,9 @@ def edit_user(user_id):
         flash(f'User {user_to_edit.username} has been updated successfully!', 'success')
         return redirect(url_for('manage_users'))
     
-    return render_template('edit_user.html', user=current_user, user_to_edit=user_to_edit)
+    # Get all users for manager selection (excluding the user being edited)
+    all_users = User.query.filter(User.user_id != user_id).all()
+    return render_template('edit_user.html', user=current_user, user_to_edit=user_to_edit, all_users=all_users)
 
 
 @app.route('/users/<int:user_id>/delete', methods=['POST'])

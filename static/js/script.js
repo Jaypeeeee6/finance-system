@@ -29,11 +29,14 @@ style.textContent = `
 document.head.appendChild(style);
 
 // ==================== FORM VALIDATION ====================
-// Validate account number (numbers only)
+// Validate account number (numbers only, max 16 digits)
 function validateAccountNumber(input) {
     const value = input.value;
     if (!/^\d*$/.test(value)) {
         input.setCustomValidity('Please enter numbers only');
+        return false;
+    } else if (value.length > 16) {
+        input.setCustomValidity('Account number cannot exceed 16 digits');
         return false;
     } else {
         input.setCustomValidity('');
