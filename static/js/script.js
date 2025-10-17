@@ -145,16 +145,8 @@ searchInputs.forEach(input => {
 });
 
 // ==================== CONFIRM DIALOGS ====================
-// Add confirmation to delete actions
-document.querySelectorAll('form[onsubmit*="confirm"]').forEach(form => {
-    form.addEventListener('submit', function(e) {
-        const confirmed = confirm(this.getAttribute('onsubmit').match(/confirm\('(.+)'\)/)[1]);
-        if (!confirmed) {
-            e.preventDefault();
-            return false;
-        }
-    });
-});
+// Note: Confirmation dialogs are handled by onsubmit attributes in HTML
+// No additional JavaScript needed to avoid double alerts
 
 // ==================== FILE UPLOAD PREVIEW ====================
 function previewFile(input) {
@@ -191,8 +183,26 @@ document.querySelectorAll('form').forEach(form => {
     form.addEventListener('submit', function(e) {
         const submitBtn = this.querySelector('button[type="submit"]');
         if (submitBtn && !this.hasAttribute('data-no-loading')) {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            // Only show loading state if form will actually submit
+            // Check if form has onsubmit that might prevent submission
+            const onsubmitAttr = this.getAttribute('onsubmit');
+            if (onsubmitAttr && onsubmitAttr.includes('confirm')) {
+                // For forms with confirmation, only show loading after confirmation
+                const originalSubmit = this.onsubmit;
+                this.onsubmit = function() {
+                    const result = originalSubmit.call(this);
+                    if (result !== false) {
+                        // User confirmed, show loading state
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+                    }
+                    return result;
+                };
+            } else {
+                // For forms without confirmation, show loading immediately
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            }
         }
     });
 });

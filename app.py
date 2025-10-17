@@ -582,6 +582,11 @@ def dashboard():
         return redirect(url_for('gm_dashboard'))
     elif role == 'IT':
         return redirect(url_for('it_dashboard'))
+    elif role == 'Department Manager':
+        # Route IT department managers to the IT dashboard, others to department dashboard
+        if current_user.department == 'IT':
+            return redirect(url_for('it_dashboard'))
+        return redirect(url_for('department_dashboard'))
     elif role == 'Project':
         return redirect(url_for('project_dashboard'))
     elif role == 'Operation Manager':
@@ -592,7 +597,7 @@ def dashboard():
 
 @app.route('/department/dashboard')
 @login_required
-@role_required('Department User', 'Finance', 'Project')
+@role_required('Department User', 'Department Manager', 'Finance', 'Project')
 def department_dashboard():
     """Dashboard for department users, finance, and project users"""
     page = request.args.get('page', 1, type=int)
@@ -740,7 +745,7 @@ def gm_dashboard():
 
 @app.route('/it/dashboard')
 @login_required
-@role_required('IT')
+@role_required('IT', 'Department Manager')
 def it_dashboard():
     """Dashboard for IT - full CRUD access"""
     page = request.args.get('page', 1, type=int)
@@ -750,6 +755,11 @@ def it_dashboard():
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
+    
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
     
     # Build query with optional department filter
     query = PaymentRequest.query
@@ -1629,18 +1639,25 @@ def export_reports_pdf():
 
 @app.route('/users')
 @login_required
-@role_required('IT')
+@role_required('IT', 'Department Manager')
 def manage_users():
     """Manage users (IT only)"""
+    # Only IT or IT Department Manager
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
     users = User.query.all()
     return render_template('manage_users.html', users=users, user=current_user)
 
 
 @app.route('/users/new', methods=['GET', 'POST'])
 @login_required
-@role_required('IT')
+@role_required('IT', 'Department Manager')
 def new_user():
     """Create a new user - IT ONLY"""
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
     if request.method == 'POST':
         name = request.form.get('name')
         username = request.form.get('username')  # This is now the email
@@ -1657,14 +1674,22 @@ def new_user():
         
         # Department restriction removed - multiple accounts per department allowed
         
-        # Auto-assign manager based on department
-        auto_manager = None
-        if department == 'IT':
-            # Find Nada as IT manager
-            auto_manager = User.query.filter_by(name='Nada').first()
-        
-        # Use manually selected manager if provided, otherwise use auto-assigned manager
-        final_manager_id = manager_id if manager_id else (auto_manager.user_id if auto_manager else None)
+        # Determine manager assignment
+        # If the new user IS a Department Manager, they manage their own department and have no manager above them (besides GM)
+        if role == 'Department Manager':
+            final_manager_id = None
+        else:
+            # First preference: explicit manager selection from form
+            if manager_id:
+                final_manager_id = manager_id
+            else:
+                # Fallback: find the department's manager user
+                dept_manager = User.query.filter_by(department=department, role='Department Manager').first()
+                if dept_manager:
+                    final_manager_id = dept_manager.user_id
+                else:
+                    # No fallback: manager assignment depends solely on users with 'Department Manager' role
+                    final_manager_id = None
         
         new_user = User(
             name=name,
@@ -1690,9 +1715,12 @@ def new_user():
 
 @app.route('/users/<int:user_id>/edit', methods=['GET', 'POST'])
 @login_required
-@role_required('IT')
+@role_required('IT', 'Department Manager')
 def edit_user(user_id):
     """Edit user information - IT ONLY"""
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
     user_to_edit = User.query.get_or_404(user_id)
     
     if request.method == 'POST':
@@ -1704,14 +1732,19 @@ def edit_user(user_id):
         
         # Department restriction removed - multiple accounts per department allowed
         
-        # Auto-assign manager based on department
-        auto_manager = None
-        if new_department == 'IT':
-            # Find Nada as IT manager
-            auto_manager = User.query.filter_by(name='Nada').first()
-        
-        # Use manually selected manager if provided, otherwise use auto-assigned manager
-        final_manager_id = new_manager_id if new_manager_id else (auto_manager.user_id if auto_manager else None)
+        # Determine manager assignment on edit
+        if new_role == 'Department Manager':
+            final_manager_id = None
+        else:
+            if new_manager_id:
+                final_manager_id = new_manager_id
+            else:
+                dept_manager = User.query.filter_by(department=new_department, role='Department Manager').first()
+                if dept_manager:
+                    final_manager_id = dept_manager.user_id
+                else:
+                    # No fallback: manager assignment depends solely on users with 'Department Manager' role
+                    final_manager_id = None
         
         # Update user information
         user_to_edit.name = new_name
@@ -1737,9 +1770,12 @@ def edit_user(user_id):
 
 @app.route('/users/<int:user_id>/delete', methods=['POST'])
 @login_required
-@role_required('IT')
+@role_required('IT', 'Department Manager')
 def delete_user(user_id):
     """Delete a user and handle related data"""
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
     user_to_delete = User.query.get_or_404(user_id)
     
     # Don't allow deleting yourself

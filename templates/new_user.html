@@ -76,6 +76,7 @@
                             <option value="IT">IT</option>
                             <option value="Project">Project</option>
                             <option value="Operation Manager">Operation Manager</option>
+                            <option value="Department Manager">Department Manager</option>
                             <option value="Department User">Department User</option>
                         </select>
                         <small>Only IT can create users</small>
@@ -105,78 +106,62 @@
     </div>
 </div>
 
+<script type="application/json" id="users-data">[
+    {% for user in all_users %}
+    {"id": {{ user.user_id }}, "name": {{ user.name|tojson }}, "department": {{ user.department|tojson }}, "role": {{ user.role|tojson }} }{% if not loop.last %},{% endif %}
+    {% endfor %}
+]</script>
+
 <script>
-// Auto-assign manager based on department selection
-document.getElementById('department').addEventListener('change', function() {
-    const department = this.value;
-    const managerDisplay = document.getElementById('manager_display');
-    const managerText = document.getElementById('manager-text');
-    const managerIdInput = document.getElementById('manager_id');
-    const managerInfo = document.getElementById('manager-info');
-    
-    // Department to Manager mapping
-    const departmentManagers = {
-        'IT': 'Nada'
-        // Add other departments when managers are available
-    };
-    
-    if (department && departmentManagers[department]) {
-        const managerName = departmentManagers[department];
-        
-        // Find the manager in the available users list
-        const managerOption = Array.from(document.querySelectorAll('option')).find(option => 
-            option.text.includes(managerName)
-        );
-        
-        if (managerOption) {
-            managerIdInput.value = managerOption.value;
-            managerText.textContent = `${managerName} (${department} Manager)`;
-            managerDisplay.style.backgroundColor = '#d4edda';
-            managerDisplay.style.borderColor = '#c3e6cb';
-            managerInfo.textContent = `Auto-assigned: ${managerName}`;
-            managerInfo.style.color = '#28a745';
-        } else {
-            // If not found in options, try to find by name in the users data
-            const users = [
-                {% for user in all_users %}
-                {id: {{ user.user_id }}, name: "{{ user.name }}", department: "{{ user.department }}", role: "{{ user.role }}"},
-                {% endfor %}
-            ];
-            
-            const foundManager = users.find(user => user.name === managerName);
-            
-            if (foundManager) {
-                managerIdInput.value = foundManager.id;
-                managerText.textContent = `${foundManager.name} (${department} Manager)`;
-                managerDisplay.style.backgroundColor = '#d4edda';
-                managerDisplay.style.borderColor = '#c3e6cb';
-                managerInfo.textContent = `Auto-assigned: ${foundManager.name}`;
-                managerInfo.style.color = '#28a745';
-            } else {
-                managerIdInput.value = '';
-                managerText.textContent = `Manager ${managerName} not found in system`;
-                managerDisplay.style.backgroundColor = '#f8d7da';
-                managerDisplay.style.borderColor = '#f5c6cb';
-                managerInfo.textContent = `Manager ${managerName} not found in system`;
-                managerInfo.style.color = '#dc3545';
-            }
-        }
-    } else if (department) {
+// Build users list from server for manager lookup using embedded JSON to avoid linter issues
+const users = JSON.parse(document.getElementById('users-data').textContent);
+
+const departmentSelect = document.getElementById('department');
+const roleSelect = document.getElementById('role');
+const managerDisplay = document.getElementById('manager_display');
+const managerText = document.getElementById('manager-text');
+const managerIdInput = document.getElementById('manager_id');
+const managerInfo = document.getElementById('manager-info');
+
+function setDisplay(text, bg, border, infoText, infoColor) {
+    managerText.textContent = text;
+    managerDisplay.style.backgroundColor = bg;
+    managerDisplay.style.borderColor = border;
+    managerInfo.textContent = infoText;
+    managerInfo.style.color = infoColor;
+}
+
+function updateManagerDisplay() {
+    const department = departmentSelect.value;
+    const role = roleSelect.value;
+
+    if (!department) {
         managerIdInput.value = '';
-        managerText.textContent = `No manager available for ${department} department yet`;
-        managerDisplay.style.backgroundColor = '#fff3cd';
-        managerDisplay.style.borderColor = '#ffeaa7';
-        managerInfo.textContent = `No manager available for ${department} department yet`;
-        managerInfo.style.color = '#ffc107';
+        setDisplay('Select a department to see assigned manager', '#f8f9fa', '#ddd', 'Manager will be automatically assigned based on department', '#6c757d');
+        return;
+    }
+
+    if (role === 'Department Manager') {
+        managerIdInput.value = '';
+        setDisplay('You will be the assigned manager for this department', '#d4edda', '#c3e6cb', 'As a Manager, you will manage this department', '#28a745');
+        return;
+    }
+
+    const managerUser = users.find(u => u.department === department && u.role === 'Department Manager');
+    if (managerUser) {
+        managerIdInput.value = managerUser.id;
+        setDisplay(`${managerUser.name}`, '#d4edda', '#c3e6cb', `${managerUser.name} is the assigned manager for the ${department} department`, '#28a745');
     } else {
         managerIdInput.value = '';
-        managerText.textContent = 'Select a department to see assigned manager';
-        managerDisplay.style.backgroundColor = '#f8f9fa';
-        managerDisplay.style.borderColor = '#ddd';
-        managerInfo.textContent = 'Manager will be automatically assigned based on department';
-        managerInfo.style.color = '#6c757d';
+        setDisplay(`There is no assigned manager for the ${department} department yet`, '#fff3cd', '#ffeaa7', `There is no assigned manager for the ${department} department yet`, '#ffc107');
     }
-});
+}
+
+departmentSelect.addEventListener('change', updateManagerDisplay);
+roleSelect.addEventListener('change', updateManagerDisplay);
+
+// Initialize on load in case defaults are pre-selected
+updateManagerDisplay();
 </script>
 {% endblock %}
 
