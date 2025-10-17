@@ -28,10 +28,10 @@ env.bak/
 venv.bak/
 
 # Database
-instance/
-*.db
-*.sqlite
-*.sqlite3
+# instance/  # Commented out to allow database files
+# *.db       # Commented out to allow database files
+# *.sqlite   # Commented out to allow database files
+# *.sqlite3  # Commented out to allow database files
 
 # Uploads
 uploads/
