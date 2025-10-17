@@ -8,6 +8,7 @@ db = SQLAlchemy()
 class User(UserMixin, db.Model):
     """User model for authentication and authorization"""
     __tablename__ = 'users'
+    __table_args__ = { 'sqlite_autoincrement': True }
     
     user_id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)

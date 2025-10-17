@@ -8,8 +8,12 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     
     # Database configuration
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'sqlite:///payment_system.db'
+    # Use absolute path under instance/ to avoid "unable to open database file"
+    _BASEDIR = os.path.abspath(os.path.dirname(__file__))
+    _INSTANCE_DIR = os.path.join(_BASEDIR, 'instance')
+    os.makedirs(_INSTANCE_DIR, exist_ok=True)
+    _DB_PATH = os.path.join(_INSTANCE_DIR, 'payment_system.db')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///' + _DB_PATH.replace('\\', '/')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # File upload configuration

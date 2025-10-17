@@ -21,8 +21,9 @@
                     <table class="data-table">
                         <thead>
                             <tr>
+                                <th><input type="checkbox" id="selectAll" onchange="toggleAllCheckboxes()"></th>
                                 <th>ID</th>
-                                <th>Username</th>
+                                <th>Full Name</th>
                                 <th>Department</th>
                                 <th>Role</th>
                                 <th>Email</th>
@@ -33,8 +34,9 @@
                         <tbody>
                             {% for u in users %}
                             <tr>
+                                <td><input type="checkbox" class="user-checkbox" value="{{ u.user_id }}" onchange="updateSelectAllState()" {% if u.user_id == current_user.user_id %}disabled{% endif %}></td>
                                 <td>{{ u.user_id }}</td>
-                                <td>{{ u.username }}</td>
+                                <td>{{ u.name }}</td>
                                 <td>{{ u.department }}</td>
                                 <td><span class="badge badge-primary">{{ u.role }}</span></td>
                                 <td>{{ u.email or 'N/A' }}</td>
@@ -44,7 +46,7 @@
                                         <i class="fas fa-edit"></i> Edit
                                     </a>
                                     {% if u.user_id != current_user.user_id %}
-                                    <form method="POST" action="{{ url_for('delete_user', user_id=u.user_id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete user {{ u.username }}?')">
+                                    <form method="POST" action="{{ url_for('delete_user', user_id=u.user_id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete user {{ u.name }}?')">
                                         <button type="submit" class="btn btn-sm btn-danger">
                                             <i class="fas fa-trash"></i> Delete
                                         </button>
@@ -67,5 +69,39 @@
         </div>
     </div>
 </div>
+
+<script>
+function toggleAllCheckboxes() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const userCheckboxes = document.querySelectorAll('.user-checkbox:not(:disabled)');
+    
+    userCheckboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+}
+
+function updateSelectAllState() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const userCheckboxes = document.querySelectorAll('.user-checkbox:not(:disabled)');
+    const checkedCheckboxes = document.querySelectorAll('.user-checkbox:checked');
+    
+    if (checkedCheckboxes.length === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+    } else if (checkedCheckboxes.length === userCheckboxes.length) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+    } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+    }
+}
+
+// Get selected user IDs
+function getSelectedUserIds() {
+    const checkedCheckboxes = document.querySelectorAll('.user-checkbox:checked');
+    return Array.from(checkedCheckboxes).map(checkbox => checkbox.value);
+}
+</script>
 {% endblock %}
 

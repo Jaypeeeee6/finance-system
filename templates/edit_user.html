@@ -70,7 +70,7 @@
                         <label for="role">Role *</label>
                         <select name="role" id="role" required>
                             <option value="">-- Select Role --</option>
-                            <option value="Admin" {% if user_to_edit.role == 'Admin' %}selected{% endif %}>Admin</option>
+                            <option value="Finance Admin" {% if user_to_edit.role == 'Finance Admin' %}selected{% endif %}>Finance Admin</option>
                             <option value="Finance" {% if user_to_edit.role == 'Finance' %}selected{% endif %}>Finance</option>
                             <option value="GM" {% if user_to_edit.role == 'GM' %}selected{% endif %}>General Manager</option>
                             <option value="IT" {% if user_to_edit.role == 'IT' %}selected{% endif %}>IT</option>
@@ -149,13 +149,23 @@ function updateManagerDisplay() {
         return;
     }
 
-    if (role === 'Department Manager') {
+    if (role === 'Department Manager' || (role === 'GM' && department === 'Office') || (role === 'Operation Manager' && department === 'Operation') || (role === 'Finance Admin' && department === 'Finance' && document.getElementById('name').value.trim() === 'Abdalaziz Hamood Al Brashdi')) {
         managerIdInput.value = '';
         setDisplay('You will be the assigned manager for this department', '#d4edda', '#c3e6cb', 'As a Manager, you will manage this department', '#28a745');
         return;
     }
 
-    const managerUser = users.find(u => u.department === department && u.role === 'Department Manager');
+    // Manager selection: Department Manager of same department; Office → GM; Operation → Operation Manager; Finance → Named manager
+    let managerUser = users.find(u => u.department === department && u.role === 'Department Manager');
+    if (!managerUser && department === 'Office') {
+        managerUser = users.find(u => u.role === 'GM');
+    }
+    if (!managerUser && department === 'Operation') {
+        managerUser = users.find(u => u.role === 'Operation Manager');
+    }
+    if (!managerUser && department === 'Finance') {
+        managerUser = users.find(u => u.department === 'Finance' && u.name === 'Abdalaziz Hamood Al Brashdi');
+    }
     if (managerUser) {
         managerIdInput.value = managerUser.id;
         setDisplay(`${managerUser.name}`, '#d4edda', '#c3e6cb', `${managerUser.name} is the assigned manager for the ${department} department`, '#28a745');

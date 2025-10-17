@@ -183,7 +183,7 @@ def handle_join_room(data):
     """Handle client joining a room"""
     room = data.get('room')
     if room and current_user.is_authenticated:
-        if room == 'finance_admin' and current_user.role in ['Finance', 'Admin']:
+        if room == 'finance_admin' and current_user.role in ['Finance', 'Finance Admin']:
             join_room(room)
             print(f'User {current_user.username} joined room: {room}')
         elif room == 'all_users':
@@ -317,7 +317,7 @@ def check_recurring_payments_due():
                     
                     if not existing_notification:
                         # Create notifications for all admin and project users
-                        admin_users = User.query.filter(User.role.in_(['Admin', 'Project'])).all()
+                        admin_users = User.query.filter(User.role.in_(['Finance Admin', 'Project'])).all()
                         for user in admin_users:
                             create_notification(
                                 user_id=user.user_id,
@@ -355,7 +355,7 @@ def check_recurring_payments_due():
                 
                 if not existing_notification:
                     # Create notification for all admin and project users
-                    admin_users = User.query.filter(User.role.in_(['Admin', 'Project'])).all()
+                    admin_users = User.query.filter(User.role.in_(['Finance Admin', 'Project'])).all()
                     for user in admin_users:
                         create_notification(
                             user_id=user.user_id,
@@ -497,7 +497,7 @@ def is_payment_due_today(request, today):
 def notify_finance_and_admin(title, message, notification_type, request_id=None):
     """Notify Finance and Admin users about new submissions"""
     # Get all Finance and Admin users
-    finance_admin_users = User.query.filter(User.role.in_(['Finance', 'Admin'])).all()
+    finance_admin_users = User.query.filter(User.role.in_(['Finance', 'Finance Admin'])).all()
     
     for user in finance_admin_users:
         create_notification(
@@ -536,6 +536,23 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Login page"""
+    # Ensure a default IT user exists if database is empty
+    try:
+        if User.query.count() == 0:
+            default_it = User(
+                name='Default IT',
+                username='it@system.local',
+                department='IT',
+                role='IT',
+                email='it@system.local'
+            )
+            default_it.set_password('admin123')
+            db.session.add(default_it)
+            db.session.commit()
+            app.logger.info('Default IT user created: it@system.local / admin123')
+    except Exception as _e:
+        # If DB not ready or other issue, continue to login page without blocking
+        pass
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     
@@ -574,7 +591,7 @@ def dashboard():
     """Main dashboard - routes to appropriate dashboard based on role"""
     role = current_user.role
     
-    if role == 'Admin':
+    if role == 'Finance Admin':
         return redirect(url_for('admin_dashboard'))
     elif role == 'Finance':
         return redirect(url_for('finance_dashboard'))
@@ -620,7 +637,7 @@ def department_dashboard():
 
 @app.route('/admin/dashboard')
 @login_required
-@role_required('Admin')
+@role_required('Finance Admin')
 def admin_dashboard():
     """Dashboard for admin - shows all requests with optional status filtering"""
     # Check for recurring payments due today
@@ -1079,13 +1096,13 @@ def view_request(request_id):
     req = PaymentRequest.query.get_or_404(request_id)
     
     # Check permissions
-    if current_user.role not in ['Admin', 'Finance', 'GM', 'IT', 'Project']:
+    if current_user.role not in ['Finance Admin', 'Finance', 'GM', 'IT', 'Project']:
         if req.user_id != current_user.user_id:
             flash('You do not have permission to view this request.', 'danger')
             return redirect(url_for('dashboard'))
     
     # Mark notifications related to this request as read for Finance and Admin users
-    if current_user.role in ['Finance', 'Admin']:
+    if current_user.role in ['Finance', 'Finance Admin']:
         Notification.query.filter_by(
             user_id=current_user.user_id,
             request_id=request_id,
@@ -1135,7 +1152,7 @@ def view_request(request_id):
 
 @app.route('/request/<int:request_id>/approve', methods=['POST'])
 @login_required
-@role_required('Admin')
+@role_required('Finance Admin')
 def approve_request(request_id):
     """Approve a payment request (Finance approval)"""
     req = PaymentRequest.query.get_or_404(request_id)
@@ -1417,7 +1434,7 @@ def delete_request(request_id):
 
 @app.route('/reports')
 @login_required
-@role_required('Admin', 'Finance', 'GM', 'IT', 'Operation Manager')
+@role_required('Finance Admin', 'Finance', 'GM', 'IT', 'Operation Manager')
 def reports():
     """View reports page"""
     # Get filter parameters
@@ -1490,7 +1507,7 @@ def reports():
 
 @app.route('/reports/export/pdf')
 @login_required
-@role_required('Admin', 'Finance', 'GM', 'IT', 'Operation Manager')
+@role_required('Finance Admin', 'Finance', 'GM', 'IT', 'Operation Manager')
 def export_reports_pdf():
     """Export filtered reports to a PDF including total amount and full list"""
     # Lazy imports to avoid hard dependency during app startup
@@ -1688,8 +1705,19 @@ def new_user():
                 if dept_manager:
                     final_manager_id = dept_manager.user_id
                 else:
-                    # No fallback: manager assignment depends solely on users with 'Department Manager' role
-                    final_manager_id = None
+                    # Special rules: Office → GM, Operation → Operation Manager, Finance → specific named manager
+                    if department == 'Office':
+                        gm_user = User.query.filter_by(role='GM').first()
+                        final_manager_id = gm_user.user_id if gm_user else None
+                    elif department == 'Operation':
+                        op_manager = User.query.filter_by(role='Operation Manager').first()
+                        final_manager_id = op_manager.user_id if op_manager else None
+                    elif department == 'Finance':
+                        named_manager = User.query.filter_by(name='Abdalaziz Hamood Al Brashdi', department='Finance').first()
+                        final_manager_id = named_manager.user_id if named_manager else None
+                    else:
+                        # No fallback: manager assignment depends solely on users with 'Department Manager' role
+                        final_manager_id = None
         
         new_user = User(
             name=name,
@@ -1743,8 +1771,19 @@ def edit_user(user_id):
                 if dept_manager:
                     final_manager_id = dept_manager.user_id
                 else:
-                    # No fallback: manager assignment depends solely on users with 'Department Manager' role
-                    final_manager_id = None
+                    # Special rules: Office → GM, Operation → Operation Manager, Finance → specific named manager
+                    if new_department == 'Office':
+                        gm_user = User.query.filter_by(role='GM').first()
+                        final_manager_id = gm_user.user_id if gm_user else None
+                    elif new_department == 'Operation':
+                        op_manager = User.query.filter_by(role='Operation Manager').first()
+                        final_manager_id = op_manager.user_id if op_manager else None
+                    elif new_department == 'Finance':
+                        named_manager = User.query.filter_by(name='Abdalaziz Hamood Al Brashdi', department='Finance').first()
+                        final_manager_id = named_manager.user_id if named_manager else None
+                    else:
+                        # No fallback: manager assignment depends solely on users with 'Department Manager' role
+                        final_manager_id = None
         
         # Update user information
         user_to_edit.name = new_name
