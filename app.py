@@ -494,6 +494,31 @@ def is_payment_due_today(request, today):
     return False
 
 
+def get_notifications_for_user(user):
+    """Get appropriate notifications for a user based on their role"""
+    if user.role == 'Project':
+        # Project users only see recurring due notifications
+        return Notification.query.filter_by(
+            user_id=user.user_id,
+            notification_type='recurring_due'
+        ).order_by(Notification.created_at.desc()).limit(5).all()
+    else:
+        # All other roles see all their notifications
+        return Notification.query.filter_by(user_id=user.user_id).order_by(Notification.created_at.desc()).limit(5).all()
+
+def get_unread_count_for_user(user):
+    """Get unread notification count for a user based on their role"""
+    if user.role == 'Project':
+        # Project users only count recurring due notifications
+        return Notification.query.filter_by(
+            user_id=user.user_id, 
+            is_read=False,
+            notification_type='recurring_due'
+        ).count()
+    else:
+        # All other roles count all notifications
+        return Notification.query.filter_by(user_id=user.user_id, is_read=False).count()
+
 def notify_finance_and_admin(title, message, notification_type, request_id=None):
     """Notify Finance and Admin users about new submissions"""
     # Get all Finance and Admin users
@@ -614,7 +639,7 @@ def dashboard():
 
 @app.route('/department/dashboard')
 @login_required
-@role_required('Department User', 'Department Manager', 'Finance', 'Project')
+@role_required('Department User', 'Department Manager', 'Operation Manager', 'Finance', 'Project')
 def department_dashboard():
     """Dashboard for department users, finance, and project users"""
     page = request.args.get('page', 1, type=int)
@@ -624,15 +649,41 @@ def department_dashboard():
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
     
-    # Get paginated requests for current user
-    requests_pagination = PaymentRequest.query.filter_by(user_id=current_user.user_id).order_by(PaymentRequest.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
+    # For Department Managers and Operation Managers, show requests that need their approval
+    if current_user.role in ['Department Manager', 'Operation Manager']:
+        # Get requests from their department that need manager approval
+        if current_user.role == 'Operation Manager':
+            # Operation Manager can see Operation department requests
+            query = PaymentRequest.query.filter(
+                PaymentRequest.department == 'Operation',
+                PaymentRequest.status == 'Pending Manager Approval'
+            )
+        else:
+            # Department Manager can see their department's requests
+            query = PaymentRequest.query.filter(
+                PaymentRequest.department == current_user.department,
+                PaymentRequest.status == 'Pending Manager Approval'
+            )
+        
+        requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    else:
+        # For regular users, show their own requests
+        requests_pagination = PaymentRequest.query.filter_by(user_id=current_user.user_id).order_by(PaymentRequest.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    
+    # Get notifications for department managers and regular users
+    notifications = get_notifications_for_user(current_user)
+    unread_count = get_unread_count_for_user(current_user)
     
     return render_template('department_dashboard.html', 
                          requests=requests_pagination.items, 
                          pagination=requests_pagination,
-                         user=current_user)
+                         user=current_user,
+                         notifications=notifications,
+                         unread_count=unread_count)
 
 
 @app.route('/admin/dashboard')
@@ -653,7 +704,8 @@ def admin_dashboard():
         per_page = 10
     
     # Build query with optional status and department filters
-    query = PaymentRequest.query
+    # Finance Admin should not see requests that are still pending manager approval
+    query = PaymentRequest.query.filter(PaymentRequest.status != 'Pending Manager Approval')
     if status_filter:
         query = query.filter(PaymentRequest.status == status_filter)
     if department_filter:
@@ -664,8 +716,8 @@ def admin_dashboard():
         page=page, per_page=per_page, error_out=False
     )
     
-    notifications = Notification.query.filter_by(user_id=current_user.user_id).order_by(Notification.created_at.desc()).limit(5).all()
-    unread_count = Notification.query.filter_by(user_id=current_user.user_id, is_read=False).count()
+    notifications = get_notifications_for_user(current_user)
+    unread_count = get_unread_count_for_user(current_user)
     
     return render_template('admin_dashboard.html', 
                          requests=requests_pagination.items, 
@@ -694,7 +746,8 @@ def finance_dashboard():
         per_page = 10
     
     # Build query with optional department filter
-    query = PaymentRequest.query
+    # Finance users should not see requests that are still pending manager approval
+    query = PaymentRequest.query.filter(PaymentRequest.status != 'Pending Manager Approval')
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     
@@ -703,8 +756,8 @@ def finance_dashboard():
         page=page, per_page=per_page, error_out=False
     )
     
-    notifications = Notification.query.filter_by(user_id=current_user.user_id).order_by(Notification.created_at.desc()).limit(5).all()
-    unread_count = Notification.query.filter_by(user_id=current_user.user_id, is_read=False).count()
+    notifications = get_notifications_for_user(current_user)
+    unread_count = get_unread_count_for_user(current_user)
     
     return render_template('finance_dashboard.html', 
                          requests=requests_pagination.items, 
@@ -729,7 +782,8 @@ def gm_dashboard():
         per_page = 10
     
     # Build query with optional department filter
-    query = PaymentRequest.query
+    # GM should not see requests that are still pending manager approval
+    query = PaymentRequest.query.filter(PaymentRequest.status != 'Pending Manager Approval')
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     
@@ -738,8 +792,8 @@ def gm_dashboard():
         page=page, per_page=per_page, error_out=False
     )
     
-    # Calculate statistics (only Approved and Pending)
-    all_requests = PaymentRequest.query.all()
+    # Calculate statistics (only Approved and Pending, excluding manager pending)
+    all_requests = PaymentRequest.query.filter(PaymentRequest.status != 'Pending Manager Approval').all()
     total_requests = len(all_requests)
     approved = len([r for r in all_requests if r.status == 'Approved'])
     pending = len([r for r in all_requests if r.status == 'Pending'])
@@ -752,11 +806,17 @@ def gm_dashboard():
         'total_amount': total_amount
     }
     
+    # Get notifications for GM (all notifications)
+    notifications = get_notifications_for_user(current_user)
+    unread_count = get_unread_count_for_user(current_user)
+    
     return render_template('gm_dashboard.html', 
                          requests=requests_pagination.items, 
                          pagination=requests_pagination,
                          stats=stats, 
                          user=current_user,
+                         notifications=notifications,
+                         unread_count=unread_count,
                          department_filter=department_filter)
 
 
@@ -779,7 +839,16 @@ def it_dashboard():
         return redirect(url_for('dashboard'))
     
     # Build query with optional department filter
-    query = PaymentRequest.query
+    if current_user.role == 'IT':
+        # IT users see all requests
+        query = PaymentRequest.query
+    elif current_user.role == 'Department Manager' and current_user.department == 'IT':
+        # IT Department Managers see all IT department requests (including pending manager approval)
+        query = PaymentRequest.query.filter(PaymentRequest.department == 'IT')
+    else:
+        # Other users should not see requests that are still pending manager approval
+        query = PaymentRequest.query.filter(PaymentRequest.status != 'Pending Manager Approval')
+    
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     
@@ -787,6 +856,10 @@ def it_dashboard():
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
+    
+    # Get notifications for IT users and IT Department Managers
+    notifications = get_notifications_for_user(current_user)
+    unread_count = get_unread_count_for_user(current_user)
     
     users = User.query.all()
     logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(50).all()
@@ -796,6 +869,8 @@ def it_dashboard():
                          users=users, 
                          logs=logs, 
                          user=current_user,
+                         notifications=notifications,
+                         unread_count=unread_count,
                          department_filter=department_filter)
 
 
@@ -826,15 +901,8 @@ def project_dashboard():
     )
     
     # Get notifications for project users (only due date notifications)
-    notifications = Notification.query.filter_by(
-        user_id=current_user.user_id,
-        notification_type='recurring_due'
-    ).order_by(Notification.created_at.desc()).limit(5).all()
-    unread_count = Notification.query.filter_by(
-        user_id=current_user.user_id, 
-        is_read=False,
-        notification_type='recurring_due'
-    ).count()
+    notifications = get_notifications_for_user(current_user)
+    unread_count = get_unread_count_for_user(current_user)
     
     return render_template('project_dashboard.html', 
                          requests=requests_pagination.items, 
@@ -864,24 +932,31 @@ def operation_dashboard():
     
     # Build query with optional status and department filters - Operation Manager sees only Maintenance, Operation, and Project Department
     query = PaymentRequest.query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project Department']))
-    if status_filter:
+    
+    # If no specific status filter, prioritize showing requests that need manager approval
+    if not status_filter:
+        # Show requests that need manager approval first, then others
+        query = query.order_by(
+            db.case(
+                (PaymentRequest.status == 'Pending Manager Approval', 1),
+                else_=2
+            ),
+            PaymentRequest.created_at.desc()
+        )
+    else:
         query = query.filter(PaymentRequest.status == status_filter)
+    
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     
     # Get paginated requests
-    requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
+    requests_pagination = query.paginate(
         page=page, per_page=per_page, error_out=False
     )
     
     # Get notifications for operation manager (all notifications, same as admin)
-    notifications = Notification.query.filter_by(
-        user_id=current_user.user_id
-    ).order_by(Notification.created_at.desc()).limit(5).all()
-    unread_count = Notification.query.filter_by(
-        user_id=current_user.user_id, 
-        is_read=False
-    ).count()
+    notifications = get_notifications_for_user(current_user)
+    unread_count = get_unread_count_for_user(current_user)
     
     return render_template('operation_dashboard.html', 
                          requests=requests_pagination.items, 
@@ -978,6 +1053,14 @@ def new_request():
         person_company = request.form.get('person_company')
         company_name = request.form.get('company_name')
         
+        # Determine initial status based on department
+        # Finance department requests are automatically approved and go to Finance Admin
+        # Other departments go to their department manager first
+        if current_user.department == 'Finance':
+            initial_status = 'Approved'  # Finance requests are automatically approved
+        else:
+            initial_status = 'Pending Manager Approval'
+        
         # Create new request
         new_req = PaymentRequest(
             request_type=request_type,
@@ -994,10 +1077,14 @@ def new_request():
             amount=amount_clean if amount else amount,  # Use cleaned amount without commas
             recurring=recurring,
             recurring_interval=recurring_interval if recurring == 'Recurring' else None,
-            status='Pending Manager Approval',
+            status=initial_status,
             receipt_path=receipt_path,  # Add receipt path if file was uploaded
             user_id=current_user.user_id
         )
+        
+        # Set approval date for finance department requests (auto-approved)
+        if current_user.department == 'Finance':
+            new_req.approval_date = datetime.utcnow().date()
         
         db.session.add(new_req)
         db.session.commit()
@@ -1027,24 +1114,58 @@ def new_request():
         
         log_action(f"Created payment request #{new_req.request_id} - {request_type}")
         
-        # Create notifications for Finance and Admin users
-        notify_finance_and_admin(
-            title="New Payment Request Submitted",
-            message=f"New {request_type} request submitted by {requestor_name} from {current_user.department} department for OMR {amount}",
-            notification_type="new_submission",
-            request_id=new_req.request_id
-        )
+        # Create notifications based on request status
+        try:
+            if new_req.status == 'Approved':
+                # Finance department requests are auto-approved - notify Finance Admin
+                notify_finance_and_admin(
+                    title="New Payment Request Submitted",
+                    message=f"New {request_type} request submitted by {requestor_name} from {current_user.department} department for OMR {amount}",
+                    notification_type="new_submission",
+                    request_id=new_req.request_id
+                )
+            else:
+                # Other departments - notify only the department manager, not Finance Admin
+                if new_req.user and new_req.user.manager_id:
+                    create_notification(
+                        user_id=new_req.user.manager_id,
+                        title="New Payment Request for Approval",
+                        message=f"New {request_type} request submitted by {requestor_name} from {current_user.department} department for OMR {amount} - requires your approval",
+                        notification_type="manager_approval_required",
+                        request_id=new_req.request_id
+                    )
+        except Exception as e:
+            print(f"Error creating notifications: {e}")
+            # Don't fail the request creation if notification fails
         
-        # Emit real-time event to all connected clients
-        socketio.emit('new_request', {
-            'request_id': new_req.request_id,
-            'request_type': new_req.request_type,
-            'requestor_name': new_req.requestor_name,
-            'department': new_req.department,
-            'amount': float(new_req.amount),
-            'status': new_req.status,
-            'date': new_req.date.strftime('%Y-%m-%d')
-        })
+        # Emit real-time event based on request status
+        try:
+            if new_req.status == 'Approved':
+                # Finance department requests - notify Finance Admin
+                socketio.emit('new_request', {
+                    'request_id': new_req.request_id,
+                    'request_type': new_req.request_type,
+                    'requestor_name': new_req.requestor_name,
+                    'department': new_req.department,
+                    'amount': float(new_req.amount),
+                    'status': new_req.status,
+                    'date': new_req.date.strftime('%Y-%m-%d')
+                }, room='finance_admin')
+            else:
+                # Other departments - notify only the manager
+                if new_req.user and new_req.user.manager_id:
+                    socketio.emit('new_request', {
+                        'request_id': new_req.request_id,
+                        'request_type': new_req.request_type,
+                        'requestor_name': new_req.requestor_name,
+                        'department': new_req.department,
+                        'amount': float(new_req.amount),
+                        'status': new_req.status,
+                        'date': new_req.date.strftime('%Y-%m-%d')
+                    }, room=f'user_{new_req.user.manager_id}')
+        except Exception as e:
+            print(f"Error emitting real-time notification: {e}")
+            # Don't fail the request creation if real-time notification fails
         
         flash('Payment request submitted successfully!', 'success')
         return redirect(url_for('dashboard'))
@@ -1093,7 +1214,10 @@ def write_cheque():
 @login_required
 def view_request(request_id):
     """View a specific payment request"""
-    req = PaymentRequest.query.get_or_404(request_id)
+    # Use eager loading to reduce database queries
+    req = PaymentRequest.query.options(
+        db.joinedload(PaymentRequest.user)
+    ).get_or_404(request_id)
     
     # Check permissions
     if current_user.role not in ['Finance Admin', 'Finance', 'GM', 'IT', 'Project']:
@@ -1103,7 +1227,8 @@ def view_request(request_id):
     
     # Mark notifications related to this request as read for Finance and Admin users
     if current_user.role in ['Finance', 'Finance Admin']:
-        Notification.query.filter_by(
+        # Use a more efficient update query
+        db.session.query(Notification).filter_by(
             user_id=current_user.user_id,
             request_id=request_id,
             is_read=False
@@ -1113,28 +1238,33 @@ def view_request(request_id):
     # Get schedule rows for variable payments - show for Admin review, but only allow payments when approved
     schedule_rows = []
     total_paid_amount = 0
+    
+    # Only process schedule if it's a recurring monthly payment
     if req.recurring_interval and 'monthly' in req.recurring_interval:
-        # Get variable payment schedule if exists
+        # Get variable payment schedule if exists - use single query with ordering
         schedule = RecurringPaymentSchedule.query.filter_by(
             request_id=request_id
         ).order_by(RecurringPaymentSchedule.payment_order).all()
         
         if schedule:
+            # Optimize: Get all paid notifications and late installments in single queries
+            # Use list comprehension for better performance
+            paid_notifications = PaidNotification.query.filter_by(request_id=request_id).all()
+            late_installments = LateInstallment.query.filter_by(request_id=request_id).all()
+            
+            # Create sets for O(1) lookup instead of O(n) list search
+            paid_dates = {paid.paid_date for paid in paid_notifications}
+            late_dates = {late.payment_date for late in late_installments}
+            
             # Calculate total paid and remaining amounts
             total_paid_amount = 0
-            paid_notifications = PaidNotification.query.filter_by(request_id=request_id).all()
             
+            # Use list comprehension for better performance
             for entry in schedule:
-                # Check if this installment is already paid
-                is_paid = any(
-                    paid_notif.paid_date == entry.payment_date 
-                    for paid_notif in paid_notifications
-                )
-                # Check if this installment is marked late
-                is_late = LateInstallment.query.filter_by(
-                    request_id=request_id,
-                    payment_date=entry.payment_date
-                ).first() is not None
+                # Check if this installment is already paid (optimized lookup)
+                is_paid = entry.payment_date in paid_dates
+                # Check if this installment is marked late (optimized lookup)
+                is_late = entry.payment_date in late_dates
                 
                 # If this installment is paid, add its amount to total paid
                 if is_paid:
@@ -1336,8 +1466,19 @@ def manager_approve_request(request_id):
     """Manager approves a payment request"""
     req = PaymentRequest.query.get_or_404(request_id)
     
+    # Check if current user is authorized to approve this request
+    is_authorized = False
+    
     # Check if current user is the manager of the request submitter
-    if not req.user.manager_id or req.user.manager_id != current_user.user_id:
+    if req.user.manager_id and req.user.manager_id == current_user.user_id:
+        is_authorized = True
+    # Special case: Operation Manager can approve Operation department requests
+    elif (current_user.role == 'Operation Manager' and 
+          req.user.department == 'Operation' and 
+          req.user.role != 'Operation Manager'):  # Operation Manager can't approve their own requests
+        is_authorized = True
+    
+    if not is_authorized:
         flash('You are not authorized to approve this request.', 'error')
         return redirect(url_for('dashboard'))
     
@@ -1355,12 +1496,20 @@ def manager_approve_request(request_id):
     
     log_action(f"Manager approved payment request #{request_id}")
     
-    # Emit real-time update
+    # Notify Finance Admin that request is ready for their review
+    notify_finance_and_admin(
+        title="Payment Request Ready for Review",
+        message=f"Payment request #{request_id} from {req.department} department has been approved by manager and is ready for Finance review",
+        notification_type="ready_for_finance_review",
+        request_id=request_id
+    )
+    
+    # Emit real-time update to Finance Admin
     socketio.emit('request_updated', {
         'request_id': request_id,
         'status': 'Pending Finance Approval',
         'manager_approved': True
-    })
+    }, room='finance_admin')
     
     flash(f'Payment request #{request_id} has been approved by manager. Sent to Finance for final approval.', 'success')
     return redirect(url_for('dashboard'))
@@ -1372,8 +1521,19 @@ def manager_reject_request(request_id):
     """Manager rejects a payment request"""
     req = PaymentRequest.query.get_or_404(request_id)
     
+    # Check if current user is authorized to reject this request
+    is_authorized = False
+    
     # Check if current user is the manager of the request submitter
-    if not req.user.manager_id or req.user.manager_id != current_user.user_id:
+    if req.user.manager_id and req.user.manager_id == current_user.user_id:
+        is_authorized = True
+    # Special case: Operation Manager can reject Operation department requests
+    elif (current_user.role == 'Operation Manager' and 
+          req.user.department == 'Operation' and 
+          req.user.role != 'Operation Manager'):  # Operation Manager can't reject their own requests
+        is_authorized = True
+    
+    if not is_authorized:
         flash('You are not authorized to reject this request.', 'error')
         return redirect(url_for('dashboard'))
     
@@ -1852,13 +2012,34 @@ def delete_user(user_id):
     return redirect(url_for('manage_users'))
 
 
+# ==================== DEBUG ROUTES ====================
+
+@app.route('/debug/requests')
+@login_required
+@role_required('Finance Admin', 'IT')
+def debug_requests():
+    """Debug route to see all requests in the database"""
+    all_requests = PaymentRequest.query.order_by(PaymentRequest.created_at.desc()).limit(20).all()
+    debug_data = []
+    for req in all_requests:
+        debug_data.append({
+            'request_id': req.request_id,
+            'requestor_name': req.requestor_name,
+            'department': req.department,
+            'status': req.status,
+            'user_id': req.user_id,
+            'created_at': req.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'amount': float(req.amount)
+        })
+    return jsonify(debug_data)
+
 # ==================== NOTIFICATION ROUTES ====================
 
 @app.route('/notifications')
 @login_required
-@role_required('Admin', 'Finance', 'Project', 'Operation Manager')
+@role_required('Finance Admin', 'Admin', 'Finance', 'Project', 'Operation Manager')
 def notifications():
-    """View all notifications for Finance, Admin, and Project users"""
+    """View all notifications for Finance Admin, Finance, Admin, and Project users"""
     if current_user.role == 'Project':
         # For project users, only show due date notifications
         notifications = Notification.query.filter_by(
@@ -1866,7 +2047,7 @@ def notifications():
             notification_type='recurring_due'
         ).order_by(Notification.created_at.desc()).all()
     else:
-        # For Admin, Finance, and Operation Manager, show all notifications
+        # For Finance Admin, Admin, Finance, and Operation Manager, show all notifications
         notifications = Notification.query.filter_by(user_id=current_user.user_id).order_by(Notification.created_at.desc()).all()
     
     return render_template('notifications.html', notifications=notifications, user=current_user)
@@ -1874,7 +2055,7 @@ def notifications():
 
 @app.route('/notifications/mark_read/<int:notification_id>')
 @login_required
-@role_required('Admin', 'Finance', 'Project', 'Operation Manager')
+@role_required('Finance Admin', 'Admin', 'Finance', 'Project', 'Operation Manager')
 def mark_notification_read(notification_id):
     """Mark a notification as read"""
     notification = Notification.query.filter_by(notification_id=notification_id, user_id=current_user.user_id).first()
@@ -1887,7 +2068,7 @@ def mark_notification_read(notification_id):
 
 @app.route('/notifications/mark_all_read')
 @login_required
-@role_required('Admin', 'Finance', 'Project', 'Operation Manager')
+@role_required('Finance Admin', 'Admin', 'Finance', 'Project', 'Operation Manager')
 def mark_all_notifications_read():
     """Mark all notifications as read for current user"""
     Notification.query.filter_by(user_id=current_user.user_id, is_read=False).update({'is_read': True})
@@ -1896,7 +2077,7 @@ def mark_all_notifications_read():
 
 @app.route('/notifications/mark_paid/<int:notification_id>')
 @login_required
-@role_required('Admin', 'Finance', 'Project', 'Operation Manager')
+@role_required('Finance Admin', 'Admin', 'Finance', 'Project', 'Operation Manager')
 def mark_notification_paid(notification_id):
     """Mark a recurring payment notification as paid and delete it"""
     notification = Notification.query.filter_by(
@@ -1928,7 +2109,7 @@ def mark_notification_paid(notification_id):
 
 @app.route('/notifications/delete/<int:notification_id>')
 @login_required
-@role_required('Admin', 'Finance', 'Project', 'Operation Manager')
+@role_required('Finance Admin', 'Admin', 'Finance', 'Project', 'Operation Manager')
 def delete_notification(notification_id):
     """Delete a specific notification"""
     notification = Notification.query.filter_by(notification_id=notification_id, user_id=current_user.user_id).first()
@@ -1941,7 +2122,7 @@ def delete_notification(notification_id):
 
 @app.route('/api/notifications/unread_count')
 @login_required
-@role_required('Admin', 'Finance', 'Project', 'Operation Manager')
+@role_required('Finance Admin', 'Admin', 'Finance', 'Project', 'Operation Manager')
 def unread_notifications_count():
     """Get count of unread notifications"""
     if current_user.role == 'Project':
@@ -1959,7 +2140,7 @@ def unread_notifications_count():
 
 @app.route('/api/notifications/recent')
 @login_required
-@role_required('Admin', 'Finance', 'Project', 'Operation Manager')
+@role_required('Finance Admin', 'Admin', 'Finance', 'Project', 'Operation Manager')
 def recent_notifications():
     """Get recent notifications for the user"""
     if current_user.role == 'Project':

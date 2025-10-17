@@ -15,6 +15,46 @@
         </a>
     </div>
 
+    <!-- Notifications Section -->
+    {% if notifications %}
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-bell"></i> Recent Notifications 
+                {% if unread_count > 0 %}
+                <span class="notification-badge">{{ unread_count }}</span>
+                {% endif %}
+            </h2>
+            <a href="{{ url_for('notifications') }}" class="btn btn-sm btn-primary">View All</a>
+        </div>
+        <div class="card-body">
+            <div class="notifications-preview">
+                {% for notification in notifications[:3] %}
+                <div class="notification-preview {% if not notification.is_read %}unread{% endif %}">
+                    <div class="notification-preview-content">
+                        <h4 class="notification-preview-title">
+                            {% if not notification.is_read %}
+                                <i class="fas fa-circle notification-dot"></i>
+                            {% endif %}
+                            {{ notification.title }}
+                        </h4>
+                        <p class="notification-preview-message">{{ notification.message[:100] }}{% if notification.message|length > 100 %}...{% endif %}</p>
+                        <span class="notification-preview-time">
+                            {% set gst_time = notification.created_at.replace(tzinfo=None) + timedelta(hours=4) %}
+                            {{ gst_time.strftime('%B %d, %Y at %I:%M %p') }}
+                        </span>
+                        {% if notification.request_id %}
+                        <a href="{{ url_for('view_request', request_id=notification.request_id) }}" class="btn btn-sm btn-info">
+                            <i class="fas fa-eye"></i> View Request
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="card">
         <div class="card-header">
             <h2><i class="fas fa-list"></i> My Payment Requests</h2>
@@ -71,6 +111,16 @@
                                     <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-success">
                                         <i class="fas fa-upload"></i> Upload Proof
                                     </a>
+                                    {% endif %}
+                                    {% if (user.role == 'Department Manager' or user.role == 'Operation Manager') and req.status == 'Pending Manager Approval' %}
+                                    <form method="POST" action="{{ url_for('manager_approve_request', request_id=req.request_id) }}" style="display: inline;">
+                                        <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Are you sure you want to approve this request?')">
+                                            <i class="fas fa-check"></i> Approve
+                                        </button>
+                                    </form>
+                                    <button type="button" class="btn btn-sm btn-danger" onclick="showRejectModal({{ req.request_id }})">
+                                        <i class="fas fa-times"></i> Reject
+                                    </button>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -137,6 +187,32 @@
         </div>
     </div>
 </div>
+
+<!-- Rejection Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" role="dialog" aria-labelledby="rejectModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="rejectModalLabel">Reject Payment Request</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="rejectForm" method="POST">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="rejection_reason">Reason for rejection:</label>
+                        <textarea class="form-control" id="rejection_reason" name="rejection_reason" rows="4" required placeholder="Please provide a detailed reason for rejecting this request..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Reject Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -147,6 +223,15 @@ function changeItemsPerPage(perPage) {
     url.searchParams.set('per_page', perPage);
     url.searchParams.set('page', '1');
     window.location.href = url.toString();
+}
+
+function showRejectModal(requestId) {
+    // Set the form action to the correct reject URL
+    document.getElementById('rejectForm').action = '/request/' + requestId + '/manager_reject';
+    // Clear the textarea
+    document.getElementById('rejection_reason').value = '';
+    // Show the modal
+    $('#rejectModal').modal('show');
 }
 </script>
 {% endblock %}
