@@ -1221,7 +1221,18 @@ def view_request(request_id):
     
     # Check permissions
     if current_user.role not in ['Finance Admin', 'Finance', 'GM', 'IT', 'Project']:
-        if req.user_id != current_user.user_id:
+        # Department Managers can view requests from their department
+        if current_user.role == 'Department Manager':
+            if req.department != current_user.department:
+                flash('You do not have permission to view this request.', 'danger')
+                return redirect(url_for('dashboard'))
+        # Operation Managers can view requests from Operation, Maintenance, and Project Department
+        elif current_user.role == 'Operation Manager':
+            if req.department not in ['Operation', 'Maintenance', 'Project Department']:
+                flash('You do not have permission to view this request.', 'danger')
+                return redirect(url_for('dashboard'))
+        # Regular users can only view their own requests
+        elif req.user_id != current_user.user_id:
             flash('You do not have permission to view this request.', 'danger')
             return redirect(url_for('dashboard'))
     
@@ -1292,53 +1303,164 @@ def approve_request(request_id):
         flash('This request is not ready for Finance approval.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
-    approver = request.form.get('approver')
-    proof_required = request.form.get('proof_required') == 'on'
+    # Get form data
+    approval_status = request.form.get('approval_status')
     
-    # Handle receipt upload
-    receipt_file = request.files.get('receipt')
-    if receipt_file and allowed_file(receipt_file.filename):
-        filename = secure_filename(receipt_file.filename)
-        # Add timestamp to filename to avoid conflicts
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{timestamp}_{filename}"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        receipt_file.save(filepath)
-        req.receipt_path = filename
+    if approval_status == 'approve':
+        approver = request.form.get('approver')
+        proof_required = request.form.get('proof_required') == 'on'
+        
+        # Handle receipt upload
+        receipt_file = request.files.get('receipt')
+        if receipt_file and allowed_file(receipt_file.filename):
+            filename = secure_filename(receipt_file.filename)
+            # Add timestamp to filename to avoid conflicts
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{timestamp}_{filename}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            receipt_file.save(filepath)
+            req.receipt_path = filename
+        
+        req.approver = approver
+        req.proof_required = proof_required
+        req.updated_at = datetime.utcnow()
+        
+        if proof_required:
+            # Proof is required - set status to Send Proof
+            req.status = 'Send Proof'
+            flash(f'Payment request #{request_id} approved. Waiting for proof of payment from department.', 'info')
+            log_action(f"Approved payment request #{request_id} - Proof required")
+            
+            # Emit real-time update
+            socketio.emit('request_updated', {
+                'request_id': request_id,
+                'status': 'Send Proof',
+                'approver': approver
+            })
+        else:
+            # No proof required - directly approved
+            req.status = 'Approved'
+            req.approval_date = datetime.utcnow().date()  # Set approval date
+            flash(f'Payment request #{request_id} has been approved.', 'success')
+            log_action(f"Approved payment request #{request_id} - No proof required")
+            
+            # Emit real-time update
+            socketio.emit('request_updated', {
+                'request_id': request_id,
+                'status': 'Approved',
+                'approver': approver
+            })
     
-    req.approver = approver
-    req.proof_required = proof_required
-    req.updated_at = datetime.utcnow()
-    
-    if proof_required:
-        # Proof is required - set status to Send Proof
-        req.status = 'Send Proof'
-        flash(f'Payment request #{request_id} approved. Waiting for proof of payment from department.', 'info')
-        log_action(f"Approved payment request #{request_id} - Proof required")
+    elif approval_status == 'action_required':
+        # Finance admin requires action - send back to requestor
+        action_reason = request.form.get('action_reason', '').strip()
+        if not action_reason:
+            flash('Please provide a reason for action required.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        req.status = 'Action Required'
+        req.reason_pending = action_reason
+        req.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        log_action(f"Finance admin marked payment request #{request_id} as action required - Reason: {action_reason}")
+        
+        # Notify the requestor
+        create_notification(
+            user_id=req.user_id,
+            title="Action Required on Payment Request",
+            message=f"Your payment request #{request_id} requires additional action from Finance. Please review the feedback and resubmit.",
+            notification_type="action_required",
+            request_id=request_id
+        )
         
         # Emit real-time update
         socketio.emit('request_updated', {
             'request_id': request_id,
-            'status': 'Send Proof',
-            'approver': approver
+            'status': 'Action Required',
+            'action_required': True
         })
+        
+        flash(f'Payment request #{request_id} has been marked as action required. Requestor has been notified.', 'success')
+    
+    elif approval_status == 'payment_pending':
+        # Mark as payment pending
+        req.status = 'Payment Pending'
+        req.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        log_action(f"Finance admin marked payment request #{request_id} as payment pending")
+        
+        # Emit real-time update
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'Payment Pending',
+            'payment_pending': True
+        })
+        
+        flash(f'Payment request #{request_id} has been marked as payment pending.', 'success')
+    
+    elif approval_status == 'reject':
+        # Finance admin rejects - request is rejected
+        rejection_reason = request.form.get('rejection_reason', '').strip()
+        if not rejection_reason:
+            flash('Please provide a reason for rejection.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        req.status = 'Rejected by Finance'
+        req.rejection_reason = rejection_reason
+        req.finance_rejection_date = datetime.utcnow().date()
+        req.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        log_action(f"Finance admin rejected payment request #{request_id} - Reason: {rejection_reason}")
+        
+        # Notify the requestor
+        create_notification(
+            user_id=req.user_id,
+            title="Payment Request Rejected",
+            message=f"Your payment request #{request_id} has been rejected by Finance. Please review the feedback.",
+            notification_type="request_rejected",
+            request_id=request_id
+        )
+        
+        # Emit real-time update
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'Rejected by Finance',
+            'finance_rejected': True
+        })
+        
+        flash(f'Payment request #{request_id} has been rejected by Finance.', 'success')
+    
+    elif approval_status == 'completed':
+        # Mark as completed
+        req.status = 'Completed'
+        req.completion_date = datetime.utcnow().date()
+        req.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        log_action(f"Finance admin marked payment request #{request_id} as completed")
+        
+        # Emit real-time update
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'Completed',
+            'completed': True
+        })
+        
+        flash(f'Payment request #{request_id} has been marked as completed.', 'success')
+    
     else:
-        # No proof required - directly approved
-        req.status = 'Approved'
-        req.approval_date = datetime.utcnow().date()  # Set approval date
-        flash(f'Payment request #{request_id} has been approved.', 'success')
-        log_action(f"Approved payment request #{request_id} - No proof required")
-        
-        # Emit real-time update
-        socketio.emit('request_updated', {
-            'request_id': request_id,
-            'status': 'Approved',
-            'approver': approver
-        })
+        flash('Invalid approval status selected.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
     
     db.session.commit()
-    
-    return redirect(url_for('admin_dashboard'))
+    return redirect(url_for('view_request', request_id=request_id))
 
 
 @app.route('/request/<int:request_id>/pending', methods=['POST'])
@@ -1487,32 +1609,110 @@ def manager_approve_request(request_id):
         flash('This request is not pending manager approval.', 'error')
         return redirect(url_for('dashboard'))
     
-    # Manager approves - move to Finance for final approval
-    req.status = 'Pending Finance Approval'
-    req.manager_approval_date = datetime.utcnow().date()
-    req.updated_at = datetime.utcnow()
+    # Get form data
+    approval_status = request.form.get('approval_status')
     
-    db.session.commit()
+    if approval_status == 'approve':
+        # Manager approves - move to Finance for final approval
+        req.status = 'Pending Finance Approval'
+        req.manager_approval_date = datetime.utcnow().date()
+        req.is_urgent = request.form.get('is_urgent') == 'on'
+        req.manager_approval_reason = request.form.get('approval_reason', '').strip()
+        req.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        log_action(f"Manager approved payment request #{request_id}")
+        
+        # Notify Finance Admin that request is ready for their review
+        notify_finance_and_admin(
+            title="Payment Request Ready for Review",
+            message=f"Payment request #{request_id} from {req.department} department has been approved by manager and is ready for Finance review",
+            notification_type="ready_for_finance_review",
+            request_id=request_id
+        )
+        
+        # Emit real-time update to Finance Admin
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'Pending Finance Approval',
+            'manager_approved': True
+        }, room='finance_admin')
+        
+        flash(f'Payment request #{request_id} has been approved by manager. Sent to Finance for final approval.', 'success')
+        
+    elif approval_status == 'action_required':
+        # Manager requires action - send back to requestor
+        action_reason = request.form.get('action_reason', '').strip()
+        if not action_reason:
+            flash('Please provide a reason for action required.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        req.status = 'Action Required'
+        req.reason_pending = action_reason
+        req.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        log_action(f"Manager marked payment request #{request_id} as action required - Reason: {action_reason}")
+        
+        # Notify the requestor
+        create_notification(
+            user_id=req.user_id,
+            title="Action Required on Payment Request",
+            message=f"Your payment request #{request_id} requires additional action. Please review the feedback and resubmit.",
+            notification_type="action_required",
+            request_id=request_id
+        )
+        
+        # Emit real-time update
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'Action Required',
+            'action_required': True
+        })
+        
+        flash(f'Payment request #{request_id} has been marked as action required. Requestor has been notified.', 'success')
+        
+    elif approval_status == 'reject':
+        # Manager rejects - request is rejected
+        rejection_reason = request.form.get('rejection_reason', '').strip()
+        if not rejection_reason:
+            flash('Please provide a reason for rejection.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        req.status = 'Rejected by Manager'
+        req.rejection_reason = rejection_reason
+        req.manager_rejection_date = datetime.utcnow().date()
+        req.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        log_action(f"Manager rejected payment request #{request_id} - Reason: {rejection_reason}")
+        
+        # Notify the requestor
+        create_notification(
+            user_id=req.user_id,
+            title="Payment Request Rejected",
+            message=f"Your payment request #{request_id} has been rejected by your manager. Please review the feedback.",
+            notification_type="request_rejected",
+            request_id=request_id
+        )
+        
+        # Emit real-time update
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'Rejected by Manager',
+            'manager_rejected': True
+        })
+        
+        flash(f'Payment request #{request_id} has been rejected by manager.', 'success')
     
-    log_action(f"Manager approved payment request #{request_id}")
+    else:
+        flash('Invalid approval status selected.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
     
-    # Notify Finance Admin that request is ready for their review
-    notify_finance_and_admin(
-        title="Payment Request Ready for Review",
-        message=f"Payment request #{request_id} from {req.department} department has been approved by manager and is ready for Finance review",
-        notification_type="ready_for_finance_review",
-        request_id=request_id
-    )
-    
-    # Emit real-time update to Finance Admin
-    socketio.emit('request_updated', {
-        'request_id': request_id,
-        'status': 'Pending Finance Approval',
-        'manager_approved': True
-    }, room='finance_admin')
-    
-    flash(f'Payment request #{request_id} has been approved by manager. Sent to Finance for final approval.', 'success')
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('view_request', request_id=request_id))
 
 
 @app.route('/request/<int:request_id>/manager_reject', methods=['POST'])

@@ -70,6 +70,10 @@ class PaymentRequest(db.Model):
     manager_approval_date = db.Column(db.Date)  # Date when manager approved
     manager_rejection_date = db.Column(db.Date)  # Date when manager rejected
     rejection_reason = db.Column(db.Text)  # Reason for manager rejection
+    is_urgent = db.Column(db.Boolean, default=False)  # Whether request is marked as urgent
+    manager_approval_reason = db.Column(db.Text)  # Manager's notes when approving
+    finance_rejection_date = db.Column(db.Date)  # Date when finance rejected
+    completion_date = db.Column(db.Date)  # Date when request was completed
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

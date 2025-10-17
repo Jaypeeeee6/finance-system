@@ -11,29 +11,35 @@
         </a>
     </div>
 
-    <div class="card">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <h2>Request Details</h2>
-            {% if request.status == 'Approved' %}
-                <span class="badge badge-success" style="font-size: 1rem; padding: 0.5rem 1rem;">✓ {{ request.status }}</span>
-            {% elif request.status == 'Send Proof' %}
-                <span class="badge" style="background: #FF9800; color: white; font-size: 1rem; padding: 0.5rem 1rem;">📤 {{ request.status }}</span>
-            {% elif request.status == 'Received Proof' %}
-                <span class="badge" style="background: #2196F3; color: white; font-size: 1rem; padding: 0.5rem 1rem;">📥 {{ request.status }}</span>
-            {% elif request.status == 'Action Required' %}
-                <span class="badge" style="background: #f57c00; color: white; font-size: 1rem; padding: 0.5rem 1rem;">⚠️ {{ request.status }}</span>
-            {% elif request.status == 'Pending Manager Approval' %}
-                <span class="badge" style="background: #17a2b8; color: white; font-size: 1rem; padding: 0.5rem 1rem;">👤 {{ request.status }}</span>
-            {% elif request.status == 'Pending Finance Approval' %}
-                <span class="badge" style="background: #6f42c1; color: white; font-size: 1rem; padding: 0.5rem 1rem;">💰 {{ request.status }}</span>
-            {% elif request.status == 'Rejected by Manager' %}
-                <span class="badge" style="background: #dc3545; color: white; font-size: 1rem; padding: 0.5rem 1rem;">❌ {{ request.status }}</span>
-            {% else %}
-                <span class="badge badge-warning" style="font-size: 1rem; padding: 0.5rem 1rem;">⏳ {{ request.status }}</span>
-            {% endif %}
-        </div>
-        <div class="card-body">
-            <!-- Form layout matching new_request.html but with readonly fields -->
+    <!-- Step Tabs Container -->
+    <div class="step-tabs-container">
+        <ul class="step-tabs">
+            <li class="step-tab completed" data-step="submit">
+                <div class="step-tab-content">
+                    Submit Request
+                </div>
+            </li>
+            <li class="step-tab {% if request.status in ['Pending Finance Approval', 'Approved', 'Send Proof', 'Received Proof', 'Action Required', 'Rejected by Manager'] %}completed{% elif request.status == 'Pending Manager Approval' %}active{% else %}disabled{% endif %}" data-step="manager">
+                <div class="step-tab-content">
+                    Manager Approval
+                </div>
+            </li>
+            <li class="step-tab {% if request.status in ['Approved', 'Send Proof', 'Received Proof', 'Action Required'] %}completed{% elif request.status == 'Pending Finance Approval' %}active{% else %}disabled{% endif %}" data-step="finance">
+                <div class="step-tab-content">
+                    Finance Admin Approval
+                </div>
+            </li>
+        </ul>
+
+        <!-- Step 1: Submit Request -->
+        <div class="step-content active" id="step-submit">
+            <h3><i class="fas fa-paper-plane"></i> Request Details</h3>
+            <div class="admin-mode-warning">
+                <i class="fas fa-info-circle"></i>
+                <span>Request submitted successfully. This step is always completed.</span>
+            </div>
+
+            <!-- Request Details Form -->
             <form>
                 <div class="form-row">
                     <div class="form-group">
@@ -81,13 +87,6 @@
                     </div>
                 </div>
 
-                {% if request.approval_date %}
-                <div class="form-group">
-                    <label for="approval_date">Approval Date</label>
-                    <input type="text" id="approval_date" value="{{ request.approval_date.strftime('%Y-%m-%d') }}" readonly style="background: #e8f5e9; color: #2e7d32; font-weight: bold;">
-                </div>
-                {% endif %}
-
                 <div class="form-group">
                     <label for="purpose">Purpose/Description</label>
                     <textarea id="purpose" rows="4" readonly style="background: #f5f5f5;">{{ request.purpose }}</textarea>
@@ -116,341 +115,378 @@
                         </div>
                     {% endif %}
                 </div>
+            </form>
+        </div>
 
-                {% if request.request_type == 'Supplier/Rental' %}
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="recurring">Payment Type</label>
-                        <input type="text" id="recurring" value="{{ request.recurring }}" readonly style="background: #f5f5f5;">
-                    </div>
-
-                    {% if request.recurring_interval %}
-                    <div class="form-group">
-                        <label for="recurring_interval">Recurring Schedule</label>
-                        <textarea id="recurring_interval" readonly style="background: #f5f5f5; height: auto; min-height: 60px; resize: vertical;">{{ format_recurring_schedule(request.recurring_interval, request.payment_schedule) }}</textarea>
-                    </div>
-                    
-                    {% endif %}
+        <!-- Step 2: Manager Approval -->
+        <div class="step-content" id="step-manager">
+            <h3><i class="fas fa-user-tie"></i> Manager Approval</h3>
+            
+            {% if request.status in ['Pending Finance Approval', 'Approved', 'Send Proof', 'Received Proof', 'Action Required', 'Rejected by Manager'] %}
+                <div class="admin-mode-warning">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Manager Approval: Completed</span>
                 </div>
                 
-                {% if user.role in ['Finance Admin', 'Finance'] and schedule_rows %}
-                <div class="card" style="margin-top: 1.5rem; border-left: 4px solid #2196F3;">
-                    <div class="card-header" style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); color: white; border-radius: 0;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-                            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">
-                                <i class="fas fa-calendar-check"></i> Payment Installments
-                            </h3>
-                            <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-                                <div style="display: flex; gap: 1.5rem; font-size: 0.85rem; flex-wrap: wrap;">
-                                    <div style="background: rgba(255,255,255,0.1); padding: 0.3rem 0.8rem; border-radius: 15px;">
-                                        <strong>Base:</strong> OMR {{ '%.3f'|format(request.amount|float) }}
-                                    </div>
-                                    <div style="background: rgba(46,125,50,0.2); padding: 0.3rem 0.8rem; border-radius: 15px;">
-                                        <strong>Paid:</strong> OMR {{ '%.3f'|format(total_paid_amount or 0) }}
-                                    </div>
-                                    <div style="background: rgba(211,47,47,0.2); padding: 0.3rem 0.8rem; border-radius: 15px;">
-                                        <strong>Remaining:</strong> OMR {{ '%.3f'|format((request.amount|float) - (total_paid_amount or 0)) }}
-                                    </div>
+                <!-- Show manager approval details -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h4>Manager Decision</h4>
+                    </div>
+                    <div class="card-body">
+                        {% if request.status == 'Rejected by Manager' %}
+                            <div class="form-group">
+                                <label>Status</label>
+                                <span class="status-badge rejected">Rejected</span>
+                            </div>
+                            <div class="form-group">
+                                <label>Rejection Reason</label>
+                                <textarea readonly style="background: #f8f9fa;">{{ request.rejection_reason }}</textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Rejection Date</label>
+                                <input type="text" value="{{ request.manager_rejection_date.strftime('%Y-%m-%d') if request.manager_rejection_date else 'N/A' }}" readonly style="background: #f5f5f5;">
+                            </div>
+                        {% else %}
+                            <div class="form-group">
+                                <label>Status</label>
+                                <span class="status-badge approved">Approved</span>
+                                {% if request.is_urgent %}
+                                    <span class="urgent-badge">URGENT</span>
+                                {% endif %}
+                            </div>
+                            {% if request.manager_approval_reason %}
+                            <div class="form-group">
+                                <label>Manager Notes</label>
+                                <textarea readonly style="background: #f8f9fa;">{{ request.manager_approval_reason }}</textarea>
+                            </div>
+                            {% endif %}
+                            <div class="form-group">
+                                <label>Approval Date</label>
+                                <input type="text" value="{{ request.approval_date.strftime('%Y-%m-%d') if request.approval_date else 'N/A' }}" readonly style="background: #f5f5f5;">
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% elif request.status == 'Pending Manager Approval' %}
+                <!-- Static message for non-managers -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header" style="background: #e3f2fd; color: #1976d2; border-left: 4px solid #2196f3;">
+                        <h4><i class="fas fa-user-tie"></i> Manager Approval Required</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <p style="margin-bottom: 0.5rem; font-size: 1.1rem;">
+                                    <strong>Status:</strong> Waiting for Manager Approval
+                                </p>
+                                <p style="margin-bottom: 0.5rem; color: #666;">
+                                    <strong>Assigned Manager:</strong> 
+                                    {% if request.user and request.user.manager %}
+                                        {{ request.user.manager.name }}
+                                    {% else %}
+                                        Not assigned
+                                    {% endif %}
+                                </p>
+                                <p style="margin-bottom: 0; color: #666;">
+                                    <strong>Department:</strong> {{ request.department }}
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-right">
+                                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 1rem; text-align: center;">
+                                    <i class="fas fa-clock" style="font-size: 2rem; color: #f57c00; margin-bottom: 0.5rem;"></i>
+                                    <p style="margin: 0; font-weight: 600; color: #856404;">Pending Review</p>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="card-body" style="padding: 0;">
-                        <div class="table-responsive" style="margin: 0;">
-                            <table class="table" style="margin: 0; border: none;">
-                                <thead style="background: #f8f9fa;">
-                                    <tr>
-                                        <th style="border: none; padding: 0.75rem; font-weight: 600; color: #495057; width: 60px;">#</th>
-                                        <th style="border: none; padding: 0.75rem; font-weight: 600; color: #495057;">Due Date</th>
-                                        <th style="border: none; padding: 0.75rem; font-weight: 600; color: #495057; text-align: right;">Amount</th>
-                                        <th style="border: none; padding: 0.75rem; font-weight: 600; color: #495057; text-align: center; width: 100px;">Status</th>
-                                        <th style="border: none; padding: 0.75rem; font-weight: 600; color: #495057; text-align: center; width: 220px;">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for row in schedule_rows %}
-                                    <tr style="border-bottom: 1px solid #e9ecef;">
-                                        <td style="border: none; padding: 0.75rem; font-weight: 500; color: #6c757d;">{{ row.order }}</td>
-                                        <td style="border: none; padding: 0.75rem; font-family: 'Courier New', monospace; color: #495057;">{{ row.date.strftime('%Y-%m-%d') }}</td>
-                                        <td style="border: none; padding: 0.75rem; text-align: right; font-weight: 600; color: #2c3e50;">OMR {{ '%.3f'|format(row.amount or 0) }}</td>
-                                        <td style="border: none; padding: 0.75rem; text-align: center;">
-                                            {% if row.is_paid %}
-                                                <span class="badge" style="background: #28a745; color: white; padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500;">
-                                                    <i class="fas fa-check"></i> Paid
-                                                </span>
-                                            {% elif row.is_late %}
-                                                <span class="badge" style="background: #d32f2f; color: #fff; padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500;">
-                                                    <i class="fas fa-exclamation-circle"></i> Late
-                                                </span>
-                                            {% else %}
-                                                <span class="badge" style="background: #ffc107; color: #212529; padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500;">
-                                                    <i class="fas fa-clock"></i> Due
-                                                </span>
-                                            {% endif %}
-                                        </td>
-                                        <td style="border: none; padding: 0.75rem; text-align: center;">
-                                            {% if row.is_paid %}
-                                                <span style="color: #6c757d; font-size: 0.8rem; font-style: italic;">
-                                                    <i class="fas fa-check-circle"></i> Completed
-                                                </span>
-                                            {% elif request.status == 'Approved' %}
-                                                <button class="btn btn-sm mark-paid-btn" 
-                                                        data-request-id="{{ request.request_id }}" 
-                                                        data-payment-date="{{ row.date.strftime('%Y-%m-%d') }}" 
-                                                        data-amount="{{ row.amount }}"
-                                                        style="background: #28a745; color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 15px; font-size: 0.7rem; font-weight: 500; cursor: pointer;"
-                                                        title="Mark this installment as paid">
-                                                    <i class="fas fa-check"></i> Mark Paid
-                                                </button>
-                                                {% if user.role == 'Finance Admin' %}
-                                                <button class="btn btn-sm mark-late-btn" 
-                                                        data-request-id="{{ request.request_id }}" 
-                                                        data-payment-date="{{ row.date.strftime('%Y-%m-%d') }}"
-                                                        style="background: #d32f2f; color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 15px; font-size: 0.7rem; font-weight: 500; cursor: pointer; margin-left: 0.5rem;"
-                                                        title="Mark this installment as late">
-                                                    <i class="fas fa-exclamation-circle"></i> Mark as Late
-                                                </button>
-                                                {% endif %}
-                                            {% else %}
-                                                <span style="color: #ffc107; font-size: 0.8rem; font-weight: 500;">
-                                                    <i class="fas fa-clock"></i> Pending Approval
-                                                </span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                </div>
+
+                <!-- Manager approval form (only visible to the assigned manager) -->
+                {% if request.user and request.user.manager_id == user.user_id %}
+                    <div class="card">
+                        <div class="card-header" style="background: #4caf50; color: white;">
+                            <h4><i class="fas fa-check-circle"></i> Your Action Required</h4>
+                            <p style="margin: 0; opacity: 0.9;">As the manager of {{ request.user.name }}, please review and approve this request.</p>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('manager_approve_request', request_id=request.request_id) }}">
+                                <div class="form-group">
+                                    <label for="approval_status">Set Status *</label>
+                                    <select name="approval_status" id="approval_status" required onchange="toggleApprovalFields()">
+                                        <option value="">-- Select Status --</option>
+                                        <option value="approve">Approve</option>
+                                        <option value="action_required">Action Required</option>
+                                        <option value="reject">Reject</option>
+                                    </select>
+                                </div>
+                                
+                                <div id="approve_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label>
+                                            <input type="checkbox" name="is_urgent" id="is_urgent">
+                                            Mark as Urgent
+                                        </label>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="approval_reason">Reason (Optional)</label>
+                                        <textarea name="approval_reason" id="approval_reason" rows="3" placeholder="Add any notes about this approval..."></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div id="action_required_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="action_reason">Reason for Action Required *</label>
+                                        <textarea name="action_reason" id="action_reason" rows="3" required placeholder="Explain what action is required from the requestor..."></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div id="reject_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="rejection_reason">Reason for Rejection *</label>
+                                        <textarea name="rejection_reason" id="rejection_reason" rows="3" required placeholder="Please provide a clear reason for rejecting this request..."></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div class="step-actions">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-check"></i> Submit Decision
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
-                </div>
                 {% endif %}
-                {% endif %}
-
-                {% if request.status != 'Pending' %}
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="approver">Approver</label>
-                        <input type="text" id="approver" value="{{ request.approver or 'Not assigned' }}" readonly style="background: #f5f5f5;">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="proof_required">Proof Required</label>
-                        <input type="text" id="proof_required" value="{{ 'Yes' if request.proof_required else 'No' }}" readonly style="background: #f5f5f5;">
-                    </div>
-                </div>
-
-                {% if request.receipt_path %}
-                <div class="form-group">
-                    <label for="receipt">Receipt</label>
-                    <a href="{{ url_for('uploaded_file', filename=request.receipt_path) }}" target="_blank" class="btn btn-info">
-                        <i class="fas fa-download"></i> View Receipt
-                    </a>
-                </div>
-                {% endif %}
-
-                {% if request.proof_of_payment %}
-                <div class="form-group">
-                    <label for="proof">Proof of Payment</label>
-                    <a href="{{ url_for('uploaded_file', filename=request.proof_of_payment) }}" target="_blank" class="btn btn-info">
-                        <i class="fas fa-eye"></i> View Proof of Payment
-                    </a>
-                </div>
-                {% endif %}
-                {% endif %}
-
-
-                {% if request.reason_pending %}
-                <div class="form-group">
-                    <label for="reason_pending" style="color: #f57c00;">Action Required Reason</label>
-                    <textarea id="reason_pending" rows="2" readonly style="background: #fff3e0; border-color: #f57c00;">{{ request.reason_pending }}</textarea>
-                </div>
-                {% endif %}
-            </form>
-        </div>
-    </div>
-
-    <!-- Rejection Reason Display -->
-    {% if request.status == 'Rejected by Manager' and request.rejection_reason %}
-    <div class="card" style="margin-top: 2rem; border-left: 4px solid #dc3545;">
-        <div class="card-header" style="background: #f8d7da; color: #721c24;">
-            <h3><i class="fas fa-times-circle"></i> Request Rejected by Manager</h3>
-        </div>
-        <div class="card-body">
-            <div class="rejection-info">
-                <p><strong>Rejection Date:</strong> {{ request.manager_rejection_date.strftime('%Y-%m-%d') if request.manager_rejection_date else 'N/A' }}</p>
-                <p><strong>Reason:</strong></p>
-                <div style="background: #f8f9fa; padding: 1rem; border-radius: 4px; border-left: 3px solid #dc3545;">
-                    <p style="margin: 0; font-style: italic;">{{ request.rejection_reason }}</p>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Department User: Upload Proof of Payment -->
-    {% if request.status == 'Send Proof' and request.user_id == user.user_id %}
-    <div class="card" style="margin-top: 2rem;">
-        <div class="card-header" style="background: #4CAF50; color: white;">
-            <h3><i class="fas fa-upload"></i> Upload Proof of Payment</h3>
-        </div>
-        <div class="card-body">
-            <p style="margin-bottom: 1rem; color: #4CAF50; font-weight: bold;">
-                <i class="fas fa-info-circle"></i> Your request has been approved! Please upload proof of payment.
-            </p>
-            <form method="POST" action="{{ url_for('upload_proof', request_id=request.request_id) }}" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label for="proof_file">Upload Proof Image *</label>
-                    <input type="file" name="proof_file" id="proof_file" accept=".jpg,.jpeg,.png,.gif,.pdf" required>
-                    <small>Accepted formats: JPG, PNG, GIF, PDF</small>
-                </div>
-                
-                <button type="submit" class="btn btn-success">
-                    <i class="fas fa-upload"></i> Submit Proof of Payment
-                </button>
-            </form>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Manager: Approval -->
-    {% if request.status == 'Pending Manager Approval' and request.user and request.user.manager_id == user.user_id %}
-    <div class="card" style="margin-top: 2rem;">
-        <div class="card-header">
-            <h3><i class="fas fa-user-tie"></i> Manager Approval Required</h3>
-            <p>As the manager of {{ request.user.name }}, please review and approve this request.</p>
-        </div>
-        <div class="card-body">
-            <div class="approval-actions" style="display: flex; gap: 1rem; align-items: center;">
-                <form method="POST" action="{{ url_for('manager_approve_request', request_id=request.request_id) }}" style="display: inline;">
-                    <button type="submit" class="btn btn-success">
-                        <i class="fas fa-check"></i> Approve
-                    </button>
-                </form>
-                
-                <button type="button" class="btn btn-danger" onclick="showRejectionForm()">
-                    <i class="fas fa-times"></i> Reject
-                </button>
-            </div>
-            
-            <!-- Rejection Form (Hidden by default) -->
-            <div id="rejectionForm" style="display: none; margin-top: 1rem; padding: 1rem; border: 1px solid #dc3545; border-radius: 4px; background-color: #f8d7da;">
-                <h4 style="color: #721c24; margin-bottom: 1rem;">Reject Request</h4>
-                <form method="POST" action="{{ url_for('manager_reject_request', request_id=request.request_id) }}">
-                    <div class="form-group">
-                        <label for="rejection_reason">Reason for Rejection *</label>
-                        <textarea name="rejection_reason" id="rejection_reason" rows="3" required 
-                                  placeholder="Please provide a clear reason for rejecting this request..." 
-                                  style="width: 100%; padding: 8px; border: 1px solid #dc3545; border-radius: 4px;"></textarea>
-                    </div>
-                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                        <button type="submit" class="btn btn-danger">
-                            <i class="fas fa-times"></i> Confirm Rejection
-                        </button>
-                        <button type="button" class="btn btn-secondary" onclick="hideRejectionForm()">
-                            <i class="fas fa-arrow-left"></i> Cancel
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Admin: Finance Approval -->
-    {% if user.role == 'Finance Admin' and request.status in ['Pending', 'Pending Finance Approval'] %}
-    <div class="card" style="margin-top: 2rem;">
-        <div class="card-header">
-            <h3><i class="fas fa-check-circle"></i> Approve Request</h3>
-        </div>
-        <div class="card-body">
-            <form method="POST" action="{{ url_for('approve_request', request_id=request.request_id) }}" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label for="approver">Select Approver *</label>
-                    <select name="approver" id="approver" required>
-                        <option value="">-- Select Approver --</option>
-                        <option value="Mahmoud">Mahmoud</option>
-                        <option value="Abdulaziz">Abdulaziz</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="receipt">Upload Receipt *</label>
-                    <input type="file" name="receipt" id="receipt" accept=".jpg,.jpeg,.png,.pdf" required>
-                </div>
-                
-                <div class="form-group checkbox-group">
-                    <label>
-                        <input type="checkbox" name="proof_required" id="proof_required">
-                        <span>Require Proof of Payment from Department</span>
-                    </label>
-                    <small style="color: #666; margin-left: 25px; display: block; margin-top: 5px;">
-                        ✓ If checked: Status → "Send Proof" (Department uploads proof → Admin final approval)<br>
-                        ✗ If not checked: Status → "Approved" (Directly approved)
-                    </small>
-                </div>
-                
-                <button type="submit" class="btn btn-success">
-                    <i class="fas fa-check"></i> Approve Request
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <div class="card" style="margin-top: 2rem;">
-        <div class="card-header" style="background: #f57c00; color: white;">
-            <h3><i class="fas fa-exclamation-triangle"></i> Action Required</h3>
-        </div>
-        <div class="card-body">
-            <form method="POST" action="{{ url_for('mark_pending', request_id=request.request_id) }}">
-                <div class="form-group">
-                    <label for="reason_pending">Reason for Action Required *</label>
-                    <textarea name="reason_pending" id="reason_pending" rows="3" required placeholder="Explain what action is required from the requestor..."></textarea>
-                </div>
-                
-                <button type="submit" class="btn btn-warning">
-                    <i class="fas fa-exclamation-triangle"></i> Mark as Action Required
-                </button>
-            </form>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Admin: Final Approval After Proof Received -->
-    {% if user.role == 'Finance Admin' and request.status == 'Received Proof' %}
-    <div class="card" style="margin-top: 2rem;">
-        <div class="card-header" style="background: #2196F3; color: white;">
-            <h3><i class="fas fa-check-double"></i> Final Approval</h3>
-        </div>
-        <div class="card-body">
-            <p style="margin-bottom: 1rem; color: #2196F3; font-weight: bold;">
-                <i class="fas fa-info-circle"></i> Proof of payment has been received. Review and give final approval.
-            </p>
-            
-            {% if request.proof_of_payment %}
-            <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f5f5f5; border-radius: 5px;">
-                <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">
-                    <i class="fas fa-file-image"></i> Uploaded Proof:
-                </label>
-                <a href="{{ url_for('uploaded_file', filename=request.proof_of_payment) }}" target="_blank" class="btn btn-info">
-                    <i class="fas fa-eye"></i> View Proof of Payment
-                </a>
-            </div>
             {% endif %}
+        </div>
+
+        <!-- Step 3: Finance Admin Approval -->
+        <div class="step-content" id="step-finance">
+            <h3><i class="fas fa-dollar-sign"></i> Finance Admin Approval</h3>
             
-            <form method="POST" action="{{ url_for('final_approve_request', request_id=request.request_id) }}">
-                <button type="submit" class="btn btn-success">
-                    <i class="fas fa-check-double"></i> Final Approve
-                </button>
-            </form>
+            {% if request.status in ['Approved', 'Send Proof', 'Received Proof', 'Action Required'] %}
+                <div class="admin-mode-warning">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Finance Admin Approval: Completed</span>
+                </div>
+                
+                <!-- Show finance approval details -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h4>Finance Admin Decision</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label>Status</label>
+                            <span class="status-badge approved">{{ request.status }}</span>
+                        </div>
+                        
+                        {% if request.approver %}
+                        <div class="form-group">
+                            <label>Approver</label>
+                            <input type="text" value="{{ request.approver }}" readonly style="background: #f5f5f5;">
+                        </div>
+                        {% endif %}
+                        
+                        {% if request.proof_required %}
+                        <div class="form-group">
+                            <label>Proof Required</label>
+                            <span class="status-badge action-required">Yes</span>
+                        </div>
+                        {% endif %}
+                        
+                        {% if request.receipt_path %}
+                        <div class="form-group">
+                            <label>Receipt</label>
+                            <a href="{{ url_for('uploaded_file', filename=request.receipt_path) }}" target="_blank" class="btn btn-info">
+                                <i class="fas fa-download"></i> View Receipt
+                            </a>
+                        </div>
+                        {% endif %}
+                        
+                        {% if request.proof_of_payment %}
+                        <div class="form-group">
+                            <label>Proof of Payment</label>
+                            <a href="{{ url_for('uploaded_file', filename=request.proof_of_payment) }}" target="_blank" class="btn btn-info">
+                                <i class="fas fa-eye"></i> View Proof of Payment
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% else %}
+                <!-- Finance admin approval form -->
+                {% if user.role == 'Finance Admin' %}
+                    <div class="card">
+                        <div class="card-header">
+                            <h4>Finance Admin Approval Required</h4>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('approve_request', request_id=request.request_id) }}" enctype="multipart/form-data">
+                                <div class="form-group">
+                                    <label for="approval_status">Set Status *</label>
+                                    <select name="approval_status" id="approval_status" required onchange="toggleFinanceApprovalFields()">
+                                        <option value="">-- Select Status --</option>
+                                        <option value="approve">Approve</option>
+                                        <option value="action_required">Action Required</option>
+                                        <option value="payment_pending">Payment Pending</option>
+                                        <option value="reject">Reject</option>
+                                        <option value="completed">Completed</option>
+                                    </select>
+                                </div>
+                                
+                                <div id="approve_fields">
+                                    <div class="form-group">
+                                        <label for="approver">Select Approver *</label>
+                                        <select name="approver" id="approver" required>
+                                            <option value="">-- Select Approver --</option>
+                                            <option value="Mahmoud">Mahmoud</option>
+                                            <option value="Abdulaziz">Abdulaziz</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="receipt">Upload Receipt *</label>
+                                        <input type="file" name="receipt" id="receipt" accept=".jpg,.jpeg,.png,.pdf" required>
+                                    </div>
+                                    
+                                    <div class="form-group checkbox-group">
+                                        <label>
+                                            <input type="checkbox" name="proof_required" id="proof_required">
+                                            <span>Require Proof of Payment from Department</span>
+                                        </label>
+                                        <small style="color: #666; margin-left: 25px; display: block; margin-top: 5px;">
+                                            ✓ If checked: Status → "Send Proof" (Department uploads proof → Admin final approval)<br>
+                                            ✗ If not checked: Status → "Approved" (Directly approved)
+                                        </small>
+                                    </div>
+                                </div>
+                                
+                                <div id="action_required_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="action_reason">Reason for Action Required *</label>
+                                        <textarea name="action_reason" id="action_reason" rows="3" required placeholder="Explain what action is required from the requestor..."></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div id="reject_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="rejection_reason">Reason for Rejection *</label>
+                                        <textarea name="rejection_reason" id="rejection_reason" rows="3" required placeholder="Please provide a clear reason for rejecting this request..."></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div class="step-actions">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-check"></i> Submit Decision
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        Waiting for Finance Admin approval. Only Finance Admins can approve this request.
+                    </div>
+                {% endif %}
+            {% endif %}
         </div>
     </div>
-    {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+// Step tabs functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const stepTabs = document.querySelectorAll('.step-tab');
+    const stepContents = document.querySelectorAll('.step-content');
+    
+    // Add click event listeners to tabs
+    stepTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            const step = this.getAttribute('data-step');
+            
+            // Don't allow clicking on disabled tabs
+            if (this.classList.contains('disabled')) {
+                return;
+            }
+            
+            // Remove active class from all tabs and contents
+            stepTabs.forEach(t => t.classList.remove('active'));
+            stepContents.forEach(c => c.classList.remove('active'));
+            
+            // Add active class to clicked tab and corresponding content
+            this.classList.add('active');
+            document.getElementById(`step-${step}`).classList.add('active');
+        });
+    });
+    
+    // Set initial active tab based on request status
+    const requestStatus = '{{ request.status }}';
+    let initialStep = 'submit';
+    
+    if (requestStatus === 'Pending Manager Approval') {
+        initialStep = 'manager';
+    } else if (requestStatus in ['Pending Finance Approval', 'Approved', 'Send Proof', 'Received Proof', 'Action Required', 'Rejected by Manager']) {
+        initialStep = 'finance';
+    }
+    
+    // Activate the appropriate tab
+    const activeTab = document.querySelector(`[data-step="${initialStep}"]`);
+    const activeContent = document.getElementById(`step-${initialStep}`);
+    
+    if (activeTab && activeContent) {
+        activeTab.classList.add('active');
+        activeContent.classList.add('active');
+    }
+});
+
+// Toggle approval fields for manager approval
+function toggleApprovalFields() {
+    const status = document.getElementById('approval_status').value;
+    const approveFields = document.getElementById('approve_fields');
+    const actionRequiredFields = document.getElementById('action_required_fields');
+    const rejectFields = document.getElementById('reject_fields');
+    
+    // Hide all fields first
+    approveFields.style.display = 'none';
+    actionRequiredFields.style.display = 'none';
+    rejectFields.style.display = 'none';
+    
+    // Show relevant fields based on selection
+    if (status === 'approve') {
+        approveFields.style.display = 'block';
+    } else if (status === 'action_required') {
+        actionRequiredFields.style.display = 'block';
+    } else if (status === 'reject') {
+        rejectFields.style.display = 'block';
+    }
+}
+
+// Toggle approval fields for finance approval
+function toggleFinanceApprovalFields() {
+    const status = document.getElementById('approval_status').value;
+    const approveFields = document.getElementById('approve_fields');
+    const actionRequiredFields = document.getElementById('action_required_fields');
+    const rejectFields = document.getElementById('reject_fields');
+    
+    // Hide all fields first
+    approveFields.style.display = 'none';
+    actionRequiredFields.style.display = 'none';
+    rejectFields.style.display = 'none';
+    
+    // Show relevant fields based on selection
+    if (status === 'approve') {
+        approveFields.style.display = 'block';
+    } else if (status === 'action_required') {
+        actionRequiredFields.style.display = 'block';
+    } else if (status === 'reject') {
+        rejectFields.style.display = 'block';
+    }
+}
+
 // Update notification count when viewing a request
 document.addEventListener('DOMContentLoaded', function() {
     // Only update for Finance and Admin users
@@ -483,161 +519,5 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 });
-
-// Mark entire request as paid
-function markEntireRequestPaid(requestId, amount) {
-    // Check if this is a recurring payment and if we're paying in advance
-    const today = new Date();
-    const nextDueDate = getNextDueDate(); // We'll need to calculate this
-    
-    let confirmMessage = `Mark the entire request (OMR ${amount}) as paid?`;
-    
-    // For recurring payments, check if we're paying in advance
-    if (nextDueDate) {
-        const dueDate = new Date(nextDueDate);
-        const isAdvancePayment = dueDate > today;
-        
-        if (isAdvancePayment) {
-            confirmMessage = `⚠️ WARNING: Are you sure you want to pay this request in advance?\n\n` +
-                           `Next Due Date: ${nextDueDate}\n` +
-                           `Today: ${today.toISOString().split('T')[0]}\n` +
-                           `Amount: OMR ${amount}\n\n` +
-                           `This payment is not yet due. Are you sure you want to mark it as paid?`;
-        }
-    }
-    
-    if (confirm(confirmMessage)) {
-        fetch(`/api/requests/mark_paid`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                request_id: requestId,
-                amount: amount
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Reload the page to show updated status
-                location.reload();
-            } else {
-                alert('Error: ' + (data.message || 'Failed to mark as paid'));
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error marking request as paid');
-        });
-    }
-}
-
-// Get next due date for recurring payments
-function getNextDueDate() {
-    // This is a simplified version - in a real implementation,
-    // you might want to calculate the actual next due date
-    // For now, we'll return null to indicate no advance payment check
-    return null;
-}
-
-// Mark installment as paid
-function markInstallmentPaid(requestId, paymentDate, amount) {
-    // Check if payment date is in the future
-    const today = new Date();
-    const dueDate = new Date(paymentDate);
-    const isFutureDate = dueDate > today;
-    
-    let confirmMessage = `Mark payment of OMR ${amount} due on ${paymentDate} as paid?`;
-    
-    if (isFutureDate) {
-        confirmMessage = `⚠️ WARNING: Are you sure you are paying this installment early?\n\n` +
-                       `Due Date: ${paymentDate}\n` +
-                       `Today: ${today.toISOString().split('T')[0]}\n` +
-                       `Amount: OMR ${amount}\n\n` +
-                       `This payment is not yet due. Are you sure you want to mark it as paid?`;
-    }
-    
-    if (confirm(confirmMessage)) {
-        fetch(`/api/installments/mark_paid`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                request_id: requestId,
-                payment_date: paymentDate,
-                amount: amount
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Reload the page to show updated status
-                location.reload();
-            } else {
-                alert('Error: ' + (data.message || 'Failed to mark as paid'));
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error marking installment as paid');
-        });
-    }
-}
-
-// Handle mark paid button clicks
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.mark-paid-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const requestId = this.getAttribute('data-request-id');
-            const paymentDate = this.getAttribute('data-payment-date');
-            const amount = this.getAttribute('data-amount');
-            
-            markInstallmentPaid(requestId, paymentDate, amount);
-        });
-    });
-    document.querySelectorAll('.mark-late-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const requestId = this.getAttribute('data-request-id');
-            const paymentDate = this.getAttribute('data-payment-date');
-            
-            if (confirm(`Mark installment due on ${paymentDate} as LATE?`)) {
-                fetch(`/api/installments/mark_late`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        request_id: requestId,
-                        payment_date: paymentDate
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error: ' + (data.message || 'Failed to mark as late'));
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error marking installment as late');
-                });
-            }
-        });
-    });
-});
-
-// Manager rejection form functions
-function showRejectionForm() {
-    document.getElementById('rejectionForm').style.display = 'block';
-}
-
-function hideRejectionForm() {
-    document.getElementById('rejectionForm').style.display = 'none';
-    document.getElementById('rejection_reason').value = '';
-}
 </script>
 {% endblock %}
