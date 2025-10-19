@@ -1309,8 +1309,6 @@ def view_request(request_id):
                 if operation_manager:
                     manager_name = operation_manager.name
         
-        # Debug: Print what we found
-        print(f"DEBUG - Request ID: {request_id}, Department: {req.department}, Manager ID: {req.user.manager_id}, Manager Name: {manager_name}")
     
     # Get all proof files for this request
     proof_files = []
