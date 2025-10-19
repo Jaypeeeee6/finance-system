@@ -187,6 +187,7 @@ class RecurringPaymentSchedule(db.Model):
     payment_order = db.Column(db.Integer, nullable=False)  # Order of this payment (1st, 2nd, etc.)
     is_paid = db.Column(db.Boolean, default=False)  # Whether this specific payment has been made
     paid_date = db.Column(db.Date)  # When this payment was actually made
+    receipt_path = db.Column(db.String(255))  # Receipt file path for this installment
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationship to the main payment request
@@ -202,6 +203,7 @@ class RecurringPaymentSchedule(db.Model):
             'payment_order': self.payment_order,
             'is_paid': self.is_paid,
             'paid_date': self.paid_date.strftime('%Y-%m-%d') if self.paid_date else None,
+            'receipt_path': self.receipt_path,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S')
         }
     

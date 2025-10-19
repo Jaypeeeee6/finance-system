@@ -1133,6 +1133,13 @@ function showCurrentConfig() {
     document.getElementById('configureButton').style.display = 'block';
 }
 
+// Helper function to parse amount with commas
+function parseAmountWithCommas(amountString) {
+    if (!amountString) return 0;
+    // Remove commas and parse as float
+    return parseFloat(amountString.replace(/,/g, '')) || 0;
+}
+
 // Variable Amount Functions
 function toggleVariableAmounts() {
     const toggle = document.getElementById('variableAmountsToggle');
@@ -1169,7 +1176,7 @@ function toggleVariableAmounts() {
 
 function generatePaymentAmountInputs() {
     const container = document.getElementById('paymentAmountsList');
-    const totalAmount = parseFloat(document.getElementById('amount').value) || 0;
+    const totalAmount = parseAmountWithCommas(document.getElementById('amount').value);
     
     console.log('🔧 DEBUG: generatePaymentAmountInputs - starting');
     console.log('Container element:', container);
@@ -1530,7 +1537,7 @@ function updateAmountSummary() {
         totalAllocated += amount;
     });
     
-    const totalAmount = parseFloat(document.getElementById('amount').value) || 0;
+    const totalAmount = parseAmountWithCommas(document.getElementById('amount').value);
     const remaining = totalAmount - totalAllocated;
     
     document.getElementById('totalAllocated').textContent = totalAllocated.toFixed(3);
@@ -1616,7 +1623,7 @@ function createAmountMismatchAlert() {
     alertDiv.style.cssText = 'margin: 10px 0; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; color: #856404; display: block;';
     alertDiv.innerHTML = `
         <i class="fas fa-exclamation-triangle"></i>
-        <strong>Amount Mismatch:</strong> Please ensure the total allocated amount matches the total amount (OMR ${parseFloat(document.getElementById('amount').value || 0).toFixed(3)}).
+        <strong>Amount Mismatch:</strong> Please ensure the total allocated amount matches the total amount (OMR ${parseAmountWithCommas(document.getElementById('amount').value).toFixed(3)}).
     `;
     
     // Find the variable amounts section and insert the alert
@@ -1652,7 +1659,7 @@ function updatePaymentSchedule() {
 function addNewPayment() {
     console.log('🔧 DEBUG: addNewPayment - starting to add new payment');
     
-    const totalAmount = parseFloat(document.getElementById('amount').value) || 0;
+    const totalAmount = parseAmountWithCommas(document.getElementById('amount').value);
     const remainingAmount = getRemainingAmount();
     console.log('🔧 DEBUG: addNewPayment - total amount:', totalAmount, 'remaining amount:', remainingAmount);
     
@@ -1915,7 +1922,7 @@ function renumberPayments() {
 
 function validateAndUpdateAmount(input) {
     const enteredAmount = parseFloat(input.value) || 0;
-    const totalAmount = parseFloat(document.getElementById('amount').value) || 0;
+    const totalAmount = parseAmountWithCommas(document.getElementById('amount').value);
     
     // First, get the remaining amount BEFORE this input is considered
     const otherInputs = Array.from(document.querySelectorAll('.payment-amount-input')).filter(inp => inp !== input);
@@ -1946,7 +1953,7 @@ function validateAndUpdateAmount(input) {
 }
 
 function getRemainingAmount() {
-    const totalAmount = parseFloat(document.getElementById('amount').value) || 0;
+    const totalAmount = parseAmountWithCommas(document.getElementById('amount').value);
     const inputs = document.querySelectorAll('.payment-amount-input');
     let totalAllocated = 0;
     
@@ -1958,7 +1965,7 @@ function getRemainingAmount() {
 }
 
 function updateInputMaxValues() {
-    const totalAmount = parseFloat(document.getElementById('amount').value) || 0;
+    const totalAmount = parseAmountWithCommas(document.getElementById('amount').value);
     const inputs = document.querySelectorAll('.payment-amount-input');
     
     inputs.forEach(input => {

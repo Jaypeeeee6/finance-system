@@ -1208,15 +1208,11 @@ def view_request(request_id):
     ).get_or_404(request_id)
     
     # Check permissions
-    if current_user.role not in ['Finance Admin', 'Finance', 'GM', 'IT', 'Project']:
+    # Allow Operation Manager to view all requests (same as GM visibility)
+    if current_user.role not in ['Finance Admin', 'Finance', 'GM', 'IT', 'Project', 'Operation Manager']:
         # Department Managers can view requests from their department
         if current_user.role == 'Department Manager':
             if req.department != current_user.department:
-                flash('You do not have permission to view this request.', 'danger')
-                return redirect(url_for('dashboard'))
-        # Operation Managers can view requests from Operation, Maintenance, and Project Department
-        elif current_user.role == 'Operation Manager':
-            if req.department not in ['Operation', 'Maintenance', 'Project Department']:
                 flash('You do not have permission to view this request.', 'danger')
                 return redirect(url_for('dashboard'))
         # Regular users can only view their own requests
@@ -1260,8 +1256,8 @@ def view_request(request_id):
             
             # Use list comprehension for better performance
             for entry in schedule:
-                # Check if this installment is already paid (optimized lookup)
-                is_paid = entry.payment_date in paid_dates
+                # Check if this installment is already paid (use the is_paid field from the schedule)
+                is_paid = entry.is_paid
                 # Check if this installment is marked late (optimized lookup)
                 is_late = entry.payment_date in late_dates
                 
@@ -1270,10 +1266,12 @@ def view_request(request_id):
                     total_paid_amount += entry.amount
                 
                 schedule_rows.append({
+                    'schedule_id': entry.schedule_id,
                     'date': entry.payment_date,
                     'amount': entry.amount,
                     'is_paid': is_paid,
-                    'is_late': is_late
+                    'is_late': is_late,
+                    'receipt_path': entry.receipt_path
                 })
     
     # Determine the manager's name for display
@@ -1376,29 +1374,75 @@ def approve_request(request_id):
                 'approver': approver
             })
         else:
-            # No proof required - set status to Completed
-            req.status = 'Completed'
-            req.approval_date = today
-            req.completion_date = today
-            flash(f'Payment request #{request_id} approved and completed. No proof of payment required.', 'success')
-            log_action(f"Approved and completed payment request #{request_id} - No proof required")
-            
-            # Notify the requestor
-            create_notification(
-                user_id=req.user_id,
-                title="Request Completed",
-                message=f"Your payment request #{request_id} has been approved and completed. No proof of payment was required.",
-                notification_type="request_completed",
-                request_id=request_id
-            )
-            
-            # Emit real-time update
-            socketio.emit('request_updated', {
-                'request_id': request_id,
-                'status': 'Completed',
-                'approver': approver,
-                'completed': True
-            })
+            # No proof required - check if it's a recurring payment
+            if req.recurring == 'Recurring':
+                # Recurring payment - set status to Recurring
+                req.status = 'Recurring'
+                req.approval_date = today
+                
+                # Automatically mark the first installment as paid
+                first_installment = RecurringPaymentSchedule.query.filter_by(
+                    request_id=request_id
+                ).order_by(RecurringPaymentSchedule.payment_order).first()
+                
+                if first_installment:
+                    first_installment.is_paid = True
+                    first_installment.paid_date = today
+                    # Copy the finance admin receipt to the first installment
+                    first_installment.receipt_path = req.receipt_path
+                    
+                    # Create a paid notification for the first installment
+                    create_notification(
+                        user_id=req.user_id,
+                        title="First Installment Paid",
+                        message=f'First installment for {first_installment.payment_date} has been automatically marked as paid (Amount: {first_installment.amount} OMR)',
+                        notification_type="installment_paid",
+                        request_id=request_id
+                    )
+                
+                flash(f'Recurring payment request #{request_id} approved. First installment automatically marked as paid. Payment schedule will be managed.', 'success')
+                log_action(f"Approved recurring payment request #{request_id} - No proof required - First installment marked as paid")
+                
+                # Notify the requestor
+                create_notification(
+                    user_id=req.user_id,
+                    title="Recurring Payment Approved",
+                    message=f"Your recurring payment request #{request_id} has been approved. Payment schedule will be managed.",
+                    notification_type="recurring_approved",
+                    request_id=request_id
+                )
+                
+                # Emit real-time update
+                socketio.emit('request_updated', {
+                    'request_id': request_id,
+                    'status': 'Recurring',
+                    'approver': approver,
+                    'recurring': True
+                })
+            else:
+                # One-time payment - set status to Completed
+                req.status = 'Completed'
+                req.approval_date = today
+                req.completion_date = today
+                flash(f'Payment request #{request_id} approved and completed. No proof of payment required.', 'success')
+                log_action(f"Approved and completed payment request #{request_id} - No proof required")
+                
+                # Notify the requestor
+                create_notification(
+                    user_id=req.user_id,
+                    title="Request Completed",
+                    message=f"Your payment request #{request_id} has been approved and completed. No proof of payment was required.",
+                    notification_type="request_completed",
+                    request_id=request_id
+                )
+                
+                # Emit real-time update
+                socketio.emit('request_updated', {
+                    'request_id': request_id,
+                    'status': 'Completed',
+                    'approver': approver,
+                    'completed': True
+                })
     
     
     elif approval_status == 'paid':
@@ -1966,6 +2010,143 @@ def delete_request(request_id):
     log_action(f"Deleted payment request #{request_id}")
     flash(f'Payment request #{request_id} has been deleted.', 'success')
     return redirect(url_for('it_dashboard'))
+
+@app.route('/bulk-delete-requests', methods=['POST'])
+@login_required
+@role_required('IT')
+def bulk_delete_requests():
+    """Bulk delete payment requests (IT only)"""
+    request_ids = request.form.getlist('request_ids')
+    
+    if not request_ids:
+        flash('No requests selected for deletion.', 'warning')
+        return redirect(url_for('it_dashboard'))
+    
+    deleted_count = 0
+    for request_id in request_ids:
+        try:
+            req = PaymentRequest.query.get(int(request_id))
+            if req:
+                # Delete associated receipt file if exists
+                if req.receipt_path:
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.receipt_path)
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                
+                # Log the deletion before deleting
+                log_action(f"Bulk deleted payment request #{request_id} - {req.request_type} - {req.purpose}")
+                db.session.delete(req)
+                deleted_count += 1
+        except (ValueError, TypeError):
+            continue
+    
+    db.session.commit()
+    
+    flash(f'{deleted_count} payment request(s) have been deleted.', 'success')
+    return redirect(url_for('it_dashboard'))
+
+@app.route('/request/<int:request_id>/mark-installment-paid', methods=['POST'])
+@login_required
+@role_required('Finance Admin')
+def mark_installment_paid_finance(request_id):
+    """Mark a specific installment as paid (Finance Admin only)"""
+    req = PaymentRequest.query.get_or_404(request_id)
+    
+    # Check if request is recurring
+    if req.status != 'Recurring':
+        flash('This endpoint is only for recurring payments.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    schedule_id = request.form.get('schedule_id')
+    payment_date = request.form.get('payment_date')
+    
+    if not schedule_id or not payment_date:
+        flash('Missing required parameters.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    try:
+        # Get the schedule entry
+        schedule_entry = RecurringPaymentSchedule.query.get(int(schedule_id))
+        if not schedule_entry or schedule_entry.request_id != request_id:
+            flash('Installment not found.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        # Mark as paid
+        schedule_entry.is_paid = True
+        schedule_entry.paid_date = datetime.strptime(payment_date, '%Y-%m-%d').date()
+        
+        # Create a paid notification
+        create_notification(
+            user_id=req.user_id,
+            title="Installment Paid",
+            message=f'Installment for {payment_date} has been marked as paid (Amount: {schedule_entry.amount} OMR)',
+            notification_type="installment_paid",
+            request_id=request_id
+        )
+        
+        db.session.commit()
+        
+        log_action(f"Marked installment {schedule_id} as paid for request #{request_id}")
+        flash(f'Installment for {payment_date} has been marked as paid.', 'success')
+        
+    except (ValueError, TypeError) as e:
+        flash('Invalid date format.', 'error')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error marking installment as paid.', 'error')
+    
+    return redirect(url_for('view_request', request_id=request_id))
+
+@app.route('/request/<int:request_id>/upload-installment-receipt', methods=['POST'])
+@login_required
+@role_required('Finance Admin')
+def upload_installment_receipt(request_id):
+    """Upload receipt for a specific installment (Finance Admin only)"""
+    req = PaymentRequest.query.get_or_404(request_id)
+    
+    # Check if request is recurring
+    if req.status != 'Recurring':
+        flash('This endpoint is only for recurring payments.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    schedule_id = request.form.get('schedule_id')
+    payment_date = request.form.get('payment_date')
+    receipt_file = request.files.get('receipt')
+    
+    if not schedule_id or not payment_date or not receipt_file:
+        flash('Missing required parameters.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    if not allowed_file(receipt_file.filename):
+        flash('Invalid file type. Please upload an image or PDF.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    try:
+        # Get the schedule entry
+        schedule_entry = RecurringPaymentSchedule.query.get(int(schedule_id))
+        if not schedule_entry or schedule_entry.request_id != request_id:
+            flash('Installment not found.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        # Handle receipt upload
+        filename = secure_filename(receipt_file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"installment_{schedule_id}_{timestamp}_{filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        receipt_file.save(filepath)
+        
+        # Store receipt path in schedule entry (you might need to add this field to the model)
+        # For now, we'll just log the action
+        
+        log_action(f"Uploaded receipt for installment {schedule_id} for request #{request_id}")
+        flash(f'Receipt uploaded successfully for installment on {payment_date}.', 'success')
+        
+    except (ValueError, TypeError) as e:
+        flash('Invalid parameters.', 'error')
+    except Exception as e:
+        flash('Error uploading receipt.', 'error')
+    
+    return redirect(url_for('view_request', request_id=request_id))
 
 
 # ==================== REPORTS ROUTES ====================

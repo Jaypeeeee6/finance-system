@@ -154,6 +154,8 @@
                                         <span class="badge" style="background: #28a745; color: white;">📥 {{ req.status }}</span>
                                     {% elif req.status == 'Paid' %}
                                         <span class="badge" style="background: #6f42c1; color: white;">💰 {{ req.status }}</span>
+                                    {% elif req.status == 'Recurring' %}
+                                        <span class="badge" style="background: #ffc107; color: #212529;">⏳ {{ req.status }}</span>
                                     {% elif 'Pending' in req.status %}
                                         <span class="badge" style="background: #17a2b8; color: white;">⏳ {{ req.status }}</span>
                                     {% else %}

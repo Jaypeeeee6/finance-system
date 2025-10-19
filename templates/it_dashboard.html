@@ -108,11 +108,32 @@
                 </div>
             </div>
             <div class="card-body">
+                <!-- Bulk Actions -->
+                <div id="bulkActions" class="bulk-actions" style="display: none; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px;">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <span id="selectedCount" style="font-weight: 600; color: #495057;">0 items selected</span>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="button" class="btn btn-sm btn-danger" onclick="bulkDelete()" disabled id="bulkDeleteBtn">
+                                <i class="fas fa-trash"></i> Delete Selected
+                            </button>
+                            <button type="button" class="btn btn-sm btn-info" onclick="bulkView()" disabled id="bulkViewBtn">
+                                <i class="fas fa-eye"></i> View Selected
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="clearSelection()">
+                                <i class="fas fa-times"></i> Clear Selection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
                 {% if requests %}
                     <div class="table-responsive">
                         <table class="data-table">
                             <thead>
                                 <tr>
+                                    <th>
+                                        <input type="checkbox" id="selectAll" onchange="toggleAllCheckboxes(this)">
+                                    </th>
                                     <th>ID</th>
                                     <th>Type</th>
                                     <th>Requestor</th>
@@ -127,6 +148,9 @@
                             <tbody>
                                 {% for req in requests %}
                                 <tr>
+                                    <td>
+                                        <input type="checkbox" class="request-checkbox" value="{{ req.request_id }}" onchange="updateBulkActions()">
+                                    </td>
                                     <td>#{{ req.request_id }}</td>
                                     <td><span class="badge badge-info">{{ req.request_type }}</span></td>
                                     <td>{{ req.requestor_name }}</td>
@@ -155,6 +179,8 @@
                                         <span class="badge" style="background: #28a745; color: white;">📥 {{ req.status }}</span>
                                     {% elif req.status == 'Paid' %}
                                         <span class="badge" style="background: #6f42c1; color: white;">💰 {{ req.status }}</span>
+                                    {% elif req.status == 'Recurring' %}
+                                        <span class="badge" style="background: #ffc107; color: #212529;">⏳ {{ req.status }}</span>
                                     {% elif 'Pending' in req.status %}
                                         <span class="badge" style="background: #17a2b8; color: white;">⏳ {{ req.status }}</span>
                                     {% else %}
@@ -372,6 +398,113 @@ function changeItemsPerPage(perPage) {
     url.searchParams.set('per_page', perPage);
     url.searchParams.set('page', '1');
     window.location.href = url.toString();
+}
+
+// Checkbox functionality
+function toggleAllCheckboxes(selectAllCheckbox) {
+    const checkboxes = document.querySelectorAll('.request-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+    updateBulkActions();
+}
+
+function updateBulkActions() {
+    const checkboxes = document.querySelectorAll('.request-checkbox');
+    const checkedBoxes = document.querySelectorAll('.request-checkbox:checked');
+    const selectedCount = checkedBoxes.length;
+    const bulkActions = document.getElementById('bulkActions');
+    const selectedCountSpan = document.getElementById('selectedCount');
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    const bulkViewBtn = document.getElementById('bulkViewBtn');
+    
+    // Update selected count
+    selectedCountSpan.textContent = `${selectedCount} item${selectedCount !== 1 ? 's' : ''} selected`;
+    
+    // Show/hide bulk actions
+    if (selectedCount > 0) {
+        bulkActions.style.display = 'block';
+        bulkDeleteBtn.disabled = false;
+        bulkViewBtn.disabled = false;
+    } else {
+        bulkActions.style.display = 'none';
+        bulkDeleteBtn.disabled = true;
+        bulkViewBtn.disabled = true;
+    }
+    
+    // Update select all checkbox state
+    const selectAllCheckbox = document.getElementById('selectAll');
+    if (selectedCount === 0) {
+        selectAllCheckbox.indeterminate = false;
+        selectAllCheckbox.checked = false;
+    } else if (selectedCount === checkboxes.length) {
+        selectAllCheckbox.indeterminate = false;
+        selectAllCheckbox.checked = true;
+    } else {
+        selectAllCheckbox.indeterminate = true;
+    }
+}
+
+function clearSelection() {
+    const checkboxes = document.querySelectorAll('.request-checkbox');
+    const selectAllCheckbox = document.getElementById('selectAll');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    selectAllCheckbox.checked = false;
+    selectAllCheckbox.indeterminate = false;
+    
+    updateBulkActions();
+}
+
+function bulkDelete() {
+    const checkedBoxes = document.querySelectorAll('.request-checkbox:checked');
+    const requestIds = Array.from(checkedBoxes).map(cb => cb.value);
+    
+    if (requestIds.length === 0) {
+        alert('Please select at least one request to delete.');
+        return;
+    }
+    
+    if (confirm(`Are you sure you want to delete ${requestIds.length} request(s)? This action cannot be undone.`)) {
+        // Create a form to submit multiple deletions
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("bulk_delete_requests") }}';
+        
+        requestIds.forEach(id => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'request_ids';
+            input.value = id;
+            form.appendChild(input);
+        });
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function bulkView() {
+    const checkedBoxes = document.querySelectorAll('.request-checkbox:checked');
+    const requestIds = Array.from(checkedBoxes).map(cb => cb.value);
+    
+    if (requestIds.length === 0) {
+        alert('Please select at least one request to view.');
+        return;
+    }
+    
+    if (requestIds.length === 1) {
+        // Single request - redirect to view page
+        window.location.href = `{{ url_for('view_request', request_id=0) }}`.replace('0', requestIds[0]);
+    } else {
+        // Multiple requests - show in new window/tab
+        const urls = requestIds.map(id => `{{ url_for('view_request', request_id=0) }}`.replace('0', id));
+        urls.forEach(url => {
+            window.open(url, '_blank');
+        });
+    }
 }
 </script>
 {% endblock %}
