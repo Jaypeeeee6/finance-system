@@ -201,7 +201,7 @@
                                     {% if (user.role == 'Department Manager' and user.department == request.department) or (user.role == 'Operation Manager' and request.department == 'Operation') %}
                                         {{ user.name }} (You)
                                     {% else %}
-                                        Department Manager for {{ request.department }}
+                                        {{ manager_name if manager_name else 'Department Manager for ' + request.department }}
                                     {% endif %}
                                 </p>
                                 <p style="margin-bottom: 0; color: #666;">
@@ -219,7 +219,7 @@
                 </div>
 
                 <!-- Manager approval form (only visible to managers of the same department) -->
-                {% if (user.role == 'Department Manager' and user.department == request.department) or (user.role == 'Operation Manager' and request.department == 'Operation') %}
+                {% if (user.role == 'Department Manager' and user.department == request.department) or (user.role == 'Operation Manager' and request.department == 'Operation') or (user.role == 'Finance Admin' and request.department == 'Finance') %}
                     <div class="card">
                         <div class="card-header" style="background: #4caf50; color: white;">
                             <h4><i class="fas fa-check-circle"></i> Your Approval Required</h4>
@@ -398,10 +398,10 @@
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label for="finance_receipt">Upload Receipt</label>
-                                    <input type="file" name="receipt" id="finance_receipt" accept=".jpg,.jpeg,.png,.pdf">
+                                    <label for="finance_receipt">Upload Receipt *</label>
+                                    <input type="file" name="receipt" id="finance_receipt" accept=".jpg,.jpeg,.png,.pdf" required>
                                     <small style="color: #666; margin-top: 5px; display: block;">
-                                        Optional - only required if marking as "Completed"
+                                        Required for Finance Admin approval
                                     </small>
                                 </div>
                                 
@@ -546,13 +546,6 @@
                             </div>
                             
                             <div class="col-md-6">
-                                {% if request.status == 'Payment Pending' %}
-                                    <form method="POST" action="{{ url_for('mark_as_paid', request_id=request.request_id) }}" style="margin-bottom: 25px;">
-                                        <button type="submit" class="btn btn-success" onclick="return confirm('Mark this request as paid?')">
-                                            <i class="fas fa-check-circle"></i> Mark as Paid
-                                        </button>
-                                    </form>
-                                {% endif %}
                                 
                                 {% if request.status != 'Completed' %}
                                 <form method="POST" action="{{ url_for('close_request', request_id=request.request_id) }}" style="margin-top: 10px;">
@@ -630,7 +623,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Exception 1: Assigned managers viewing "Pending Manager Approval" → Manager tab
         if (requestStatus === 'Pending Manager Approval' && 
             ((user.role === 'Department Manager' && user.department === request.department) || 
-             (user.role === 'Operation Manager' && request.department === 'Operation'))) {
+             (user.role === 'Operation Manager' && request.department === 'Operation') ||
+             (user.role === 'Finance Admin' && request.department === 'Finance'))) {
             initialStep = 'manager';
         }
         // Exception 2: Finance admins viewing "Pending Finance Approval" → Finance tab

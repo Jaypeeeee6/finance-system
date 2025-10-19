@@ -700,8 +700,8 @@ def admin_dashboard():
         per_page = 10
     
     # Build query with optional status and department filters
-    # Finance Admin should not see requests that are still pending manager approval
-    query = PaymentRequest.query.filter(PaymentRequest.status != 'Pending Manager Approval')
+    # Finance Admin can see all requests, including pending manager approval
+    query = PaymentRequest.query
     if status_filter:
         query = query.filter(PaymentRequest.status == status_filter)
     if department_filter:
@@ -742,8 +742,8 @@ def finance_dashboard():
         per_page = 10
     
     # Build query with optional department filter
-    # Finance users should not see requests that are still pending manager approval
-    query = PaymentRequest.query.filter(PaymentRequest.status != 'Pending Manager Approval')
+    # Finance users can see all requests, including their own pending manager approval requests
+    query = PaymentRequest.query
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     
@@ -1049,13 +1049,8 @@ def new_request():
         person_company = request.form.get('person_company')
         company_name = request.form.get('company_name')
         
-        # Determine initial status based on department
-        # Finance department requests are automatically approved and go to Finance Admin
-        # Other departments go to their department manager first
-        if current_user.department == 'Finance':
-            initial_status = 'Approved'  # Finance requests are automatically approved
-        else:
-            initial_status = 'Pending Manager Approval'
+        # All departments go to their manager first for approval
+        initial_status = 'Pending Manager Approval'
         
         # Create new request
         new_req = PaymentRequest(
@@ -1078,9 +1073,6 @@ def new_request():
             user_id=current_user.user_id
         )
         
-        # Set approval date for finance department requests (auto-approved)
-        if current_user.department == 'Finance':
-            new_req.approval_date = datetime.utcnow().date()
         
         db.session.add(new_req)
         db.session.commit()
@@ -1286,28 +1278,27 @@ def view_request(request_id):
     
     # Determine the manager's name for display
     manager_name = None
-    if req.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Rejected by Manager', 'Completed']:
-        # If the request has been processed by a manager, determine who the manager was
-        if req.user.manager_id:
-            # Get the manager's name from the manager_id
-            manager = User.query.get(req.user.manager_id)
-            if manager:
-                manager_name = manager.name
-            else:
-                # If manager_id exists but user not found, try to find Department Manager
-                dept_manager = User.query.filter_by(role='Department Manager', department=req.department).first()
-                if dept_manager:
-                    manager_name = dept_manager.name
+    # Determine manager name for all statuses (pending and completed)
+    if req.user.manager_id:
+        # Get the manager's name from the manager_id
+        manager = User.query.get(req.user.manager_id)
+        if manager:
+            manager_name = manager.name
         else:
-            # If no manager_id is set, find the Department Manager for the requestor's department
+            # If manager_id exists but user not found, try to find Department Manager
             dept_manager = User.query.filter_by(role='Department Manager', department=req.department).first()
             if dept_manager:
                 manager_name = dept_manager.name
-            elif req.department == 'Operation':
-                # For Operation department, try Operation Manager as fallback
-                operation_manager = User.query.filter_by(role='Operation Manager').first()
-                if operation_manager:
-                    manager_name = operation_manager.name
+    else:
+        # If no manager_id is set, find the Department Manager for the requestor's department
+        dept_manager = User.query.filter_by(role='Department Manager', department=req.department).first()
+        if dept_manager:
+            manager_name = dept_manager.name
+        elif req.department == 'Operation':
+            # For Operation department, try Operation Manager as fallback
+            operation_manager = User.query.filter_by(role='Operation Manager').first()
+            if operation_manager:
+                manager_name = operation_manager.name
         
     
     # Get all proof files for this request
@@ -1344,6 +1335,20 @@ def approve_request(request_id):
         approver = request.form.get('approver')
         proof_required = request.form.get('proof_required') == 'on'
         today = datetime.utcnow().date()
+        
+        # Require receipt upload for Finance Admin approval
+        receipt_file = request.files.get('receipt')
+        if not receipt_file or not allowed_file(receipt_file.filename):
+            flash('Receipt upload is required for Finance Admin approval.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        # Handle receipt upload
+        filename = secure_filename(receipt_file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{timestamp}_{filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        receipt_file.save(filepath)
+        req.receipt_path = filename
         
         req.approver = approver
         req.proof_required = proof_required
@@ -1783,6 +1788,11 @@ def manager_approve_request(request_id):
           req.user.department == 'Operation' and 
           req.user.role != 'Operation Manager'):  # Operation Manager can't approve their own requests
         is_authorized = True
+    # Special case: Finance Admin can approve Finance department requests
+    elif (current_user.role == 'Finance Admin' and 
+          req.user.department == 'Finance' and 
+          req.user.role != 'Finance Admin'):  # Finance Admin can't approve their own requests
+        is_authorized = True
     
     if not is_authorized:
         flash('You are not authorized to approve this request.', 'error')
@@ -1883,6 +1893,11 @@ def manager_reject_request(request_id):
     elif (current_user.role == 'Operation Manager' and 
           req.user.department == 'Operation' and 
           req.user.role != 'Operation Manager'):  # Operation Manager can't reject their own requests
+        is_authorized = True
+    # Special case: Finance Admin can reject Finance department requests
+    elif (current_user.role == 'Finance Admin' and 
+          req.user.department == 'Finance' and 
+          req.user.role != 'Finance Admin'):  # Finance Admin can't reject their own requests
         is_authorized = True
     
     if not is_authorized:
