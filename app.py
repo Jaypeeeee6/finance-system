@@ -494,6 +494,67 @@ def is_payment_due_today(request, today):
     return False
 
 
+def check_recurring_payment_completion(request_id):
+    """Check if all installments for a recurring payment are paid and mark as completed"""
+    try:
+        # Get the payment request
+        req = PaymentRequest.query.get(request_id)
+        if not req or req.status != 'Recurring' or req.recurring != 'Recurring':
+            return False
+        
+        # Get all installments for this request
+        installments = RecurringPaymentSchedule.query.filter_by(request_id=request_id).all()
+        
+        if not installments:
+            return False
+        
+        # Check if all installments are paid
+        all_paid = all(installment.is_paid for installment in installments)
+        
+        if all_paid:
+            # Calculate total paid amount
+            total_paid = sum(float(installment.amount) for installment in installments)
+            total_requested = float(req.amount)
+            
+            # Check if there's no remaining amount (allowing for small floating point differences)
+            remaining_amount = total_requested - total_paid
+            if abs(remaining_amount) < 0.001:  # Less than 0.001 OMR difference
+                # Mark the request as completed
+                req.status = 'Completed'
+                req.completion_date = datetime.utcnow().date()
+                req.updated_at = datetime.utcnow()
+                
+                db.session.commit()
+                
+                # Create completion notification
+                create_notification(
+                    user_id=req.user_id,
+                    title="Recurring Payment Completed",
+                    message=f'All installments for recurring payment request #{request_id} have been paid. Request marked as completed.',
+                    notification_type="recurring_completed",
+                    request_id=request_id
+                )
+                
+                # Log the action
+                log_action(f"Recurring payment request #{request_id} automatically marked as completed - all installments paid")
+                
+                # Emit real-time update
+                socketio.emit('request_updated', {
+                    'request_id': request_id,
+                    'status': 'Completed',
+                    'recurring': True,
+                    'completed': True
+                })
+                
+                return True
+        
+        return False
+        
+    except Exception as e:
+        print(f"Error checking recurring payment completion: {e}")
+        return False
+
+
 def get_notifications_for_user(user):
     """Get appropriate notifications for a user based on their role"""
     if user.role == 'Project':
@@ -1412,6 +1473,9 @@ def approve_request(request_id):
                     request_id=request_id
                 )
                 
+                # Check if all installments are now paid and mark as completed if so
+                check_recurring_payment_completion(request_id)
+                
                 # Emit real-time update
                 socketio.emit('request_updated', {
                     'request_id': request_id,
@@ -2086,6 +2150,9 @@ def mark_installment_paid_finance(request_id):
         
         db.session.commit()
         
+        # Check if all installments are now paid and mark as completed if so
+        check_recurring_payment_completion(request_id)
+        
         log_action(f"Marked installment {schedule_id} as paid for request #{request_id}")
         flash(f'Installment for {payment_date} has been marked as paid.', 'success')
         
@@ -2135,8 +2202,9 @@ def upload_installment_receipt(request_id):
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         receipt_file.save(filepath)
         
-        # Store receipt path in schedule entry (you might need to add this field to the model)
-        # For now, we'll just log the action
+        # Store receipt path in schedule entry
+        schedule_entry.receipt_path = filename
+        db.session.commit()
         
         log_action(f"Uploaded receipt for installment {schedule_id} for request #{request_id}")
         flash(f'Receipt uploaded successfully for installment on {payment_date}.', 'success')
@@ -3127,6 +3195,9 @@ def mark_installment_paid():
         )
         db.session.add(audit_log)
         db.session.commit()
+        
+        # Check if all installments are now paid and mark as completed if so
+        check_recurring_payment_completion(request_id)
         
         return jsonify({'success': True, 'message': 'Installment marked as paid successfully'})
         

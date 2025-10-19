@@ -2,6 +2,55 @@
 
 {% block title %}View Request #{{ request.request_id }}{% endblock %}
 
+{% block extra_css %}
+<style>
+.mark-paid-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+    position: relative;
+}
+
+.mark-paid-btn:disabled:hover {
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+    transform: none;
+}
+
+.mark-paid-btn:disabled:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #333;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 1000;
+    margin-top: 5px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    pointer-events: none;
+}
+
+.mark-paid-btn:disabled:hover::before {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-bottom-color: #333;
+    z-index: 1000;
+    margin-top: -1px;
+    pointer-events: none;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="dashboard-container">
     <div class="dashboard-header">
@@ -485,21 +534,24 @@
                                                 <button type="button" class="btn btn-success btn-sm mark-paid-btn" 
                                                         data-schedule-id="{{ installment.schedule_id }}" 
                                                         data-payment-date="{{ installment.date.strftime('%Y-%m-%d') }}" 
-                                                        style="margin-right: 5px;">
+                                                        data-has-receipt="{{ 'true' if installment.receipt_path else 'false' }}"
+                                                        data-tooltip="Please upload a receipt first"
+                                                        style="margin-right: 5px;"
+                                                        {% if not installment.receipt_path %}disabled{% endif %}>
                                                     <i class="fas fa-check"></i> Mark as Paid
                                                 </button>
                                             {% endif %}
                                             
-                                            {% if installment.is_paid and installment.receipt_path and loop.first %}
-                                                <!-- First installment with receipt - show View Receipt -->
+                                            {% if installment.receipt_path %}
+                                                <!-- Installment with receipt - show View Receipt -->
                                                 <a href="{{ url_for('uploaded_file', filename=installment.receipt_path) }}" 
                                                    target="_blank" 
                                                    class="btn btn-info btn-sm" 
                                                    style="margin-right: 5px;">
                                                     <i class="fas fa-eye"></i> View Receipt
                                                 </a>
-                                            {% else %}
-                                                <!-- Other installments or first without receipt - show Upload Receipt -->
+                                            {% elif not installment.is_paid %}
+                                                <!-- Unpaid installment without receipt - show Upload Receipt -->
                                                 <button type="button" class="btn btn-info btn-sm upload-receipt-btn" 
                                                         data-schedule-id="{{ installment.schedule_id }}" 
                                                         data-payment-date="{{ installment.date.strftime('%Y-%m-%d') }}">
@@ -510,8 +562,8 @@
                                         {% else %}
                                         <!-- Non-Finance Admin users see read-only status -->
                                         <div class="installment-actions" style="margin-left: 15px;">
-                                            {% if installment.is_paid and installment.receipt_path and loop.first %}
-                                                <!-- First installment with receipt - show View Receipt for all users -->
+                                            {% if installment.receipt_path %}
+                                                <!-- Any installment with receipt - show View Receipt for all users -->
                                                 <a href="{{ url_for('uploaded_file', filename=installment.receipt_path) }}" 
                                                    target="_blank" 
                                                    class="btn btn-info btn-sm" 
@@ -591,6 +643,115 @@
                     <div class="admin-mode-warning" style="background: #28a745; color: white; margin-top: 10px;">
                         <i class="fas fa-calendar"></i>
                         <span>Completed on {{ request.completion_date.strftime('%B %d, %Y') }}</span>
+                    </div>
+                    {% endif %}
+
+                    {% if request.recurring_interval and 'monthly' in request.recurring_interval %}
+                    <div class="card" style="margin-top: 1rem; margin-bottom: 1.5rem;">
+                        <div class="card-header" style="background: #6c757d; color: white;">
+                            <h4><i class="fas fa-calendar-alt"></i> Payment Schedule</h4>
+                            <p style="margin: 0; opacity: 0.9;">Installments overview (read-only)</p>
+                        </div>
+                        <div class="card-body">
+                            {% if schedule_rows %}
+                                <div class="installments-header">
+                                    <h4 style="margin: 0; color: #495057; font-size: 1.1rem;">
+                                        <i class="fas fa-list-ol"></i> Payment Installments
+                                    </h4>
+                                    <span style="background: #6c757d; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">
+                                        {{ schedule_rows|length }} Installment{{ 's' if schedule_rows|length != 1 else '' }}
+                                    </span>
+                                </div>
+                                
+                                <div class="installments-list">
+                                    {% for installment in schedule_rows %}
+                                    <div class="installment-item">
+                                        <div class="installment-info">
+                                            <div style="display: flex; align-items: center; gap: 10px;">
+                                                <span class="installment-number">
+                                                    {{ loop.index }}
+                                                </span>
+                                                <div>
+                                                    <div class="installment-date">
+                                                        {{ installment.date.strftime('%B %d, %Y') }}
+                                                    </div>
+                                                    <div class="installment-day">
+                                                        {{ installment.date.strftime('%A') }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="installment-amount">
+                                            {% if user.role == 'IT' %}
+                                            <div class="installment-amount-value">***</div>
+                                            {% else %}
+                                            <div class="installment-amount-value">OMR {{ '%.3f'|format(installment.amount) }}</div>
+                                            {% endif %}
+
+                                            {% if installment.is_paid %}
+                                                <div class="installment-status paid"><i class="fas fa-check-circle"></i> Paid</div>
+                                            {% elif installment.is_late %}
+                                                <div class="installment-status late"><i class="fas fa-exclamation-triangle"></i> Late</div>
+                                            {% else %}
+                                                <div class="installment-status pending"><i class="fas fa-clock"></i> Pending</div>
+                                            {% endif %}
+                                        </div>
+
+                                        <div class="installment-actions" style="margin-left: 15px;">
+                                            {% if installment.receipt_path %}
+                                                <!-- Any installment with receipt - show View Receipt for all users -->
+                                                <a href="{{ url_for('uploaded_file', filename=installment.receipt_path) }}" 
+                                                   target="_blank" 
+                                                   class="btn btn-info btn-sm" 
+                                                   style="margin-right: 5px;">
+                                                    <i class="fas fa-eye"></i> View Receipt
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+
+                                <div class="installments-summary">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <span style="font-weight: 600; color: #495057;">Total Amount:</span>
+                                        {% if user.role == 'IT' %}
+                                        <span style="font-weight: bold; color: #495057; font-size: 1.1rem;">***</span>
+                                        {% else %}
+                                        <span style="font-weight: bold; color: #495057; font-size: 1.1rem;">OMR {{ '%.3f'|format(request.amount|float) }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <span style="font-weight: 600; color: #28a745;">Amount Paid:</span>
+                                        {% if user.role == 'IT' %}
+                                        <span style="font-weight: bold; color: #28a745; font-size: 1.1rem;">***</span>
+                                        {% else %}
+                                        <span style="font-weight: bold; color: #28a745; font-size: 1.1rem;">OMR {{ '%.3f'|format(total_paid_amount) }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span style="font-weight: 600; color: #dc3545;">Remaining:</span>
+                                        {% if user.role == 'IT' %}
+                                        <span style="font-weight: bold; color: #dc3545; font-size: 1.1rem;">***</span>
+                                        {% else %}
+                                        <span style="font-weight: bold; color: #dc3545; font-size: 1.1rem;">OMR {{ '%.3f'|format(request.amount|float - total_paid_amount) }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div style="text-align: center; padding: 20px; color: #6c757d;">
+                                    <i class="fas fa-calendar-check" style="font-size: 2rem; margin-bottom: 10px; color: #6c757d;"></i>
+                                    <div style="font-weight: 600; margin-bottom: 5px;">Monthly Recurring Payment</div>
+                                    <div style="font-size: 0.9rem;">This is a recurring monthly payment. The same amount will be due each month.</div>
+                                    {% if user.role == 'IT' %}
+                                    <div style="margin-top: 10px; font-weight: bold; color: #6c757d;">Monthly Amount: ***</div>
+                                    {% else %}
+                                    <div style="margin-top: 10px; font-weight: bold; color: #6c757d;">Monthly Amount: OMR {{ '%.3f'|format(request.amount|float) }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
                     </div>
                     {% endif %}
                 {% else %}
@@ -1089,6 +1250,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Functions for managing recurring payment installments
 function markInstallmentAsPaid(scheduleId, paymentDate) {
+    // Check if receipt is uploaded
+    const markPaidBtn = document.querySelector(`[data-schedule-id="${scheduleId}"].mark-paid-btn`);
+    const hasReceipt = markPaidBtn.getAttribute('data-has-receipt') === 'true';
+    
+    if (!hasReceipt) {
+        alert('Please upload a receipt before marking this installment as paid.');
+        return;
+    }
+    
     if (confirm(`Mark installment for ${paymentDate} as paid?`)) {
         // Create a form to submit the payment
         const form = document.createElement('form');
@@ -1112,6 +1282,15 @@ function markInstallmentAsPaid(scheduleId, paymentDate) {
     }
 }
 
+function enableMarkAsPaidButton(scheduleId) {
+    const markPaidBtn = document.querySelector(`[data-schedule-id="${scheduleId}"].mark-paid-btn`);
+    if (markPaidBtn) {
+        markPaidBtn.disabled = false;
+        markPaidBtn.removeAttribute('title');
+        markPaidBtn.setAttribute('data-has-receipt', 'true');
+    }
+}
+
 function uploadInstallmentReceipt(scheduleId, paymentDate) {
     // Create a modal for receipt upload
     const modal = document.createElement('div');
@@ -1129,7 +1308,7 @@ function uploadInstallmentReceipt(scheduleId, paymentDate) {
                         <span>&times;</span>
                     </button>
                 </div>
-                <form method="POST" action="{{ url_for('upload_installment_receipt', request_id=request.request_id) }}" enctype="multipart/form-data">
+                <form method="POST" action="{{ url_for('upload_installment_receipt', request_id=request.request_id) }}" enctype="multipart/form-data" id="installmentReceiptForm">
                     <div class="modal-body" style="padding: 20px;">
                         <input type="hidden" name="schedule_id" value="${scheduleId}">
                         <input type="hidden" name="payment_date" value="${paymentDate}">
@@ -1145,7 +1324,7 @@ function uploadInstallmentReceipt(scheduleId, paymentDate) {
                         <button type="button" class="btn btn-secondary" onclick="closeInstallmentReceiptModal()" style="background-color: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; margin-right: 10px; cursor: pointer;">
                             <i class="fas fa-times"></i> Cancel
                         </button>
-                        <button type="submit" class="btn btn-primary" style="background-color: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                        <button type="submit" class="btn btn-primary" id="uploadReceiptBtn" style="background-color: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
                             <i class="fas fa-upload"></i> Upload Receipt
                         </button>
                     </div>
@@ -1156,6 +1335,43 @@ function uploadInstallmentReceipt(scheduleId, paymentDate) {
     
     document.body.appendChild(modal);
     document.body.style.overflow = 'hidden';
+    
+    // Add form submission handler
+    const form = document.getElementById('installmentReceiptForm');
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const submitBtn = document.getElementById('uploadReceiptBtn');
+        const originalText = submitBtn.innerHTML;
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+        
+        // Create FormData and submit via fetch
+        const formData = new FormData(form);
+        
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            redirect: 'follow'
+        })
+        .then(response => {
+            if (response.ok || response.redirected) {
+                // Success - close modal and reload page to show updated receipt status
+                closeInstallmentReceiptModal();
+                window.location.reload();
+            } else {
+                throw new Error('Upload failed');
+            }
+        })
+        .catch(error => {
+            console.error('Upload error:', error);
+            alert('Failed to upload receipt. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        });
+    });
 }
 
 function closeInstallmentReceiptModal() {
