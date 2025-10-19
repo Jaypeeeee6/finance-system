@@ -182,10 +182,10 @@
                                 </p>
                                 <p style="margin-bottom: 0.5rem; color: #666;">
                                     <strong>Assigned Manager:</strong> 
-                                    {% if request.user and request.user.manager %}
-                                        {{ request.user.manager.name }}
+                                    {% if (user.role == 'Department Manager' and user.department == request.department) or (user.role == 'Operation Manager' and request.department == 'Operation') %}
+                                        {{ user.name }} (You)
                                     {% else %}
-                                        Not assigned
+                                        Department Manager for {{ request.department }}
                                     {% endif %}
                                 </p>
                                 <p style="margin-bottom: 0; color: #666;">
@@ -202,8 +202,8 @@
                     </div>
                 </div>
 
-                <!-- Manager approval form (only visible to the assigned manager) -->
-                {% if request.user and request.user.manager_id == user.user_id %}
+                <!-- Manager approval form (only visible to managers of the same department) -->
+                {% if (user.role == 'Department Manager' and user.department == request.department) or (user.role == 'Operation Manager' and request.department == 'Operation') %}
                     <div class="card">
                         <div class="card-header" style="background: #4caf50; color: white;">
                             <h4><i class="fas fa-check-circle"></i> Your Approval Required</h4>
