@@ -67,6 +67,7 @@ class PaymentRequest(db.Model):
     proof_required = db.Column(db.Boolean, default=False)  # Whether proof is required
     proof_of_payment = db.Column(db.String(255))  # File path for proof uploaded by department
     approval_date = db.Column(db.Date)  # Date when request was approved
+    payment_date = db.Column(db.Date)  # Date when payment is scheduled
     manager_approval_date = db.Column(db.Date)  # Date when manager approved
     manager_rejection_date = db.Column(db.Date)  # Date when manager rejected
     rejection_reason = db.Column(db.Text)  # Reason for manager rejection

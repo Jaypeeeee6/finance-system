@@ -180,6 +180,11 @@ document.querySelectorAll('input[type="file"]').forEach(input => {
 
 // ==================== FORM SUBMIT LOADING STATE ====================
 document.querySelectorAll('form').forEach(form => {
+    // Skip manager approval forms as they have their own validation
+    if (form.action && form.action.includes('manager_approve')) {
+        return;
+    }
+    
     form.addEventListener('submit', function(e) {
         const submitBtn = this.querySelector('button[type="submit"]');
         if (submitBtn && !this.hasAttribute('data-no-loading')) {

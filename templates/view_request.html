@@ -19,12 +19,12 @@
                     Submit Request
                 </div>
             </li>
-            <li class="step-tab {% if request.status in ['Pending Finance Approval', 'Approved', 'Send Proof', 'Received Proof', 'Action Required', 'Rejected by Manager'] %}completed{% elif request.status == 'Pending Manager Approval' %}active{% else %}disabled{% endif %}" data-step="manager">
+            <li class="step-tab {% if request.status in ['Pending Finance Approval', 'Approved', 'Payment Pending', 'Send Proof', 'Received Proof', 'Action Required', 'Rejected by Manager'] %}completed{% elif request.status == 'Pending Manager Approval' %}active{% else %}disabled{% endif %}" data-step="manager">
                 <div class="step-tab-content">
                     Manager Approval
                 </div>
             </li>
-            <li class="step-tab {% if request.status in ['Approved', 'Send Proof', 'Received Proof', 'Action Required'] %}completed{% elif request.status == 'Pending Finance Approval' %}active{% else %}disabled{% endif %}" data-step="finance">
+            <li class="step-tab {% if request.status in ['Approved', 'Payment Pending', 'Send Proof', 'Received Proof', 'Action Required'] %}completed{% elif request.status == 'Pending Finance Approval' %}active{% else %}disabled{% endif %}" data-step="finance">
                 <div class="step-tab-content">
                     Finance Admin Approval
                 </div>
@@ -122,7 +122,7 @@
         <div class="step-content" id="step-manager">
             <h3><i class="fas fa-user-tie"></i> Manager Approval</h3>
             
-            {% if request.status in ['Pending Finance Approval', 'Approved', 'Send Proof', 'Received Proof', 'Action Required', 'Rejected by Manager'] %}
+            {% if request.status in ['Pending Finance Approval', 'Approved', 'Payment Pending', 'Send Proof', 'Received Proof', 'Action Required', 'Rejected by Manager'] %}
                 <div class="admin-mode-warning">
                     <i class="fas fa-check-circle"></i>
                     <span>Manager Approval: Completed</span>
@@ -162,8 +162,8 @@
                             </div>
                             {% endif %}
                             <div class="form-group">
-                                <label>Approval Date</label>
-                                <input type="text" value="{{ request.approval_date.strftime('%Y-%m-%d') if request.approval_date else 'N/A' }}" readonly style="background: #f5f5f5;">
+                                <label>Manager Approval Date</label>
+                                <input type="text" value="{{ request.manager_approval_date.strftime('%Y-%m-%d') if request.manager_approval_date else 'N/A' }}" readonly style="background: #f5f5f5;">
                             </div>
                         {% endif %}
                     </div>
@@ -212,8 +212,8 @@
                         <div class="card-body">
                             <form method="POST" action="{{ url_for('manager_approve_request', request_id=request.request_id) }}">
                                 <div class="form-group">
-                                    <label for="approval_status">Set Status *</label>
-                                    <select name="approval_status" id="approval_status" required onchange="toggleApprovalFields()">
+                                    <label for="manager_approval_status">Set Status *</label>
+                                    <select name="approval_status" id="manager_approval_status" required onchange="toggleManagerApprovalFields()">
                                         <option value="">-- Select Status --</option>
                                         <option value="approve">Approve</option>
                                         <option value="action_required">Action Required</option>
@@ -221,30 +221,30 @@
                                     </select>
                                 </div>
                                 
-                                <div id="approve_fields" style="display: none;">
+                                <div id="manager_approve_fields" style="display: none;">
                                     <div class="form-group">
                                         <label>
-                                            <input type="checkbox" name="is_urgent" id="is_urgent">
+                                            <input type="checkbox" name="is_urgent" id="manager_is_urgent">
                                             Mark as Urgent
                                         </label>
                                     </div>
                                     <div class="form-group">
-                                        <label for="approval_reason">Reason (Optional)</label>
-                                        <textarea name="approval_reason" id="approval_reason" rows="3" placeholder="Add any notes about this approval..."></textarea>
+                                        <label for="manager_approval_reason">Reason (Optional)</label>
+                                        <textarea name="approval_reason" id="manager_approval_reason" rows="3" placeholder="Add any notes about this approval..."></textarea>
                                     </div>
                                 </div>
                                 
-                                <div id="action_required_fields" style="display: none;">
+                                <div id="manager_action_required_fields" style="display: none;">
                                     <div class="form-group">
-                                        <label for="action_reason">Reason for Action Required *</label>
-                                        <textarea name="action_reason" id="action_reason" rows="3" required placeholder="Explain what action is required from the requestor..."></textarea>
+                                        <label for="manager_action_reason">Reason for Action Required *</label>
+                                        <textarea name="action_reason" id="manager_action_reason" rows="3" placeholder="Explain what action is required from the requestor..."></textarea>
                                     </div>
                                 </div>
                                 
-                                <div id="reject_fields" style="display: none;">
+                                <div id="manager_reject_fields" style="display: none;">
                                     <div class="form-group">
-                                        <label for="rejection_reason">Reason for Rejection *</label>
-                                        <textarea name="rejection_reason" id="rejection_reason" rows="3" required placeholder="Please provide a clear reason for rejecting this request..."></textarea>
+                                        <label for="manager_rejection_reason">Reason for Rejection *</label>
+                                        <textarea name="rejection_reason" id="manager_rejection_reason" rows="3" placeholder="Please provide a clear reason for rejecting this request..."></textarea>
                                     </div>
                                 </div>
                                 
@@ -264,7 +264,7 @@
         <div class="step-content" id="step-finance">
             <h3><i class="fas fa-dollar-sign"></i> Finance Admin Approval</h3>
             
-            {% if request.status in ['Approved', 'Send Proof', 'Received Proof', 'Action Required'] %}
+            {% if request.status in ['Approved', 'Payment Pending', 'Send Proof', 'Received Proof', 'Action Required'] %}
                 <div class="admin-mode-warning">
                     <i class="fas fa-check-circle"></i>
                     <span>Finance Admin Approval: Completed</span>
@@ -324,8 +324,8 @@
                         <div class="card-body">
                             <form method="POST" action="{{ url_for('approve_request', request_id=request.request_id) }}" enctype="multipart/form-data">
                                 <div class="form-group">
-                                    <label for="approval_status">Set Status *</label>
-                                    <select name="approval_status" id="approval_status" required onchange="toggleFinanceApprovalFields()">
+                                    <label for="finance_approval_status">Set Status *</label>
+                                    <select name="approval_status" id="finance_approval_status" required onchange="toggleFinanceApprovalFields()">
                                         <option value="">-- Select Status --</option>
                                         <option value="approve">Approve</option>
                                         <option value="action_required">Action Required</option>
@@ -335,10 +335,10 @@
                                     </select>
                                 </div>
                                 
-                                <div id="approve_fields">
+                                <div id="finance_approve_fields">
                                     <div class="form-group">
-                                        <label for="approver">Select Approver *</label>
-                                        <select name="approver" id="approver" required>
+                                        <label for="finance_approver">Select Approver *</label>
+                                        <select name="approver" id="finance_approver" required>
                                             <option value="">-- Select Approver --</option>
                                             <option value="Mahmoud">Mahmoud</option>
                                             <option value="Abdulaziz">Abdulaziz</option>
@@ -346,33 +346,44 @@
                                     </div>
                                     
                                     <div class="form-group">
-                                        <label for="receipt">Upload Receipt *</label>
-                                        <input type="file" name="receipt" id="receipt" accept=".jpg,.jpeg,.png,.pdf" required>
+                                        <label for="payment_date">Payment Date *</label>
+                                        <input type="date" name="payment_date" id="payment_date" required>
+                                        <small style="color: #666; margin-top: 5px; display: block;">
+                                            If payment date is not today, status will be "Payment Pending"
+                                        </small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="finance_receipt">Upload Receipt</label>
+                                        <input type="file" name="receipt" id="finance_receipt" accept=".jpg,.jpeg,.png,.pdf">
+                                        <small style="color: #666; margin-top: 5px; display: block;">
+                                            Optional - only required if marking as "Completed"
+                                        </small>
                                     </div>
                                     
                                     <div class="form-group checkbox-group">
                                         <label>
-                                            <input type="checkbox" name="proof_required" id="proof_required">
+                                            <input type="checkbox" name="proof_required" id="finance_proof_required">
                                             <span>Require Proof of Payment from Department</span>
                                         </label>
                                         <small style="color: #666; margin-left: 25px; display: block; margin-top: 5px;">
                                             ✓ If checked: Status → "Send Proof" (Department uploads proof → Admin final approval)<br>
-                                            ✗ If not checked: Status → "Approved" (Directly approved)
+                                            ✗ If not checked: Status → "Approved" or "Payment Pending" (Based on payment date)
                                         </small>
                                     </div>
                                 </div>
                                 
-                                <div id="action_required_fields" style="display: none;">
+                                <div id="finance_action_required_fields" style="display: none;">
                                     <div class="form-group">
-                                        <label for="action_reason">Reason for Action Required *</label>
-                                        <textarea name="action_reason" id="action_reason" rows="3" required placeholder="Explain what action is required from the requestor..."></textarea>
+                                        <label for="finance_action_reason">Reason for Action Required *</label>
+                                        <textarea name="action_reason" id="finance_action_reason" rows="3" placeholder="Explain what action is required from the requestor..."></textarea>
                                     </div>
                                 </div>
                                 
-                                <div id="reject_fields" style="display: none;">
+                                <div id="finance_reject_fields" style="display: none;">
                                     <div class="form-group">
-                                        <label for="rejection_reason">Reason for Rejection *</label>
-                                        <textarea name="rejection_reason" id="rejection_reason" rows="3" required placeholder="Please provide a clear reason for rejecting this request..."></textarea>
+                                        <label for="finance_rejection_reason">Reason for Rejection *</label>
+                                        <textarea name="rejection_reason" id="finance_rejection_reason" rows="3" placeholder="Please provide a clear reason for rejecting this request..."></textarea>
                                     </div>
                                 </div>
                                 
@@ -390,6 +401,62 @@
                         Waiting for Finance Admin approval. Only Finance Admins can approve this request.
                     </div>
                 {% endif %}
+            {% endif %}
+            
+            <!-- Post-approval editing section for Finance Admin -->
+            {% if user.role == 'Finance Admin' and request.status in ['Approved', 'Payment Pending', 'Send Proof', 'Received Proof'] %}
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div class="card-header" style="background: #17a2b8; color: white;">
+                        <h4><i class="fas fa-edit"></i> Post-Approval Actions</h4>
+                        <p style="margin: 0; opacity: 0.9;">Manage this approved request</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Upload Additional Files</h5>
+                                <form method="POST" action="{{ url_for('upload_additional_files', request_id=request.request_id) }}" enctype="multipart/form-data">
+                                    <div class="form-group">
+                                        <label for="additional_files">Select Files</label>
+                                        <input type="file" name="additional_files" id="additional_files" multiple accept=".jpg,.jpeg,.png,.pdf">
+                                    </div>
+                                    <button type="submit" class="btn btn-info">
+                                        <i class="fas fa-upload"></i> Upload Files
+                                    </button>
+                                </form>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h5>Payment Actions</h5>
+                                {% if request.status == 'Payment Pending' %}
+                                    <form method="POST" action="{{ url_for('mark_as_paid', request_id=request.request_id) }}" style="display: inline;">
+                                        <button type="submit" class="btn btn-success" onclick="return confirm('Mark this request as paid?')">
+                                            <i class="fas fa-check-circle"></i> Mark as Paid
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                
+                                <form method="POST" action="{{ url_for('close_request', request_id=request.request_id) }}" style="display: inline; margin-left: 10px;">
+                                    <button type="submit" class="btn btn-warning" onclick="return confirm('Close this request? This action cannot be undone.')">
+                                        <i class="fas fa-lock"></i> Close Request
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        
+                        {% if request.payment_date %}
+                        <div class="row" style="margin-top: 1rem;">
+                            <div class="col-12">
+                                <div class="alert alert-info">
+                                    <strong>Payment Date:</strong> {{ request.payment_date.strftime('%Y-%m-%d') }}
+                                    {% if request.status == 'Payment Pending' %}
+                                        <span class="badge badge-warning">Pending Payment</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
             {% endif %}
         </div>
     </div>
@@ -429,7 +496,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (requestStatus === 'Pending Manager Approval') {
         initialStep = 'manager';
-    } else if (requestStatus in ['Pending Finance Approval', 'Approved', 'Send Proof', 'Received Proof', 'Action Required', 'Rejected by Manager']) {
+    } else if (requestStatus in ['Pending Finance Approval', 'Approved', 'Payment Pending', 'Send Proof', 'Received Proof', 'Action Required', 'Rejected by Manager']) {
         initialStep = 'finance';
     }
     
@@ -444,48 +511,136 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Toggle approval fields for manager approval
-function toggleApprovalFields() {
-    const status = document.getElementById('approval_status').value;
-    const approveFields = document.getElementById('approve_fields');
-    const actionRequiredFields = document.getElementById('action_required_fields');
-    const rejectFields = document.getElementById('reject_fields');
+function toggleManagerApprovalFields() {
+    const status = document.getElementById('manager_approval_status').value;
+    const approveFields = document.getElementById('manager_approve_fields');
+    const actionRequiredFields = document.getElementById('manager_action_required_fields');
+    const rejectFields = document.getElementById('manager_reject_fields');
+    const actionReasonField = document.getElementById('manager_action_reason');
+    const rejectionReasonField = document.getElementById('manager_rejection_reason');
     
-    // Hide all fields first
+    // Hide all fields first and remove required attributes
     approveFields.style.display = 'none';
     actionRequiredFields.style.display = 'none';
     rejectFields.style.display = 'none';
+    actionReasonField.removeAttribute('required');
+    rejectionReasonField.removeAttribute('required');
     
-    // Show relevant fields based on selection
+    // Show relevant fields based on selection and add required attributes
     if (status === 'approve') {
         approveFields.style.display = 'block';
     } else if (status === 'action_required') {
         actionRequiredFields.style.display = 'block';
+        actionReasonField.setAttribute('required', 'required');
     } else if (status === 'reject') {
         rejectFields.style.display = 'block';
+        rejectionReasonField.setAttribute('required', 'required');
     }
 }
 
 // Toggle approval fields for finance approval
 function toggleFinanceApprovalFields() {
-    const status = document.getElementById('approval_status').value;
-    const approveFields = document.getElementById('approve_fields');
-    const actionRequiredFields = document.getElementById('action_required_fields');
-    const rejectFields = document.getElementById('reject_fields');
+    const status = document.getElementById('finance_approval_status').value;
+    const approveFields = document.getElementById('finance_approve_fields');
+    const actionRequiredFields = document.getElementById('finance_action_required_fields');
+    const rejectFields = document.getElementById('finance_reject_fields');
+    const actionReasonField = document.getElementById('finance_action_reason');
+    const rejectionReasonField = document.getElementById('finance_rejection_reason');
+    const receiptField = document.getElementById('finance_receipt');
     
-    // Hide all fields first
+    // Hide all fields first and remove required attributes
     approveFields.style.display = 'none';
     actionRequiredFields.style.display = 'none';
     rejectFields.style.display = 'none';
+    actionReasonField.removeAttribute('required');
+    rejectionReasonField.removeAttribute('required');
+    receiptField.removeAttribute('required');
     
-    // Show relevant fields based on selection
+    // Reset receipt label first
+    const receiptLabel = document.querySelector('label[for="finance_receipt"]');
+    if (receiptLabel) {
+        receiptLabel.innerHTML = 'Upload Receipt';
+    }
+    
+    // Show relevant fields based on selection and add required attributes
     if (status === 'approve') {
         approveFields.style.display = 'block';
     } else if (status === 'action_required') {
         actionRequiredFields.style.display = 'block';
+        actionReasonField.setAttribute('required', 'required');
     } else if (status === 'reject') {
         rejectFields.style.display = 'block';
+        rejectionReasonField.setAttribute('required', 'required');
+    } else if (status === 'completed') {
+        approveFields.style.display = 'block';
+        receiptField.setAttribute('required', 'required');
+        // Update receipt field label to indicate it's required
+        if (receiptLabel) {
+            receiptLabel.innerHTML = 'Upload Receipt *';
+        }
     }
 }
+
+// Set default payment date to today
+document.addEventListener('DOMContentLoaded', function() {
+    const paymentDateField = document.getElementById('payment_date');
+    if (paymentDateField) {
+        const today = new Date().toISOString().split('T')[0];
+        paymentDateField.value = today;
+    }
+});
+
+// Debug form submission
+document.addEventListener('DOMContentLoaded', function() {
+    const managerForm = document.querySelector('form[action*="manager_approve"]');
+    if (managerForm) {
+        console.log('Manager approval form found:', managerForm);
+        
+        managerForm.addEventListener('submit', function(e) {
+            console.log('Form submission triggered');
+            console.log('Form action:', this.action);
+            console.log('Form method:', this.method);
+            
+            // Check if required fields are filled
+            const approvalStatus = document.getElementById('manager_approval_status').value;
+            console.log('Approval status:', approvalStatus);
+            
+            if (!approvalStatus) {
+                e.preventDefault();
+                alert('Please select an approval status');
+                return false;
+            }
+            
+            // Check for required fields based on status
+            if (approvalStatus === 'action_required') {
+                const actionReason = document.getElementById('manager_action_reason').value;
+                if (!actionReason.trim()) {
+                    e.preventDefault();
+                    alert('Please provide a reason for action required');
+                    return false;
+                }
+            }
+            
+            if (approvalStatus === 'reject') {
+                const rejectionReason = document.getElementById('manager_rejection_reason').value;
+                if (!rejectionReason.trim()) {
+                    e.preventDefault();
+                    alert('Please provide a reason for rejection');
+                    return false;
+                }
+            }
+            
+            console.log('Form validation passed, submitting...');
+            
+            // Show loading state
+            const submitBtn = this.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            }
+        });
+    }
+});
 
 // Update notification count when viewing a request
 document.addEventListener('DOMContentLoaded', function() {
@@ -521,3 +676,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+

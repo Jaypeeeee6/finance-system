@@ -1309,6 +1309,11 @@ def approve_request(request_id):
     if approval_status == 'approve':
         approver = request.form.get('approver')
         proof_required = request.form.get('proof_required') == 'on'
+        payment_date_str = request.form.get('payment_date')
+        
+        # Parse payment date
+        payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date()
+        today = datetime.utcnow().date()
         
         # Handle receipt upload
         receipt_file = request.files.get('receipt')
@@ -1323,6 +1328,7 @@ def approve_request(request_id):
         
         req.approver = approver
         req.proof_required = proof_required
+        req.payment_date = payment_date
         req.updated_at = datetime.utcnow()
         
         if proof_required:
@@ -1338,16 +1344,21 @@ def approve_request(request_id):
                 'approver': approver
             })
         else:
-            # No proof required - directly approved
-            req.status = 'Approved'
-            req.approval_date = datetime.utcnow().date()  # Set approval date
-            flash(f'Payment request #{request_id} has been approved.', 'success')
-            log_action(f"Approved payment request #{request_id} - No proof required")
+            # No proof required - check payment date
+            req.approval_date = today
+            if payment_date == today:
+                req.status = 'Approved'
+                flash(f'Payment request #{request_id} has been approved.', 'success')
+                log_action(f"Approved payment request #{request_id} - No proof required")
+            else:
+                req.status = 'Payment Pending'
+                flash(f'Payment request #{request_id} approved. Payment scheduled for {payment_date_str}.', 'success')
+                log_action(f"Approved payment request #{request_id} - Payment pending until {payment_date_str}")
             
             # Emit real-time update
             socketio.emit('request_updated', {
                 'request_id': request_id,
-                'status': 'Approved',
+                'status': req.status,
                 'approver': approver
             })
     
@@ -1437,14 +1448,48 @@ def approve_request(request_id):
         flash(f'Payment request #{request_id} has been rejected by Finance.', 'success')
     
     elif approval_status == 'completed':
-        # Mark as completed
+        # Mark as completed - requires receipt upload
+        approver = request.form.get('approver')
+        payment_date_str = request.form.get('payment_date')
+        
+        # Parse payment date
+        payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date()
+        today = datetime.utcnow().date()
+        
+        # Handle receipt upload (required for completed status)
+        receipt_file = request.files.get('receipt')
+        if not receipt_file or not allowed_file(receipt_file.filename):
+            flash('Receipt upload is required when marking as completed.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        # Save receipt
+        filename = secure_filename(receipt_file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{timestamp}_{filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        receipt_file.save(filepath)
+        req.receipt_path = filename
+        
+        # Set request details
+        req.approver = approver
+        req.payment_date = payment_date
+        req.approval_date = today
         req.status = 'Completed'
-        req.completion_date = datetime.utcnow().date()
+        req.completion_date = today
         req.updated_at = datetime.utcnow()
         
         db.session.commit()
         
-        log_action(f"Finance admin marked payment request #{request_id} as completed")
+        log_action(f"Finance admin completed payment request #{request_id}")
+        
+        # Notify the requestor
+        create_notification(
+            user_id=req.user_id,
+            title="Payment Request Completed",
+            message=f"Your payment request #{request_id} has been completed by Finance.",
+            notification_type="request_completed",
+            request_id=request_id
+        )
         
         # Emit real-time update
         socketio.emit('request_updated', {
@@ -1460,6 +1505,124 @@ def approve_request(request_id):
         return redirect(url_for('view_request', request_id=request_id))
     
     db.session.commit()
+    return redirect(url_for('view_request', request_id=request_id))
+
+
+@app.route('/request/<int:request_id>/upload_additional_files', methods=['POST'])
+@login_required
+@role_required('Finance Admin')
+def upload_additional_files(request_id):
+    """Upload additional files to an approved request"""
+    req = PaymentRequest.query.get_or_404(request_id)
+    
+    # Check if request is in correct status for additional file upload
+    if req.status not in ['Approved', 'Payment Pending', 'Send Proof', 'Received Proof']:
+        flash('This request is not in a state that allows file uploads.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Handle file uploads
+    files = request.files.getlist('additional_files')
+    uploaded_files = []
+    
+    for file in files:
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            # Add timestamp to filename to avoid conflicts
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"additional_{timestamp}_{filename}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            uploaded_files.append(filename)
+    
+    if uploaded_files:
+        # Store additional files (you might want to add a new field for this)
+        # For now, we'll just log the action
+        log_action(f"Finance admin uploaded {len(uploaded_files)} additional files to request #{request_id}")
+        flash(f'Successfully uploaded {len(uploaded_files)} additional files.', 'success')
+    else:
+        flash('No valid files were uploaded.', 'warning')
+    
+    return redirect(url_for('view_request', request_id=request_id))
+
+
+@app.route('/request/<int:request_id>/mark_as_paid', methods=['POST'])
+@login_required
+@role_required('Finance Admin')
+def mark_as_paid(request_id):
+    """Mark a payment pending request as paid"""
+    req = PaymentRequest.query.get_or_404(request_id)
+    
+    # Check if request is in correct status
+    if req.status != 'Payment Pending':
+        flash('This request is not in Payment Pending status.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Mark as paid
+    req.status = 'Approved'
+    req.updated_at = datetime.utcnow()
+    
+    db.session.commit()
+    
+    log_action(f"Finance admin marked payment request #{request_id} as paid")
+    
+    # Notify the requestor
+    create_notification(
+        user_id=req.user_id,
+        title="Payment Completed",
+        message=f"Your payment request #{request_id} has been paid.",
+        notification_type="payment_completed",
+        request_id=request_id
+    )
+    
+    # Emit real-time update
+    socketio.emit('request_updated', {
+        'request_id': request_id,
+        'status': 'Approved',
+        'paid': True
+    })
+    
+    flash(f'Payment request #{request_id} has been marked as paid.', 'success')
+    return redirect(url_for('view_request', request_id=request_id))
+
+
+@app.route('/request/<int:request_id>/close', methods=['POST'])
+@login_required
+@role_required('Finance Admin')
+def close_request(request_id):
+    """Close a request (mark as completed)"""
+    req = PaymentRequest.query.get_or_404(request_id)
+    
+    # Check if request is in correct status
+    if req.status not in ['Approved', 'Payment Pending', 'Send Proof', 'Received Proof']:
+        flash('This request cannot be closed in its current status.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Close the request
+    req.status = 'Completed'
+    req.completion_date = datetime.utcnow().date()
+    req.updated_at = datetime.utcnow()
+    
+    db.session.commit()
+    
+    log_action(f"Finance admin closed payment request #{request_id}")
+    
+    # Notify the requestor
+    create_notification(
+        user_id=req.user_id,
+        title="Request Completed",
+        message=f"Your payment request #{request_id} has been completed and closed.",
+        notification_type="request_completed",
+        request_id=request_id
+    )
+    
+    # Emit real-time update
+    socketio.emit('request_updated', {
+        'request_id': request_id,
+        'status': 'Completed',
+        'completed': True
+    })
+    
+    flash(f'Payment request #{request_id} has been closed.', 'success')
     return redirect(url_for('view_request', request_id=request_id))
 
 
