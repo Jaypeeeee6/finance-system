@@ -649,20 +649,16 @@ def department_dashboard():
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
     
-    # For Department Managers and Operation Managers, show requests that need their approval
+    # For Department Managers and Operation Managers, show requests from their departments
     if current_user.role in ['Department Manager', 'Operation Manager']:
-        # Get requests from their department that need manager approval
+        # Get requests from their department(s) (including completed/paid ones)
         if current_user.role == 'Operation Manager':
-            # Operation Manager can see Operation department requests
-            query = PaymentRequest.query.filter(
-                PaymentRequest.department == 'Operation',
-                PaymentRequest.status == 'Pending Manager Approval'
-            )
+            # Operation Manager can see ALL departments
+            query = PaymentRequest.query
         else:
-            # Department Manager can see their department's requests
+            # Department Manager can see ALL their department's requests
             query = PaymentRequest.query.filter(
-                PaymentRequest.department == current_user.department,
-                PaymentRequest.status == 'Pending Manager Approval'
+                PaymentRequest.department == current_user.department
             )
         
         requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
@@ -782,8 +778,8 @@ def gm_dashboard():
         per_page = 10
     
     # Build query with optional department filter
-    # GM should not see requests that are still pending manager approval
-    query = PaymentRequest.query.filter(PaymentRequest.status != 'Pending Manager Approval')
+    # GM can see ALL requests from ALL departments
+    query = PaymentRequest.query
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     
@@ -792,8 +788,8 @@ def gm_dashboard():
         page=page, per_page=per_page, error_out=False
     )
     
-    # Calculate statistics (only Approved and Pending, excluding manager pending)
-    all_requests = PaymentRequest.query.filter(PaymentRequest.status != 'Pending Manager Approval').all()
+    # Calculate statistics (all requests from all departments)
+    all_requests = PaymentRequest.query.all()
     total_requests = len(all_requests)
     approved = len([r for r in all_requests if r.status == 'Approved'])
     pending = len([r for r in all_requests if r.status == 'Pending'])
@@ -930,8 +926,8 @@ def operation_dashboard():
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
     
-    # Build query with optional status and department filters - Operation Manager sees only Maintenance, Operation, and Project Department
-    query = PaymentRequest.query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project Department']))
+    # Build query with optional status and department filters - Operation Manager sees ALL departments
+    query = PaymentRequest.query
     
     # If no specific status filter, prioritize showing requests that need manager approval
     if not status_filter:
@@ -1299,7 +1295,7 @@ def approve_request(request_id):
     req = PaymentRequest.query.get_or_404(request_id)
     
     # Check if request is in correct status for Finance approval
-    if req.status not in ['Pending', 'Pending Finance Approval']:
+    if req.status not in ['Pending', 'Pending Finance Approval', 'Payment Pending', 'Proof Sent']:
         flash('This request is not ready for Finance approval.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
@@ -1315,103 +1311,139 @@ def approve_request(request_id):
         payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date()
         today = datetime.utcnow().date()
         
-        # Handle receipt upload
-        receipt_file = request.files.get('receipt')
-        if receipt_file and allowed_file(receipt_file.filename):
-            filename = secure_filename(receipt_file.filename)
-            # Add timestamp to filename to avoid conflicts
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f"{timestamp}_{filename}"
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            receipt_file.save(filepath)
-            req.receipt_path = filename
-        
         req.approver = approver
         req.proof_required = proof_required
         req.payment_date = payment_date
         req.updated_at = datetime.utcnow()
         
         if proof_required:
-            # Proof is required - set status to Send Proof
-            req.status = 'Send Proof'
+            # Proof is required - set status to Proof Pending
+            req.status = 'Proof Pending'
             flash(f'Payment request #{request_id} approved. Waiting for proof of payment from department.', 'info')
             log_action(f"Approved payment request #{request_id} - Proof required")
             
-            # Emit real-time update
-            socketio.emit('request_updated', {
-                'request_id': request_id,
-                'status': 'Send Proof',
-                'approver': approver
-            })
-        else:
-            # No proof required - check payment date
-            req.approval_date = today
-            if payment_date == today:
-                req.status = 'Approved'
-                flash(f'Payment request #{request_id} has been approved.', 'success')
-                log_action(f"Approved payment request #{request_id} - No proof required")
-            else:
-                req.status = 'Payment Pending'
-                flash(f'Payment request #{request_id} approved. Payment scheduled for {payment_date_str}.', 'success')
-                log_action(f"Approved payment request #{request_id} - Payment pending until {payment_date_str}")
+            # Notify the requestor
+            create_notification(
+                user_id=req.user_id,
+                title="Proof of Payment Required",
+                message=f"Your payment request #{request_id} has been approved. Please upload proof of payment.",
+                notification_type="proof_required",
+                request_id=request_id
+            )
             
             # Emit real-time update
             socketio.emit('request_updated', {
                 'request_id': request_id,
-                'status': req.status,
+                'status': 'Proof Pending',
+                'approver': approver
+            })
+        else:
+            # No proof required - set status to Payment Pending
+            req.status = 'Payment Pending'
+            req.approval_date = today
+            flash(f'Payment request #{request_id} approved. Status set to Payment Pending.', 'success')
+            log_action(f"Approved payment request #{request_id} - No proof required")
+            
+            # Emit real-time update
+            socketio.emit('request_updated', {
+                'request_id': request_id,
+                'status': 'Payment Pending',
                 'approver': approver
             })
     
-    elif approval_status == 'action_required':
-        # Finance admin requires action - send back to requestor
-        action_reason = request.form.get('action_reason', '').strip()
-        if not action_reason:
-            flash('Please provide a reason for action required.', 'error')
+    
+    elif approval_status == 'paid':
+        # Mark as paid - requires receipt upload
+        receipt_file = request.files.get('receipt')
+        if not receipt_file or not allowed_file(receipt_file.filename):
+            flash('Receipt upload is required to mark as paid.', 'error')
             return redirect(url_for('view_request', request_id=request_id))
         
-        req.status = 'Action Required'
-        req.reason_pending = action_reason
+        # Handle receipt upload
+        filename = secure_filename(receipt_file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{timestamp}_{filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        receipt_file.save(filepath)
+        req.receipt_path = filename
+        
+        req.status = 'Paid'
+        req.approval_date = datetime.utcnow().date()
         req.updated_at = datetime.utcnow()
         
         db.session.commit()
         
-        log_action(f"Finance admin marked payment request #{request_id} as action required - Reason: {action_reason}")
+        log_action(f"Finance admin marked payment request #{request_id} as paid")
+        
+        # Emit real-time update
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'Paid',
+            'paid': True
+        })
+        
+        flash(f'Payment request #{request_id} has been marked as paid.', 'success')
+    
+    elif approval_status == 'proof_sent_approve':
+        # Approve proof sent by requestor
+        req.status = 'Payment Pending'
+        req.approval_date = datetime.utcnow().date()
+        req.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        log_action(f"Finance admin approved proof for payment request #{request_id}")
         
         # Notify the requestor
         create_notification(
             user_id=req.user_id,
-            title="Action Required on Payment Request",
-            message=f"Your payment request #{request_id} requires additional action from Finance. Please review the feedback and resubmit.",
-            notification_type="action_required",
+            title="Proof Approved",
+            message=f"Your proof for payment request #{request_id} has been approved. Status updated to Payment Pending.",
+            notification_type="proof_approved",
             request_id=request_id
         )
         
         # Emit real-time update
         socketio.emit('request_updated', {
             'request_id': request_id,
-            'status': 'Action Required',
-            'action_required': True
+            'status': 'Payment Pending',
+            'proof_approved': True
         })
         
-        flash(f'Payment request #{request_id} has been marked as action required. Requestor has been notified.', 'success')
+        flash(f'Proof for payment request #{request_id} has been approved.', 'success')
     
-    elif approval_status == 'payment_pending':
-        # Mark as payment pending
-        req.status = 'Payment Pending'
+    elif approval_status == 'proof_sent_reject':
+        # Reject proof sent by requestor
+        rejection_reason = request.form.get('rejection_reason', '').strip()
+        if not rejection_reason:
+            flash('Please provide a reason for rejection.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        req.status = 'Proof Pending'  # Go back to Proof Pending
+        req.rejection_reason = rejection_reason
         req.updated_at = datetime.utcnow()
         
         db.session.commit()
         
-        log_action(f"Finance admin marked payment request #{request_id} as payment pending")
+        log_action(f"Finance admin rejected proof for payment request #{request_id} - Reason: {rejection_reason}")
+        
+        # Notify the requestor
+        create_notification(
+            user_id=req.user_id,
+            title="Proof Rejected",
+            message=f"Your proof for payment request #{request_id} has been rejected. Please review the feedback and resubmit.",
+            notification_type="proof_rejected",
+            request_id=request_id
+        )
         
         # Emit real-time update
         socketio.emit('request_updated', {
             'request_id': request_id,
-            'status': 'Payment Pending',
-            'payment_pending': True
+            'status': 'Proof Pending',
+            'proof_rejected': True
         })
         
-        flash(f'Payment request #{request_id} has been marked as payment pending.', 'success')
+        flash(f'Proof for payment request #{request_id} has been rejected.', 'success')
     
     elif approval_status == 'reject':
         # Finance admin rejects - request is rejected
@@ -1447,58 +1479,6 @@ def approve_request(request_id):
         
         flash(f'Payment request #{request_id} has been rejected by Finance.', 'success')
     
-    elif approval_status == 'completed':
-        # Mark as completed - requires receipt upload
-        approver = request.form.get('approver')
-        payment_date_str = request.form.get('payment_date')
-        
-        # Parse payment date
-        payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date()
-        today = datetime.utcnow().date()
-        
-        # Handle receipt upload (required for completed status)
-        receipt_file = request.files.get('receipt')
-        if not receipt_file or not allowed_file(receipt_file.filename):
-            flash('Receipt upload is required when marking as completed.', 'error')
-            return redirect(url_for('view_request', request_id=request_id))
-        
-        # Save receipt
-        filename = secure_filename(receipt_file.filename)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{timestamp}_{filename}"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        receipt_file.save(filepath)
-        req.receipt_path = filename
-        
-        # Set request details
-        req.approver = approver
-        req.payment_date = payment_date
-        req.approval_date = today
-        req.status = 'Completed'
-        req.completion_date = today
-        req.updated_at = datetime.utcnow()
-        
-        db.session.commit()
-        
-        log_action(f"Finance admin completed payment request #{request_id}")
-        
-        # Notify the requestor
-        create_notification(
-            user_id=req.user_id,
-            title="Payment Request Completed",
-            message=f"Your payment request #{request_id} has been completed by Finance.",
-            notification_type="request_completed",
-            request_id=request_id
-        )
-        
-        # Emit real-time update
-        socketio.emit('request_updated', {
-            'request_id': request_id,
-            'status': 'Completed',
-            'completed': True
-        })
-        
-        flash(f'Payment request #{request_id} has been marked as completed.', 'success')
     
     else:
         flash('Invalid approval status selected.', 'error')
@@ -1516,7 +1496,7 @@ def upload_additional_files(request_id):
     req = PaymentRequest.query.get_or_404(request_id)
     
     # Check if request is in correct status for additional file upload
-    if req.status not in ['Approved', 'Payment Pending', 'Send Proof', 'Received Proof']:
+    if req.status not in ['Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid']:
         flash('This request is not in a state that allows file uploads.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
@@ -1593,7 +1573,7 @@ def close_request(request_id):
     req = PaymentRequest.query.get_or_404(request_id)
     
     # Check if request is in correct status
-    if req.status not in ['Approved', 'Payment Pending', 'Send Proof', 'Received Proof']:
+    if req.status not in ['Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid']:
         flash('This request cannot be closed in its current status.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
@@ -1636,25 +1616,25 @@ def mark_pending(request_id):
     reason = request.form.get('reason_pending')
     
     if not reason:
-        flash('Please provide a reason for marking as Action Required.', 'warning')
+        flash('Please provide a reason for marking as pending.', 'warning')
         return redirect(url_for('view_request', request_id=request_id))
     
-    req.status = 'Action Required'
+    req.status = 'Pending'
     req.reason_pending = reason
     req.updated_at = datetime.utcnow()
     
     db.session.commit()
     
-    log_action(f"Marked payment request #{request_id} as Action Required")
+    log_action(f"Marked payment request #{request_id} as pending")
     
-    # Emit real-time update for Action Required status
+    # Emit real-time update for pending status
     socketio.emit('request_updated', {
         'request_id': request_id,
-        'status': 'Action Required',
+        'status': 'Pending',
         'reason': reason
     })
     
-    flash(f'Payment request #{request_id} has been marked as Action Required.', 'info')
+    flash(f'Payment request #{request_id} has been marked as pending.', 'info')
     return redirect(url_for('admin_dashboard'))
 
 
@@ -1669,8 +1649,8 @@ def upload_proof(request_id):
         flash('You can only upload proof for your own requests.', 'error')
         return redirect(url_for('dashboard'))
     
-    # Check if request is in "Send Proof" status
-    if req.status != 'Send Proof':
+    # Check if request is in "Proof Pending" status
+    if req.status != 'Proof Pending':
         flash('This request does not require proof upload.', 'error')
         return redirect(url_for('dashboard'))
     
@@ -1692,21 +1672,29 @@ def upload_proof(request_id):
         
         # Update request
         req.proof_of_payment = filename
-        req.status = 'Received Proof'
+        req.status = 'Proof Sent'
         req.updated_at = datetime.utcnow()
         
         db.session.commit()
         
         log_action(f"Uploaded proof for payment request #{request_id}")
         
+        # Notify Finance Admin
+        notify_finance_and_admin(
+            title="Proof of Payment Uploaded",
+            message=f"Proof of payment has been uploaded for request #{request_id} by {current_user.name}",
+            notification_type="proof_uploaded",
+            request_id=request_id
+        )
+        
         # Emit real-time update
         socketio.emit('request_updated', {
             'request_id': request_id,
-            'status': 'Received Proof',
+            'status': 'Proof Sent',
             'requestor': current_user.username
         })
         
-        flash('Proof of payment uploaded successfully! Waiting for final approval.', 'success')
+        flash('Proof of payment uploaded successfully! Finance will review your proof.', 'success')
     else:
         flash('Invalid file type. Please upload an image (jpg, png, gif, etc.).', 'error')
     
@@ -1720,8 +1708,8 @@ def final_approve_request(request_id):
     """Admin final approval after receiving proof"""
     req = PaymentRequest.query.get_or_404(request_id)
     
-    # Check if request is in "Received Proof" status
-    if req.status != 'Received Proof':
+    # Check if request is in "Proof Sent" status
+    if req.status != 'Proof Sent':
         flash('This request is not ready for final approval.', 'error')
         return redirect(url_for('admin_dashboard'))
     
@@ -1804,38 +1792,6 @@ def manager_approve_request(request_id):
         
         flash(f'Payment request #{request_id} has been approved by manager. Sent to Finance for final approval.', 'success')
         
-    elif approval_status == 'action_required':
-        # Manager requires action - send back to requestor
-        action_reason = request.form.get('action_reason', '').strip()
-        if not action_reason:
-            flash('Please provide a reason for action required.', 'error')
-            return redirect(url_for('view_request', request_id=request_id))
-        
-        req.status = 'Action Required'
-        req.reason_pending = action_reason
-        req.updated_at = datetime.utcnow()
-        
-        db.session.commit()
-        
-        log_action(f"Manager marked payment request #{request_id} as action required - Reason: {action_reason}")
-        
-        # Notify the requestor
-        create_notification(
-            user_id=req.user_id,
-            title="Action Required on Payment Request",
-            message=f"Your payment request #{request_id} requires additional action. Please review the feedback and resubmit.",
-            notification_type="action_required",
-            request_id=request_id
-        )
-        
-        # Emit real-time update
-        socketio.emit('request_updated', {
-            'request_id': request_id,
-            'status': 'Action Required',
-            'action_required': True
-        })
-        
-        flash(f'Payment request #{request_id} has been marked as action required. Requestor has been notified.', 'success')
         
     elif approval_status == 'reject':
         # Manager rejects - request is rejected
@@ -1995,7 +1951,7 @@ def reports():
             query = query.filter(PaymentRequest.approval_date <= datetime.strptime(date_to, '%Y-%m-%d').date())
         requests = query.order_by(PaymentRequest.approval_date.desc()).all()
     else:
-        # For all other statuses (Pending, Send Proof, Received Proof, or All), use submission date
+        # For all other statuses (Pending, Proof Pending, Proof Sent, or All), use submission date
         if date_from:
             query = query.filter(PaymentRequest.date >= datetime.strptime(date_from, '%Y-%m-%d').date())
         if date_to:

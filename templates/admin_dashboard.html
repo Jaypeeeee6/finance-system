@@ -9,46 +9,6 @@
         <p>Review and approve payment requests</p>
     </div>
 
-    <!-- Notifications Section -->
-    {% if notifications %}
-    <div class="card">
-        <div class="card-header">
-            <h2><i class="fas fa-bell"></i> Recent Notifications 
-                {% if unread_count > 0 %}
-                <span class="notification-badge">{{ unread_count }}</span>
-                {% endif %}
-            </h2>
-            <a href="{{ url_for('notifications') }}" class="btn btn-sm btn-primary">View All</a>
-        </div>
-        <div class="card-body">
-            <div class="notifications-preview">
-                {% for notification in notifications[:3] %}
-                <div class="notification-preview {% if not notification.is_read %}unread{% endif %}">
-                    <div class="notification-preview-content">
-                        <h4 class="notification-preview-title">
-                            {% if not notification.is_read %}
-                                <i class="fas fa-circle notification-dot"></i>
-                            {% endif %}
-                            {{ notification.title }}
-                        </h4>
-                        <p class="notification-preview-message">{{ notification.message[:100] }}{% if notification.message|length > 100 %}...{% endif %}</p>
-                        <span class="notification-preview-time">
-                            {% set gst_time = notification.created_at.replace(tzinfo=None) + timedelta(hours=4) %}
-                            {{ gst_time.strftime('%B %d, %Y at %I:%M %p') }}
-                        </span>
-                        {% if notification.request_id %}
-                        <a href="{{ url_for('view_request', request_id=notification.request_id) }}" class="btn btn-sm btn-info">
-                            <i class="fas fa-eye"></i> View Request
-                        </a>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
     <div class="stats-grid">
         <div class="stat-card clickable-stat" data-status="Approved" onclick="filterByStatus('Approved')">
             <div class="stat-icon" style="background: #4CAF50;">
@@ -68,13 +28,40 @@
                 <p>Pending</p>
             </div>
         </div>
-        <div class="stat-card clickable-stat" data-status="Action Required" onclick="filterByStatus('Action Required')">
-            <div class="stat-icon" style="background: #f57c00;">
-                <i class="fas fa-exclamation-triangle"></i>
+        <div class="stat-card clickable-stat" data-status="Payment Pending" onclick="filterByStatus('Payment Pending')">
+            <div class="stat-icon" style="background: #FF9800;">
+                <i class="fas fa-clock"></i>
             </div>
             <div class="stat-info">
-                <h3>{{ requests|selectattr('status', 'equalto', 'Action Required')|list|length }}</h3>
-                <p>Action Required</p>
+                <h3>{{ requests|selectattr('status', 'equalto', 'Payment Pending')|list|length }}</h3>
+                <p>Payment Pending</p>
+            </div>
+        </div>
+        <div class="stat-card clickable-stat" data-status="Proof Pending" onclick="filterByStatus('Proof Pending')">
+            <div class="stat-icon" style="background: #17a2b8;">
+                <i class="fas fa-upload"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ requests|selectattr('status', 'equalto', 'Proof Pending')|list|length }}</h3>
+                <p>Proof Pending</p>
+            </div>
+        </div>
+        <div class="stat-card clickable-stat" data-status="Proof Sent" onclick="filterByStatus('Proof Sent')">
+            <div class="stat-icon" style="background: #28a745;">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ requests|selectattr('status', 'equalto', 'Proof Sent')|list|length }}</h3>
+                <p>Proof Sent</p>
+            </div>
+        </div>
+        <div class="stat-card clickable-stat" data-status="Paid" onclick="filterByStatus('Paid')">
+            <div class="stat-icon" style="background: #6f42c1;">
+                <i class="fas fa-dollar-sign"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ requests|selectattr('status', 'equalto', 'Paid')|list|length }}</h3>
+                <p>Paid</p>
             </div>
         </div>
         <div class="stat-card clickable-stat" data-status="" onclick="filterByStatus('')">
@@ -127,7 +114,6 @@
         </div>
     </div>
     {% endif %}
-
 
     <div class="card">
         <div class="card-header">
@@ -216,12 +202,14 @@
                                 <td>
                                     {% if req.status == 'Approved' %}
                                         <span class="badge badge-success">✓ {{ req.status }}</span>
-                                    {% elif req.status == 'Send Proof' %}
-                                        <span class="badge" style="background: #FF9800; color: white;">📤 {{ req.status }}</span>
-                                    {% elif req.status == 'Received Proof' %}
-                                        <span class="badge" style="background: #2196F3; color: white;">📥 {{ req.status }}</span>
-                                    {% elif req.status == 'Action Required' %}
-                                        <span class="badge" style="background: #f57c00; color: white;">⚠️ {{ req.status }}</span>
+                                    {% elif req.status == 'Payment Pending' %}
+                                        <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
+                                    {% elif req.status == 'Proof Pending' %}
+                                        <span class="badge" style="background: #17a2b8; color: white;">📤 {{ req.status }}</span>
+                                    {% elif req.status == 'Proof Sent' %}
+                                        <span class="badge" style="background: #28a745; color: white;">📥 {{ req.status }}</span>
+                                    {% elif req.status == 'Paid' %}
+                                        <span class="badge" style="background: #6f42c1; color: white;">💰 {{ req.status }}</span>
                                     {% else %}
                                         <span class="badge badge-warning">⏳ {{ req.status }}</span>
                                     {% endif %}
@@ -230,10 +218,11 @@
                                     <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
                                         <i class="fas fa-eye"></i> View
                                     </a>
-                                    {% if req.status == 'Received Proof' %}
-                                    <form method="POST" action="{{ url_for('final_approve_request', request_id=req.request_id) }}" style="display: inline;">
+                                    {% if req.status == 'Proof Sent' %}
+                                    <form method="POST" action="{{ url_for('approve_request', request_id=req.request_id) }}" style="display: inline;">
+                                        <input type="hidden" name="approval_status" value="proof_sent_approve">
                                         <button type="submit" class="btn btn-sm btn-success">
-                                            <i class="fas fa-check-double"></i> Final Approve
+                                            <i class="fas fa-check"></i> Approve Proof
                                         </button>
                                     </form>
                                     {% endif %}

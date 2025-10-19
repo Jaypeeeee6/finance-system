@@ -31,8 +31,8 @@
                         <select name="status" id="status">
                             <option value="">All Statuses</option>
                             <option value="Pending" {% if request.args.get('status') == 'Pending' %}selected{% endif %}>⏳ Pending</option>
-                            <option value="Send Proof" {% if request.args.get('status') == 'Send Proof' %}selected{% endif %}>📤 Send Proof</option>
-                            <option value="Received Proof" {% if request.args.get('status') == 'Received Proof' %}selected{% endif %}>📥 Received Proof</option>
+                            <option value="Proof Pending" {% if request.args.get('status') == 'Proof Pending' %}selected{% endif %}>📤 Proof Pending</option>
+                            <option value="Proof Sent" {% if request.args.get('status') == 'Proof Sent' %}selected{% endif %}>📥 Proof Sent</option>
                             <option value="Approved" {% if request.args.get('status') == 'Approved' %}selected{% endif %}>✓ Approved</option>
                         </select>
                     </div>
@@ -189,12 +189,14 @@
                                 <td>
                                     {% if req.status == 'Approved' %}
                                         <span class="badge badge-success">✓ {{ req.status }}</span>
-                                    {% elif req.status == 'Send Proof' %}
-                                        <span class="badge" style="background: #FF9800; color: white;">📤 {{ req.status }}</span>
-                                    {% elif req.status == 'Received Proof' %}
-                                        <span class="badge" style="background: #2196F3; color: white;">📥 {{ req.status }}</span>
-                                    {% elif req.status == 'Action Required' %}
-                                        <span class="badge" style="background: #f57c00; color: white;">⚠️ {{ req.status }}</span>
+                                    {% elif req.status == 'Payment Pending' %}
+                                        <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
+                                    {% elif req.status == 'Proof Pending' %}
+                                        <span class="badge" style="background: #17a2b8; color: white;">📤 {{ req.status }}</span>
+                                    {% elif req.status == 'Proof Sent' %}
+                                        <span class="badge" style="background: #28a745; color: white;">📥 {{ req.status }}</span>
+                                    {% elif req.status == 'Paid' %}
+                                        <span class="badge" style="background: #6f42c1; color: white;">💰 {{ req.status }}</span>
                                     {% else %}
                                         <span class="badge badge-warning">⏳ {{ req.status }}</span>
                                     {% endif %}

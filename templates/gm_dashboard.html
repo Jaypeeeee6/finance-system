@@ -183,12 +183,14 @@
                                 <td>
                                     {% if req.status == 'Approved' %}
                                         <span class="badge badge-success">✓ {{ req.status }}</span>
-                                    {% elif req.status == 'Send Proof' %}
-                                        <span class="badge" style="background: #FF9800; color: white;">📤 {{ req.status }}</span>
-                                    {% elif req.status == 'Received Proof' %}
-                                        <span class="badge" style="background: #2196F3; color: white;">📥 {{ req.status }}</span>
-                                    {% elif req.status == 'Action Required' %}
-                                        <span class="badge" style="background: #f57c00; color: white;">⚠️ {{ req.status }}</span>
+                                    {% elif req.status == 'Payment Pending' %}
+                                        <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
+                                    {% elif req.status == 'Proof Pending' %}
+                                        <span class="badge" style="background: #17a2b8; color: white;">📤 {{ req.status }}</span>
+                                    {% elif req.status == 'Proof Sent' %}
+                                        <span class="badge" style="background: #28a745; color: white;">📥 {{ req.status }}</span>
+                                    {% elif req.status == 'Paid' %}
+                                        <span class="badge" style="background: #6f42c1; color: white;">💰 {{ req.status }}</span>
                                     {% else %}
                                         <span class="badge badge-warning">⏳ {{ req.status }}</span>
                                     {% endif %}

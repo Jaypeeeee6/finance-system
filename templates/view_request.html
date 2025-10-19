@@ -19,12 +19,12 @@
                     Submit Request
                 </div>
             </li>
-            <li class="step-tab {% if request.status in ['Pending Finance Approval', 'Approved', 'Payment Pending', 'Send Proof', 'Received Proof', 'Action Required', 'Rejected by Manager'] %}completed{% elif request.status == 'Pending Manager Approval' %}active{% else %}disabled{% endif %}" data-step="manager">
+            <li class="step-tab {% if request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid', 'Rejected by Manager'] %}completed{% elif request.status == 'Pending Manager Approval' %}active{% else %}disabled{% endif %}" data-step="manager">
                 <div class="step-tab-content">
                     Manager Approval
                 </div>
             </li>
-            <li class="step-tab {% if request.status in ['Approved', 'Payment Pending', 'Send Proof', 'Received Proof', 'Action Required'] %}completed{% elif request.status == 'Pending Finance Approval' %}active{% else %}disabled{% endif %}" data-step="finance">
+            <li class="step-tab {% if request.status in ['Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid'] %}completed{% elif request.status == 'Pending Finance Approval' %}active{% else %}disabled{% endif %}" data-step="finance">
                 <div class="step-tab-content">
                     Finance Admin Approval
                 </div>
@@ -32,7 +32,7 @@
         </ul>
 
         <!-- Step 1: Submit Request -->
-        <div class="step-content active" id="step-submit">
+        <div class="step-content active request-details-section" id="step-submit">
             <h3><i class="fas fa-paper-plane"></i> Request Details</h3>
             <div class="admin-mode-warning">
                 <i class="fas fa-info-circle"></i>
@@ -122,8 +122,8 @@
         <div class="step-content" id="step-manager">
             <h3><i class="fas fa-user-tie"></i> Manager Approval</h3>
             
-            {% if request.status in ['Pending Finance Approval', 'Approved', 'Payment Pending', 'Send Proof', 'Received Proof', 'Action Required', 'Rejected by Manager'] %}
-                <div class="admin-mode-warning">
+            {% if request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid', 'Rejected by Manager'] %}
+                <div class="admin-mode-warning" style="background: #28a745; color: white;">
                     <i class="fas fa-check-circle"></i>
                     <span>Manager Approval: Completed</span>
                 </div>
@@ -206,7 +206,7 @@
                 {% if request.user and request.user.manager_id == user.user_id %}
                     <div class="card">
                         <div class="card-header" style="background: #4caf50; color: white;">
-                            <h4><i class="fas fa-check-circle"></i> Your Action Required</h4>
+                            <h4><i class="fas fa-check-circle"></i> Your Approval Required</h4>
                             <p style="margin: 0; opacity: 0.9;">As the manager of {{ request.user.name }}, please review and approve this request.</p>
                         </div>
                         <div class="card-body">
@@ -216,7 +216,6 @@
                                     <select name="approval_status" id="manager_approval_status" required onchange="toggleManagerApprovalFields()">
                                         <option value="">-- Select Status --</option>
                                         <option value="approve">Approve</option>
-                                        <option value="action_required">Action Required</option>
                                         <option value="reject">Reject</option>
                                     </select>
                                 </div>
@@ -234,12 +233,6 @@
                                     </div>
                                 </div>
                                 
-                                <div id="manager_action_required_fields" style="display: none;">
-                                    <div class="form-group">
-                                        <label for="manager_action_reason">Reason for Action Required *</label>
-                                        <textarea name="action_reason" id="manager_action_reason" rows="3" placeholder="Explain what action is required from the requestor..."></textarea>
-                                    </div>
-                                </div>
                                 
                                 <div id="manager_reject_fields" style="display: none;">
                                     <div class="form-group">
@@ -264,11 +257,18 @@
         <div class="step-content" id="step-finance">
             <h3><i class="fas fa-dollar-sign"></i> Finance Admin Approval</h3>
             
-            {% if request.status in ['Approved', 'Payment Pending', 'Send Proof', 'Received Proof', 'Action Required'] %}
-                <div class="admin-mode-warning">
-                    <i class="fas fa-check-circle"></i>
-                    <span>Finance Admin Approval: Completed</span>
-                </div>
+            {% if request.status in ['Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid'] %}
+                {% if request.status == 'Proof Pending' %}
+                    <div class="admin-mode-warning" style="background: #17a2b8; color: white;">
+                        <i class="fas fa-upload"></i>
+                        <span>Awaiting proof of payment from {{ request.user.name }}</span>
+                    </div>
+                {% else %}
+                    <div class="admin-mode-warning">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Finance Admin Approval: Completed</span>
+                    </div>
+                {% endif %}
                 
                 <!-- Show finance approval details -->
                 <div class="card" style="margin-bottom: 1.5rem;">
@@ -328,10 +328,10 @@
                                     <select name="approval_status" id="finance_approval_status" required onchange="toggleFinanceApprovalFields()">
                                         <option value="">-- Select Status --</option>
                                         <option value="approve">Approve</option>
-                                        <option value="action_required">Action Required</option>
-                                        <option value="payment_pending">Payment Pending</option>
-                                        <option value="reject">Reject</option>
-                                        <option value="completed">Completed</option>
+                                        <option value="paid">Mark as Paid</option>
+                                        <option value="proof_sent_approve">Approve Proof</option>
+                                        <option value="proof_sent_reject">Reject Proof</option>
+                                        <option value="reject">Reject Request</option>
                                     </select>
                                 </div>
                                 
@@ -367,16 +367,26 @@
                                             <span>Require Proof of Payment from Department</span>
                                         </label>
                                         <small style="color: #666; margin-left: 25px; display: block; margin-top: 5px;">
-                                            ✓ If checked: Status → "Send Proof" (Department uploads proof → Admin final approval)<br>
+                                            ✓ If checked: Status → "Proof Pending" (Department uploads proof → Admin final approval)<br>
                                             ✗ If not checked: Status → "Approved" or "Payment Pending" (Based on payment date)
                                         </small>
                                     </div>
                                 </div>
                                 
-                                <div id="finance_action_required_fields" style="display: none;">
+                                <div id="finance_paid_fields" style="display: none;">
                                     <div class="form-group">
-                                        <label for="finance_action_reason">Reason for Action Required *</label>
-                                        <textarea name="action_reason" id="finance_action_reason" rows="3" placeholder="Explain what action is required from the requestor..."></textarea>
+                                        <label for="finance_paid_receipt">Upload Receipt *</label>
+                                        <input type="file" name="receipt" id="finance_paid_receipt" accept=".jpg,.jpeg,.png,.pdf" required>
+                                        <small style="color: #666; margin-top: 5px; display: block;">
+                                            Receipt upload is required to mark as paid
+                                        </small>
+                                    </div>
+                                </div>
+                                
+                                <div id="finance_proof_sent_reject_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="finance_proof_rejection_reason">Reason for Rejecting Proof *</label>
+                                        <textarea name="rejection_reason" id="finance_proof_rejection_reason" rows="3" placeholder="Please provide a clear reason for rejecting this proof..."></textarea>
                                     </div>
                                 </div>
                                 
@@ -403,8 +413,34 @@
                 {% endif %}
             {% endif %}
             
+            <!-- Proof Upload Section for Requestors -->
+            {% if request.status == 'Proof Pending' and request.user_id == user.user_id %}
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div class="card-header" style="background: #28a745; color: white;">
+                        <h4><i class="fas fa-upload"></i> Upload Proof of Payment</h4>
+                        <p style="margin: 0; opacity: 0.9;">Your request has been approved. Please upload proof of payment.</p>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('upload_proof', request_id=request.request_id) }}" enctype="multipart/form-data">
+                            <div class="form-group">
+                                <label for="proof_file">Upload Proof of Payment *</label>
+                                <input type="file" name="proof_file" id="proof_file" accept=".jpg,.jpeg,.png,.pdf" required>
+                                <small style="color: #666; margin-top: 5px; display: block;">
+                                    Supported formats: JPG, PNG, PDF. You can upload multiple files.
+                                </small>
+                            </div>
+                            <div class="step-actions">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-upload"></i> Submit Proof
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            {% endif %}
+            
             <!-- Post-approval editing section for Finance Admin -->
-            {% if user.role == 'Finance Admin' and request.status in ['Approved', 'Payment Pending', 'Send Proof', 'Received Proof'] %}
+            {% if user.role == 'Finance Admin' and request.status in ['Payment Pending', 'Proof Sent', 'Paid'] %}
                 <div class="card" style="margin-top: 1.5rem;">
                     <div class="card-header" style="background: #17a2b8; color: white;">
                         <h4><i class="fas fa-edit"></i> Post-Approval Actions</h4>
@@ -487,6 +523,16 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add active class to clicked tab and corresponding content
             this.classList.add('active');
             document.getElementById(`step-${step}`).classList.add('active');
+            
+            // Show/hide request details section based on active tab
+            const requestDetailsSection = document.querySelector('.request-details-section');
+            if (requestDetailsSection) {
+                if (step === 'submit') {
+                    requestDetailsSection.style.display = 'block';
+                } else {
+                    requestDetailsSection.style.display = 'none';
+                }
+            }
         });
     });
     
@@ -494,9 +540,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const requestStatus = '{{ request.status }}';
     let initialStep = 'submit';
     
-    if (requestStatus === 'Pending Manager Approval') {
+    // Check for URL parameter to override initial step
+    const urlParams = new URLSearchParams(window.location.search);
+    const requestedTab = urlParams.get('tab');
+    
+    if (requestedTab === 'finance') {
+        initialStep = 'finance';
+    } else if (requestStatus === 'Pending Manager Approval') {
         initialStep = 'manager';
-    } else if (requestStatus in ['Pending Finance Approval', 'Approved', 'Payment Pending', 'Send Proof', 'Received Proof', 'Action Required', 'Rejected by Manager']) {
+    } else if (requestStatus in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid', 'Rejected by Manager']) {
         initialStep = 'finance';
     }
     
@@ -504,8 +556,56 @@ document.addEventListener('DOMContentLoaded', function() {
     const activeTab = document.querySelector(`[data-step="${initialStep}"]`);
     const activeContent = document.getElementById(`step-${initialStep}`);
     
+    // Set classes for all tabs based on request status
+    const submitTab = document.querySelector('[data-step="submit"]');
+    const managerTab = document.querySelector('[data-step="manager"]');
+    const financeTab = document.querySelector('[data-step="finance"]');
+    
+    // Remove all existing classes from all tabs
+    [submitTab, managerTab, financeTab].forEach(tab => {
+        if (tab) {
+            tab.classList.remove('active', 'completed', 'disabled');
+        }
+    });
+    
+    // Set submit tab (always completed)
+    if (submitTab) {
+        submitTab.classList.add('completed');
+    }
+    
+    // Set manager tab
+    if (managerTab) {
+        if (requestStatus === 'Pending Manager Approval') {
+            managerTab.classList.add('active');
+        } else if (['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid', 'Rejected by Manager'].includes(requestStatus)) {
+            managerTab.classList.add('completed');
+        } else {
+            managerTab.classList.add('disabled');
+        }
+    }
+    
+    // Set finance tab
+    if (financeTab) {
+        if (requestedTab === 'finance') {
+            // Force finance tab to be active when requested via URL parameter
+            financeTab.classList.add('active');
+            
+            // Hide request details section when forcing finance tab
+            const requestDetailsSection = document.querySelector('.request-details-section');
+            if (requestDetailsSection) {
+                requestDetailsSection.style.display = 'none';
+            }
+        } else if (requestStatus === 'Pending Finance Approval') {
+            financeTab.classList.add('active');
+        } else if (['Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid'].includes(requestStatus)) {
+            financeTab.classList.add('completed');
+        } else {
+            financeTab.classList.add('disabled');
+        }
+    }
+    
+    // Set active content
     if (activeTab && activeContent) {
-        activeTab.classList.add('active');
         activeContent.classList.add('active');
     }
 });
@@ -514,24 +614,17 @@ document.addEventListener('DOMContentLoaded', function() {
 function toggleManagerApprovalFields() {
     const status = document.getElementById('manager_approval_status').value;
     const approveFields = document.getElementById('manager_approve_fields');
-    const actionRequiredFields = document.getElementById('manager_action_required_fields');
     const rejectFields = document.getElementById('manager_reject_fields');
-    const actionReasonField = document.getElementById('manager_action_reason');
     const rejectionReasonField = document.getElementById('manager_rejection_reason');
     
     // Hide all fields first and remove required attributes
     approveFields.style.display = 'none';
-    actionRequiredFields.style.display = 'none';
     rejectFields.style.display = 'none';
-    actionReasonField.removeAttribute('required');
     rejectionReasonField.removeAttribute('required');
     
     // Show relevant fields based on selection and add required attributes
     if (status === 'approve') {
         approveFields.style.display = 'block';
-    } else if (status === 'action_required') {
-        actionRequiredFields.style.display = 'block';
-        actionReasonField.setAttribute('required', 'required');
     } else if (status === 'reject') {
         rejectFields.style.display = 'block';
         rejectionReasonField.setAttribute('required', 'required');
@@ -542,19 +635,23 @@ function toggleManagerApprovalFields() {
 function toggleFinanceApprovalFields() {
     const status = document.getElementById('finance_approval_status').value;
     const approveFields = document.getElementById('finance_approve_fields');
-    const actionRequiredFields = document.getElementById('finance_action_required_fields');
+    const paidFields = document.getElementById('finance_paid_fields');
+    const proofSentRejectFields = document.getElementById('finance_proof_sent_reject_fields');
     const rejectFields = document.getElementById('finance_reject_fields');
-    const actionReasonField = document.getElementById('finance_action_reason');
     const rejectionReasonField = document.getElementById('finance_rejection_reason');
+    const proofRejectionReasonField = document.getElementById('finance_proof_rejection_reason');
     const receiptField = document.getElementById('finance_receipt');
+    const paidReceiptField = document.getElementById('finance_paid_receipt');
     
     // Hide all fields first and remove required attributes
     approveFields.style.display = 'none';
-    actionRequiredFields.style.display = 'none';
+    paidFields.style.display = 'none';
+    proofSentRejectFields.style.display = 'none';
     rejectFields.style.display = 'none';
-    actionReasonField.removeAttribute('required');
     rejectionReasonField.removeAttribute('required');
+    proofRejectionReasonField.removeAttribute('required');
     receiptField.removeAttribute('required');
+    paidReceiptField.removeAttribute('required');
     
     // Reset receipt label first
     const receiptLabel = document.querySelector('label[for="finance_receipt"]');
@@ -565,19 +662,17 @@ function toggleFinanceApprovalFields() {
     // Show relevant fields based on selection and add required attributes
     if (status === 'approve') {
         approveFields.style.display = 'block';
-    } else if (status === 'action_required') {
-        actionRequiredFields.style.display = 'block';
-        actionReasonField.setAttribute('required', 'required');
+    } else if (status === 'paid') {
+        paidFields.style.display = 'block';
+        paidReceiptField.setAttribute('required', 'required');
+    } else if (status === 'proof_sent_approve') {
+        // No additional fields needed for approving proof
+    } else if (status === 'proof_sent_reject') {
+        proofSentRejectFields.style.display = 'block';
+        proofRejectionReasonField.setAttribute('required', 'required');
     } else if (status === 'reject') {
         rejectFields.style.display = 'block';
         rejectionReasonField.setAttribute('required', 'required');
-    } else if (status === 'completed') {
-        approveFields.style.display = 'block';
-        receiptField.setAttribute('required', 'required');
-        // Update receipt field label to indicate it's required
-        if (receiptLabel) {
-            receiptLabel.innerHTML = 'Upload Receipt *';
-        }
     }
 }
 
@@ -612,15 +707,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Check for required fields based on status
-            if (approvalStatus === 'action_required') {
-                const actionReason = document.getElementById('manager_action_reason').value;
-                if (!actionReason.trim()) {
-                    e.preventDefault();
-                    alert('Please provide a reason for action required');
-                    return false;
-                }
-            }
-            
             if (approvalStatus === 'reject') {
                 const rejectionReason = document.getElementById('manager_rejection_reason').value;
                 if (!rejectionReason.trim()) {
