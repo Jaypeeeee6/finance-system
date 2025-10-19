@@ -1082,6 +1082,7 @@ def new_request():
                 return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
         
         # Handle multiple file uploads for receipts
+        receipt_path = None  # Initialize receipt_path
         receipt_paths = []
         if 'receipt_files' in request.files:
             receipt_files = request.files.getlist('receipt_files')

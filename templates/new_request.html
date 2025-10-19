@@ -2186,7 +2186,6 @@ document.getElementById('receipt_files').addEventListener('change', function(e) 
     });
     
     updateFilePreview();
-    updateFileInput();
     
     // Clear the file input to prevent showing old file names
     e.target.value = '';
@@ -2261,25 +2260,55 @@ function updateFilePreview() {
     }
 }
 
-function updateFileInput() {
-    const input = document.getElementById('receipt_files');
-    const dt = new DataTransfer();
-    
-    allSelectedFiles.forEach(file => {
-        dt.items.add(file);
-    });
-    
-    input.files = dt.files;
-    
-    // Clear the input value to prevent showing file names in the input field
-    input.value = '';
-}
+// Function removed - using FormData approach instead
 
 function removeFileFromList(indexToRemove) {
     allSelectedFiles.splice(indexToRemove, 1);
     updateFilePreview();
-    updateFileInput();
 }
+
+// Form submission handler to ensure files are properly submitted
+document.getElementById('requestForm').addEventListener('submit', function(e) {
+    // Create a new FormData object with all the files
+    const formData = new FormData(this);
+    
+    // Clear existing receipt_files from FormData
+    formData.delete('receipt_files');
+    
+    // Add all selected files to FormData
+    allSelectedFiles.forEach((file, index) => {
+        formData.append('receipt_files', file);
+    });
+    
+    // Debug: Log the files being submitted
+    console.log('Files being submitted:', allSelectedFiles.length);
+    allSelectedFiles.forEach((file, index) => {
+        console.log('File', index, ':', file.name);
+    });
+    
+    // Prevent default form submission
+    e.preventDefault();
+    
+    // Submit the form with FormData
+    fetch(this.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            // Redirect to dashboard on success
+            window.location.href = '/dashboard';
+        } else {
+            // Handle error
+            console.error('Form submission failed');
+            alert('Form submission failed. Please try again.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred. Please try again.');
+    });
+});
 </script>
 
 {% endblock %}

@@ -177,6 +177,37 @@
                 </div>
                 {% endif %}
 
+       <!-- Receipt Files Section -->
+       <div class="form-group">
+           <label>Receipt/Proof of Payment</label>
+           {% if request.receipt_path %}
+               {% set receipt_files = request.receipt_path|from_json if request.receipt_path else [] %}
+               {% if receipt_files is string or (receipt_files is not iterable) %}
+                   <!-- Handle legacy single file format -->
+                   <div style="margin-bottom: 10px;">
+                       <a href="{{ url_for('uploaded_file', filename=request.receipt_path) }}" target="_blank" class="btn btn-info">
+                           <i class="fas fa-download"></i> View Receipt
+                       </a>
+                   </div>
+               {% elif receipt_files|length > 0 %}
+                   <!-- Handle multiple files -->
+                   {% for receipt_file in receipt_files %}
+                   <div style="margin-bottom: 10px; padding: 8px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">
+                       <a href="{{ url_for('uploaded_file', filename=receipt_file) }}" target="_blank" class="btn btn-info">
+                           <i class="fas fa-download"></i> View Receipt {{ loop.index }}
+                       </a>
+                       <small style="color: #666; margin-left: 10px;">{{ receipt_file.split('_', 1)[1] if '_' in receipt_file else receipt_file }}</small>
+                   </div>
+                   {% endfor %}
+               {% else %}
+                   <!-- No files -->
+                   <p style="color: #666; font-style: italic;">No receipt files uploaded</p>
+               {% endif %}
+           {% else %}
+               <p style="color: #666; font-style: italic;">No receipt files uploaded</p>
+           {% endif %}
+       </div>
+
                 <!-- Payment Installments Display for Recurring Payments -->
                 {% if request.recurring_interval and 'monthly' in request.recurring_interval %}
                 <div class="form-group">
@@ -789,28 +820,6 @@
                         </div>
                         {% endif %}
                         
-                        {% if request.receipt_path %}
-                        <div class="form-group">
-                            <label>Receipt(s)</label>
-                            {% set receipt_files = request.receipt_path|from_json if request.receipt_path else [] %}
-                            {% if receipt_files is string %}
-                                <!-- Handle legacy single file format -->
-                                <a href="{{ url_for('uploaded_file', filename=request.receipt_path) }}" target="_blank" class="btn btn-info">
-                                    <i class="fas fa-download"></i> View Receipt
-                                </a>
-                            {% else %}
-                                <!-- Handle multiple files -->
-                                {% for receipt_file in receipt_files %}
-                                <div style="margin-bottom: 10px; padding: 8px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">
-                                    <a href="{{ url_for('uploaded_file', filename=receipt_file) }}" target="_blank" class="btn btn-info">
-                                        <i class="fas fa-download"></i> View Receipt {{ loop.index }}
-                                    </a>
-                                    <small style="color: #666; margin-left: 10px;">{{ receipt_file.split('_', 1)[1] if '_' in receipt_file else receipt_file }}</small>
-                                </div>
-                                {% endfor %}
-                            {% endif %}
-                        </div>
-                        {% endif %}
                         
                         {% if proof_files %}
                         <div class="form-group">
