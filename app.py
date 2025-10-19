@@ -1376,17 +1376,28 @@ def approve_request(request_id):
                 'approver': approver
             })
         else:
-            # No proof required - set status to Payment Pending
-            req.status = 'Payment Pending'
+            # No proof required - set status to Completed
+            req.status = 'Completed'
             req.approval_date = today
-            flash(f'Payment request #{request_id} approved. Status set to Payment Pending.', 'success')
-            log_action(f"Approved payment request #{request_id} - No proof required")
+            req.completion_date = today
+            flash(f'Payment request #{request_id} approved and completed. No proof of payment required.', 'success')
+            log_action(f"Approved and completed payment request #{request_id} - No proof required")
+            
+            # Notify the requestor
+            create_notification(
+                user_id=req.user_id,
+                title="Request Completed",
+                message=f"Your payment request #{request_id} has been approved and completed. No proof of payment was required.",
+                notification_type="request_completed",
+                request_id=request_id
+            )
             
             # Emit real-time update
             socketio.emit('request_updated', {
                 'request_id': request_id,
-                'status': 'Payment Pending',
-                'approver': approver
+                'status': 'Completed',
+                'approver': approver,
+                'completed': True
             })
     
     
