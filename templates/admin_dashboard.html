@@ -226,7 +226,14 @@
                                         </button>
                                     </form>
                                     {% endif %}
-                                    {% if req.status == 'Pending' %}
+                                    {% if req.status == 'Pending Finance Approval' %}
+                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-success">
+                                        <i class="fas fa-check"></i> Approve
+                                    </a>
+                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-danger">
+                                        <i class="fas fa-times"></i> Reject
+                                    </a>
+                                    {% elif req.status == 'Pending' %}
                                     <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-success">
                                         <i class="fas fa-check"></i> Approve
                                     </a>

@@ -546,10 +546,24 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (requestedTab === 'finance') {
         initialStep = 'finance';
-    } else if (requestStatus === 'Pending Manager Approval') {
+    } else if (requestedTab === 'manager') {
         initialStep = 'manager';
-    } else if (requestStatus in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid', 'Rejected by Manager']) {
-        initialStep = 'finance';
+    } else if (requestedTab === 'submit') {
+        initialStep = 'submit';
+    } else {
+        // Default behavior: go to submit tab
+        initialStep = 'submit';
+        
+        // Exception 1: Assigned managers viewing "Pending Manager Approval" → Manager tab
+        if (requestStatus === 'Pending Manager Approval' && 
+            ((user.role === 'Department Manager' && user.department === request.department) || 
+             (user.role === 'Operation Manager' && request.department === 'Operation'))) {
+            initialStep = 'manager';
+        }
+        // Exception 2: Finance admins viewing "Pending Finance Approval" → Finance tab
+        else if (requestStatus === 'Pending Finance Approval' && user.role === 'Finance Admin') {
+            initialStep = 'finance';
+        }
     }
     
     // Activate the appropriate tab
@@ -577,6 +591,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (managerTab) {
         if (requestStatus === 'Pending Manager Approval') {
             managerTab.classList.add('active');
+            // Hide request details section when manager tab is active
+            const requestDetailsSection = document.querySelector('.request-details-section');
+            if (requestDetailsSection) {
+                requestDetailsSection.style.display = 'none';
+            }
         } else if (['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid', 'Rejected by Manager'].includes(requestStatus)) {
             managerTab.classList.add('completed');
         } else {
@@ -597,6 +616,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } else if (requestStatus === 'Pending Finance Approval') {
             financeTab.classList.add('active');
+            // Hide request details section when finance tab is active
+            const requestDetailsSection = document.querySelector('.request-details-section');
+            if (requestDetailsSection) {
+                requestDetailsSection.style.display = 'none';
+            }
         } else if (['Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid'].includes(requestStatus)) {
             financeTab.classList.add('completed');
         } else {
@@ -607,6 +631,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set active content
     if (activeTab && activeContent) {
         activeContent.classList.add('active');
+    }
+    
+    // Ensure request details section is only visible for submit tab
+    const requestDetailsSection = document.querySelector('.request-details-section');
+    if (requestDetailsSection) {
+        const activeTabStep = document.querySelector('.step-tab.active');
+        if (activeTabStep && activeTabStep.getAttribute('data-step') !== 'submit') {
+            requestDetailsSection.style.display = 'none';
+        } else if (activeTabStep && activeTabStep.getAttribute('data-step') === 'submit') {
+            requestDetailsSection.style.display = 'block';
+        }
     }
 });
 
