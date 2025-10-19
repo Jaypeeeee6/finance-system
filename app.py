@@ -17,6 +17,16 @@ app.config.from_object(Config)
 from datetime import timedelta
 app.jinja_env.globals.update(timedelta=timedelta)
 
+# Add JSON filter for templates
+import json
+@app.template_filter('from_json')
+def from_json_filter(value):
+    """Parse JSON string to Python object"""
+    try:
+        return json.loads(value) if value else []
+    except (json.JSONDecodeError, TypeError):
+        return value if value else []
+
 def format_recurring_schedule(interval, payment_schedule=None):
     """Format recurring interval into human-readable text"""
     try:
@@ -1071,39 +1081,47 @@ def new_request():
                 flash('Invalid amount format.', 'error')
                 return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
         
-        # Handle file upload for receipt
-        receipt_path = None
-        if 'receipt_file' in request.files:
-            receipt_file = request.files['receipt_file']
-            if receipt_file and receipt_file.filename:
-                # Validate file size (10MB max)
-                if len(receipt_file.read()) > 10 * 1024 * 1024:  # 10MB
-                    flash('Receipt file is too large. Maximum size is 10MB.', 'error')
-                    return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
-                
-                # Reset file pointer
-                receipt_file.seek(0)
-                
-                # Validate file extension
-                allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
-                file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
-                if file_extension not in allowed_extensions:
-                    flash('Invalid file type. Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
-                    return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
-                
-                # Generate unique filename
+        # Handle multiple file uploads for receipts
+        receipt_paths = []
+        if 'receipt_files' in request.files:
+            receipt_files = request.files.getlist('receipt_files')
+            if receipt_files and any(f.filename for f in receipt_files):
                 import uuid
-                filename = f"{uuid.uuid4()}_{receipt_file.filename}"
+                import json
+                import os
                 
                 # Create uploads directory if it doesn't exist
-                import os
                 upload_folder = os.path.join(app.root_path, 'uploads', 'receipts')
                 os.makedirs(upload_folder, exist_ok=True)
                 
-                # Save file
-                full_path = os.path.join(upload_folder, filename)
-                receipt_file.save(full_path)
-                receipt_path = filename  # Store only the filename, not the full path
+                allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+                
+                for receipt_file in receipt_files:
+                    if receipt_file and receipt_file.filename:
+                        # Validate file size (10MB max)
+                        if len(receipt_file.read()) > 10 * 1024 * 1024:  # 10MB
+                            flash(f'File "{receipt_file.filename}" is too large. Maximum size is 10MB.', 'error')
+                            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+                        
+                        # Reset file pointer
+                        receipt_file.seek(0)
+                        
+                        # Validate file extension
+                        file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
+                        if file_extension not in allowed_extensions:
+                            flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
+                            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+                        
+                        # Generate unique filename
+                        filename = f"{uuid.uuid4()}_{receipt_file.filename}"
+                        
+                        # Save file
+                        full_path = os.path.join(upload_folder, filename)
+                        receipt_file.save(full_path)
+                        receipt_paths.append(filename)  # Store only the filename, not the full path
+                
+                # Convert list to JSON string for storage
+                receipt_path = json.dumps(receipt_paths) if receipt_paths else None
         
         # Get dynamic fields based on request type
         item_name = request.form.get('item_name')

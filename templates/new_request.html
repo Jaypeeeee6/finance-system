@@ -125,9 +125,21 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="receipt_file">Receipt/Proof of Payment (Optional)</label>
-                    <input type="file" name="receipt_file" id="receipt_file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 100%;">
-                    <small>Upload receipt or proof of payment (PDF, JPG, PNG, DOC, DOCX - Max 10MB)</small>
+                    <label>Receipt/Proof of Payment (Optional)</label>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                        <button type="button" id="add-files-btn" class="btn btn-primary" style="white-space: nowrap;">
+                            <i class="fas fa-plus"></i> Add Files
+                        </button>
+                        <span style="color: #666; font-size: 14px;">
+                            <i class="fas fa-info-circle" style="margin-right: 5px;"></i>
+                            Click to select one or multiple files
+                        </span>
+                    </div>
+                    <small>Upload multiple receipts or proof of payment (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)</small>
+                    <div id="file-preview" style="margin-top: 10px;"></div>
+                    
+                    <!-- Hidden file input for actual file selection -->
+                    <input type="file" name="receipt_files" id="receipt_files" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" multiple style="display: none;">
                 </div>
 
                 <!-- Show only for Supplier/Rental type -->
@@ -2148,6 +2160,125 @@ function showSwiftCode() {
     } else {
         swiftDisplay.style.display = 'none';
     }
+}
+
+// Global array to store all selected files
+let allSelectedFiles = [];
+
+// Add Files button functionality
+document.getElementById('add-files-btn').addEventListener('click', function() {
+    document.getElementById('receipt_files').click();
+});
+
+// File selection handling
+document.getElementById('receipt_files').addEventListener('change', function(e) {
+    const newFiles = Array.from(e.target.files);
+    
+    // Add new files to the global array
+    newFiles.forEach(file => {
+        // Check if file already exists (by name and size)
+        const exists = allSelectedFiles.some(existingFile => 
+            existingFile.name === file.name && existingFile.size === file.size
+        );
+        if (!exists) {
+            allSelectedFiles.push(file);
+        }
+    });
+    
+    updateFilePreview();
+    updateFileInput();
+    
+    // Clear the file input to prevent showing old file names
+    e.target.value = '';
+});
+
+function updateFilePreview() {
+    const preview = document.getElementById('file-preview');
+    const button = document.getElementById('add-files-btn');
+    preview.innerHTML = '';
+    
+    if (allSelectedFiles.length > 0) {
+        // Update button text when files are selected
+        button.innerHTML = '<i class="fas fa-plus"></i> Add More Files';
+        button.className = 'btn btn-outline-primary';
+        
+        const fileList = document.createElement('div');
+        fileList.style.cssText = 'border: 1px solid #28a745; border-radius: 4px; padding: 10px; background: #d4edda;';
+        
+        const header = document.createElement('div');
+        header.style.cssText = 'font-weight: bold; margin-bottom: 8px; color: #155724; display: flex; align-items: center;';
+        header.innerHTML = `<i class="fas fa-check-circle" style="margin-right: 8px; color: #28a745;"></i>Selected Files (${allSelectedFiles.length}):`;
+        fileList.appendChild(header);
+        
+        allSelectedFiles.forEach((file, index) => {
+            const fileItem = document.createElement('div');
+            fileItem.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 8px; background: white; border-radius: 4px; margin-bottom: 5px; border: 1px solid #c3e6cb;';
+            
+            const fileInfo = document.createElement('div');
+            fileInfo.style.cssText = 'display: flex; align-items: center; color: #333; font-size: 14px;';
+            
+            // Add file type icon
+            const fileIcon = document.createElement('i');
+            const extension = file.name.split('.').pop().toLowerCase();
+            if (['jpg', 'jpeg', 'png', 'gif'].includes(extension)) {
+                fileIcon.className = 'fas fa-image';
+                fileIcon.style.cssText = 'color: #17a2b8; margin-right: 8px;';
+            } else if (extension === 'pdf') {
+                fileIcon.className = 'fas fa-file-pdf';
+                fileIcon.style.cssText = 'color: #dc3545; margin-right: 8px;';
+            } else if (['doc', 'docx'].includes(extension)) {
+                fileIcon.className = 'fas fa-file-word';
+                fileIcon.style.cssText = 'color: #007bff; margin-right: 8px;';
+            } else {
+                fileIcon.className = 'fas fa-file';
+                fileIcon.style.cssText = 'color: #6c757d; margin-right: 8px;';
+            }
+            
+            const fileName = document.createElement('span');
+            fileName.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+            
+            fileInfo.appendChild(fileIcon);
+            fileInfo.appendChild(fileName);
+            
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+            removeBtn.style.cssText = 'background: #dc3545; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;';
+            removeBtn.onclick = function() {
+                removeFileFromList(index);
+            };
+            
+            fileItem.appendChild(fileInfo);
+            fileItem.appendChild(removeBtn);
+            fileList.appendChild(fileItem);
+        });
+        
+        preview.appendChild(fileList);
+    } else {
+        // Reset button when no files are selected
+        button.innerHTML = '<i class="fas fa-plus"></i> Add Files';
+        button.className = 'btn btn-primary';
+    }
+}
+
+function updateFileInput() {
+    const input = document.getElementById('receipt_files');
+    const dt = new DataTransfer();
+    
+    allSelectedFiles.forEach(file => {
+        dt.items.add(file);
+    });
+    
+    input.files = dt.files;
+    
+    // Clear the input value to prevent showing file names in the input field
+    input.value = '';
+}
+
+function removeFileFromList(indexToRemove) {
+    allSelectedFiles.splice(indexToRemove, 1);
+    updateFilePreview();
+    updateFileInput();
 }
 </script>
 

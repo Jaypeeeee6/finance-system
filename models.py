@@ -62,7 +62,7 @@ class PaymentRequest(db.Model):
     recurring_interval = db.Column(db.String(50))  # Monthly, Quarterly, Annually
     status = db.Column(db.String(20), default='Pending')  # Pending, Send Proof, Received Proof, Approved
     reason_pending = db.Column(db.Text)
-    receipt_path = db.Column(db.String(255))
+    receipt_path = db.Column(db.Text)  # JSON string containing multiple file paths
     approver = db.Column(db.String(50))  # Mahmoud, Abdulaziz
     proof_required = db.Column(db.Boolean, default=False)  # Whether proof is required
     proof_of_payment = db.Column(db.String(255))  # File path for proof uploaded by department
