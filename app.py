@@ -1284,7 +1284,47 @@ def view_request(request_id):
                     'is_late': is_late
                 })
     
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount))
+    # Determine the manager's name for display
+    manager_name = None
+    if req.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Rejected by Manager', 'Completed']:
+        # If the request has been processed by a manager, determine who the manager was
+        if req.user.manager_id:
+            # Get the manager's name from the manager_id
+            manager = User.query.get(req.user.manager_id)
+            if manager:
+                manager_name = manager.name
+            else:
+                # If manager_id exists but user not found, try to find Department Manager
+                dept_manager = User.query.filter_by(role='Department Manager', department=req.department).first()
+                if dept_manager:
+                    manager_name = dept_manager.name
+        else:
+            # If no manager_id is set, find the Department Manager for the requestor's department
+            dept_manager = User.query.filter_by(role='Department Manager', department=req.department).first()
+            if dept_manager:
+                manager_name = dept_manager.name
+            elif req.department == 'Operation':
+                # For Operation department, try Operation Manager as fallback
+                operation_manager = User.query.filter_by(role='Operation Manager').first()
+                if operation_manager:
+                    manager_name = operation_manager.name
+        
+        # Debug: Print what we found
+        print(f"DEBUG - Request ID: {request_id}, Department: {req.department}, Manager ID: {req.user.manager_id}, Manager Name: {manager_name}")
+    
+    # Get all proof files for this request
+    proof_files = []
+    if req.status in ['Proof Sent', 'Proof Rejected', 'Payment Pending', 'Paid', 'Completed']:
+        import os
+        import glob
+        upload_folder = app.config['UPLOAD_FOLDER']
+        # Look for all proof files for this request (files starting with proof_{request_id}_)
+        proof_pattern = os.path.join(upload_folder, f"proof_{request_id}_*")
+        proof_files = [os.path.basename(f) for f in glob.glob(proof_pattern)]
+        # Sort by filename (which includes timestamp) to show newest first
+        proof_files.sort(reverse=True)
+    
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, proof_files=proof_files)
 
 
 @app.route('/request/<int:request_id>/approve', methods=['POST'])
@@ -1305,15 +1345,10 @@ def approve_request(request_id):
     if approval_status == 'approve':
         approver = request.form.get('approver')
         proof_required = request.form.get('proof_required') == 'on'
-        payment_date_str = request.form.get('payment_date')
-        
-        # Parse payment date
-        payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date()
         today = datetime.utcnow().date()
         
         req.approver = approver
         req.proof_required = proof_required
-        req.payment_date = payment_date
         req.updated_at = datetime.utcnow()
         
         if proof_required:
@@ -1419,7 +1454,7 @@ def approve_request(request_id):
             flash('Please provide a reason for rejection.', 'error')
             return redirect(url_for('view_request', request_id=request_id))
         
-        req.status = 'Proof Pending'  # Go back to Proof Pending
+        req.status = 'Proof Rejected'  # Set to Proof Rejected status
         req.rejection_reason = rejection_reason
         req.updated_at = datetime.utcnow()
         
@@ -1649,8 +1684,8 @@ def upload_proof(request_id):
         flash('You can only upload proof for your own requests.', 'error')
         return redirect(url_for('dashboard'))
     
-    # Check if request is in "Proof Pending" status
-    if req.status != 'Proof Pending':
+    # Check if request is in "Proof Pending" or "Proof Rejected" status
+    if req.status not in ['Proof Pending', 'Proof Rejected']:
         flash('This request does not require proof upload.', 'error')
         return redirect(url_for('dashboard'))
     
