@@ -66,6 +66,17 @@
     background: #c82333 !important;
 }
 </style>
+<style>
+/* Finance tab warning state (yellow) */
+.step-tab.warning .step-tab-content {
+    background: #ffc107 !important;
+    color: #212529 !important;
+    font-weight: 600 !important;
+}
+.step-tab.warning:hover .step-tab-content {
+    background: #e0a800 !important;
+}
+</style>
 {% endblock %}
 
 {% block content %}
@@ -90,7 +101,7 @@
                     Manager Approval
                 </div>
             </li>
-            <li class="step-tab {% if request.status in ['Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'] %}completed{% elif request.status == 'Pending Finance Approval' %}active{% else %}disabled{% endif %}" data-step="finance">
+            <li class="step-tab {% if request.status != 'Completed' %}warning {% endif %}{% if request.status in ['Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'] %}completed{% elif request.status == 'Pending Finance Approval' %}active{% else %}disabled{% endif %}" data-step="finance">
                 <div class="step-tab-content">
                     Finance Admin Approval
                 </div>
