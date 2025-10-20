@@ -117,8 +117,15 @@
                 <i class="fas fa-money-bill-wave"></i>
             </div>
             <div class="stat-info">
-                {% if user.role == 'IT' %}
-                    <h3 style="color: #999;">***</h3>
+                {% if user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT') %}
+                    {% set it_approved_requests = requests|selectattr('status', 'equalto', 'Approved')|selectattr('department', 'equalto', 'IT')|list %}
+                    {% set other_approved_requests = requests|selectattr('status', 'equalto', 'Approved')|rejectattr('department', 'equalto', 'IT')|list %}
+                    {% if it_approved_requests|length > 0 %}
+                        <h3>OMR {{ "%.3f"|format(it_approved_requests|map(attribute='amount')|sum) }}</h3>
+                        <small style="color: #666;">(IT Department Only)</small>
+                    {% else %}
+                        <h3 style="color: #999;">***</h3>
+                    {% endif %}
                 {% else %}
                     <h3>OMR {{ "%.3f"|format(requests|selectattr('status', 'equalto', 'Approved')|map(attribute='amount')|sum) }}</h3>
                 {% endif %}
@@ -180,7 +187,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if user.role == 'IT' %}
+                                    {% if (user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and req.department != 'IT' %}
                                         <span style="color: #999;">***</span>
                                     {% else %}
                                         OMR {{ "%.3f"|format(req.amount) }}

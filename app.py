@@ -810,8 +810,8 @@ def admin_dashboard():
         per_page = 10
     
     # Build query with optional status, department, and search filters
-    # Finance Admin can see all requests, including pending manager approval
-    query = PaymentRequest.query
+    # Finance Admin can see all requests, including pending manager approval, but exclude rejected by manager
+    query = PaymentRequest.query.filter(PaymentRequest.status != 'Rejected by Manager')
     if status_filter:
         query = query.filter(PaymentRequest.status == status_filter)
     if department_filter:
@@ -863,8 +863,8 @@ def finance_dashboard():
         per_page = 10
     
     # Build query with optional department and search filters
-    # Finance users can see all requests, including their own pending manager approval requests
-    query = PaymentRequest.query
+    # Finance users can see all requests, including their own pending manager approval requests, but exclude rejected by manager
+    query = PaymentRequest.query.filter(PaymentRequest.status != 'Rejected by Manager')
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     if search_query:
@@ -910,7 +910,7 @@ def gm_dashboard():
         per_page = 10
     
     # Build query with optional department and search filters
-    # GM can see ALL requests from ALL departments
+    # GM can see ALL requests from ALL departments including rejected by manager
     query = PaymentRequest.query
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
@@ -978,12 +978,9 @@ def it_dashboard():
         return redirect(url_for('dashboard'))
     
     # Build query with optional department and search filters
-    if current_user.role == 'IT':
-        # IT users see all requests
+    if current_user.role == 'IT' or (current_user.role == 'Department Manager' and current_user.department == 'IT'):
+        # IT users and IT Department Managers see all requests
         query = PaymentRequest.query
-    elif current_user.role == 'Department Manager' and current_user.department == 'IT':
-        # IT Department Managers see all IT department requests (including pending manager approval)
-        query = PaymentRequest.query.filter(PaymentRequest.department == 'IT')
     else:
         # Other users should not see requests that are still pending manager approval
         query = PaymentRequest.query.filter(PaymentRequest.status != 'Pending Manager Approval')
@@ -1392,11 +1389,14 @@ def view_request(request_id):
     ).get_or_404(request_id)
     
     # Check permissions
-    # Allow Operation Manager to view all requests (same as GM visibility)
+    # Allow Operation Manager, IT users, and IT Department Managers to view all requests (same as GM visibility)
     if current_user.role not in ['Finance Admin', 'Finance', 'GM', 'IT', 'Project', 'Operation Manager']:
         # Department Managers can view requests from their department
         if current_user.role == 'Department Manager':
-            if req.department != current_user.department:
+            # IT Department Managers can view all requests
+            if current_user.department == 'IT':
+                pass  # Allow access to all requests
+            elif req.department != current_user.department:
                 flash('You do not have permission to view this request.', 'danger')
                 return redirect(url_for('dashboard'))
         # Regular users can only view their own requests
@@ -2344,9 +2344,14 @@ def upload_installment_receipt(request_id):
 
 @app.route('/reports')
 @login_required
-@role_required('Finance Admin', 'Finance', 'GM', 'IT', 'Operation Manager')
+@role_required('Finance Admin', 'Finance', 'GM', 'IT', 'Department Manager', 'Operation Manager')
 def reports():
     """View reports page"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
     # Get filter parameters
     department_filter = request.args.get('department', '')
     status_filter = request.args.get('status', '')
