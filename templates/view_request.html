@@ -1061,25 +1061,39 @@
                         {% endif %}
                         
                         
-                        {% if proof_files %}
+                        {% if proof_batches and proof_batches|length > 0 %}
                         <div class="form-group">
-                            <label>Proof of Payment</label>
-                            {% for proof_file in proof_files %}
-                            <div style="margin-bottom: 10px; padding: 8px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">
-                                <a href="{{ url_for('uploaded_file', filename=proof_file) }}" target="_blank" class="btn btn-info">
-                                    <i class="fas fa-eye"></i> View Proof {{ loop.index }}
-                                </a>
-                                <small style="color: #666; margin-left: 10px;">
-                                    {% if loop.first %}
-                                        (Latest)
-                                    {% else %}
-                                        (Previous)
-                                    {% endif %}
-                                </small>
-                                {% if loop.first and request.status == 'Proof Sent' and user.role == 'Finance Admin' %}
-                                    <button type="button" class="btn btn-danger" style="background-color: #dc3545; border-color: #dc3545; color: white; margin-left: 10px;" onmouseover="this.style.backgroundColor='#c82333'; this.style.borderColor='#bd2130';" onmouseout="this.style.backgroundColor='#dc3545'; this.style.borderColor='#dc3545';" onclick="openRejectModal()">
+                            {% for batch in proof_batches %}
+                            {% set is_latest = loop.first %}
+                            {% set batch_files = batch.files %}
+                            {% set container_classes = 'proof-container' %}
+                            {% if not is_latest or request.status == 'Proof Rejected' %}
+                                {% set container_classes = 'proof-container rejected' %}
+                            {% endif %}
+                            <div class="{{ container_classes }}">
+                                <div class="proof-header">
+                                    <span>Proof of Payment — Batch {{ batch.batch_num }}</span>
+                                    <span class="proof-status">{{ batch_files|length }} file{{ 's' if batch_files|length != 1 else '' }} uploaded</span>
+                                </div>
+                                <div class="proof-files">
+                                    {% for proof_file in batch_files %}
+                                    {% set original_name = proof_file.split('_', 3)[3] if proof_file.count('_') >= 3 else (proof_file.split('_', 2)[2] if proof_file.count('_') >= 2 else proof_file) %}
+                                    <div class="proof-item">
+                                        <div class="proof-info">
+                                            <a href="{{ url_for('uploaded_file', filename=proof_file) }}" target="_blank" class="btn btn-info">
+                                                <i class="fas fa-eye"></i> View Proof {{ loop.index }}
+                                            </a>
+                                            <span class="proof-label">{{ original_name }}</span>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% if is_latest and request.status == 'Proof Sent' and user.role == 'Finance Admin' %}
+                                <div class="proof-actions" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #dee2e6; text-align: right;">
+                                    <button type="button" class="reject-button" onclick="openRejectModal()">
                                         <i class="fas fa-times"></i> Reject Proof
                                     </button>
+                                </div>
                                 {% endif %}
                             </div>
                             {% endfor %}
@@ -1285,31 +1299,14 @@
                         <p style="margin: 0; opacity: 0.9;">Your proof of payment was rejected. Please review and upload a new proof.</p>
                     </div>
                     <div class="card-body">
-                        <!-- Previous Proofs Section -->
-                        {% if proof_files %}
+                        {% set rejected_batch_num = (proof_batches[0].batch_num if proof_batches and proof_batches|length > 0 else 1) %}
                         <div class="form-group" style="margin-bottom: 1.5rem;">
-                            <label>Previous Proofs of Payment</label>
-                            <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px;">
-                                {% for proof_file in proof_files %}
-                                <div style="margin-bottom: 8px; padding: 8px; background: white; border-radius: 4px; border: 1px solid #e9ecef;">
-                                    <a href="{{ url_for('uploaded_file', filename=proof_file) }}" target="_blank" class="btn btn-outline-info btn-sm">
-                                        <i class="fas fa-eye"></i> View Proof {{ loop.index }}
-                                    </a>
-                                    <small style="color: #666; margin-left: 10px;">
-                                        {% if loop.first %}
-                                            (Latest - Current)
-                                        {% else %}
-                                            (Previous - Rejected)
-                                        {% endif %}
-                                    </small>
-                                </div>
-                                {% endfor %}
-                                <small style="color: #666; margin-top: 8px; display: block;">
-                                    The latest proof was rejected by Finance Admin. Please upload a new one.
-                                </small>
+                            <div style="margin-top: 10px; padding: 12px; background: #fff5f5; border-radius: 4px; border: 1px solid #f5c6cb;">
+                                <strong style="color: #721c24;">
+                                    <i class="fas fa-exclamation-triangle"></i> Batch {{ rejected_batch_num }} was rejected by Finance Admin. Please upload a new one.
+                                </strong>
                             </div>
                         </div>
-                        {% endif %}
                         
                         <!-- Rejection Reason Section -->
                         {% if request.rejection_reason %}

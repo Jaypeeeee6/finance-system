@@ -2458,6 +2458,116 @@ input:checked + .toggle-slider:before {
     font-size: 1.2rem;
 }
 
+/* ==================== PROOF OF PAYMENT CONTAINERS ==================== */
+.proof-container {
+    background: #f8f9fa;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.proof-container.rejected {
+    background: #f8d7da;
+    border-color: #dc3545;
+    border-left: 4px solid #dc3545;
+}
+
+.proof-container.rejected .proof-header {
+    color: #721c24;
+    font-weight: 600;
+}
+
+.proof-container.rejected .proof-item {
+    background: #fff5f5;
+    border-color: #f5c6cb;
+}
+
+.proof-container .proof-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+    color: #495057;
+}
+
+.proof-container.rejected .proof-header {
+    border-bottom-color: #f5c6cb;
+}
+
+.proof-container .proof-files {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.proof-container .proof-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.proof-container .proof-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.proof-container .proof-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.proof-container .proof-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.proof-container .proof-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+.proof-container .proof-status {
+    font-size: 0.85rem;
+    color: #6c757d;
+    font-style: italic;
+}
+
+.proof-container .reject-button {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.proof-container .reject-button:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+}
+
+.proof-container .reject-button i {
+    margin-right: 4px;
+}
+
 /* ==================== PAYMENT INSTALLMENTS STYLES ==================== */
 .installments-container {
     background: #f8f9fa;

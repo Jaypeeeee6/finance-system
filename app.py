@@ -1637,17 +1637,45 @@ def view_request(request_id):
                 manager_name = operation_manager.name
         
     
-    # Get all proof files for this request
+    # Get all proof files for this request grouped by batch
     proof_files = []
+    proof_batches = []
     if req.status in ['Proof Sent', 'Proof Rejected', 'Payment Pending', 'Paid', 'Completed']:
         import os
         import glob
         upload_folder = app.config['UPLOAD_FOLDER']
         # Look for all proof files for this request (files starting with proof_{request_id}_)
         proof_pattern = os.path.join(upload_folder, f"proof_{request_id}_*")
-        proof_files = [os.path.basename(f) for f in glob.glob(proof_pattern)]
-        # Sort by filename (which includes timestamp) to show newest first
-        proof_files.sort(reverse=True)
+        all_files = [os.path.basename(f) for f in glob.glob(proof_pattern)]
+        # Parse batch numbers from filenames
+        from collections import defaultdict
+        batches = defaultdict(list)
+        for fname in all_files:
+            batch_num = 1
+            try:
+                prefix = f"proof_{request_id}_"
+                if fname.startswith(prefix + "b"):
+                    after = fname[len(prefix)+1:]  # skip 'b'
+                    part = after.split('_', 1)[0]
+                    batch_num = int(part)
+            except Exception:
+                batch_num = 1
+            batches[batch_num].append(fname)
+
+        # Sort files within each batch by filename (timestamp included)
+        for bn in batches:
+            batches[bn].sort(reverse=True)
+
+        # Build ordered list of batches, latest first
+        ordered_batch_nums = sorted(batches.keys(), reverse=True)
+        for bn in ordered_batch_nums:
+            proof_batches.append({
+                'batch_num': bn,
+                'files': batches[bn]
+            })
+
+        # Also keep a flat list for legacy sections if any
+        proof_files = [f for bn in ordered_batch_nums for f in batches[bn]]
     
     # Get current server time for timer calculations
     current_server_time = datetime.utcnow()
@@ -1657,7 +1685,7 @@ def view_request(request_id):
     if req.finance_approval_duration_minutes is not None:
         db.session.commit()
     
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, proof_files=proof_files, current_server_time=current_server_time)
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time)
 
 
 @app.route('/request/<int:request_id>/approve', methods=['POST'])
@@ -2250,6 +2278,31 @@ def upload_proof(request_id):
     uploaded_files = []
     allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
     
+    # Determine next batch number for this request
+    import glob, os
+    existing_files_pattern = os.path.join(app.config['UPLOAD_FOLDER'], f"proof_{request_id}_*")
+    existing_files = [os.path.basename(f) for f in glob.glob(existing_files_pattern)]
+    max_batch = 0
+    for ef in existing_files:
+        # Expect formats:
+        #  - proof_{request_id}_b{batch}_{timestamp}_{original}
+        #  - legacy: proof_{request_id}_{timestamp}_{original}
+        try:
+            if ef.startswith(f"proof_{request_id}_b"):
+                after_prefix = ef[len(f"proof_{request_id}_b"):]
+                batch_str = after_prefix.split('_', 1)[0]
+                batch_num = int(batch_str)
+                if batch_num > max_batch:
+                    max_batch = batch_num;
+            elif ef.startswith(f"proof_{request_id}_"):
+                # Treat legacy as batch 1 candidate
+                if 1 > max_batch:
+                    max_batch = 1
+        except Exception:
+            pass
+
+    next_batch = max(1, max_batch + 1) if existing_files else 1
+
     for file in proof_files:
         if file and file.filename:
             # Validate file size (10MB max)
@@ -2267,7 +2320,7 @@ def upload_proof(request_id):
                 return redirect(url_for('view_request', request_id=request_id))
             
             # Generate unique filename
-            filename = secure_filename(f"proof_{request_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}")
+            filename = secure_filename(f"proof_{request_id}_b{next_batch}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}")
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
             uploaded_files.append(filename)
