@@ -1519,18 +1519,49 @@ def approve_request(request_id):
         today = datetime.utcnow().date()
         
         # Require receipt upload for Finance Admin approval
-        receipt_file = request.files.get('receipt')
-        if not receipt_file or not allowed_file(receipt_file.filename):
+        if 'receipt_files' not in request.files:
             flash('Receipt upload is required for Finance Admin approval.', 'error')
             return redirect(url_for('view_request', request_id=request_id))
         
-        # Handle receipt upload
-        filename = secure_filename(receipt_file.filename)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{timestamp}_{filename}"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        receipt_file.save(filepath)
-        req.receipt_path = filename
+        receipt_files = request.files.getlist('receipt_files')
+        if not receipt_files or not any(f.filename for f in receipt_files):
+            flash('Receipt upload is required for Finance Admin approval.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        # Handle multiple receipt uploads
+        uploaded_files = []
+        allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+        
+        for receipt_file in receipt_files:
+            if receipt_file and receipt_file.filename:
+                # Validate file size (10MB max)
+                if len(receipt_file.read()) > 10 * 1024 * 1024:  # 10MB
+                    flash(f'File "{receipt_file.filename}" is too large. Maximum size is 10MB.', 'error')
+                    return redirect(url_for('view_request', request_id=request_id))
+                
+                # Reset file pointer
+                receipt_file.seek(0)
+                
+                # Validate file extension
+                file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
+                if file_extension not in allowed_extensions:
+                    flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
+                    return redirect(url_for('view_request', request_id=request_id))
+                
+                # Generate unique filename
+                filename = secure_filename(receipt_file.filename)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = f"receipt_{timestamp}_{filename}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                receipt_file.save(filepath)
+                uploaded_files.append(filename)
+        
+        if not uploaded_files:
+            flash('No valid receipt files were uploaded.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        # Store the first file as primary receipt, others are additional
+        req.receipt_path = uploaded_files[0]
         
         req.approver = approver
         req.proof_required = proof_required
@@ -1634,18 +1665,49 @@ def approve_request(request_id):
     
     elif approval_status == 'paid':
         # Mark as paid - requires receipt upload
-        receipt_file = request.files.get('receipt')
-        if not receipt_file or not allowed_file(receipt_file.filename):
+        if 'receipt_files' not in request.files:
             flash('Receipt upload is required to mark as paid.', 'error')
             return redirect(url_for('view_request', request_id=request_id))
         
-        # Handle receipt upload
-        filename = secure_filename(receipt_file.filename)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{timestamp}_{filename}"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        receipt_file.save(filepath)
-        req.receipt_path = filename
+        receipt_files = request.files.getlist('receipt_files')
+        if not receipt_files or not any(f.filename for f in receipt_files):
+            flash('Receipt upload is required to mark as paid.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        # Handle multiple receipt uploads
+        uploaded_files = []
+        allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+        
+        for receipt_file in receipt_files:
+            if receipt_file and receipt_file.filename:
+                # Validate file size (10MB max)
+                if len(receipt_file.read()) > 10 * 1024 * 1024:  # 10MB
+                    flash(f'File "{receipt_file.filename}" is too large. Maximum size is 10MB.', 'error')
+                    return redirect(url_for('view_request', request_id=request_id))
+                
+                # Reset file pointer
+                receipt_file.seek(0)
+                
+                # Validate file extension
+                file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
+                if file_extension not in allowed_extensions:
+                    flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
+                    return redirect(url_for('view_request', request_id=request_id))
+                
+                # Generate unique filename
+                filename = secure_filename(receipt_file.filename)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = f"receipt_{timestamp}_{filename}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                receipt_file.save(filepath)
+                uploaded_files.append(filename)
+        
+        if not uploaded_files:
+            flash('No valid receipt files were uploaded.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        # Store the first file as primary receipt, others are additional
+        req.receipt_path = uploaded_files[0]
         
         req.status = 'Paid'
         req.approval_date = datetime.utcnow().date()
@@ -1776,27 +1838,78 @@ def upload_additional_files(request_id):
     req = PaymentRequest.query.get_or_404(request_id)
     
     # Check if request is in correct status for additional file upload
-    if req.status not in ['Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid']:
+    if req.status not in ['Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid', 'Completed', 'Recurring']:
         flash('This request is not in a state that allows file uploads.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
     # Handle file uploads
     files = request.files.getlist('additional_files')
+    print(f"DEBUG: Received {len(files)} files from request")
+    for i, file in enumerate(files):
+        print(f"DEBUG: File {i}: {file.filename if file else 'None'}")
+    
     uploaded_files = []
+    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+    
+    # First, validate all files and collect valid ones
+    valid_files = []
+    validation_errors = []
     
     for file in files:
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            # Add timestamp to filename to avoid conflicts
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f"additional_{timestamp}_{filename}"
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            uploaded_files.append(filename)
+        if file and file.filename:
+            # Validate file size (10MB max)
+            if len(file.read()) > 10 * 1024 * 1024:  # 10MB
+                validation_errors.append(f'File "{file.filename}" is too large. Maximum size is 10MB.')
+                continue
+            
+            # Reset file pointer
+            file.seek(0)
+            
+            # Validate file extension
+            file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+            if file_extension not in allowed_extensions:
+                validation_errors.append(f'Invalid file type for "{file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX')
+                continue
+            
+            # File is valid, add to valid files list
+            valid_files.append(file)
+    
+    # Show validation errors if any
+    if validation_errors:
+        for error in validation_errors:
+            flash(error, 'error')
+    
+    # Process only valid files
+    for file in valid_files:
+        filename = secure_filename(file.filename)
+        # Add timestamp to filename to avoid conflicts
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"additional_{timestamp}_{filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        uploaded_files.append(filename)
     
     if uploaded_files:
-        # Store additional files (you might want to add a new field for this)
-        # For now, we'll just log the action
+        # Store additional files in the database
+        import json
+        
+        # Get existing additional files
+        existing_files = []
+        if req.additional_files:
+            try:
+                existing_files = json.loads(req.additional_files)
+            except (json.JSONDecodeError, TypeError):
+                existing_files = []
+        
+        # Add new files to existing ones
+        all_files = existing_files + uploaded_files
+        
+        # Store as JSON string
+        req.additional_files = json.dumps(all_files)
+        req.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
         log_action(f"Finance admin uploaded {len(uploaded_files)} additional files to request #{request_id}")
         flash(f'Successfully uploaded {len(uploaded_files)} additional files.', 'success')
     else:
@@ -1934,35 +2047,56 @@ def upload_proof(request_id):
         flash('This request does not require proof upload.', 'error')
         return redirect(url_for('dashboard'))
     
-    # Handle file upload
-    if 'proof_file' not in request.files:
-        flash('No file uploaded.', 'error')
+    # Handle multiple file uploads
+    if 'proof_files' not in request.files:
+        flash('No files uploaded.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
-    file = request.files['proof_file']
+    proof_files = request.files.getlist('proof_files')
     
-    if file.filename == '':
-        flash('No file selected.', 'error')
+    if not proof_files or not any(f.filename for f in proof_files):
+        flash('No files selected.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
-    if file and allowed_file(file.filename):
-        filename = secure_filename(f"proof_{request_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}")
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        
-        # Update request
-        req.proof_of_payment = filename
+    uploaded_files = []
+    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+    
+    for file in proof_files:
+        if file and file.filename:
+            # Validate file size (10MB max)
+            if len(file.read()) > 10 * 1024 * 1024:  # 10MB
+                flash(f'File "{file.filename}" is too large. Maximum size is 10MB.', 'error')
+                return redirect(url_for('view_request', request_id=request_id))
+            
+            # Reset file pointer
+            file.seek(0)
+            
+            # Validate file extension
+            file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+            if file_extension not in allowed_extensions:
+                flash(f'Invalid file type for "{file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
+                return redirect(url_for('view_request', request_id=request_id))
+            
+            # Generate unique filename
+            filename = secure_filename(f"proof_{request_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}")
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            uploaded_files.append(filename)
+    
+    if uploaded_files:
+        # Update request - store the first file as primary proof, others are additional
+        req.proof_of_payment = uploaded_files[0]
         req.status = 'Proof Sent'
         req.updated_at = datetime.utcnow()
         
         db.session.commit()
         
-        log_action(f"Uploaded proof for payment request #{request_id}")
+        log_action(f"Uploaded {len(uploaded_files)} proof files for payment request #{request_id}")
         
         # Notify Finance Admin
         notify_finance_and_admin(
             title="Proof of Payment Uploaded",
-            message=f"Proof of payment has been uploaded for request #{request_id} by {current_user.name}",
+            message=f"{len(uploaded_files)} proof file(s) have been uploaded for request #{request_id} by {current_user.name}",
             notification_type="proof_uploaded",
             request_id=request_id
         )
@@ -1974,9 +2108,9 @@ def upload_proof(request_id):
             'requestor': current_user.username
         })
         
-        flash('Proof of payment uploaded successfully! Finance will review your proof.', 'success')
+        flash(f'Successfully uploaded {len(uploaded_files)} proof file(s)! Finance will review your proof.', 'success')
     else:
-        flash('Invalid file type. Please upload an image (jpg, png, gif, etc.).', 'error')
+        flash('No valid files were uploaded.', 'error')
     
     return redirect(url_for('view_request', request_id=request_id))
 
@@ -2301,14 +2435,44 @@ def upload_installment_receipt(request_id):
     
     schedule_id = request.form.get('schedule_id')
     payment_date = request.form.get('payment_date')
-    receipt_file = request.files.get('receipt')
     
-    if not schedule_id or not payment_date or not receipt_file:
+    if not schedule_id or not payment_date:
         flash('Missing required parameters.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
-    if not allowed_file(receipt_file.filename):
-        flash('Invalid file type. Please upload an image or PDF.', 'error')
+    # Handle multiple receipt uploads
+    if 'receipt_files' not in request.files:
+        flash('No receipt files uploaded.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    receipt_files = request.files.getlist('receipt_files')
+    if not receipt_files or not any(f.filename for f in receipt_files):
+        flash('No receipt files selected.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    uploaded_files = []
+    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+    
+    for receipt_file in receipt_files:
+        if receipt_file and receipt_file.filename:
+            # Validate file size (10MB max)
+            if len(receipt_file.read()) > 10 * 1024 * 1024:  # 10MB
+                flash(f'File "{receipt_file.filename}" is too large. Maximum size is 10MB.', 'error')
+                return redirect(url_for('view_request', request_id=request_id))
+            
+            # Reset file pointer
+            receipt_file.seek(0)
+            
+            # Validate file extension
+            file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
+            if file_extension not in allowed_extensions:
+                flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
+                return redirect(url_for('view_request', request_id=request_id))
+            
+            uploaded_files.append(receipt_file)
+    
+    if not uploaded_files:
+        flash('No valid receipt files were uploaded.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
     try:
@@ -2318,15 +2482,19 @@ def upload_installment_receipt(request_id):
             flash('Installment not found.', 'error')
             return redirect(url_for('view_request', request_id=request_id))
         
-        # Handle receipt upload
-        filename = secure_filename(receipt_file.filename)
+        # Handle multiple receipt uploads
+        uploaded_filenames = []
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"installment_{schedule_id}_{timestamp}_{filename}"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        receipt_file.save(filepath)
         
-        # Store receipt path in schedule entry
-        schedule_entry.receipt_path = filename
+        for i, receipt_file in enumerate(uploaded_files):
+            filename = secure_filename(receipt_file.filename)
+            filename = f"installment_{schedule_id}_{timestamp}_{i+1}_{filename}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            receipt_file.save(filepath)
+            uploaded_filenames.append(filename)
+        
+        # Store the first file as primary receipt, others are additional
+        schedule_entry.receipt_path = uploaded_filenames[0]
         db.session.commit()
         
         log_action(f"Uploaded receipt for installment {schedule_id} for request #{request_id}")

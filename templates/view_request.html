@@ -898,12 +898,15 @@
                                     </select>
                                 </div>
                                 
-                                <div class="form-group">
-                                    <label for="finance_receipt">Upload Receipt *</label>
-                                    <input type="file" name="receipt" id="finance_receipt" accept=".jpg,.jpeg,.png,.pdf" required>
-                                    <small style="color: #666; margin-top: 5px; display: block;">
-                                        Required for Finance Admin approval
-                                    </small>
+                                <div id="finance-receipt-upload-container" 
+                                     data-multiple-file-upload
+                                     data-input-name="receipt_files"
+                                     data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                     data-max-size="10485760"
+                                     data-max-files="10"
+                                     data-required="true"
+                                     data-label="Upload Receipt"
+                                     data-help-text="Required for Finance Admin approval (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
                                 </div>
                                 
                                 <div class="form-group checkbox-group">
@@ -961,13 +964,16 @@
                         <p style="margin: 0; opacity: 0.9;">Your request has been approved. Please upload proof of payment.</p>
                     </div>
                     <div class="card-body">
-                        <form method="POST" action="{{ url_for('upload_proof', request_id=request.request_id) }}" enctype="multipart/form-data">
-                            <div class="form-group">
-                                <label for="proof_file">Upload Proof of Payment *</label>
-                                <input type="file" name="proof_file" id="proof_file" accept=".jpg,.jpeg,.png,.pdf" required>
-                                <small style="color: #666; margin-top: 5px; display: block;">
-                                    Supported formats: JPG, PNG, PDF. You can upload multiple files.
-                                </small>
+                        <form method="POST" action="{{ url_for('upload_proof', request_id=request.request_id) }}" enctype="multipart/form-data" id="proofUploadForm">
+                            <div id="proof-upload-container" 
+                                 data-multiple-file-upload
+                                 data-input-name="proof_files"
+                                 data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                 data-max-size="10485760"
+                                 data-max-files="10"
+                                 data-required="true"
+                                 data-label="Upload Proof of Payment"
+                                 data-help-text="Upload multiple proof files (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
                             </div>
                             <div class="step-actions">
                                 <button type="submit" class="btn btn-success">
@@ -1026,13 +1032,16 @@
                         {% endif %}
                         
                         <!-- New Proof Upload Form -->
-                        <form method="POST" action="{{ url_for('upload_proof', request_id=request.request_id) }}" enctype="multipart/form-data">
-                            <div class="form-group">
-                                <label for="proof_file">Upload New Proof of Payment *</label>
-                                <input type="file" name="proof_file" id="proof_file" accept=".jpg,.jpeg,.png,.pdf" required>
-                                <small style="color: #666; margin-top: 5px; display: block;">
-                                    Supported formats: JPG, PNG, PDF. You can upload multiple files.
-                                </small>
+                        <form method="POST" action="{{ url_for('upload_proof', request_id=request.request_id) }}" enctype="multipart/form-data" id="proofRejectedUploadForm">
+                            <div id="proof-rejected-upload-container" 
+                                 data-multiple-file-upload
+                                 data-input-name="proof_files"
+                                 data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                 data-max-size="10485760"
+                                 data-max-files="10"
+                                 data-required="true"
+                                 data-label="Upload New Proof of Payment"
+                                 data-help-text="Upload multiple proof files (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
                             </div>
                             <div class="step-actions">
                                 <button type="submit" class="btn btn-success">
@@ -1055,10 +1064,16 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <h5>Upload Additional Files</h5>
-                                <form method="POST" action="{{ url_for('upload_additional_files', request_id=request.request_id) }}" enctype="multipart/form-data">
-                                    <div class="form-group">
-                                        <label for="additional_files">Select Files</label>
-                                        <input type="file" name="additional_files" id="additional_files" multiple accept=".jpg,.jpeg,.png,.pdf">
+                                <form method="POST" action="{{ url_for('upload_additional_files', request_id=request.request_id) }}" enctype="multipart/form-data" id="additionalFilesForm">
+                                    <div id="additional-files-upload-container" 
+                                         data-multiple-file-upload
+                                         data-input-name="additional_files"
+                                         data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                         data-max-size="10485760"
+                                         data-max-files="10"
+                                         data-required="false"
+                                         data-label="Select Files"
+                                         data-help-text="Upload additional files (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
                                     </div>
                                     <button type="submit" class="btn btn-info">
                                         <i class="fas fa-upload"></i> Upload Files
@@ -1080,6 +1095,34 @@
                         
                     </div>
                 </div>
+            {% endif %}
+            
+            <!-- Additional Files Display - Visible to all users -->
+            {% if request.additional_files %}
+                {% set additional_files = request.additional_files|from_json if request.additional_files else [] %}
+                {% if additional_files|length > 0 %}
+                    <div class="card" style="margin-top: 1.5rem;">
+                        <div class="card-header" style="background: #6c757d; color: white;">
+                            <h4><i class="fas fa-paperclip"></i> Additional Files</h4>
+                            <p style="margin: 0; opacity: 0.9;">Files uploaded by Finance Admin</p>
+                        </div>
+                        <div class="card-body">
+                            <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px;">
+                                {% for file in additional_files %}
+                                <div style="margin-bottom: 10px; padding: 10px; background: white; border-radius: 4px; border: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="display: flex; align-items: center;">
+                                        <i class="fas fa-file" style="color: #6c757d; margin-right: 10px; font-size: 16px;"></i>
+                                        <span style="color: #333; font-size: 14px; font-weight: 500;">{{ file.split('_', 2)[2] if file.count('_') >= 2 else file }}</span>
+                                    </div>
+                                    <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-info btn-sm" style="background-color: #17a2b8; border-color: #17a2b8; color: white; padding: 6px 12px; font-size: 12px; border-radius: 4px;">
+                                        <i class="fas fa-eye"></i> View Receipt
+                                    </a>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
             {% endif %}
         </div>
     </div>
@@ -1378,12 +1421,15 @@ function uploadInstallmentReceipt(scheduleId, paymentDate) {
                     <div class="modal-body" style="padding: 20px;">
                         <input type="hidden" name="schedule_id" value="${scheduleId}">
                         <input type="hidden" name="payment_date" value="${paymentDate}">
-                        <div class="form-group">
-                            <label for="installment_receipt" style="display: block; margin-bottom: 8px; font-weight: 500;">Upload Receipt *</label>
-                            <input type="file" name="receipt" id="installment_receipt" accept=".jpg,.jpeg,.png,.pdf" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
-                            <small style="color: #666; font-size: 0.9rem; margin-top: 5px; display: block;">
-                                Supported formats: JPG, PNG, PDF
-                            </small>
+                        <div id="installment-receipt-upload-container" 
+                             data-multiple-file-upload
+                             data-input-name="receipt_files"
+                             data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                             data-max-size="10485760"
+                             data-max-files="10"
+                             data-required="true"
+                             data-label="Upload Receipt"
+                             data-help-text="Upload receipt files (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
                         </div>
                     </div>
                     <div class="modal-footer" style="padding: 15px 20px; border-top: 1px solid #dee2e6; text-align: right;">
@@ -1594,6 +1640,202 @@ document.addEventListener('keydown', function(event) {
     opacity: 0.9;
 }
 </style>
+
+<!-- Include multiple file upload JavaScript -->
+<script src="{{ url_for('static', filename='js/multiple-file-upload.js') }}"></script>
+
+<script>
+// Form submission handlers for proof uploads
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle proof upload form submission
+    const proofUploadForm = document.getElementById('proofUploadForm');
+    if (proofUploadForm) {
+        proofUploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Get the multiple file upload component
+            const container = document.getElementById('proof-upload-container');
+            if (container && container.uploadComponent) {
+                const uploadComponent = container.uploadComponent;
+                if (uploadComponent.getFiles().length === 0) {
+                    alert('Please select at least one file to upload.');
+                    return;
+                }
+                
+                // Prepare form data with all selected files
+                const formData = new FormData(this);
+                uploadComponent.prepareFormData(formData);
+                
+                // Submit the form with FormData
+                fetch(this.action, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        window.location.href = window.location.href;
+                    } else {
+                        console.error('Form submission failed');
+                        alert('Form submission failed. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred. Please try again.');
+                });
+            } else {
+                this.submit();
+            }
+        });
+    }
+    
+    // Handle proof rejected upload form submission
+    const proofRejectedUploadForm = document.getElementById('proofRejectedUploadForm');
+    if (proofRejectedUploadForm) {
+        proofRejectedUploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Get the multiple file upload component
+            const container = document.getElementById('proof-rejected-upload-container');
+            if (container && container.uploadComponent) {
+                const uploadComponent = container.uploadComponent;
+                if (uploadComponent.getFiles().length === 0) {
+                    alert('Please select at least one file to upload.');
+                    return;
+                }
+                
+                // Prepare form data with all selected files
+                const formData = new FormData(this);
+                uploadComponent.prepareFormData(formData);
+                
+                // Submit the form with FormData
+                fetch(this.action, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        window.location.href = window.location.href;
+                    } else {
+                        console.error('Form submission failed');
+                        alert('Form submission failed. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred. Please try again.');
+                });
+            } else {
+                this.submit();
+            }
+        });
+    }
+    
+    // Handle additional files form submission - same as new request page
+    const additionalFilesForm = document.getElementById('additionalFilesForm');
+    if (additionalFilesForm) {
+        additionalFilesForm.addEventListener('submit', function(e) {
+            // Get the multiple file upload component
+            const container = document.getElementById('additional-files-upload-container');
+            if (container && container.uploadComponent) {
+                const uploadComponent = container.uploadComponent;
+                
+                // Check if files are selected
+                if (uploadComponent.getFiles().length === 0) {
+                    e.preventDefault();
+                    alert('Please select at least one file to upload.');
+                    return;
+                }
+                
+                // Create a new FormData object with all the files
+                const formData = new FormData(this);
+                
+                // Clear existing additional_files from FormData
+                formData.delete('additional_files');
+                
+                // Add all selected files to FormData
+                uploadComponent.getFiles().forEach((file, index) => {
+                    formData.append('additional_files', file);
+                });
+                
+                // Debug: Log the files being submitted
+                console.log('Files being submitted:', uploadComponent.getFiles().length);
+                uploadComponent.getFiles().forEach((file, index) => {
+                    console.log('File', index, ':', file.name);
+                });
+                
+                // Prevent default form submission
+                e.preventDefault();
+                
+                // Submit the form with FormData
+                fetch(this.action, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        // Redirect to the same page to show updated files
+                        window.location.href = window.location.href;
+                    } else {
+                        // Handle error
+                        console.error('Form submission failed');
+                        alert('Form submission failed. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred. Please try again.');
+                });
+            } else {
+                // Fallback to regular form submission
+                console.log('Component not found, using regular form submission');
+            }
+        });
+    }
+    
+    // Handle installment receipt form submission
+    const installmentReceiptForm = document.getElementById('installmentReceiptForm');
+    if (installmentReceiptForm) {
+        installmentReceiptForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Get the multiple file upload component
+            const container = document.getElementById('installment-receipt-upload-container');
+            if (container && container.uploadComponent) {
+                const uploadComponent = container.uploadComponent;
+                if (uploadComponent.getFiles().length === 0) {
+                    alert('Please select at least one file to upload.');
+                    return;
+                }
+                
+                // Prepare form data with all selected files
+                const formData = new FormData(this);
+                uploadComponent.prepareFormData(formData);
+                
+                // Submit the form with FormData
+                fetch(this.action, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        window.location.href = window.location.href;
+                    } else {
+                        console.error('Form submission failed');
+                        alert('Form submission failed. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred. Please try again.');
+                });
+            } else {
+                this.submit();
+            }
+        });
+    }
+});
+</script>
 
 {% endblock %}
 

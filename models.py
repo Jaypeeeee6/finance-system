@@ -75,6 +75,7 @@ class PaymentRequest(db.Model):
     manager_approval_reason = db.Column(db.Text)  # Manager's notes when approving
     finance_rejection_date = db.Column(db.Date)  # Date when finance rejected
     completion_date = db.Column(db.Date)  # Date when request was completed
+    additional_files = db.Column(db.Text)  # JSON string containing additional file paths uploaded by Finance Admin
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
