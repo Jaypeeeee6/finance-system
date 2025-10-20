@@ -35,6 +35,30 @@
                 {% endif %}
                 
                 
+                <li class="notification-bell-container">
+                    <button class="notification-bell" onclick="toggleNotificationDropdown()">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="nav-notification-badge" style="display: none;">0</span>
+                    </button>
+                    <div class="notification-dropdown" id="notification-dropdown">
+                        <div class="notification-dropdown-header">
+                            <h3>Notifications</h3>
+                            <button class="close-dropdown" onclick="closeNotificationDropdown()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="notification-dropdown-content" id="notification-dropdown-content">
+                            <div class="notification-loading">
+                                <i class="fas fa-spinner fa-spin"></i> Loading notifications...
+                            </div>
+                        </div>
+                        <div class="notification-dropdown-footer">
+                            <a href="{{ url_for('notifications') }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-list"></i> View All
+                            </a>
+                        </div>
+                    </div>
+                </li>
                 <li class="nav-user">
                     <span class="user-info">
                         <i class="fas fa-user-circle"></i>
@@ -73,6 +97,193 @@
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     <script src="{{ url_for('static', filename='js/realtime.js') }}"></script>
     <script src="{{ url_for('static', filename='js/multiple-file-upload.js') }}"></script>
+    
+    <!-- Notification Bell JavaScript -->
+    <script>
+    let notificationDropdownOpen = false;
+    
+    function toggleNotificationDropdown() {
+        const dropdown = document.getElementById('notification-dropdown');
+        if (notificationDropdownOpen) {
+            closeNotificationDropdown();
+        } else {
+            openNotificationDropdown();
+        }
+    }
+    
+    function openNotificationDropdown() {
+        const dropdown = document.getElementById('notification-dropdown');
+        const content = document.getElementById('notification-dropdown-content');
+        
+        dropdown.classList.add('show');
+        notificationDropdownOpen = true;
+        
+        // Load notifications
+        loadNotifications();
+    }
+    
+    function closeNotificationDropdown() {
+        const dropdown = document.getElementById('notification-dropdown');
+        dropdown.classList.remove('show');
+        notificationDropdownOpen = false;
+        
+        // Stop dynamic time updates when dropdown is closed
+        stopDynamicTimeUpdates();
+    }
+    
+    function loadNotifications() {
+        const content = document.getElementById('notification-dropdown-content');
+        content.innerHTML = '<div class="notification-loading"><i class="fas fa-spinner fa-spin"></i> Loading notifications...</div>';
+        
+        fetch('/api/notifications/recent')
+            .then(response => response.json())
+            .then(data => {
+                displayNotifications(data);
+            })
+            .catch(error => {
+                console.error('Error loading notifications:', error);
+                content.innerHTML = '<div class="notification-empty"><i class="fas fa-exclamation-triangle"></i><p>Error loading notifications</p></div>';
+            });
+    }
+    
+    function displayNotifications(notifications) {
+        const content = document.getElementById('notification-dropdown-content');
+        
+        if (notifications.length === 0) {
+            content.innerHTML = '<div class="notification-empty"><i class="fas fa-bell-slash"></i><p>No notifications</p></div>';
+            return;
+        }
+        
+        let html = '';
+        notifications.forEach(notification => {
+            const isUnread = !notification.is_read;
+            
+            html += `
+                <div class="notification-item-dropdown ${isUnread ? 'unread' : ''}" data-notification-id="${notification.notification_id}" data-created-at="${notification.created_at}">
+                    <div class="notification-title-dropdown">
+                        ${isUnread ? '<i class="fas fa-circle notification-dot"></i>' : ''}
+                        ${notification.title}
+                    </div>
+                    <div class="notification-message-dropdown">${notification.message}</div>
+                    <div class="notification-time-dropdown" data-time-element="true">${getTimeAgo(notification.created_at)}</div>
+                    <div class="notification-actions-dropdown">
+                        ${notification.request_id ? `<a href="/request/${notification.request_id}" class="btn btn-sm btn-info"><i class="fas fa-eye"></i> View</a>` : ''}
+                        ${isUnread ? `<button onclick="markAsRead(${notification.notification_id})" class="btn btn-sm btn-success"><i class="fas fa-check"></i> Mark Read</button>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        content.innerHTML = html;
+        
+        // Start dynamic time updates
+        startDynamicTimeUpdates();
+    }
+    
+    function startDynamicTimeUpdates() {
+        // Clear any existing interval
+        if (window.notificationTimeInterval) {
+            clearInterval(window.notificationTimeInterval);
+        }
+        
+        // Update time every minute
+        window.notificationTimeInterval = setInterval(() => {
+            const timeElements = document.querySelectorAll('[data-time-element="true"]');
+            timeElements.forEach(element => {
+                const notificationItem = element.closest('.notification-item-dropdown');
+                const createdAt = notificationItem.getAttribute('data-created-at');
+                if (createdAt) {
+                    element.textContent = getTimeAgo(createdAt);
+                }
+            });
+        }, 60000); // Update every minute
+    }
+    
+    function stopDynamicTimeUpdates() {
+        if (window.notificationTimeInterval) {
+            clearInterval(window.notificationTimeInterval);
+            window.notificationTimeInterval = null;
+        }
+    }
+    
+    function getTimeAgo(dateString) {
+        const now = new Date();
+        const date = new Date(dateString);
+        
+        // The notification time from server is in UTC, convert to GST
+        const dateGST = new Date(date.getTime() + (4 * 60 * 60 * 1000));
+        
+        // Current time is already in user's local timezone (GST), so use it directly
+        const diffInSeconds = Math.floor((now - dateGST) / 1000);
+        
+        if (diffInSeconds < 60) return 'Just now';
+        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+        if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+        
+        return dateGST.toLocaleDateString();
+    }
+    
+    function markAsRead(notificationId) {
+        fetch(`/notifications/mark_read/${notificationId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove unread styling
+                    const notificationItem = document.querySelector(`[data-notification-id="${notificationId}"]`);
+                    if (notificationItem) {
+                        notificationItem.classList.remove('unread');
+                        const dot = notificationItem.querySelector('.notification-dot');
+                        if (dot) {
+                            dot.remove();
+                        }
+                        const markButton = notificationItem.querySelector('button');
+                        if (markButton) {
+                            markButton.remove();
+                        }
+                    }
+                    // Update badge count
+                    updateNotificationBadge();
+                }
+            })
+            .catch(error => {
+                console.error('Error marking notification as read:', error);
+            });
+    }
+    
+    function updateNotificationBadge() {
+        fetch('/api/notifications/unread_count')
+            .then(response => response.json())
+            .then(data => {
+                const badge = document.getElementById('nav-notification-badge');
+                if (data.count > 0) {
+                    badge.textContent = data.count;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Error updating notification count:', error);
+            });
+    }
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        const dropdown = document.getElementById('notification-dropdown');
+        const bell = document.querySelector('.notification-bell');
+        
+        if (notificationDropdownOpen && !dropdown.contains(event.target) && !bell.contains(event.target)) {
+            closeNotificationDropdown();
+        }
+    });
+    
+    // Update notification badge on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        updateNotificationBadge();
+    });
+    </script>
+    
     {% block extra_js %}{% endblock %}
 </body>
 </html>

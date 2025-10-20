@@ -19,45 +19,6 @@
     </div>
 
 
-    <!-- Notifications Section -->
-    {% if notifications %}
-    <div class="card">
-        <div class="card-header">
-            <h2><i class="fas fa-bell"></i> Recent Notifications 
-                {% if unread_count > 0 %}
-                <span class="notification-badge">{{ unread_count }}</span>
-                {% endif %}
-            </h2>
-            <a href="{{ url_for('notifications') }}" class="btn btn-sm btn-primary">View All</a>
-        </div>
-        <div class="card-body">
-            <div class="notifications-preview">
-                {% for notification in notifications[:3] %}
-                <div class="notification-preview {% if not notification.is_read %}unread{% endif %}">
-                    <div class="notification-preview-content">
-                        <h4 class="notification-preview-title">
-                            {% if not notification.is_read %}
-                                <i class="fas fa-circle notification-dot"></i>
-                            {% endif %}
-                            {{ notification.title }}
-                        </h4>
-                        <p class="notification-preview-message">{{ notification.message[:100] }}{% if notification.message|length > 100 %}...{% endif %}</p>
-                        <span class="notification-preview-time">
-                            {% set gst_time = notification.created_at.replace(tzinfo=None) + timedelta(hours=4) %}
-                            {{ gst_time.strftime('%B %d, %Y at %I:%M %p') }}
-                        </span>
-                        {% if notification.request_id %}
-                        <a href="{{ url_for('view_request', request_id=notification.request_id) }}" class="btn btn-sm btn-info">
-                            <i class="fas fa-eye"></i> View Request
-                        </a>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-    {% endif %}
 
     <div class="card">
         <div class="card-header">
@@ -256,60 +217,10 @@
 
 {% block extra_js %}
 <script>
-// Update notification count on dashboard load
+// Dashboard-specific functionality
 document.addEventListener('DOMContentLoaded', function() {
-    updateNotificationCount();
+    // Any dashboard-specific initialization can go here
 });
-
-function filterByDepartment(department) {
-    // Redirect to dashboard with department filter
-    const url = new URL(window.location);
-    if (department) {
-        url.searchParams.set('department', department);
-    } else {
-        url.searchParams.delete('department');
-    }
-    url.searchParams.set('page', '1'); // Reset to page 1 when filtering
-    window.location.href = url.toString();
-}
-
-function updateNotificationCount() {
-    fetch('/api/notifications/unread_count')
-        .then(response => response.json())
-        .then(data => {
-            // Update notification badge in navigation
-            const navLink = document.querySelector('a[href*="notifications"]');
-            if (navLink) {
-                let badge = navLink.querySelector('.notification-badge');
-                if (!badge) {
-                    badge = document.createElement('span');
-                    badge.className = 'notification-badge';
-                    navLink.appendChild(badge);
-                }
-                
-                if (data.count > 0) {
-                    badge.textContent = data.count;
-                    badge.style.display = 'inline';
-                } else {
-                    badge.style.display = 'none';
-                }
-            }
-            
-            // Update notification badge in dashboard header
-            const dashboardBadge = document.querySelector('.card-header .notification-badge');
-            if (dashboardBadge) {
-                if (data.count > 0) {
-                    dashboardBadge.textContent = data.count;
-                    dashboardBadge.style.display = 'inline';
-                } else {
-                    dashboardBadge.style.display = 'none';
-                }
-            }
-        })
-        .catch(error => {
-            console.error('Error updating notification count:', error);
-        });
-}
 
 function changeItemsPerPage(perPage) {
     // Redirect to page 1 with new per_page value

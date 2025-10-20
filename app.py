@@ -672,12 +672,35 @@ def get_notifications_for_user(user):
     
     elif user.role in ['Finance Staff', 'Finance Admin']:
         # Finance roles: New submissions when requests reach Pending Finance Approval + proof uploaded + recurring payment due + system-wide
-        return Notification.query.filter(
-            db.and_(
-                Notification.user_id == user.user_id,
-                Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
-            )
-        ).order_by(Notification.created_at.desc()).limit(5).all()
+        # Finance Staff additionally get updates on their own requests
+        if user.role == 'Finance Staff':
+            return Notification.query.filter(
+                db.and_(
+                    Notification.user_id == user.user_id,
+                    db.or_(
+                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                    )
+                )
+            ).order_by(Notification.created_at.desc()).limit(5).all()
+        elif user.name == 'Abdalaziz Hamood Al Brashdi':
+            # Abdalaziz gets finance notifications + updates on Finance Staff, GM, and Operation Manager requests
+            return Notification.query.filter(
+                db.and_(
+                    Notification.user_id == user.user_id,
+                    db.or_(
+                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                    )
+                )
+            ).order_by(Notification.created_at.desc()).limit(5).all()
+        else:  # Other Finance Admin
+            return Notification.query.filter(
+                db.and_(
+                    Notification.user_id == user.user_id,
+                    Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
+                )
+            ).order_by(Notification.created_at.desc()).limit(5).all()
     
     elif user.role == 'GM':
         # GM: New submissions from Department Manager only + updates on their own requests + system-wide
@@ -770,13 +793,38 @@ def get_unread_count_for_user(user):
     
     elif user.role in ['Finance Staff', 'Finance Admin']:
         # Finance roles: New submissions when requests reach Pending Finance Approval + proof uploaded + recurring payment due + system-wide
-        return Notification.query.filter(
-            db.and_(
-                Notification.user_id == user.user_id,
-                Notification.is_read == False,
-                Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
-            )
-        ).count()
+        # Finance Staff additionally get updates on their own requests
+        if user.role == 'Finance Staff':
+            return Notification.query.filter(
+                db.and_(
+                    Notification.user_id == user.user_id,
+                    Notification.is_read == False,
+                    db.or_(
+                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                    )
+                )
+            ).count()
+        elif user.name == 'Abdalaziz Hamood Al Brashdi':
+            # Abdalaziz gets finance notifications + updates on Finance Staff, GM, and Operation Manager requests
+            return Notification.query.filter(
+                db.and_(
+                    Notification.user_id == user.user_id,
+                    Notification.is_read == False,
+                    db.or_(
+                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                    )
+                )
+            ).count()
+        else:  # Other Finance Admin
+            return Notification.query.filter(
+                db.and_(
+                    Notification.user_id == user.user_id,
+                    Notification.is_read == False,
+                    Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
+                )
+            ).count()
     
     elif user.role == 'GM':
         # GM: New submissions from Department Manager only + updates on their own requests + system-wide
@@ -1175,9 +1223,32 @@ def finance_dashboard():
         per_page = 10
     
     # Build query with optional department and search filters
-    # Finance Staff can only see finance-related statuses as per RBAC (not Pending Manager Approval)
+    # Finance Staff can see finance-related statuses + their own requests with Pending Manager Approval + their own requests with Rejected by Manager
+    # Abdalaziz can see finance-related statuses + Pending Manager Approval + Rejected by Manager for Finance Staff, GM, and Operation Manager
     finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Recurring', 'Completed', 'Rejected by Finance']
+    
+    # Base query for finance-related statuses
     query = PaymentRequest.query.filter(PaymentRequest.status.in_(finance_statuses))
+    
+    # Add Finance Staff's own requests with Pending Manager Approval and Rejected by Manager
+    if current_user.role == 'Finance Staff':
+        own_pending_requests = PaymentRequest.query.filter(
+            db.and_(
+                PaymentRequest.user_id == current_user.user_id,
+                PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager'])
+            )
+        )
+        query = query.union(own_pending_requests)
+    
+    # Add Abdalaziz's special permissions for Finance Staff, GM, and Operation Manager requests
+    elif current_user.name == 'Abdalaziz Hamood Al Brashdi':
+        abdalaziz_special_requests = PaymentRequest.query.filter(
+            db.and_(
+                PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager']),
+                PaymentRequest.user.has(User.role.in_(['Finance Staff', 'GM', 'Operation Manager']))
+            )
+        )
+        query = query.union(abdalaziz_special_requests)
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     if search_query:
@@ -1837,13 +1908,16 @@ def view_request(request_id):
         # Finance users can only view requests in finance-related statuses
         finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Recurring', 'Completed', 'Rejected by Finance']
         
-        # For Abdalaziz, also allow viewing Pending Manager Approval requests from Finance Staff, GM, and Operation Manager
-        if current_user.name == 'Abdalaziz Hamood Al Brashdi' and req.status == 'Pending Manager Approval':
+        # For Abdalaziz, also allow viewing Pending Manager Approval and Rejected by Manager requests from Finance Staff, GM, and Operation Manager
+        if current_user.name == 'Abdalaziz Hamood Al Brashdi' and req.status in ['Pending Manager Approval', 'Rejected by Manager']:
             if req.user.role in ['Finance Staff', 'GM', 'Operation Manager']:
                 pass  # Allow access
             else:
                 flash('You do not have permission to view this request.', 'danger')
                 return redirect(url_for('dashboard'))
+        # For Finance Staff, allow viewing their own requests with Pending Manager Approval and Rejected by Manager
+        elif current_user.role == 'Finance Staff' and req.status in ['Pending Manager Approval', 'Rejected by Manager'] and req.user_id == current_user.user_id:
+            pass  # Allow access to own requests
         elif req.status not in finance_statuses:
             flash('You do not have permission to view this request.', 'danger')
             return redirect(url_for('dashboard'))

@@ -49,6 +49,7 @@ This document describes who can view what, who can approve/reject, and how a pay
   - **View**: All departments, all roles; finance-related statuses across the board
     - Statuses of interest: Pending Finance Approval, Proof Pending, Proof Sent, Recurring, Completed, Rejected by Finance
     - Additional for Abdalaziz: Pending Manager Approval (only for Finance Staff, General Manager, and Operation Manager requests)
+    - Additional for Abdalaziz: Rejected by Manager (only for Finance Staff, General Manager, and Operation Manager requests)
   - **Approve/Reject**: All departments as Finance Admin approvers, only after manager approval
 
 - **Finance Admin (Abdalaziz)**
@@ -59,6 +60,8 @@ This document describes who can view what, who can approve/reject, and how a pay
 - **Finance Staff**
   - **View**: All departments, all roles; finance-related statuses across the board
     - Statuses of interest: Pending Finance Approval, Proof Pending, Proof Sent, Recurring, Completed, Rejected by Finance
+    - **Additional**: Pending Manager Approval (only for their own requests)
+    - **Additional**: Rejected by Manager (only for their own requests)
   - **Approve/Reject**: None
 
 ### IT Department
@@ -104,12 +107,15 @@ Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Qual
 
 ### **Finance Admin (Mahmoud, Abdalaziz)**
 - **New submissions** when requests reach "Pending Finance Approval"
+- **Updates on their own requests** (status changes, approvals, rejections, etc.)
 - **Proof uploaded** notifications
 - **Recurring payment due** notifications
 - **System-wide notifications** (all types)
+- **Additional for Abdalaziz**: Updates on Finance Staff, General Manager, and Operation Manager requests (including rejections)
 
 ### **Finance Staff**
 - **New submissions** when requests reach "Pending Finance Approval"
+- **Updates on their own requests** (status changes, approvals, rejections, etc.)
 - **Proof uploaded** notifications
 - **Recurring payment due** notifications
 - **System-wide notifications** (all types)
