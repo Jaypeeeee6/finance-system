@@ -798,13 +798,19 @@
                         <h4>Finance Admin Decision</h4>
                     </div>
                     <div class="card-body">
-                        <!-- Status Display -->
-                        <div class="status-display" style="margin-bottom: 1.5rem;">
-                            <div style="font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 0.5rem;">Status</div>
-                            <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
-                                <span style="color: #155724; font-weight: bold; font-size: 1.1rem;">{{ request.status.upper() }}</span>
-                            </div>
-                        </div>
+                         <!-- Status Display -->
+                         <div class="status-display" style="margin-bottom: 1.5rem;">
+                             <div style="font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 0.5rem;">Status</div>
+                             {% if request.status == 'Proof Pending' %}
+                                 <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 12px 20px; text-align: center;">
+                                     <span style="color: #856404; font-weight: bold; font-size: 1.1rem;">{{ request.status.upper() }}</span>
+                                 </div>
+                             {% else %}
+                                 <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
+                                     <span style="color: #155724; font-weight: bold; font-size: 1.1rem;">{{ request.status.upper() }}</span>
+                                 </div>
+                             {% endif %}
+                         </div>
                         
                         {% if request.approver %}
                         <div class="form-group">
@@ -871,7 +877,7 @@
                                     <select name="approver" id="finance_approver" required>
                                         <option value="">-- Select Finance Admin Approver --</option>
                                         <option value="Mahmoud">Mahmoud</option>
-                                        <option value="Abdulaziz">Abdulaziz</option>
+                                        <option value="Abdalaziz">Abdalaziz</option>
                                     </select>
                                 </div>
                                 
@@ -903,9 +909,29 @@
                         </div>
                     </div>
                 {% else %}
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i>
-                        Waiting for Finance Admin approval. Only Finance Admins can approve this request.
+                    <!-- Static message for non-finance admins -->
+                    <div class="card" style="margin-bottom: 1.5rem;">
+                        <div class="card-header" style="background: #e3f2fd; color: #1976d2; border-left: 4px solid #2196f3;">
+                            <h4><i class="fas fa-dollar-sign"></i> Finance Admin Approval Required</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <p style="margin-bottom: 0.5rem; font-size: 1.1rem;">
+                                        <strong>Status:</strong> Waiting for Finance Admin Approval
+                                    </p>
+                                    <p style="margin-bottom: 0; color: #666;">
+                                        <strong>Department:</strong> Finance
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-right">
+                                    <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 1rem; text-align: center;">
+                                        <i class="fas fa-clock" style="font-size: 2rem; color: #f57c00; margin-bottom: 0.5rem;"></i>
+                                        <p style="margin: 0; font-weight: 600; color: #856404;">Pending Review</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 {% endif %}
             {% endif %}
