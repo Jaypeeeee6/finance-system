@@ -199,20 +199,18 @@
                                         <span class="badge badge-success">✓ {{ req.status }}</span>
                                     {% elif req.status == 'Completed' %}
                                         <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
+                                    {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
+                                        <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
                                     {% elif req.status == 'Payment Pending' %}
                                         <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
-                                    {% elif req.status == 'Proof Pending' %}
-                                        <span class="badge" style="background: #17a2b8; color: white;">📤 {{ req.status }}</span>
-                                    {% elif req.status == 'Proof Sent' %}
-                                        <span class="badge" style="background: #28a745; color: white;">📥 {{ req.status }}</span>
+                                    {% elif req.status in ['Proof Pending', 'Proof Sent'] %}
+                                        <span class="badge" style="background: #2196F3; color: white;">📄 {{ req.status }}</span>
                                     {% elif req.status == 'Paid' %}
                                         <span class="badge" style="background: #6f42c1; color: white;">💰 {{ req.status }}</span>
                                     {% elif req.status == 'Recurring' %}
-                                        <span class="badge" style="background: #ffc107; color: #212529;">⏳ {{ req.status }}</span>
-                                    {% elif 'Rejected' in req.status %}
+                                        <span class="badge" style="background: #ffc107; color: #212529;">↻ {{ req.status }}</span>
+                                    {% elif req.status in ['Rejected by Manager', 'Rejected by Finance'] or 'Rejected' in req.status %}
                                         <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
-                                    {% elif 'Pending' in req.status %}
-                                        <span class="badge" style="background: #17a2b8; color: white;">⏳ {{ req.status }}</span>
                                     {% else %}
                                         <span class="badge badge-warning">⏳ {{ req.status }}</span>
                                     {% endif %}

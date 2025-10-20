@@ -1035,14 +1035,18 @@
                         <!-- Status Display -->
                         <div class="status-display" style="margin-bottom: 1.5rem;">
                             <div style="font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 0.5rem;">Status</div>
-                             {% if request.status == 'Proof Pending' %}
+                             {% if request.status in ['Proof Pending', 'Proof Sent'] %}
                                  <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 12px 20px; text-align: center;">
                                      <span style="color: #856404; font-weight: bold; font-size: 1.1rem;">{{ request.status.upper() }}</span>
                                  </div>
+                             {% elif 'Rejected' in request.status %}
+                                 <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
+                                     <span style="color: #721c24; font-weight: bold; font-size: 1.1rem;">{{ request.status.upper() }}</span>
+                                 </div>
                              {% else %}
-                            <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
-                                <span style="color: #155724; font-weight: bold; font-size: 1.1rem;">{{ request.status.upper() }}</span>
-                            </div>
+                                <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
+                                    <span style="color: #155724; font-weight: bold; font-size: 1.1rem;">{{ request.status.upper() }}</span>
+                                </div>
                              {% endif %}
                         </div>
                         
