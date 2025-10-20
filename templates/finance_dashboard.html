@@ -18,35 +18,6 @@
         </a>
     </div>
 
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #4CAF50;">
-                <i class="fas fa-check-circle"></i>
-            </div>
-            <div class="stat-info">
-                <h3>{{ requests|selectattr('status', 'equalto', 'Approved')|list|length }}</h3>
-                <p>Approved</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #FF9800;">
-                <i class="fas fa-clock"></i>
-            </div>
-            <div class="stat-info">
-                <h3>{{ requests|selectattr('status', 'equalto', 'Pending')|list|length }}</h3>
-                <p>Pending</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #2196F3;">
-                <i class="fas fa-money-bill-wave"></i>
-            </div>
-            <div class="stat-info">
-                <h3>OMR {{ "%.3f"|format(requests|selectattr('status', 'equalto', 'Approved')|map(attribute='amount')|sum) }}</h3>
-                <p>Total Approved Amount</p>
-            </div>
-        </div>
-    </div>
 
     <!-- Notifications Section -->
     {% if notifications %}

@@ -60,44 +60,6 @@
     </div>
     {% endif %}
 
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #2196F3;">
-                <i class="fas fa-file-invoice"></i>
-            </div>
-            <div class="stat-info">
-                <h3>{{ stats.total_requests }}</h3>
-                <p>Total Requests</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #4CAF50;">
-                <i class="fas fa-check-circle"></i>
-            </div>
-            <div class="stat-info">
-                <h3>{{ stats.approved }}</h3>
-                <p>Approved</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #FF9800;">
-                <i class="fas fa-clock"></i>
-            </div>
-            <div class="stat-info">
-                <h3>{{ stats.pending }}</h3>
-                <p>Pending Review</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #9C27B0;">
-                <i class="fas fa-money-bill-wave"></i>
-            </div>
-            <div class="stat-info">
-                <h3>OMR {{ "%.3f"|format(stats.total_amount) }}</h3>
-                <p>Total Approved Amount</p>
-            </div>
-        </div>
-    </div>
 
     <div class="dashboard-actions">
         <a href="{{ url_for('reports') }}" class="btn btn-primary">
