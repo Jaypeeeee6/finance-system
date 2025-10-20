@@ -225,6 +225,7 @@
            {% endif %}
        </div>
 
+
                 <!-- Payment Installments Display for Recurring Payments -->
                 {% if request.recurring_interval and 'monthly' in request.recurring_interval %}
                 <div class="form-group">
@@ -379,6 +380,46 @@
                             </div>
                         </div>
                         
+                        <!-- Approval Timing Information - Always Visible -->
+                        <div class="form-group">
+                            <label><i class="fas fa-clock"></i> Approval Timing</label>
+                            <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px;">
+                                {% if request.manager_approval_start_time %}
+                                    {% if request.manager_approval_start_time %}
+                                    <div style="margin-bottom: 10px;">
+                                        <strong>Manager Approval:</strong>
+                                        <div style="margin-left: 15px; margin-top: 5px;">
+                                            <div><i class="fas fa-play-circle" style="color: #28a745;"></i> Started: {{ utc_to_local(request.manager_approval_start_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                            {% if request.manager_approval_end_time %}
+                                            <div><i class="fas fa-stop-circle" style="color: #dc3545;"></i> Ended: {{ utc_to_local(request.manager_approval_end_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                            {% if request.manager_approval_duration_minutes %}
+                                            {% set duration_seconds = request.manager_approval_duration_minutes %}
+                                            {% if duration_seconds < 60 %}
+                                            <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ duration_seconds }} second{{ 's' if duration_seconds != 1 else '' }}</div>
+                                            {% elif duration_seconds < 3600 %}
+                                            <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 60) }} minute{{ 's' if (duration_seconds // 60) != 1 else '' }} {{ duration_seconds % 60 }} second{{ 's' if (duration_seconds % 60) != 1 else '' }}</div>
+                                            {% else %}
+                                            <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 3600) }} hour{{ 's' if (duration_seconds // 3600) != 1 else '' }} {{ ((duration_seconds % 3600) // 60) }} minute{{ 's' if ((duration_seconds % 3600) // 60) != 1 else '' }}</div>
+                                            {% endif %}
+                                            {% endif %}
+                                            {% else %}
+                                            <div><i class="fas fa-clock" style="color: #6c757d;"></i> Status: In Progress</div>
+                                            <div id="manager-timer-completed" style="color: #007bff; font-weight: bold; font-size: 1.1rem;">
+                                                <i class="fas fa-stopwatch"></i> <span id="manager-elapsed-completed">Calculating...</span>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    
+                                {% else %}
+                                    <div style="text-align: center; color: #6c757d; font-style: italic;">
+                                        <i class="fas fa-info-circle"></i> No timing data available yet
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
                         {% if request.status == 'Rejected by Manager' %}
                             <div class="form-group">
                                 <label>Rejection Reason</label>
@@ -414,6 +455,7 @@
                                 <p style="margin-bottom: 0.5rem; font-size: 1.1rem;">
                                     <strong>Status:</strong> Waiting for Manager Approval
                                 </p>
+                                
                                 <p style="margin-bottom: 0.5rem; color: #666;">
                                     <strong>Assigned Manager:</strong> 
                                     {% if (user.role == 'Department Manager' and user.department == request.department) or (user.role == 'Operation Manager' and request.department == 'Operation') %}
@@ -425,6 +467,44 @@
                                 <p style="margin-bottom: 0; color: #666;">
                                     <strong>Department:</strong> {{ request.department }}
                                 </p>
+                                
+                                <!-- Approval Timing Information -->
+                                <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                                    <h5 style="margin: 0 0 10px 0; color: #495057;"><i class="fas fa-clock"></i> Approval Timing</h5>
+                                    {% if request.manager_approval_start_time %}
+                                        {% if request.manager_approval_start_time %}
+                                        <div style="margin-bottom: 10px;">
+                                            <strong>Manager Approval:</strong>
+                                            <div style="margin-left: 15px; margin-top: 5px;">
+                                                <div><i class="fas fa-play-circle" style="color: #28a745;"></i> Started: {{ utc_to_local(request.manager_approval_start_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                                {% if request.manager_approval_end_time %}
+                                                <div><i class="fas fa-stop-circle" style="color: #dc3545;"></i> Ended: {{ utc_to_local(request.manager_approval_end_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                                {% if request.manager_approval_duration_minutes %}
+                                                {% set duration_seconds = request.manager_approval_duration_minutes %}
+                                                {% if duration_seconds < 60 %}
+                                                <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ duration_seconds }} second{{ 's' if duration_seconds != 1 else '' }}</div>
+                                                {% elif duration_seconds < 3600 %}
+                                                <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 60) }} minute{{ 's' if (duration_seconds // 60) != 1 else '' }} {{ duration_seconds % 60 }} second{{ 's' if (duration_seconds % 60) != 1 else '' }}</div>
+                                                {% else %}
+                                                <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 3600) }} hour{{ 's' if (duration_seconds // 3600) != 1 else '' }} {{ ((duration_seconds % 3600) // 60) }} minute{{ 's' if ((duration_seconds % 3600) // 60) != 1 else '' }}</div>
+                                                {% endif %}
+                                                {% endif %}
+                                                {% else %}
+                                                <div><i class="fas fa-clock" style="color: #6c757d;"></i> Status: In Progress</div>
+                                                <div id="manager-timer" style="color: #007bff; font-weight: bold; font-size: 1.1rem;">
+                                                    <i class="fas fa-stopwatch"></i> <span id="manager-elapsed">Calculating...</span>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        
+                                    {% else %}
+                                        <div style="text-align: center; color: #6c757d; font-style: italic;">
+                                            <i class="fas fa-info-circle"></i> No timing data available yet
+                                        </div>
+                                    {% endif %}
+                                </div>
                             </div>
                             <div class="col-md-4 text-right">
                                 <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 1rem; text-align: center;">
@@ -496,16 +576,118 @@
                         <i class="fas fa-upload"></i>
                         <span>Awaiting proof of payment from {{ request.user.name }}</span>
                     </div>
+
+                    <!-- Finance Approval Timing Information for Proof Pending -->
+                    {% if request.finance_approval_start_time %}
+                    <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                        <h5 style="margin: 0 0 10px 0; color: #495057;"><i class="fas fa-clock"></i> Approval Timing</h5>
+                        
+                        <div>
+                            <strong>Finance Approval:</strong>
+                            <div style="margin-left: 15px; margin-top: 5px;">
+                                <div><i class="fas fa-play-circle" style="color: #28a745;"></i> Started: {{ utc_to_local(request.finance_approval_start_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                {% if request.finance_approval_end_time %}
+                                <div><i class="fas fa-stop-circle" style="color: #dc3545;"></i> Ended: {{ utc_to_local(request.finance_approval_end_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                {% if request.finance_approval_duration_minutes %}
+                                    {% set duration_seconds = request.finance_approval_duration_minutes %}
+                                    {% if duration_seconds < 60 %}
+                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ duration_seconds }} second{{ 's' if duration_seconds != 1 else '' }}</div>
+                                    {% elif duration_seconds < 3600 %}
+                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 60) }} minute{{ 's' if (duration_seconds // 60) != 1 else '' }} {{ duration_seconds % 60 }} second{{ 's' if (duration_seconds % 60) != 1 else '' }}</div>
+                                    {% else %}
+                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 3600) }} hour{{ 's' if (duration_seconds // 3600) != 1 else '' }} {{ ((duration_seconds % 3600) // 60) }} minute{{ 's' if ((duration_seconds % 3600) // 60) != 1 else '' }}</div>
+                                    {% endif %}
+                                {% else %}
+                                <div><i class="fas fa-exclamation-triangle" style="color: #ffc107;"></i> Duration: Not calculated (Value: {{ request.finance_approval_duration_minutes }})</div>
+                                {% endif %}
+                                {% else %}
+                                <div><i class="fas fa-clock" style="color: #6c757d;"></i> Status: In Progress</div>
+                                <div id="finance-timer-proof-pending" style="color: #007bff; font-weight: bold; font-size: 1.1rem;">
+                                    <i class="fas fa-stopwatch"></i> <span id="finance-elapsed-proof-pending">Calculating...</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 {% elif request.status == 'Proof Sent' %}
                     <div class="admin-mode-warning" style="background: #ffc107; color: #212529;">
                         <i class="fas fa-clock"></i>
                         <span>Proof of Payment Received - Awaiting Finance Review</span>
                     </div>
+
+                    <!-- Finance Approval Timing Information for Proof Sent -->
+                    {% if request.finance_approval_start_time %}
+                    <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                        <h5 style="margin: 0 0 10px 0; color: #495057;"><i class="fas fa-clock"></i> Approval Timing</h5>
+                        
+                        <div>
+                            <strong>Finance Approval:</strong>
+                            <div style="margin-left: 15px; margin-top: 5px;">
+                                <div><i class="fas fa-play-circle" style="color: #28a745;"></i> Started: {{ utc_to_local(request.finance_approval_start_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                {% if request.finance_approval_end_time %}
+                                <div><i class="fas fa-stop-circle" style="color: #dc3545;"></i> Ended: {{ utc_to_local(request.finance_approval_end_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                {% if request.finance_approval_duration_minutes %}
+                                    {% set duration_seconds = request.finance_approval_duration_minutes %}
+                                    {% if duration_seconds < 60 %}
+                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ duration_seconds }} second{{ 's' if duration_seconds != 1 else '' }}</div>
+                                    {% elif duration_seconds < 3600 %}
+                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 60) }} minute{{ 's' if (duration_seconds // 60) != 1 else '' }} {{ duration_seconds % 60 }} second{{ 's' if (duration_seconds % 60) != 1 else '' }}</div>
+                                    {% else %}
+                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 3600) }} hour{{ 's' if (duration_seconds // 3600) != 1 else '' }} {{ ((duration_seconds % 3600) // 60) }} minute{{ 's' if ((duration_seconds % 3600) // 60) != 1 else '' }}</div>
+                                    {% endif %}
+                                {% else %}
+                                <div><i class="fas fa-exclamation-triangle" style="color: #ffc107;"></i> Duration: Not calculated (Value: {{ request.finance_approval_duration_minutes }})</div>
+                                {% endif %}
+                                {% else %}
+                                <div><i class="fas fa-clock" style="color: #6c757d;"></i> Status: In Progress</div>
+                                <div id="finance-timer-proof-sent" style="color: #007bff; font-weight: bold; font-size: 1.1rem;">
+                                    <i class="fas fa-stopwatch"></i> <span id="finance-elapsed-proof-sent">Calculating...</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 {% elif request.status == 'Proof Rejected' %}
                     <div class="admin-mode-warning" style="background: #dc3545; color: white;">
                         <i class="fas fa-times-circle"></i>
                         <span>Proof of Payment Rejected - Awaiting New Proof from {{ request.user.name }}</span>
                     </div>
+
+                    <!-- Finance Approval Timing Information for Proof Rejected -->
+                    {% if request.finance_approval_start_time %}
+                    <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                        <h5 style="margin: 0 0 10px 0; color: #495057;"><i class="fas fa-clock"></i> Approval Timing</h5>
+                        
+                        <div>
+                            <strong>Finance Approval:</strong>
+                            <div style="margin-left: 15px; margin-top: 5px;">
+                                <div><i class="fas fa-play-circle" style="color: #28a745;"></i> Started: {{ utc_to_local(request.finance_approval_start_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                {% if request.finance_approval_end_time %}
+                                <div><i class="fas fa-stop-circle" style="color: #dc3545;"></i> Ended: {{ utc_to_local(request.finance_approval_end_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                {% if request.finance_approval_duration_minutes %}
+                                    {% set duration_seconds = request.finance_approval_duration_minutes %}
+                                    {% if duration_seconds < 60 %}
+                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ duration_seconds }} second{{ 's' if duration_seconds != 1 else '' }}</div>
+                                    {% elif duration_seconds < 3600 %}
+                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 60) }} minute{{ 's' if (duration_seconds // 60) != 1 else '' }} {{ duration_seconds % 60 }} second{{ 's' if (duration_seconds % 60) != 1 else '' }}</div>
+                                    {% else %}
+                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 3600) }} hour{{ 's' if (duration_seconds // 3600) != 1 else '' }} {{ ((duration_seconds % 3600) // 60) }} minute{{ 's' if ((duration_seconds % 3600) // 60) != 1 else '' }}</div>
+                                    {% endif %}
+                                {% else %}
+                                <div><i class="fas fa-exclamation-triangle" style="color: #ffc107;"></i> Duration: Not calculated (Value: {{ request.finance_approval_duration_minutes }})</div>
+                                {% endif %}
+                                {% else %}
+                                <div><i class="fas fa-clock" style="color: #6c757d;"></i> Status: In Progress</div>
+                                <div id="finance-timer-proof-rejected" style="color: #007bff; font-weight: bold; font-size: 1.1rem;">
+                                    <i class="fas fa-stopwatch"></i> <span id="finance-elapsed-proof-rejected">Calculating...</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 {% elif request.status == 'Recurring' %}
                     <div class="admin-mode-warning" style="background: #007bff; color: white;">
                         <i class="fas fa-sync-alt"></i>
@@ -694,6 +876,41 @@
                     </div>
                     {% endif %}
 
+                    <!-- Finance Approval Timing Information for Completed Requests -->
+                    <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                        <h5 style="margin: 0 0 10px 0; color: #495057;"><i class="fas fa-clock"></i> Approval Timing</h5>
+                        
+                        {% if request.finance_approval_start_time %}
+                        <div>
+                            <strong>Finance Approval:</strong>
+                            <div style="margin-left: 15px; margin-top: 5px;">
+                                <div><i class="fas fa-play-circle" style="color: #28a745;"></i> Started: {{ utc_to_local(request.finance_approval_start_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                {% if request.finance_approval_end_time %}
+                                <div><i class="fas fa-stop-circle" style="color: #dc3545;"></i> Ended: {{ utc_to_local(request.finance_approval_end_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                {% if request.finance_approval_duration_minutes %}
+                                    {% set duration_seconds = request.finance_approval_duration_minutes %}
+                                    {% if duration_seconds < 60 %}
+                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ duration_seconds }} second{{ 's' if duration_seconds != 1 else '' }}</div>
+                                    {% elif duration_seconds < 3600 %}
+                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 60) }} minute{{ 's' if (duration_seconds // 60) != 1 else '' }} {{ duration_seconds % 60 }} second{{ 's' if (duration_seconds % 60) != 1 else '' }}</div>
+                                    {% else %}
+                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 3600) }} hour{{ 's' if (duration_seconds // 3600) != 1 else '' }} {{ ((duration_seconds % 3600) // 60) }} minute{{ 's' if ((duration_seconds % 3600) // 60) != 1 else '' }}</div>
+                                    {% endif %}
+                                {% else %}
+                                <div><i class="fas fa-exclamation-triangle" style="color: #ffc107;"></i> Duration: Not calculated (Value: {{ request.finance_approval_duration_minutes }})</div>
+                                {% endif %}
+                                {% else %}
+                                <div><i class="fas fa-exclamation-triangle" style="color: #ffc107;"></i> End time not recorded</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% else %}
+                        <div style="color: #6c757d; font-style: italic;">
+                            <i class="fas fa-info-circle"></i> No timing data available for this request.
+                        </div>
+                        {% endif %}
+                    </div>
+
                     {% if request.recurring_interval and 'monthly' in request.recurring_interval %}
                     <div class="card" style="margin-top: 1rem; margin-bottom: 1.5rem;">
                         <div class="card-header" style="background: #6c757d; color: white;">
@@ -815,19 +1032,19 @@
                         <h4>Finance Admin Decision</h4>
                     </div>
                     <div class="card-body">
-                         <!-- Status Display -->
-                         <div class="status-display" style="margin-bottom: 1.5rem;">
-                             <div style="font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 0.5rem;">Status</div>
+                        <!-- Status Display -->
+                        <div class="status-display" style="margin-bottom: 1.5rem;">
+                            <div style="font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 0.5rem;">Status</div>
                              {% if request.status == 'Proof Pending' %}
                                  <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 12px 20px; text-align: center;">
                                      <span style="color: #856404; font-weight: bold; font-size: 1.1rem;">{{ request.status.upper() }}</span>
                                  </div>
                              {% else %}
-                                 <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
-                                     <span style="color: #155724; font-weight: bold; font-size: 1.1rem;">{{ request.status.upper() }}</span>
-                                 </div>
+                            <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
+                                <span style="color: #155724; font-weight: bold; font-size: 1.1rem;">{{ request.status.upper() }}</span>
+                            </div>
                              {% endif %}
-                         </div>
+                        </div>
                         
                         {% if request.approver %}
                         <div class="form-group">
@@ -886,6 +1103,46 @@
                                 </div>
                             </div>
                             
+                            <!-- Approval Timing Information -->
+                            <div class="form-group">
+                                <label><i class="fas fa-clock"></i> Approval Timing</label>
+                                <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px;">
+                                    {% if request.finance_approval_start_time %}
+                                        
+                                        {% if request.finance_approval_start_time %}
+                                        <div>
+                                            <strong>Finance Approval:</strong>
+                                            <div style="margin-left: 15px; margin-top: 5px;">
+                                                <div><i class="fas fa-play-circle" style="color: #28a745;"></i> Started: {{ utc_to_local(request.finance_approval_start_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                                {% if request.finance_approval_end_time %}
+                                                <div><i class="fas fa-stop-circle" style="color: #dc3545;"></i> Ended: {{ utc_to_local(request.finance_approval_end_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                                {% if request.finance_approval_duration_minutes %}
+                                                    {% set duration_seconds = request.finance_approval_duration_minutes %}
+                                                    {% if duration_seconds < 60 %}
+                                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ duration_seconds }} second{{ 's' if duration_seconds != 1 else '' }}</div>
+                                                    {% elif duration_seconds < 3600 %}
+                                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 60) }} minute{{ 's' if (duration_seconds // 60) != 1 else '' }} {{ duration_seconds % 60 }} second{{ 's' if (duration_seconds % 60) != 1 else '' }}</div>
+                                                    {% else %}
+                                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 3600) }} hour{{ 's' if (duration_seconds // 3600) != 1 else '' }} {{ ((duration_seconds % 3600) // 60) }} minute{{ 's' if ((duration_seconds % 3600) // 60) != 1 else '' }}</div>
+                                                    {% endif %}
+                                                {% endif %}
+                                                {% else %}
+                                                <div><i class="fas fa-clock" style="color: #6c757d;"></i> Status: In Progress</div>
+                                                <div id="finance-timer-finance" style="color: #007bff; font-weight: bold; font-size: 1.1rem;">
+                                                    <i class="fas fa-stopwatch"></i> <span id="finance-elapsed-finance">Calculating...</span>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    {% else %}
+                                        <div style="text-align: center; color: #6c757d; font-style: italic;">
+                                            <i class="fas fa-info-circle"></i> No timing data available yet
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
                             <form method="POST" action="{{ url_for('approve_request', request_id=request.request_id) }}" enctype="multipart/form-data">
                                 <input type="hidden" name="approval_status" value="approve">
                                 
@@ -940,9 +1197,44 @@
                                     <p style="margin-bottom: 0.5rem; font-size: 1.1rem;">
                                         <strong>Status:</strong> Waiting for Finance Admin Approval
                                     </p>
+                                    
                                     <p style="margin-bottom: 0; color: #666;">
                                         <strong>Department:</strong> Finance
                                     </p>
+                                    
+                                    <!-- Finance Approval Timing Information -->
+                                    {% if request.finance_approval_start_time %}
+                                    <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                                        <h5 style="margin: 0 0 10px 0; color: #495057;"><i class="fas fa-clock"></i> Approval Timing</h5>
+                                        
+                                        {% if request.finance_approval_start_time %}
+                                        <div>
+                                            <strong>Finance Approval:</strong>
+                                            <div style="margin-left: 15px; margin-top: 5px;">
+                                                <div><i class="fas fa-play-circle" style="color: #28a745;"></i> Started: {{ utc_to_local(request.finance_approval_start_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                                {% if request.finance_approval_end_time %}
+                                                <div><i class="fas fa-stop-circle" style="color: #dc3545;"></i> Ended: {{ utc_to_local(request.finance_approval_end_time).strftime('%Y-%m-%d %H:%M:%S') }} (Local Time)</div>
+                                                {% if request.finance_approval_duration_minutes %}
+                                                    {% set duration_seconds = request.finance_approval_duration_minutes %}
+                                                    {% if duration_seconds < 60 %}
+                                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ duration_seconds }} second{{ 's' if duration_seconds != 1 else '' }}</div>
+                                                    {% elif duration_seconds < 3600 %}
+                                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 60) }} minute{{ 's' if (duration_seconds // 60) != 1 else '' }} {{ duration_seconds % 60 }} second{{ 's' if (duration_seconds % 60) != 1 else '' }}</div>
+                                                    {% else %}
+                                                    <div><i class="fas fa-hourglass-half" style="color: #ffc107;"></i> Duration: {{ (duration_seconds // 3600) }} hour{{ 's' if (duration_seconds // 3600) != 1 else '' }} {{ ((duration_seconds % 3600) // 60) }} minute{{ 's' if ((duration_seconds % 3600) // 60) != 1 else '' }}</div>
+                                                    {% endif %}
+                                                {% endif %}
+                                                {% else %}
+                                                <div><i class="fas fa-clock" style="color: #6c757d;"></i> Status: In Progress</div>
+                                                <div id="finance-timer-finance" style="color: #007bff; font-weight: bold; font-size: 1.1rem;">
+                                                    <i class="fas fa-stopwatch"></i> <span id="finance-elapsed-finance">Calculating...</span>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
                                 </div>
                                 <div class="col-md-4 text-right">
                                     <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 1rem; text-align: center;">
@@ -1105,7 +1397,7 @@
                         <div class="card-header" style="background: #6c757d; color: white;">
                             <h4><i class="fas fa-paperclip"></i> Additional Files</h4>
                             <p style="margin: 0; opacity: 0.9;">Files uploaded by Finance Admin</p>
-                        </div>
+        </div>
                         <div class="card-body">
                             <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px;">
                                 {% for file in additional_files %}
@@ -1834,6 +2126,131 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+});
+
+// Server-based timer functionality - uses server time to avoid timezone issues
+let managerStartTime = null;
+let financeStartTime = null;
+let managerTimerActive = false;
+let financeTimerActive = false;
+let serverTimeOffset = 0;
+
+function formatElapsedTime(seconds) {
+    if (seconds < 60) {
+        return `${seconds} second${seconds !== 1 ? 's' : ''}`;
+    } else if (seconds < 3600) {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${minutes} minute${minutes !== 1 ? 's' : ''} ${remainingSeconds} second${remainingSeconds !== 1 ? 's' : ''}`;
+    } else if (seconds < 86400) {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        return `${hours} hour${hours !== 1 ? 's' : ''} ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    } else {
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        return `${days} day${days !== 1 ? 's' : ''} ${hours} hour${hours !== 1 ? 's' : ''}`;
+    }
+}
+
+function getServerTime() {
+    return new Date(Date.now() + serverTimeOffset);
+}
+
+function updateServerBasedTimers() {
+    const currentServerTime = getServerTime();
+    
+    // Update manager timer if active
+    if (managerTimerActive && managerStartTime) {
+        const elapsedSeconds = Math.floor((currentServerTime - managerStartTime) / 1000);
+        
+        const managerElapsed = document.getElementById('manager-elapsed');
+        if (managerElapsed) {
+            managerElapsed.textContent = formatElapsedTime(elapsedSeconds);
+        }
+        
+        const managerElapsedCompleted = document.getElementById('manager-elapsed-completed');
+        if (managerElapsedCompleted) {
+            managerElapsedCompleted.textContent = formatElapsedTime(elapsedSeconds);
+        }
+        
+        const managerElapsedFinance = document.getElementById('manager-elapsed-finance');
+        if (managerElapsedFinance) {
+            managerElapsedFinance.textContent = formatElapsedTime(elapsedSeconds);
+        }
+    }
+    
+            // Update finance timer if active
+            if (financeTimerActive && financeStartTime) {
+                const elapsedSeconds = Math.floor((currentServerTime - financeStartTime) / 1000);
+                
+                const financeElapsed = document.getElementById('finance-elapsed');
+                if (financeElapsed) {
+                    financeElapsed.textContent = formatElapsedTime(elapsedSeconds);
+                }
+                
+                const financeElapsedCompleted = document.getElementById('finance-elapsed-completed');
+                if (financeElapsedCompleted) {
+                    financeElapsedCompleted.textContent = formatElapsedTime(elapsedSeconds);
+                }
+                
+                const financeElapsedFinance = document.getElementById('finance-elapsed-finance');
+                if (financeElapsedFinance) {
+                    financeElapsedFinance.textContent = formatElapsedTime(elapsedSeconds);
+                }
+                
+                const financeElapsedProofPending = document.getElementById('finance-elapsed-proof-pending');
+                if (financeElapsedProofPending) {
+                    financeElapsedProofPending.textContent = formatElapsedTime(elapsedSeconds);
+                }
+                
+                const financeElapsedProofSent = document.getElementById('finance-elapsed-proof-sent');
+                if (financeElapsedProofSent) {
+                    financeElapsedProofSent.textContent = formatElapsedTime(elapsedSeconds);
+                }
+                
+                const financeElapsedProofRejected = document.getElementById('finance-elapsed-proof-rejected');
+                if (financeElapsedProofRejected) {
+                    financeElapsedProofRejected.textContent = formatElapsedTime(elapsedSeconds);
+                }
+            }
+}
+
+// Initialize timers based on request status
+document.addEventListener('DOMContentLoaded', function() {
+    // Get server time offset by comparing with the current server time
+    const serverTimeStr = '{{ current_server_time.isoformat() }}';
+    const serverTime = new Date(serverTimeStr);
+    const clientTime = new Date();
+    serverTimeOffset = serverTime.getTime() - clientTime.getTime();
+    
+    // Check if manager approval is in progress
+    const managerStartTimeStr = '{{ request.manager_approval_start_time.isoformat() if request.manager_approval_start_time else "" }}';
+    const managerEndTimeStr = '{{ request.manager_approval_end_time.isoformat() if request.manager_approval_end_time else "" }}';
+    
+    if (managerStartTimeStr && !managerEndTimeStr) {
+        managerStartTime = new Date(managerStartTimeStr);
+        managerTimerActive = true;
+        console.log('Manager timer started from:', managerStartTime);
+    }
+    
+    // Check if finance approval is in progress
+    const financeStartTimeStr = '{{ request.finance_approval_start_time.isoformat() if request.finance_approval_start_time else "" }}';
+    const financeEndTimeStr = '{{ request.finance_approval_end_time.isoformat() if request.finance_approval_end_time else "" }}';
+    const requestStatus = '{{ request.status }}';
+    
+    // Finance timer should be active if finance approval has started and status is not completed
+    if (financeStartTimeStr && !financeEndTimeStr && requestStatus !== 'Completed') {
+        financeStartTime = new Date(financeStartTimeStr);
+        financeTimerActive = true;
+        console.log('Finance timer started from:', financeStartTime, 'Status:', requestStatus);
+    }
+    
+    // Start the server-based timers
+    setInterval(updateServerBasedTimers, 1000);
+    
+    // Initial update
+    updateServerBasedTimers();
 });
 </script>
 

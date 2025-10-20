@@ -76,6 +76,15 @@ class PaymentRequest(db.Model):
     finance_rejection_date = db.Column(db.Date)  # Date when finance rejected
     completion_date = db.Column(db.Date)  # Date when request was completed
     additional_files = db.Column(db.Text)  # JSON string containing additional file paths uploaded by Finance Admin
+    
+    # Timing fields for approval process
+    manager_approval_start_time = db.Column(db.DateTime)  # When manager approval process starts
+    manager_approval_end_time = db.Column(db.DateTime)  # When manager approval process ends
+    finance_approval_start_time = db.Column(db.DateTime)  # When finance approval process starts
+    finance_approval_end_time = db.Column(db.DateTime)  # When finance approval process ends
+    manager_approval_duration_minutes = db.Column(db.Integer)  # Duration in minutes
+    finance_approval_duration_minutes = db.Column(db.Integer)  # Duration in minutes
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

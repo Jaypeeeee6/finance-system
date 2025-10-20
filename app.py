@@ -17,6 +17,16 @@ app.config.from_object(Config)
 from datetime import timedelta
 app.jinja_env.globals.update(timedelta=timedelta)
 
+# Timezone conversion function
+def utc_to_local(utc_datetime):
+    """Convert UTC datetime to Oman time (UTC+4)"""
+    if utc_datetime is None:
+        return None
+    return utc_datetime + timedelta(hours=4)
+
+# Make timezone conversion available in templates
+app.jinja_env.globals.update(utc_to_local=utc_to_local)
+
 # Add JSON filter for templates
 import json
 @app.template_filter('from_json')
@@ -504,6 +514,17 @@ def is_payment_due_today(request, today):
     return False
 
 
+def calculate_finance_approval_duration(request):
+    """Calculate and set finance approval duration if not already set"""
+    if (request.finance_approval_start_time and 
+        request.finance_approval_end_time and 
+        not request.finance_approval_duration_minutes):
+        duration = request.finance_approval_end_time - request.finance_approval_start_time
+        # Store duration in seconds for more precision (consistent with template logic)
+        request.finance_approval_duration_minutes = int(duration.total_seconds())
+        return True
+    return False
+
 def check_recurring_payment_completion(request_id):
     """Check if all installments for a recurring payment are paid and mark as completed"""
     try:
@@ -533,6 +554,13 @@ def check_recurring_payment_completion(request_id):
                 req.status = 'Completed'
                 req.completion_date = datetime.utcnow().date()
                 req.updated_at = datetime.utcnow()
+                
+                # End finance approval timing when completed
+                if req.finance_approval_start_time and not req.finance_approval_end_time:
+                    current_time = datetime.utcnow()
+                    req.finance_approval_end_time = current_time
+                    duration = current_time - req.finance_approval_start_time
+                    req.finance_approval_duration_minutes = int(duration.total_seconds())
                 
                 db.session.commit()
                 
@@ -1234,6 +1262,7 @@ def new_request():
         initial_status = 'Pending Manager Approval'
         
         # Create new request
+        current_time = datetime.utcnow()
         new_req = PaymentRequest(
             request_type=request_type,
             requestor_name=requestor_name,
@@ -1251,7 +1280,9 @@ def new_request():
             recurring_interval=recurring_interval if recurring == 'Recurring' else None,
             status=initial_status,
             receipt_path=receipt_path,  # Add receipt path if file was uploaded
-            user_id=current_user.user_id
+            user_id=current_user.user_id,
+            # Start timing immediately when request is submitted
+            manager_approval_start_time=current_time
         )
         
         
@@ -1343,6 +1374,113 @@ def new_request():
     today = datetime.utcnow().date().strftime('%Y-%m-%d')
     return render_template('new_request.html', user=current_user, today=today)
 
+
+@app.route('/test-timezone')
+def test_timezone():
+    """Test timezone conversion"""
+    from datetime import datetime
+    test_time = datetime(2025, 10, 20, 6, 36, 21)
+    local_time = utc_to_local(test_time)
+    return f"UTC: {test_time}, Local: {local_time}"
+
+@app.route('/fix-durations')
+@login_required
+@role_required('Admin')
+def fix_durations():
+    """Fix existing incorrect duration calculations in the database"""
+    try:
+        # Get all requests with timing data
+        requests = PaymentRequest.query.filter(
+            PaymentRequest.manager_approval_start_time.isnot(None),
+            PaymentRequest.manager_approval_end_time.isnot(None)
+        ).all()
+        
+        fixed_count = 0
+        
+        for req in requests:
+            # Recalculate manager approval duration
+            if req.manager_approval_start_time and req.manager_approval_end_time:
+                duration = req.manager_approval_end_time - req.manager_approval_start_time
+                correct_duration_seconds = int(duration.total_seconds())
+                
+                # If the stored duration is much larger than the actual duration,
+                # it was likely calculated in minutes instead of seconds
+                if req.manager_approval_duration_minutes and req.manager_approval_duration_minutes > correct_duration_seconds:
+                    req.manager_approval_duration_minutes = correct_duration_seconds
+                    fixed_count += 1
+            
+            # Recalculate finance approval duration
+            if req.finance_approval_start_time and req.finance_approval_end_time:
+                duration = req.finance_approval_end_time - req.finance_approval_start_time
+                correct_duration_seconds = int(duration.total_seconds())
+                
+                # If the stored duration is much larger than the actual duration,
+                # it was likely calculated in minutes instead of seconds
+                if req.finance_approval_duration_minutes and req.finance_approval_duration_minutes > correct_duration_seconds:
+                    req.finance_approval_duration_minutes = correct_duration_seconds
+                    fixed_count += 1
+        
+        db.session.commit()
+        return f"Fixed {fixed_count} duration calculations"
+        
+    except Exception as e:
+        return f"Error fixing durations: {str(e)}"
+
+@app.route('/api/timing/<int:request_id>')
+@login_required
+def get_timing_api(request_id):
+    """API endpoint to get real-time timing data for a request"""
+    try:
+        req = PaymentRequest.query.get_or_404(request_id)
+        current_time = datetime.utcnow()
+        
+        timing_data = {}
+        
+        # Manager approval timing
+        if req.manager_approval_start_time:
+            if req.manager_approval_end_time:
+                # Completed - show final duration
+                duration = req.manager_approval_end_time - req.manager_approval_start_time
+                timing_data['manager'] = {
+                    'status': 'completed',
+                    'start_time': req.manager_approval_start_time.isoformat(),
+                    'end_time': req.manager_approval_end_time.isoformat(),
+                    'duration_seconds': int(duration.total_seconds()),
+                    'duration_minutes': req.manager_approval_duration_minutes
+                }
+            else:
+                # In progress - calculate elapsed time
+                elapsed = current_time - req.manager_approval_start_time
+                timing_data['manager'] = {
+                    'status': 'in_progress',
+                    'start_time': req.manager_approval_start_time.isoformat(),
+                    'elapsed_seconds': int(elapsed.total_seconds())
+                }
+        
+        # Finance approval timing
+        if req.finance_approval_start_time:
+            if req.finance_approval_end_time:
+                # Completed - show final duration
+                duration = req.finance_approval_end_time - req.finance_approval_start_time
+                timing_data['finance'] = {
+                    'status': 'completed',
+                    'start_time': req.finance_approval_start_time.isoformat(),
+                    'end_time': req.finance_approval_end_time.isoformat(),
+                    'duration_seconds': int(duration.total_seconds()),
+                    'duration_minutes': req.finance_approval_duration_minutes
+                }
+            else:
+                # In progress - calculate elapsed time
+                elapsed = current_time - req.finance_approval_start_time
+                timing_data['finance'] = {
+                    'status': 'in_progress',
+                    'start_time': req.finance_approval_start_time.isoformat(),
+                    'elapsed_seconds': int(elapsed.total_seconds())
+                }
+        
+        return jsonify(timing_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/payment-schedule/<int:request_id>')
 @login_required
@@ -1495,7 +1633,15 @@ def view_request(request_id):
         # Sort by filename (which includes timestamp) to show newest first
         proof_files.sort(reverse=True)
     
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, proof_files=proof_files)
+    # Get current server time for timer calculations
+    current_server_time = datetime.utcnow()
+    
+    # Ensure finance approval duration is calculated if needed
+    calculate_finance_approval_duration(req)
+    if req.finance_approval_duration_minutes is not None:
+        db.session.commit()
+    
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, proof_files=proof_files, current_server_time=current_server_time)
 
 
 @app.route('/request/<int:request_id>/approve', methods=['POST'])
@@ -1642,6 +1788,13 @@ def approve_request(request_id):
                 req.status = 'Completed'
                 req.approval_date = today
                 req.completion_date = today
+                
+                # End finance approval timing when completed
+                if req.finance_approval_start_time and not req.finance_approval_end_time:
+                    current_time = datetime.utcnow()
+                    req.finance_approval_end_time = current_time
+                    duration = current_time - req.finance_approval_start_time
+                    req.finance_approval_duration_minutes = int(duration.total_seconds())
                 flash(f'Payment request #{request_id} approved and completed. No proof of payment required.', 'success')
                 log_action(f"Approved and completed payment request #{request_id} - No proof required")
                 
@@ -1728,9 +1881,14 @@ def approve_request(request_id):
     
     elif approval_status == 'proof_sent_approve':
         # Approve proof sent by requestor
+        current_time = datetime.utcnow()
+        
+        # Don't end finance approval timing here - it should continue until completed
+        # The timer should continue running through Payment Pending status
+        
         req.status = 'Payment Pending'
-        req.approval_date = datetime.utcnow().date()
-        req.updated_at = datetime.utcnow()
+        req.approval_date = current_time.date()
+        req.updated_at = current_time
         
         db.session.commit()
         
@@ -1794,10 +1952,18 @@ def approve_request(request_id):
             flash('Please provide a reason for rejection.', 'error')
             return redirect(url_for('view_request', request_id=request_id))
         
+        current_time = datetime.utcnow()
+        
+        # End finance approval timing (rejection stops the timer)
+        if req.finance_approval_start_time:
+            req.finance_approval_end_time = current_time
+            duration = current_time - req.finance_approval_start_time
+            req.finance_approval_duration_minutes = int(duration.total_seconds())
+        
         req.status = 'Rejected by Finance'
         req.rejection_reason = rejection_reason
-        req.finance_rejection_date = datetime.utcnow().date()
-        req.updated_at = datetime.utcnow()
+        req.finance_rejection_date = current_time.date()
+        req.updated_at = current_time
         
         db.session.commit()
         
@@ -1974,6 +2140,13 @@ def close_request(request_id):
     req.status = 'Completed'
     req.completion_date = datetime.utcnow().date()
     req.updated_at = datetime.utcnow()
+    
+    # End finance approval timing when completed
+    if req.finance_approval_start_time and not req.finance_approval_end_time:
+        current_time = datetime.utcnow()
+        req.finance_approval_end_time = current_time
+        duration = current_time - req.finance_approval_start_time
+        req.finance_approval_duration_minutes = int(duration.total_seconds())
     
     db.session.commit()
     
@@ -2153,22 +2326,39 @@ def manager_approve_request(request_id):
     """Manager approves a payment request"""
     req = PaymentRequest.query.get_or_404(request_id)
     
+    # Debug information
+    print(f"DEBUG: Current user: {current_user.name} (ID: {current_user.user_id}, Role: {current_user.role}, Department: {current_user.department})")
+    print(f"DEBUG: Request submitter: {req.user.name} (ID: {req.user.user_id}, Role: {req.user.role}, Department: {req.user.department})")
+    print(f"DEBUG: Request submitter's manager_id: {req.user.manager_id}")
+    print(f"DEBUG: Request status: {req.status}")
+    
     # Check if current user is authorized to approve this request
     is_authorized = False
     
     # Check if current user is the manager of the request submitter
     if req.user.manager_id and req.user.manager_id == current_user.user_id:
         is_authorized = True
+        print("DEBUG: Authorized via manager_id relationship")
     # Special case: Operation Manager can approve Operation department requests
     elif (current_user.role == 'Operation Manager' and 
           req.user.department == 'Operation' and 
           req.user.role != 'Operation Manager'):  # Operation Manager can't approve their own requests
         is_authorized = True
+        print("DEBUG: Authorized via Operation Manager role")
     # Special case: Finance Admin can approve Finance department requests
     elif (current_user.role == 'Finance Admin' and 
           req.user.department == 'Finance' and 
           req.user.role != 'Finance Admin'):  # Finance Admin can't approve their own requests
         is_authorized = True
+        print("DEBUG: Authorized via Finance Admin role")
+    # Special case: Department Manager can approve same department requests
+    elif (current_user.role == 'Department Manager' and 
+          req.user.department == current_user.department and 
+          req.user.role != 'Department Manager'):  # Department Manager can't approve their own requests
+        is_authorized = True
+        print("DEBUG: Authorized via Department Manager role")
+    
+    print(f"DEBUG: Authorization result: {is_authorized}")
     
     if not is_authorized:
         flash('You are not authorized to approve this request.', 'error')
@@ -2184,11 +2374,28 @@ def manager_approve_request(request_id):
     
     if approval_status == 'approve':
         # Manager approves - move to Finance for final approval
+        current_time = datetime.utcnow()
+        
+        # Start manager approval timing if not already started
+        if not req.manager_approval_start_time:
+            req.manager_approval_start_time = current_time
+        
+        # End manager approval timing
+        req.manager_approval_end_time = current_time
+        
+        # Calculate duration in seconds
+        if req.manager_approval_start_time:
+            duration = current_time - req.manager_approval_start_time
+            req.manager_approval_duration_minutes = int(duration.total_seconds())
+        
+        # Start finance approval timing
+        req.finance_approval_start_time = current_time
+        
         req.status = 'Pending Finance Approval'
-        req.manager_approval_date = datetime.utcnow().date()
+        req.manager_approval_date = current_time.date()
         req.is_urgent = request.form.get('is_urgent') == 'on'
         req.manager_approval_reason = request.form.get('approval_reason', '').strip()
-        req.updated_at = datetime.utcnow()
+        req.updated_at = current_time
         
         db.session.commit()
         
@@ -2219,10 +2426,24 @@ def manager_approve_request(request_id):
             flash('Please provide a reason for rejection.', 'error')
             return redirect(url_for('view_request', request_id=request_id))
         
+        current_time = datetime.utcnow()
+        
+        # Start manager approval timing if not already started (for rejection tracking)
+        if not req.manager_approval_start_time:
+            req.manager_approval_start_time = current_time
+        
+        # End manager approval timing (rejection stops the timer)
+        req.manager_approval_end_time = current_time
+        
+        # Calculate duration in seconds
+        if req.manager_approval_start_time:
+            duration = current_time - req.manager_approval_start_time
+            req.manager_approval_duration_minutes = int(duration.total_seconds())
+        
         req.status = 'Rejected by Manager'
         req.rejection_reason = rejection_reason
-        req.manager_rejection_date = datetime.utcnow().date()
-        req.updated_at = datetime.utcnow()
+        req.manager_rejection_date = current_time.date()
+        req.updated_at = current_time
         
         db.session.commit()
         
