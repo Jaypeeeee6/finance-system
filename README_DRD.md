@@ -20,7 +20,7 @@ To define the structure, storage, and relationships of data used in the Payment 
 | username | VARCHAR | Login name |
 | password | VARCHAR | Encrypted password |
 | department | VARCHAR | Department name |
-| role | ENUM('Admin', 'Finance', 'GM', 'Department User', 'IT', 'Project') | Role type |
+| role | ENUM('Admin', 'Finance', 'GM', 'IT', 'Project', '... Staff roles') | Role type |
 | email | VARCHAR | Optional user email |
 
 ---

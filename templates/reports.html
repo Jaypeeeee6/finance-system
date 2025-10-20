@@ -117,7 +117,7 @@
                 <i class="fas fa-money-bill-wave"></i>
             </div>
             <div class="stat-info">
-                {% if user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT') %}
+                {% if user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT') %}
                     {% set it_approved_requests = requests|selectattr('status', 'equalto', 'Approved')|selectattr('department', 'equalto', 'IT')|list %}
                     {% set other_approved_requests = requests|selectattr('status', 'equalto', 'Approved')|rejectattr('department', 'equalto', 'IT')|list %}
                     {% if it_approved_requests|length > 0 %}
@@ -187,7 +187,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if (user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and req.department != 'IT' %}
+                                    {% if (user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and req.department != 'IT' %}
                                         <span style="color: #999;">***</span>
                                     {% else %}
                                         OMR {{ "%.3f"|format(req.amount) }}

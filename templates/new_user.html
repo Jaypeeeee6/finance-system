@@ -71,13 +71,27 @@
                         <select name="role" id="role" required>
                             <option value="">-- Select Role --</option>
                             <option value="Finance Admin">Finance Admin</option>
-                            <option value="Finance">Finance</option>
+                            <option value="Finance Staff">Finance Staff</option>
                             <option value="GM">General Manager</option>
-                            <option value="IT">IT</option>
-                            <option value="Project">Project</option>
+                            <option value="IT Staff">IT Staff</option>
+                            <option value="Project Staff">Project Staff</option>
                             <option value="Operation Manager">Operation Manager</option>
                             <option value="Department Manager">Department Manager</option>
-                            <option value="Department User">Department User</option>
+                            <!-- Department-specific staff roles -->
+                            <option value="HR Staff">HR Staff</option>
+                            <option value="Finance Staff">Finance Staff</option>
+                            <option value="IT Staff">IT Staff</option>
+                            <option value="Purchasing Staff">Purchasing Staff</option>
+                            <option value="PR Staff">PR Staff</option>
+                            <option value="Auditing Staff">Auditing Staff</option>
+                            <option value="Customer Service Staff">Customer Service Staff</option>
+                            <option value="Marketing Staff">Marketing Staff</option>
+                            <option value="Operation Staff">Operation Staff</option>
+                            <option value="Quality Control Staff">Quality Control Staff</option>
+                            <option value="Project Staff">Project Staff</option>
+                            <option value="Research and Development Staff">Research and Development Staff</option>
+                            <option value="Office Staff">Office Staff</option>
+                            <option value="Maintenance Staff">Maintenance Staff</option>
                         </select>
                         <small>Only IT can create users</small>
                     </div>
@@ -143,7 +157,13 @@ function updateManagerDisplay() {
 
     if (role === 'Department Manager' || (role === 'GM' && department === 'Office') || (role === 'Operation Manager' && department === 'Operation') || (role === 'Finance Admin' && department === 'Finance' && document.getElementById('name').value.trim() === 'Abdalaziz Hamood Al Brashdi')) {
         managerIdInput.value = '';
-        setDisplay('You will be the assigned manager for this department', '#d4edda', '#c3e6cb', 'As a Manager, you will manage this department', '#28a745');
+        if (role === 'Department Manager') {
+            setDisplay('General Manager will be your assigned manager', '#d4edda', '#c3e6cb', 'As a Department Manager, the General Manager will approve your requests', '#28a745');
+        } else if (role === 'GM') {
+            setDisplay('Abdalaziz Hamood Al Brashdi will be your assigned manager', '#d4edda', '#c3e6cb', 'As a General Manager, Abdalaziz will approve your requests', '#28a745');
+        } else {
+            setDisplay('You will be the assigned manager for this department', '#d4edda', '#c3e6cb', 'As a Manager, you will manage this department', '#28a745');
+        }
         return;
     }
 

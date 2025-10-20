@@ -183,7 +183,7 @@
 
                 <div class="form-group">
                     <label for="amount">Amount (OMR)</label>
-                    {% if (user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
+                    {% if (user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
                         <input type="text" id="amount" value="***" readonly style="background: #f5f5f5; color: #999; font-size: 1.2rem;">
                     {% else %}
                         <div style="position: relative;">
@@ -272,7 +272,7 @@
                                     </div>
                                     
                                     <div class="installment-amount">
-                                        {% if (user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
+                                        {% if (user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
                                             <div style="font-size: 1.1rem; font-weight: bold; color: #999;">***</div>
                                         {% else %}
                                             <div class="installment-amount-value">
@@ -302,7 +302,7 @@
                             <div class="installments-summary">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                     <span style="font-weight: 600; color: #495057;">Total Amount:</span>
-                                    {% if (user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
+                                    {% if (user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
                                         <span style="font-weight: bold; color: #999;">***</span>
                                     {% else %}
                                         <span style="font-weight: bold; color: #007bff; font-size: 1.1rem;">
@@ -311,7 +311,7 @@
                                     {% endif %}
                                 </div>
                                 
-                                {% if not ((user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT') %}
+                                {% if not ((user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT') %}
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                     <span style="font-weight: 600; color: #28a745;">Amount Paid:</span>
                                     <span style="font-weight: bold; color: #28a745; font-size: 1.1rem;">
@@ -335,7 +335,7 @@
                                 <div style="font-size: 0.9rem;">
                                     This is a recurring monthly payment. The same amount will be due each month.
                                 </div>
-                                {% if user.role != 'IT' %}
+                                {% if user.role != 'IT Staff' %}
                                 <div style="margin-top: 10px; font-weight: bold; color: #007bff;">
                                     Monthly Amount: OMR {{ '%.3f'|format(request.amount|float) }}
                                 </div>
@@ -469,7 +469,15 @@
                                 
                                 <p style="margin-bottom: 0.5rem; color: #666;">
                                     <strong>Assigned Manager:</strong> 
-                                    {% if (user.role == 'Department Manager' and user.department == request.department) or (user.role == 'Operation Manager' and request.department == 'Operation') %}
+                                    {% if user.role == 'Department Manager' and user.department == request.department %}
+                                        General Manager ({{ manager_name if manager_name else 'General Manager' }})
+                                    {% elif user.role == 'GM' and user.user_id == request.user_id %}
+                                        Abdalaziz Hamood Al Brashdi (Finance Admin)
+                                    {% elif user.role == 'Finance Staff' and user.user_id == request.user_id %}
+                                        Abdalaziz Hamood Al Brashdi (Finance Admin)
+                                    {% elif user.role == 'Operation Manager' and user.user_id == request.user_id %}
+                                        Abdalaziz Hamood Al Brashdi (Finance Admin)
+                                    {% elif user.role == 'Operation Manager' and request.department == 'Operation' %}
                                         {{ user.name }} (You)
                                     {% else %}
                                         {{ manager_name if manager_name else 'Department Manager for ' + request.department }}
@@ -527,8 +535,8 @@
                     </div>
                 </div>
 
-                <!-- Manager approval form (only visible to managers of the same department) -->
-                {% if (user.role == 'Department Manager' and user.department == request.department) or (user.role == 'Operation Manager' and request.department == 'Operation') or (user.role == 'Finance Admin' and request.department == 'Finance') %}
+                <!-- Manager approval form (only visible to managers of the same department, but not Department Managers viewing their own requests) -->
+                {% if (user.role == 'Department Manager' and user.department == request.department and user.user_id != request.user_id) or (user.role == 'Operation Manager' and request.department == 'Operation') or (user.role == 'Finance Admin' and request.department == 'Finance') or (user.role == 'GM' and request.user.role == 'Department Manager') or (user.name == 'Abdalaziz Hamood Al Brashdi' and request.user.role in ['GM', 'Finance Staff', 'Operation Manager']) %}
                     <div class="card">
                         <div class="card-header" style="background: #4caf50; color: white;">
                             <h4><i class="fas fa-check-circle"></i> Your Approval Required</h4>
@@ -743,7 +751,7 @@
                                         </div>
                                         
                                         <div class="installment-amount">
-                                            {% if (user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
+                                            {% if (user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
                                             <div class="installment-amount-value">
                                                 ***
                                             </div>
@@ -822,7 +830,7 @@
                                 <div class="installments-summary">
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                         <span style="font-weight: 600; color: #495057;">Total Amount:</span>
-                                        {% if (user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
+                                        {% if (user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
                                         <span style="font-weight: bold; color: #007bff; font-size: 1.1rem;">***</span>
                                         {% else %}
                                         <span style="font-weight: bold; color: #007bff; font-size: 1.1rem;">
@@ -833,7 +841,7 @@
                                     
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                         <span style="font-weight: 600; color: #28a745;">Amount Paid:</span>
-                                        {% if (user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
+                                        {% if (user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
                                         <span style="font-weight: bold; color: #28a745; font-size: 1.1rem;">***</span>
                                         {% else %}
                                         <span style="font-weight: bold; color: #28a745; font-size: 1.1rem;">
@@ -844,7 +852,7 @@
                                     
                                     <div style="display: flex; justify-content: space-between; align-items: center;">
                                         <span style="font-weight: 600; color: #dc3545;">Remaining:</span>
-                                        {% if (user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
+                                        {% if (user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
                                         <span style="font-weight: bold; color: #dc3545; font-size: 1.1rem;">***</span>
                                         {% else %}
                                         <span style="font-weight: bold; color: #dc3545; font-size: 1.1rem;">
@@ -861,7 +869,7 @@
                                     <div style="font-size: 0.9rem;">
                                         This is a recurring monthly payment. The same amount will be due each month.
                                     </div>
-                                    {% if (user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
+                                    {% if (user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
                                     <div style="margin-top: 10px; font-weight: bold; color: #007bff;">
                                         Monthly Amount: ***
                                     </div>
@@ -959,7 +967,7 @@
                                         </div>
 
                                         <div class="installment-amount">
-                                            {% if (user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
+                                            {% if (user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
                                             <div class="installment-amount-value">***</div>
                                             {% else %}
                                             <div class="installment-amount-value">OMR {{ '%.3f'|format(installment.amount) }}</div>
@@ -992,7 +1000,7 @@
                                 <div class="installments-summary">
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                         <span style="font-weight: 600; color: #495057;">Total Amount:</span>
-                                        {% if (user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
+                                        {% if (user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
                                         <span style="font-weight: bold; color: #495057; font-size: 1.1rem;">***</span>
                                         {% else %}
                                         <span style="font-weight: bold; color: #495057; font-size: 1.1rem;">OMR {{ '%.3f'|format(request.amount|float) }}</span>
@@ -1000,7 +1008,7 @@
                                     </div>
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                         <span style="font-weight: 600; color: #28a745;">Amount Paid:</span>
-                                        {% if (user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
+                                        {% if (user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
                                         <span style="font-weight: bold; color: #28a745; font-size: 1.1rem;">***</span>
                                         {% else %}
                                         <span style="font-weight: bold; color: #28a745; font-size: 1.1rem;">OMR {{ '%.3f'|format(total_paid_amount) }}</span>
@@ -1008,7 +1016,7 @@
                                     </div>
                                     <div style="display: flex; justify-content: space-between; align-items: center;">
                                         <span style="font-weight: 600; color: #dc3545;">Remaining:</span>
-                                        {% if (user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
+                                        {% if (user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
                                         <span style="font-weight: bold; color: #dc3545; font-size: 1.1rem;">***</span>
                                         {% else %}
                                         <span style="font-weight: bold; color: #dc3545; font-size: 1.1rem;">OMR {{ '%.3f'|format(request.amount|float - total_paid_amount) }}</span>
@@ -1020,7 +1028,7 @@
                                     <i class="fas fa-calendar-check" style="font-size: 2rem; margin-bottom: 10px; color: #6c757d;"></i>
                                     <div style="font-weight: 600; margin-bottom: 5px;">Monthly Recurring Payment</div>
                                     <div style="font-size: 0.9rem;">This is a recurring monthly payment. The same amount will be due each month.</div>
-                                    {% if (user.role == 'IT' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
+                                    {% if (user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT' %}
                                     <div style="margin-top: 10px; font-weight: bold; color: #6c757d;">Monthly Amount: ***</div>
                                     {% else %}
                                     <div style="margin-top: 10px; font-weight: bold; color: #6c757d;">Monthly Amount: OMR {{ '%.3f'|format(request.amount|float) }}</div>
@@ -1632,7 +1640,7 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('DOMContentLoaded', function() {
     // Only update for Finance and Admin users
     const userRole = document.body.getAttribute('data-user-role');
-    if (userRole === 'Finance' || userRole === 'Admin') {
+    if (userRole === 'Finance Staff' || userRole === 'Admin') {
         // Update notification count in navigation
         fetch('/api/notifications/unread_count')
             .then(response => response.json())

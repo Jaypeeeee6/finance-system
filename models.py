@@ -15,7 +15,7 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(255), nullable=False)
     name = db.Column(db.String(100), nullable=False)  # User's full name
     department = db.Column(db.String(100), nullable=False)
-    role = db.Column(db.String(50), nullable=False)  # Admin, Finance, GM, IT, Department User, Project
+    role = db.Column(db.String(50), nullable=False)  # Admin, Finance, GM, IT, Department-specific Staff roles, Project
     manager_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)  # Manager reference
     email = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

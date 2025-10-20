@@ -48,15 +48,17 @@ This document describes who can view what, who can approve/reject, and how a pay
 - **Finance Admin** (users: Mahmoud, Abdalaziz)
   - **View**: All departments, all roles; finance-related statuses across the board
     - Statuses of interest: Pending Finance Approval, Proof Pending, Proof Sent, Recurring, Completed, Rejected by Finance
+    - Additional for Abdalaziz: Pending Manager Approval (only for Finance Staff, General Manager, and Operation Manager requests)
   - **Approve/Reject**: All departments as Finance Admin approvers, only after manager approval
 
 - **Finance Admin (Abdalaziz)**
   - **View**: Same as Finance Admin
   - **Approve/Reject**: Same as Finance Admin
-  - **Additional Responsibility**: Assigned Manager for all Finance department requests (performs manager approval for Finance department before Finance Admin approval stage)
+  - **Additional Responsibility**: Assigned Manager for Finance Staff, General Manager, and Operation Manager requests (performs manager approval for these roles before Finance Admin approval stage)
 
-- **Finance (staff)**
-  - **View**: All departments, all roles
+- **Finance Staff**
+  - **View**: All departments, all roles; finance-related statuses across the board
+    - Statuses of interest: Pending Finance Approval, Proof Pending, Proof Sent, Recurring, Completed, Rejected by Finance
   - **Approve/Reject**: None
 
 ### IT Department
@@ -64,7 +66,7 @@ This document describes who can view what, who can approve/reject, and how a pay
   - **View**: All departments, all roles; amounts are censored except for IT department requests
   - **Approve/Reject**: IT department only
 
-- **IT Department Staff**
+- **IT Staff**
   - **View**: All departments, all roles; amounts are censored except for IT department requests
   - **Approve/Reject**: None
 
@@ -95,3 +97,62 @@ Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Qual
 - **Accountable**: Department Manager for departmental gatekeeping; Finance Admin (Abdalaziz) for Finance approvals
 - **Consulted**: Finance Admin (oversight), GM/Operation Manager as needed
 - **Informed**: General Manager has full visibility across the process
+
+---
+
+## Notification Permissions by Role
+
+### **Finance Admin (Mahmoud, Abdalaziz)**
+- **New submissions** when requests reach "Pending Finance Approval"
+- **Proof uploaded** notifications
+- **Recurring payment due** notifications
+- **System-wide notifications** (all types)
+
+### **Finance Staff**
+- **New submissions** when requests reach "Pending Finance Approval"
+- **Proof uploaded** notifications
+- **Recurring payment due** notifications
+- **System-wide notifications** (all types)
+
+### **General Manager (GM)**
+- **New submissions** from users with role "Department Manager" only
+- **Updates on their own requests** (status changes, approvals, rejections, etc.)
+- **System-wide notifications** (all types)
+
+### **Operation Manager**
+- **New submissions** from users with role "Operation Staff" only
+- **Updates on their own requests** (status changes, approvals, rejections, etc.)
+- **System-wide notifications** (all types)
+
+### **IT Department Manager**
+- **New submissions** from users with role "IT Staff" only
+- **Updates on their own requests** (status changes, approvals, rejections, etc.)
+- **System-wide notifications** (all types)
+- **User management** notifications (user creation, role changes)
+
+### **IT Staff**
+- **Updates on their own requests** (status changes, approvals, rejections, etc.)
+- **System-wide notifications** (all types)
+- **User management** notifications (user creation, role changes)
+
+### **Project Staff**
+- **Updates on their own requests** (status changes, approvals, rejections, etc.)
+- **Recurring payment due** notifications on their own requests only
+- **Project-related** notifications (if any)
+
+### **Department Managers (Non-IT)**
+- **New submissions** from their own department staff only
+- **Recurring payment due** notifications for their department
+
+### **Department Staff (All departments)**
+- **Updates on their own requests** only (status changes, approvals, rejections, etc.)
+- **Recurring payment due** notifications for their own requests
+
+### **System-Wide Notifications**
+These are notifications that affect the entire system or multiple users:
+- **System Maintenance/Updates**: "System will be down for maintenance on [date]"
+- **Policy Changes**: "New approval policies have been implemented"
+- **Security Alerts**: "Multiple failed login attempts detected"
+- **System Errors/Issues**: "Payment processing is temporarily unavailable"
+- **Administrative Announcements**: "New user roles have been added"
+- **IT-Specific System Notifications**: "Server performance issues detected"

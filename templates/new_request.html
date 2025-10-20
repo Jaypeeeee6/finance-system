@@ -20,20 +20,20 @@
                             <option value="Item">Item</option>
                             <option value="Person">Person</option>
                             
-                            {% if user.role == 'Finance' %}
+                            {% if user.role == 'Finance Staff' %}
                             <!-- Finance can access Item, Person, Supplier/Rental -->
                             <option value="Supplier/Rental">Supplier/Rental</option>
                             {% endif %}
                             
-                            {% if user.role == 'Project' %}
+                            {% if user.role == 'Project Staff' %}
                             <!-- Project role can access Item or Supplier/Rental -->
                             <option value="Supplier/Rental">Supplier/Rental</option>
                             {% endif %}
                         </select>
                         <small>
-                            {% if user.role == 'Finance' %}
+                            {% if user.role == 'Finance Staff' %}
                                 Available: Item, Person, Supplier/Rental
-                            {% elif user.role == 'Project' %}
+                            {% elif user.role == 'Project Staff' %}
                                 Available: Item, Supplier/Rental
                             {% else %}
                                 Available: Item, Person

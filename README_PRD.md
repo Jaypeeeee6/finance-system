@@ -24,7 +24,7 @@ It ensures transparency, accountability, and efficiency across all financial req
 
 | Role | Description | Access |
 |------|--------------|---------|
-| **Department User** | Can request payments (Item or Person). | Submit 2 forms & view own requests. |
+| **Department Staff** | Can request payments (Item or Person). | Submit 2 forms & view own requests. |
 | **Finance** | Can request for items, persons, or suppliers/rentals. | Submit 3 forms & view reports. |
 | **Project** | Special role for project-related payments. | Submit Item or Company forms (2 forms). |
 | **General Manager** | Oversees all financial activities. | View all reports. |

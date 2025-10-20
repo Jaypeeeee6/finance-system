@@ -29,7 +29,7 @@ Client–Server (Web-based Application)
 - Session expiration handled through Flask sessions.
 
 **Roles:**
-- Department User
+- Department-specific Staff roles (e.g., HR Staff, Finance Staff, IT Staff, ...)
 - Finance
 - General Manager
 - Admin
@@ -40,7 +40,7 @@ Client–Server (Web-based Application)
 
 ### 2. **Payment Request Module**
 - Each department can submit payment requests.
-- **Department Users** can choose between **Item** or **Person** forms (2 forms).
+- **Department Staff** can choose between **Item** or **Person** forms (2 forms).
 - **Finance role** can use **Item**, **Person**, or **Supplier/Rental** forms (3 forms).
 - **Project role** can use **Item** or **Company** forms (2 forms).
 - Department field auto-fills based on logged-in user's account.
@@ -84,7 +84,7 @@ Client–Server (Web-based Application)
 | username | VARCHAR(50) | Login name |
 | password | VARCHAR(255) | Hashed password |
 | department | VARCHAR(100) | Department name |
-| role | VARCHAR(50) | Role (Admin, Finance, GM, IT, Department User) |
+| role | VARCHAR(50) | Role (Admin, Finance, GM, IT, Department Staff) |
 | email | VARCHAR(100) | Optional email address |
 | created_at | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Creation date |
 

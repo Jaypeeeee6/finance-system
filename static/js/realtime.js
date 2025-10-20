@@ -20,7 +20,7 @@ function initRealTimeUpdates() {
         
         // Join appropriate room based on user role
         const userRole = document.body.getAttribute('data-user-role');
-        if (userRole === 'Finance' || userRole === 'Finance Admin') {
+        if (userRole === 'Finance Staff' || userRole === 'Finance Admin') {
             socket.emit('join_room', { room: 'finance_admin' });
         }
         socket.emit('join_room', { room: 'all_users' });

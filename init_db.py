@@ -35,7 +35,7 @@ def init_database():
                 'username': 'finance',
                 'password': 'finance123',
                 'department': 'Finance',
-                'role': 'Finance',
+                'role': 'Finance Staff',
                 'email': 'finance@company.com'
             },
             {
@@ -49,35 +49,35 @@ def init_database():
                 'username': 'it',
                 'password': 'it123',
                 'department': 'IT',
-                'role': 'IT',
+                'role': 'IT Staff',
                 'email': 'it@company.com'
             },
             {
                 'username': 'hr_user',
                 'password': 'hr123',
                 'department': 'Human Resources',
-                'role': 'Department User',
+                'role': 'HR Staff',
                 'email': 'hr@company.com'
             },
             {
                 'username': 'marketing_user',
                 'password': 'marketing123',
                 'department': 'Marketing',
-                'role': 'Department User',
+                'role': 'Marketing Staff',
                 'email': 'marketing@company.com'
             },
             {
                 'username': 'sales_user',
                 'password': 'sales123',
                 'department': 'Sales',
-                'role': 'Department User',
+                'role': 'Sales Staff',
                 'email': 'sales@company.com'
             },
             {
                 'username': 'operations_user',
                 'password': 'operations123',
                 'department': 'Operations',
-                'role': 'Department User',
+                'role': 'Operation Staff',
                 'email': 'operations@company.com'
             }
         ]
