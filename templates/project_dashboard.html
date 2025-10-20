@@ -104,22 +104,14 @@
                 {% endif %}
             </h2>
             <div class="card-header-actions">
-                <form method="GET" class="search-form" style="display: inline-flex; align-items: center; margin-right: 10px;">
-                    <input type="text" name="search" placeholder="Search by request ID..." 
-                           value="{{ search_query or '' }}" class="form-control" style="width: 300px; margin-right: 5px;">
-                    <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="fas fa-search"></i> Search
-                    </button>
-                    {% if search_query %}
-                    <a href="{{ url_for('project_dashboard') }}" class="btn btn-outline btn-sm" style="margin-left: 5px;">
+                <div class="search-form" style="display: inline-flex; align-items: center; margin-right: 10px;">
+                    <input type="text" id="searchInput" placeholder="Search by request ID..." 
+                           value="{{ search_query or '' }}" class="form-control" style="width: 300px; margin-right: 5px;"
+                           onkeyup="filterTable()">
+                    <button type="button" onclick="clearSearch()" class="btn btn-outline btn-sm" style="margin-left: 5px;">
                         <i class="fas fa-times"></i> Clear
-                    </a>
-                    {% endif %}
-                    <!-- Preserve other filters -->
-                    {% if status_filter %}
-                    <input type="hidden" name="status" value="{{ status_filter }}">
-                    {% endif %}
-                </form>
+                    </button>
+                </div>
             </div>
             {% if status_filter or search_query %}
             <div class="filter-indicator">
@@ -331,6 +323,43 @@ function updateNotificationCount() {
         .catch(error => {
             console.error('Error updating notification count:', error);
         });
+}
+
+function filterTable() {
+    const searchInput = document.getElementById('searchInput');
+    const searchFilter = searchInput.value.toLowerCase();
+    
+    const table = document.querySelector('.data-table');
+    const rows = table.getElementsByTagName('tr');
+    
+    // Skip header row (index 0)
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const cells = row.getElementsByTagName('td');
+        
+        if (cells.length >= 1) {
+            const requestIdCell = cells[0]; // Request ID
+            
+            let showRow = true;
+            
+            // Filter by search term (request ID)
+            if (searchFilter) {
+                const requestId = requestIdCell.textContent || requestIdCell.innerText;
+                const requestIdText = requestId.toLowerCase();
+                if (!requestIdText.includes(searchFilter)) {
+                    showRow = false;
+                }
+            }
+            
+            // Show or hide row
+            row.style.display = showRow ? '' : 'none';
+        }
+    }
+}
+
+function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    filterTable();
 }
 </script>
 {% endblock %}

@@ -832,6 +832,7 @@ def admin_dashboard():
     status_filter = request.args.get('status', None)
     department_filter = request.args.get('department', None)
     search_query = request.args.get('search', None)
+    urgent_filter = request.args.get('urgent', None)
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -854,6 +855,12 @@ def admin_dashboard():
             # If not a number, no results (only search by request ID)
             query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
     
+    if urgent_filter:
+        if urgent_filter == 'urgent':
+            query = query.filter(PaymentRequest.is_urgent == True)
+        elif urgent_filter == 'not_urgent':
+            query = query.filter(PaymentRequest.is_urgent == False)
+    
     # Get paginated requests
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
@@ -870,7 +877,8 @@ def admin_dashboard():
                          unread_count=unread_count,
                          status_filter=status_filter,
                          department_filter=department_filter,
-                         search_query=search_query)
+                         search_query=search_query,
+                         urgent_filter=urgent_filter)
 
 
 @app.route('/finance/dashboard')
@@ -885,6 +893,7 @@ def finance_dashboard():
     per_page = request.args.get('per_page', 10, type=int)
     department_filter = request.args.get('department', None)
     search_query = request.args.get('search', None)
+    urgent_filter = request.args.get('urgent', None)
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -905,6 +914,12 @@ def finance_dashboard():
             # If not a number, no results (only search by request ID)
             query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
     
+    if urgent_filter:
+        if urgent_filter == 'urgent':
+            query = query.filter(PaymentRequest.is_urgent == True)
+        elif urgent_filter == 'not_urgent':
+            query = query.filter(PaymentRequest.is_urgent == False)
+    
     # Get paginated requests
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
@@ -920,7 +935,8 @@ def finance_dashboard():
                          notifications=notifications, 
                          unread_count=unread_count,
                          department_filter=department_filter,
-                         search_query=search_query)
+                         search_query=search_query,
+                         urgent_filter=urgent_filter)
 
 
 @app.route('/gm/dashboard')
