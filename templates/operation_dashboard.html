@@ -104,6 +104,25 @@
             </h2>
             <div class="card-header-actions">
                 <div class="filter-controls">
+                    <form method="GET" class="search-form" style="display: inline-flex; align-items: center; margin-right: 10px;">
+                        <input type="text" name="search" placeholder="Search by request ID..." 
+                               value="{{ search_query or '' }}" class="form-control" style="width: 300px; margin-right: 5px;">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                        {% if search_query %}
+                        <a href="{{ url_for('operation_dashboard') }}" class="btn btn-outline btn-sm" style="margin-left: 5px;">
+                            <i class="fas fa-times"></i> Clear
+                        </a>
+                        {% endif %}
+                        <!-- Preserve other filters -->
+                        {% if status_filter %}
+                        <input type="hidden" name="status" value="{{ status_filter }}">
+                        {% endif %}
+                        {% if department_filter %}
+                        <input type="hidden" name="department" value="{{ department_filter }}">
+                        {% endif %}
+                    </form>
                     <select id="departmentFilter" onchange="filterByDepartment(this.value)" class="form-select">
                         <option value="">All Departments</option>
                         <option value="Maintenance" {% if department_filter == 'Maintenance' %}selected{% endif %}>Maintenance</option>
@@ -111,17 +130,15 @@
                         <option value="Project Department" {% if department_filter == 'Project Department' %}selected{% endif %}>Project Department</option>
                     </select>
                 </div>
-                {% if status_filter or department_filter %}
+                {% if status_filter or department_filter or search_query %}
                 <div class="filter-indicator">
                     <span class="badge" style="background: #f57c00; color: white;">
                         <i class="fas fa-filter"></i> 
-                        {% if status_filter and department_filter %}
-                            {{ status_filter }} | {{ department_filter }}
-                        {% elif status_filter %}
-                            {{ status_filter }}
-                        {% elif department_filter %}
-                            {{ department_filter }}
-                        {% endif %}
+                        {% set filters = [] %}
+                        {% if status_filter %}{{ filters.append(status_filter) or '' }}{% endif %}
+                        {% if department_filter %}{{ filters.append(department_filter) or '' }}{% endif %}
+                        {% if search_query %}{{ filters.append('Search: ' + search_query) or '' }}{% endif %}
+                        {{ filters|join(' | ') }}
                     </span>
                     <a href="{{ url_for('operation_dashboard') }}" class="btn btn-sm btn-outline">
                         <i class="fas fa-times"></i> Clear All

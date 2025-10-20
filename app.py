@@ -715,6 +715,7 @@ def department_dashboard():
     """Dashboard for department users, finance, and project users"""
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
+    search_query = request.args.get('search', None)
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -732,12 +733,48 @@ def department_dashboard():
                 PaymentRequest.department == current_user.department
             )
         
+        # Apply search filter if provided
+        if search_query:
+            try:
+                # Try to convert to integer for exact match
+                search_id = int(search_query)
+                query = query.filter(PaymentRequest.request_id == search_id)
+            except ValueError:
+                # If not a number, search by requestor name or other text fields
+                search_term = f'%{search_query}%'
+                query = query.filter(
+                    db.or_(
+                        PaymentRequest.requestor_name.ilike(search_term),
+                        PaymentRequest.purpose.ilike(search_term),
+                        PaymentRequest.account_name.ilike(search_term)
+                    )
+                )
+        
         requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
     else:
         # For regular users, show their own requests
-        requests_pagination = PaymentRequest.query.filter_by(user_id=current_user.user_id).order_by(PaymentRequest.created_at.desc()).paginate(
+        query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
+        
+        # Apply search filter if provided
+        if search_query:
+            try:
+                # Try to convert to integer for exact match
+                search_id = int(search_query)
+                query = query.filter(PaymentRequest.request_id == search_id)
+            except ValueError:
+                # If not a number, search by requestor name or other text fields
+                search_term = f'%{search_query}%'
+                query = query.filter(
+                    db.or_(
+                        PaymentRequest.requestor_name.ilike(search_term),
+                        PaymentRequest.purpose.ilike(search_term),
+                        PaymentRequest.account_name.ilike(search_term)
+                    )
+                )
+        
+        requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
     
@@ -750,7 +787,8 @@ def department_dashboard():
                          pagination=requests_pagination,
                          user=current_user,
                          notifications=notifications,
-                         unread_count=unread_count)
+                         unread_count=unread_count,
+                         search_query=search_query)
 
 
 @app.route('/admin/dashboard')
@@ -765,18 +803,28 @@ def admin_dashboard():
     per_page = request.args.get('per_page', 10, type=int)
     status_filter = request.args.get('status', None)
     department_filter = request.args.get('department', None)
+    search_query = request.args.get('search', None)
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
     
-    # Build query with optional status and department filters
+    # Build query with optional status, department, and search filters
     # Finance Admin can see all requests, including pending manager approval
     query = PaymentRequest.query
     if status_filter:
         query = query.filter(PaymentRequest.status == status_filter)
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
+    if search_query:
+        # Search by request ID only
+        try:
+            # Try to convert to integer for exact match
+            search_id = int(search_query)
+            query = query.filter(PaymentRequest.request_id == search_id)
+        except ValueError:
+            # If not a number, no results (only search by request ID)
+            query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
     
     # Get paginated requests
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
@@ -793,7 +841,8 @@ def admin_dashboard():
                          notifications=notifications, 
                          unread_count=unread_count,
                          status_filter=status_filter,
-                         department_filter=department_filter)
+                         department_filter=department_filter,
+                         search_query=search_query)
 
 
 @app.route('/finance/dashboard')
@@ -807,16 +856,26 @@ def finance_dashboard():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     department_filter = request.args.get('department', None)
+    search_query = request.args.get('search', None)
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
     
-    # Build query with optional department filter
+    # Build query with optional department and search filters
     # Finance users can see all requests, including their own pending manager approval requests
     query = PaymentRequest.query
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
+    if search_query:
+        # Search by request ID only
+        try:
+            # Try to convert to integer for exact match
+            search_id = int(search_query)
+            query = query.filter(PaymentRequest.request_id == search_id)
+        except ValueError:
+            # If not a number, no results (only search by request ID)
+            query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
     
     # Get paginated requests
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
@@ -832,7 +891,8 @@ def finance_dashboard():
                          user=current_user, 
                          notifications=notifications, 
                          unread_count=unread_count,
-                         department_filter=department_filter)
+                         department_filter=department_filter,
+                         search_query=search_query)
 
 
 @app.route('/gm/dashboard')
@@ -843,16 +903,26 @@ def gm_dashboard():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     department_filter = request.args.get('department', None)
+    search_query = request.args.get('search', None)
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
     
-    # Build query with optional department filter
+    # Build query with optional department and search filters
     # GM can see ALL requests from ALL departments
     query = PaymentRequest.query
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
+    if search_query:
+        # Search by request ID only
+        try:
+            # Try to convert to integer for exact match
+            search_id = int(search_query)
+            query = query.filter(PaymentRequest.request_id == search_id)
+        except ValueError:
+            # If not a number, no results (only search by request ID)
+            query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
     
     # Get paginated requests
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
@@ -884,7 +954,8 @@ def gm_dashboard():
                          user=current_user,
                          notifications=notifications,
                          unread_count=unread_count,
-                         department_filter=department_filter)
+                         department_filter=department_filter,
+                         search_query=search_query)
 
 
 @app.route('/it/dashboard')
@@ -895,6 +966,7 @@ def it_dashboard():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     department_filter = request.args.get('department', None)
+    search_query = request.args.get('search', None)
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -905,7 +977,7 @@ def it_dashboard():
         flash('You do not have permission to access this page.', 'danger')
         return redirect(url_for('dashboard'))
     
-    # Build query with optional department filter
+    # Build query with optional department and search filters
     if current_user.role == 'IT':
         # IT users see all requests
         query = PaymentRequest.query
@@ -918,6 +990,15 @@ def it_dashboard():
     
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
+    if search_query:
+        # Search by request ID only
+        try:
+            # Try to convert to integer for exact match
+            search_id = int(search_query)
+            query = query.filter(PaymentRequest.request_id == search_id)
+        except ValueError:
+            # If not a number, no results (only search by request ID)
+            query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
     
     # Get paginated requests
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
@@ -938,7 +1019,8 @@ def it_dashboard():
                          user=current_user,
                          notifications=notifications,
                          unread_count=unread_count,
-                         department_filter=department_filter)
+                         department_filter=department_filter,
+                         search_query=search_query)
 
 
 @app.route('/project/dashboard')
@@ -952,15 +1034,25 @@ def project_dashboard():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     status_filter = request.args.get('status', None)
+    search_query = request.args.get('search', None)
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
     
-    # Build query with optional status filter
+    # Build query with optional status and search filters
     query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
     if status_filter:
         query = query.filter(PaymentRequest.status == status_filter)
+    if search_query:
+        # Search by request ID only
+        try:
+            # Try to convert to integer for exact match
+            search_id = int(search_query)
+            query = query.filter(PaymentRequest.request_id == search_id)
+        except ValueError:
+            # If not a number, no results (only search by request ID)
+            query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
     
     # Get paginated requests
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
@@ -977,7 +1069,8 @@ def project_dashboard():
                          user=current_user,
                          notifications=notifications,
                          unread_count=unread_count,
-                         status_filter=status_filter)
+                         status_filter=status_filter,
+                         search_query=search_query)
 
 
 @app.route('/operation/dashboard')
@@ -992,12 +1085,13 @@ def operation_dashboard():
     per_page = request.args.get('per_page', 10, type=int)
     status_filter = request.args.get('status', None)
     department_filter = request.args.get('department', None)
+    search_query = request.args.get('search', None)
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
     
-    # Build query with optional status and department filters - Operation Manager sees ALL departments
+    # Build query with optional status, department, and search filters - Operation Manager sees ALL departments
     query = PaymentRequest.query
     
     # If no specific status filter, prioritize showing requests that need manager approval
@@ -1015,6 +1109,15 @@ def operation_dashboard():
     
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
+    if search_query:
+        # Search by request ID only
+        try:
+            # Try to convert to integer for exact match
+            search_id = int(search_query)
+            query = query.filter(PaymentRequest.request_id == search_id)
+        except ValueError:
+            # If not a number, no results (only search by request ID)
+            query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
     
     # Get paginated requests
     requests_pagination = query.paginate(
@@ -1032,7 +1135,8 @@ def operation_dashboard():
                          notifications=notifications,
                          unread_count=unread_count,
                          status_filter=status_filter,
-                         department_filter=department_filter)
+                         department_filter=department_filter,
+                         search_query=search_query)
 
 
 # ==================== PAYMENT REQUEST ROUTES ====================
