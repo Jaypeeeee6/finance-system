@@ -328,6 +328,17 @@
     color: var(--white) !important;
 }
 
+/* Special case for IT dashboard where card is inside tab-content after tab-navigation */
+.tab-navigation ~ .tab-content .card {
+    border-radius: 0 8px 8px 0 !important;
+}
+
+.tab-navigation ~ .tab-content .card .card-header {
+    border-radius: 0 10px 0 0 !important;
+    background: var(--dark-color) !important;
+    color: var(--white) !important;
+}
+
 /* Even more specific targeting */
 div.card > div.card-header {
     border-radius: 0 10px 0 0 !important;
@@ -1351,6 +1362,23 @@ body {
 }
 
 .empty-state p {
+    font-size: 1.1rem;
+}
+
+/* ==================== NO DATA STATE ==================== */
+.no-data {
+    text-align: center;
+    padding: 3rem;
+    color: var(--secondary-color);
+}
+
+.no-data i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.no-data p {
     font-size: 1.1rem;
 }
 

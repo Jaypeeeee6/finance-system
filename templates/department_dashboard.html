@@ -15,43 +15,63 @@
         </a>
     </div>
 
+    <!-- Tab Navigation -->
+    <div class="tab-navigation">
+        <button class="tab-button {% if active_tab == 'pending' %}active{% endif %}" onclick="switchTab('pending')" id="tab-pending">
+            <i class="fas fa-list"></i> All Requests
+        </button>
+        <button class="tab-button {% if active_tab == 'completed' %}active{% endif %}" onclick="switchTab('completed')" id="tab-completed">
+            <i class="fas fa-check-circle"></i> Completed
+        </button>
+        <button class="tab-button {% if active_tab == 'rejected' %}active{% endif %}" onclick="switchTab('rejected')" id="tab-rejected">
+            <i class="fas fa-times-circle"></i> Rejected
+        </button>
+        <div class="tab-search">
+            <input type="text" id="tabSearchInput" placeholder="Search..." class="tab-search-input">
+            <button type="button" class="tab-search-btn">
+                <i class="fas fa-search"></i>
+            </button>
+        </div>
+    </div>
 
     <div class="card">
         <div class="card-header">
-            <h2><i class="fas fa-list"></i> 
-                {% if search_query %}
-                    Search Results: {{ search_query }}
-                {% else %}
-                    My Payment Requests
-                {% endif %}
-            </h2>
-            <div class="card-header-actions">
-                <div class="search-form" style="display: inline-flex; align-items: center; margin-right: 10px;">
-                    <input type="text" id="searchInput" placeholder="Search by request ID..." 
-                           value="{{ search_query or '' }}" class="form-control" style="width: 300px; margin-right: 5px;"
-                           onkeyup="filterTable()">
-                    <button type="button" onclick="clearSearch()" class="btn btn-outline btn-sm" style="margin-left: 5px;">
-                        <i class="fas fa-times"></i> Clear
-                    </button>
+            <div class="header-top">
+                <div class="filter-controls">
+                    <select id="urgentFilter" onchange="filterTable()" class="form-select">
+                        <option value="">All Requests</option>
+                        <option value="urgent" {% if urgent_filter == 'urgent' %}selected{% endif %}>🔴 Urgent Only</option>
+                        <option value="not_urgent" {% if urgent_filter == 'not_urgent' %}selected{% endif %}>⚪ Not Urgent</option>
+                    </select>
                 </div>
+                <h2><i class="fas fa-tasks"></i> Payment Requests</h2>
             </div>
-            {% if search_query %}
-            <div class="filter-indicator">
-                <span class="badge" style="background: #f57c00; color: white;">
-                    <i class="fas fa-filter"></i> Search: {{ search_query }}
-                </span>
-                <a href="{{ url_for('department_dashboard') }}" class="btn btn-sm btn-outline">
-                    <i class="fas fa-times"></i> Clear Search
-                </a>
+            <div class="card-header-actions">
+                {% if search_query or urgent_filter %}
+                <div class="filter-indicator">
+                    <span class="badge" style="background: #f57c00; color: white;">
+                        <i class="fas fa-filter"></i> 
+                        {% set filters = [] %}
+                        {% if urgent_filter %}{{ filters.append(urgent_filter) or '' }}{% endif %}
+                        {% if search_query %}{{ filters.append('Search: ' + search_query) or '' }}{% endif %}
+                        {{ filters|join(' | ') }}
+                    </span>
+                    <a href="{{ url_for('department_dashboard') }}" class="btn btn-sm btn-outline">
+                        <i class="fas fa-times"></i> Clear All
+                    </a>
+                </div>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
         <div class="card-body">
-            {% if requests %}
+            <h4 class="card-title mb-4">Payment Requests</h4>
+            <!-- All Requests Tab -->
+            <div id="tab-content-pending" class="tab-content {% if active_tab == 'pending' %}active{% endif %}">
+                {% if requests %}
                 <div class="table-responsive">
                     <table class="data-table">
                         <thead>
-                            <tr>
+                            <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
                                 <th>ID</th>
                                 <th>Type</th>
                                 <th>Requestor</th>
@@ -64,8 +84,13 @@
                         </thead>
                         <tbody>
                             {% for req in requests %}
-                            <tr>
-                                <td>#{{ req.request_id }}</td>
+                            <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
+                                <td>
+                                    <span>#{{ req.request_id }}</span>
+                                    {% if req.is_urgent %}
+                                        <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
+                                    {% endif %}
+                                </td>
                                 <td><span class="badge badge-info">{{ req.request_type }}</span></td>
                                 <td>{{ req.requestor_name }}</td>
                                 <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
@@ -181,6 +206,125 @@
                 {% endif %}
             </div>
             {% endif %}
+            </div>
+            
+            <!-- Completed Tab -->
+            <div id="tab-content-completed" class="tab-content {% if active_tab == 'completed' %}active{% endif %}">
+                {% if completed_requests %}
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
+                                    <th>ID</th>
+                                    <th>Type</th>
+                                    <th>Requestor</th>
+                                    <th>Submission Date</th>
+                                    <th>Completed Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for req in completed_requests %}
+                                <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
+                                    <td>
+                                    <span>#{{ req.request_id }}</span>
+                                    {% if req.is_urgent %}
+                                        <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
+                                    {% endif %}
+                                </td>
+                                    <td><span class="badge badge-info">{{ req.request_type }}</span></td>
+                                    <td>{{ req.requestor_name }}</td>
+                                    <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        {% if req.completion_date %}
+                                            {{ req.completion_date.strftime('%Y-%m-%d') }}
+                                        {% elif req.approval_date %}
+                                            {{ req.approval_date.strftime('%Y-%m-%d') }}
+                                        {% else %}
+                                            <span style="color: #999;">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                    <td>
+                                        <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="no-data">
+                        <i class="fas fa-check-circle"></i>
+                        <p>No completed requests found.</p>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- Rejected Tab -->
+            <div id="tab-content-rejected" class="tab-content {% if active_tab == 'rejected' %}active{% endif %}">
+                {% if rejected_requests %}
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
+                                    <th>ID</th>
+                                    <th>Type</th>
+                                    <th>Requestor</th>
+                                    <th>Submission Date</th>
+                                    <th>Rejection Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for req in rejected_requests %}
+                                <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
+                                    <td>
+                                    <span>#{{ req.request_id }}</span>
+                                    {% if req.is_urgent %}
+                                        <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
+                                    {% endif %}
+                                </td>
+                                    <td><span class="badge badge-info">{{ req.request_type }}</span></td>
+                                    <td>{{ req.requestor_name }}</td>
+                                    <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        {% if req.rejection_date %}
+                                            {{ req.rejection_date.strftime('%Y-%m-%d') }}
+                                        {% else %}
+                                            <span style="color: #999;">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                    <td>
+                                        <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="no-data">
+                        <i class="fas fa-times-circle"></i>
+                        <p>No rejected requests found.</p>
+                    </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>
@@ -232,8 +376,11 @@ function showRejectModal(requestId) {
 }
 
 function filterTable() {
-    const searchInput = document.getElementById('searchInput');
+    const searchInput = document.getElementById('tabSearchInput');
+    const urgentFilter = document.getElementById('urgentFilter');
+    
     const searchFilter = searchInput.value.toLowerCase();
+    const urgentValue = urgentFilter.value;
     
     const table = document.querySelector('.data-table');
     const rows = table.getElementsByTagName('tr');
@@ -245,6 +392,7 @@ function filterTable() {
         
         if (cells.length >= 1) {
             const requestIdCell = cells[0]; // Request ID
+            const urgentBadge = row.querySelector('[style*="background: #dc3545"]'); // URGENT badge
             
             let showRow = true;
             
@@ -257,6 +405,16 @@ function filterTable() {
                 }
             }
             
+            // Filter by urgent status
+            if (urgentValue && showRow) {
+                const isUrgent = urgentBadge !== null;
+                if (urgentValue === 'urgent' && !isUrgent) {
+                    showRow = false;
+                } else if (urgentValue === 'not_urgent' && isUrgent) {
+                    showRow = false;
+                }
+            }
+            
             // Show or hide row
             row.style.display = showRow ? '' : 'none';
         }
@@ -264,9 +422,55 @@ function filterTable() {
 }
 
 function clearSearch() {
-    document.getElementById('searchInput').value = '';
+    document.getElementById('tabSearchInput').value = '';
     filterTable();
 }
+
+function switchTab(tabName) {
+    // Hide all tab contents
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    // Remove active class from all tab buttons
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(button => {
+        button.classList.remove('active');
+    });
+    
+    // Show selected tab content
+    const selectedContent = document.getElementById('tab-content-' + tabName);
+    if (selectedContent) {
+        selectedContent.classList.add('active');
+    }
+    
+    // Add active class to selected tab button
+    const selectedButton = document.getElementById('tab-' + tabName);
+    if (selectedButton) {
+        selectedButton.classList.add('active');
+    }
+    
+    // Update URL with tab parameter
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tabName);
+    window.history.pushState({}, '', url);
+}
+
+// Initialize tab search functionality when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up tab search functionality
+    const tabSearchInput = document.getElementById('tabSearchInput');
+    if (tabSearchInput) {
+        tabSearchInput.addEventListener('keyup', filterTable);
+    }
+    
+    // Set up tab search button
+    const tabSearchBtn = document.querySelector('.tab-search-btn');
+    if (tabSearchBtn) {
+        tabSearchBtn.addEventListener('click', filterTable);
+    }
+});
 </script>
 {% endblock %}
 
