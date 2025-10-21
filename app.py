@@ -919,13 +919,13 @@ def notify_finance_and_admin(title, message, notification_type, request_id=None)
             request_id=request_id
         )
     
-    # Emit real-time notification to Finance and Admin users
+    # Emit real-time notification to all users
     socketio.emit('new_notification', {
         'title': title,
         'message': message,
         'type': notification_type,
         'request_id': request_id
-    }, room='finance_admin')
+    }, room='all_users')
 
 
 def allowed_file(filename):
@@ -1748,31 +1748,17 @@ def new_request():
             print(f"Error creating notifications: {e}")
             # Don't fail the request creation if notification fails
         
-        # Emit real-time event based on request status
+        # Emit real-time event to all users
         try:
-            if new_req.status == 'Approved':
-                # Finance department requests - notify Finance Admin
-                socketio.emit('new_request', {
-                    'request_id': new_req.request_id,
-                    'request_type': new_req.request_type,
-                    'requestor_name': new_req.requestor_name,
-                    'department': new_req.department,
-                    'amount': float(new_req.amount),
-                    'status': new_req.status,
-                    'date': new_req.date.strftime('%Y-%m-%d')
-                }, room='finance_admin')
-            else:
-                # Other departments - notify only the manager
-                if new_req.user and new_req.user.manager_id:
-                    socketio.emit('new_request', {
-                        'request_id': new_req.request_id,
-                        'request_type': new_req.request_type,
-                        'requestor_name': new_req.requestor_name,
-                        'department': new_req.department,
-                        'amount': float(new_req.amount),
-                        'status': new_req.status,
-                        'date': new_req.date.strftime('%Y-%m-%d')
-                    }, room=f'user_{new_req.user.manager_id}')
+            socketio.emit('new_request', {
+                'request_id': new_req.request_id,
+                'request_type': new_req.request_type,
+                'requestor_name': new_req.requestor_name,
+                'department': new_req.department,
+                'amount': float(new_req.amount),
+                'status': new_req.status,
+                'date': new_req.date.strftime('%Y-%m-%d')
+            }, room='all_users')
         except Exception as e:
             print(f"Error emitting real-time notification: {e}")
             # Don't fail the request creation if real-time notification fails
@@ -2201,6 +2187,13 @@ def approve_request(request_id):
                 req.status = 'Recurring'
                 req.approval_date = today
                 
+                # End finance approval timing when recurring payment is approved
+                if req.finance_approval_start_time and not req.finance_approval_end_time:
+                    current_time = datetime.utcnow()
+                    req.finance_approval_end_time = current_time
+                    duration = current_time - req.finance_approval_start_time
+                    req.finance_approval_duration_minutes = int(duration.total_seconds())
+                
                 # Automatically mark the first installment as paid
                 first_installment = RecurringPaymentSchedule.query.filter_by(
                     request_id=request_id
@@ -2330,12 +2323,12 @@ def approve_request(request_id):
         
         log_action(f"Finance admin marked payment request #{request_id} as paid")
         
-        # Emit real-time update
+        # Emit real-time update to all users
         socketio.emit('request_updated', {
             'request_id': request_id,
             'status': 'Paid',
             'paid': True
-        })
+        }, room='all_users')
         
         flash(f'Payment request #{request_id} has been marked as paid.', 'success')
     
@@ -2468,6 +2461,9 @@ def upload_additional_files(request_id):
         flash('This request is not in a state that allows file uploads.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
+    # Get the note about the files
+    file_note = request.form.get('file_note', '').strip()
+    
     # Handle file uploads
     files = request.files.getlist('additional_files')
     print(f"DEBUG: Received {len(files)} files from request")
@@ -2527,8 +2523,19 @@ def upload_additional_files(request_id):
             except (json.JSONDecodeError, TypeError):
                 existing_files = []
         
+        # Create file entries with notes
+        new_file_entries = []
+        for filename in uploaded_files:
+            file_entry = {
+                'filename': filename,
+                'uploaded_at': datetime.utcnow().isoformat(),
+                'uploaded_by': current_user.name,
+                'note': file_note if file_note else None
+            }
+            new_file_entries.append(file_entry)
+        
         # Add new files to existing ones
-        all_files = existing_files + uploaded_files
+        all_files = existing_files + new_file_entries
         
         # Store as JSON string
         req.additional_files = json.dumps(all_files)
@@ -2536,7 +2543,8 @@ def upload_additional_files(request_id):
         
         db.session.commit()
         
-        log_action(f"Finance admin uploaded {len(uploaded_files)} additional files to request #{request_id}")
+        note_text = f" with note: '{file_note}'" if file_note else ""
+        log_action(f"Finance admin uploaded {len(uploaded_files)} additional files to request #{request_id}{note_text}")
         flash(f'Successfully uploaded {len(uploaded_files)} additional files.', 'success')
     else:
         flash('No valid files were uploaded.', 'warning')
@@ -2760,12 +2768,12 @@ def upload_proof(request_id):
             request_id=request_id
         )
         
-        # Emit real-time update
+        # Emit real-time update to all users
         socketio.emit('request_updated', {
             'request_id': request_id,
             'status': 'Proof Sent',
             'requestor': current_user.username
-        })
+        }, room='all_users')
         
         flash(f'Successfully uploaded {len(uploaded_files)} proof file(s)! Finance will review your proof.', 'success')
     else:
@@ -3058,6 +3066,22 @@ def delete_request(request_id):
         if os.path.exists(filepath):
             os.remove(filepath)
     
+    # Delete related InstallmentEditHistory records first
+    InstallmentEditHistory.query.filter_by(request_id=request_id).delete()
+    
+    # Delete related RecurringPaymentSchedule records
+    RecurringPaymentSchedule.query.filter_by(request_id=request_id).delete()
+    
+    # Delete related LateInstallment records
+    LateInstallment.query.filter_by(request_id=request_id).delete()
+    
+    # Delete related PaidNotification records
+    PaidNotification.query.filter_by(request_id=request_id).delete()
+    
+    # Delete related Notification records
+    Notification.query.filter_by(request_id=request_id).delete()
+    
+    # Now delete the main request
     db.session.delete(req)
     db.session.commit()
     
@@ -3086,6 +3110,13 @@ def bulk_delete_requests():
                     filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.receipt_path)
                     if os.path.exists(filepath):
                         os.remove(filepath)
+                
+                # Delete related records first
+                InstallmentEditHistory.query.filter_by(request_id=request_id).delete()
+                RecurringPaymentSchedule.query.filter_by(request_id=request_id).delete()
+                LateInstallment.query.filter_by(request_id=request_id).delete()
+                PaidNotification.query.filter_by(request_id=request_id).delete()
+                Notification.query.filter_by(request_id=request_id).delete()
                 
                 # Log the deletion before deleting
                 log_action(f"Bulk deleted payment request #{request_id} - {req.request_type} - {req.purpose}")
@@ -3945,6 +3976,73 @@ def recent_notifications():
     """Get recent notifications for the user based on RBAC"""
     notifications = get_notifications_for_user(current_user)
     return jsonify([n.to_dict() for n in notifications])
+
+
+# Real-time dashboard API endpoints
+@app.route('/api/dashboard/finance')
+@login_required
+@role_required('Finance Admin', 'Finance Staff')
+def api_finance_dashboard():
+    """API endpoint for finance dashboard data"""
+    try:
+        # Get the same data as the finance dashboard
+        requests = PaymentRequest.query.order_by(PaymentRequest.created_at.desc()).all()
+        
+        # Render the dashboard template and return HTML
+        from flask import render_template
+        html = render_template('finance_dashboard.html', 
+                              user=current_user, 
+                              requests=requests,
+                              status_filter=None,
+                              department_filter=None,
+                              search_query=None,
+                              urgent_filter=None,
+                              pagination=None)
+        return html
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/dashboard/admin')
+@login_required
+@role_required('Admin')
+def api_admin_dashboard():
+    """API endpoint for admin dashboard data"""
+    try:
+        requests = PaymentRequest.query.order_by(PaymentRequest.created_at.desc()).all()
+        
+        from flask import render_template
+        html = render_template('admin_dashboard.html', 
+                              user=current_user, 
+                              requests=requests,
+                              status_filter=None,
+                              department_filter=None,
+                              search_query=None,
+                              urgent_filter=None,
+                              pagination=None)
+        return html
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/dashboard/it')
+@login_required
+@role_required('IT Staff')
+def api_it_dashboard():
+    """API endpoint for IT dashboard data"""
+    try:
+        requests = PaymentRequest.query.order_by(PaymentRequest.created_at.desc()).all()
+        
+        from flask import render_template
+        html = render_template('it_dashboard.html', 
+                              user=current_user, 
+                              requests=requests,
+                              status_filter=None,
+                              department_filter=None,
+                              search_query=None,
+                              urgent_filter=None,
+                              pagination=None)
+        return html
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 
