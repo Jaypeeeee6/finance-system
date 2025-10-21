@@ -2422,8 +2422,8 @@ def view_request(request_id):
         dept_manager = User.query.filter_by(role='Department Manager', department=req.department).first()
         if dept_manager:
             manager_name = dept_manager.name
-        elif req.department == 'Operation':
-            # For Operation department, try Operation Manager as fallback
+        elif req.department in ['Operation', 'Project Department']:
+            # For Operation and Project Department, try Operation Manager as fallback
             operation_manager = User.query.filter_by(role='Operation Manager').first()
             if operation_manager:
                 manager_name = operation_manager.name
@@ -3318,9 +3318,9 @@ def manager_approve_request(request_id):
     elif (current_user.name == 'Abdalaziz Hamood Al Brashdi' and req.user.role == 'Operation Manager'):
         is_authorized = True
         print("DEBUG: Authorized via Abdalaziz role for Operation Manager")
-    # Special case: Operation Manager can approve Operation department requests
+    # Special case: Operation Manager can approve Operation department and Project Department requests
     elif (current_user.role == 'Operation Manager' and 
-          req.user.department == 'Operation' and 
+          (req.user.department == 'Operation' or req.user.department == 'Project Department') and 
           req.user.role != 'Operation Manager'):  # Operation Manager can't approve their own requests
         is_authorized = True
         print("DEBUG: Authorized via Operation Manager role")
@@ -4170,11 +4170,14 @@ def new_user():
                 if dept_manager:
                     final_manager_id = dept_manager.user_id
                 else:
-                    # Special rules: Office → GM, Operation → Operation Manager, Finance → specific named manager
+                    # Special rules: Office → GM, Operation → Operation Manager, Project Department → Operation Manager, Finance → specific named manager
                     if department == 'Office':
                         gm_user = User.query.filter_by(role='GM').first()
                         final_manager_id = gm_user.user_id if gm_user else None
                     elif department == 'Operation':
+                        op_manager = User.query.filter_by(role='Operation Manager').first()
+                        final_manager_id = op_manager.user_id if op_manager else None
+                    elif department == 'Project Department':
                         op_manager = User.query.filter_by(role='Operation Manager').first()
                         final_manager_id = op_manager.user_id if op_manager else None
                     elif department == 'Finance':
@@ -4250,11 +4253,14 @@ def edit_user(user_id):
                 if dept_manager:
                     final_manager_id = dept_manager.user_id
                 else:
-                    # Special rules: Office → GM, Operation → Operation Manager, Finance → specific named manager
+                    # Special rules: Office → GM, Operation → Operation Manager, Project Department → Operation Manager, Finance → specific named manager
                     if new_department == 'Office':
                         gm_user = User.query.filter_by(role='GM').first()
                         final_manager_id = gm_user.user_id if gm_user else None
                     elif new_department == 'Operation':
+                        op_manager = User.query.filter_by(role='Operation Manager').first()
+                        final_manager_id = op_manager.user_id if op_manager else None
+                    elif new_department == 'Project Department':
                         op_manager = User.query.filter_by(role='Operation Manager').first()
                         final_manager_id = op_manager.user_id if op_manager else None
                     elif new_department == 'Finance':

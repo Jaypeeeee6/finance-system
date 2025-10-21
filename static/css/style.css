@@ -2957,8 +2957,10 @@ input:checked + .toggle-slider:before {
 }
 
 .step-tab.active .step-tab-content {
+    background: #007bff !important;
+    color: white !important;
+    font-weight: 600 !important;
     transform: scale(1.05);
-    font-weight: 600;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     z-index: 10;
     position: relative;

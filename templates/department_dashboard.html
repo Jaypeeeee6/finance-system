@@ -134,16 +134,6 @@
                                         <i class="fas fa-upload"></i> Upload Proof
                                     </a>
                                     {% endif %}
-                                    {% if (user.role == 'Department Manager' or user.role == 'Operation Manager') and req.status == 'Pending Manager Approval' %}
-                                    <form method="POST" action="{{ url_for('manager_approve_request', request_id=req.request_id) }}" style="display: inline;">
-                                        <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Are you sure you want to approve this request?')">
-                                            <i class="fas fa-check"></i> Approve
-                                        </button>
-                                    </form>
-                                    <button type="button" class="btn btn-sm btn-danger" onclick="showRejectModal('{{ req.request_id }}')">
-                                        <i class="fas fa-times"></i> Reject
-                                    </button>
-                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -329,31 +319,6 @@
     </div>
 </div>
 
-<!-- Rejection Modal -->
-<div class="modal fade" id="rejectModal" tabindex="-1" role="dialog" aria-labelledby="rejectModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="rejectModalLabel">Reject Payment Request</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <form id="rejectForm" method="POST">
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label for="rejection_reason">Reason for rejection:</label>
-                        <textarea class="form-control" id="rejection_reason" name="rejection_reason" rows="4" required placeholder="Please provide a detailed reason for rejecting this request..."></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-danger">Reject Request</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -366,14 +331,6 @@ function changeItemsPerPage(perPage) {
     window.location.href = url.toString();
 }
 
-function showRejectModal(requestId) {
-    // Set the form action to the correct reject URL
-    document.getElementById('rejectForm').action = '/request/' + requestId + '/manager_reject';
-    // Clear the textarea
-    document.getElementById('rejection_reason').value = '';
-    // Show the modal
-    $('#rejectModal').modal('show');
-}
 
 function filterTable() {
     const searchInput = document.getElementById('tabSearchInput');

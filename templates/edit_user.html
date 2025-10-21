@@ -70,17 +70,16 @@
                         <label for="role">Role *</label>
                         <select name="role" id="role" required>
                             <option value="">-- Select Role --</option>
-                            <option value="Finance Admin" {% if user_to_edit.role == 'Finance Admin' %}selected{% endif %}>Finance Admin</option>
-                            <option value="Finance Staff" {% if user_to_edit.role == 'Finance Staff' %}selected{% endif %}>Finance Staff</option>
+                            <!-- Management Roles -->
                             <option value="GM" {% if user_to_edit.role == 'GM' %}selected{% endif %}>General Manager</option>
-                            <option value="IT Staff" {% if user_to_edit.role == 'IT Staff' %}selected{% endif %}>IT Staff</option>
-                            <option value="Project Staff" {% if user_to_edit.role == 'Project Staff' %}selected{% endif %}>Project Staff</option>
+                            <option value="Finance Admin" {% if user_to_edit.role == 'Finance Admin' %}selected{% endif %}>Finance Admin</option>
                             <option value="Operation Manager" {% if user_to_edit.role == 'Operation Manager' %}selected{% endif %}>Operation Manager</option>
                             <option value="Department Manager" {% if user_to_edit.role == 'Department Manager' %}selected{% endif %}>Department Manager</option>
-                            <!-- Department-specific staff roles -->
-                            <option value="HR Staff" {% if user_to_edit.role == 'HR Staff' %}selected{% endif %}>HR Staff</option>
+                            <!-- Staff Roles -->
                             <option value="Finance Staff" {% if user_to_edit.role == 'Finance Staff' %}selected{% endif %}>Finance Staff</option>
                             <option value="IT Staff" {% if user_to_edit.role == 'IT Staff' %}selected{% endif %}>IT Staff</option>
+                            <option value="Project Staff" {% if user_to_edit.role == 'Project Staff' %}selected{% endif %}>Project Staff</option>
+                            <option value="HR Staff" {% if user_to_edit.role == 'HR Staff' %}selected{% endif %}>HR Staff</option>
                             <option value="Purchasing Staff" {% if user_to_edit.role == 'Purchasing Staff' %}selected{% endif %}>Purchasing Staff</option>
                             <option value="PR Staff" {% if user_to_edit.role == 'PR Staff' %}selected{% endif %}>PR Staff</option>
                             <option value="Auditing Staff" {% if user_to_edit.role == 'Auditing Staff' %}selected{% endif %}>Auditing Staff</option>
@@ -174,16 +173,21 @@ function updateManagerDisplay() {
         return;
     }
 
-    // Manager selection: Department Manager of same department; Office → GM; Operation → Operation Manager; Finance → Named manager
-    let managerUser = users.find(u => u.department === department && u.role === 'Department Manager');
-    if (!managerUser && department === 'Office') {
+    // Manager selection: Special cases first, then Department Manager fallback
+    let managerUser = null;
+    
+    // Special cases take priority
+    if (department === 'Office') {
         managerUser = users.find(u => u.role === 'GM');
-    }
-    if (!managerUser && department === 'Operation') {
+    } else if (department === 'Operation') {
         managerUser = users.find(u => u.role === 'Operation Manager');
-    }
-    if (!managerUser && department === 'Finance') {
+    } else if (department === 'Project Department') {
+        managerUser = users.find(u => u.role === 'Operation Manager');
+    } else if (department === 'Finance') {
         managerUser = users.find(u => u.department === 'Finance' && u.name === 'Abdalaziz Hamood Al Brashdi');
+    } else {
+        // Fallback: Department Manager of same department
+        managerUser = users.find(u => u.department === department && u.role === 'Department Manager');
     }
     if (managerUser) {
         managerIdInput.value = managerUser.id;

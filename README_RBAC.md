@@ -42,7 +42,7 @@ This document describes who can view what, who can approve/reject, and how a pay
 
 - **Operation Manager**
   - **View**: All departments, all roles, all statuses
-  - **Approve/Reject**: Operation department only
+  - **Approve/Reject**: Operation department and Project Department
 
 ### Finance Roles
 - **Finance Admin** (users: Mahmoud, Abdalaziz)
@@ -74,26 +74,43 @@ This document describes who can view what, who can approve/reject, and how a pay
   - **View**: All departments, all roles; amounts are censored except for IT department requests
   - **Approve/Reject**: None
 
+### Project Department Management Structure
+- **Project Department** is managed by the **Operation Manager**
+  - **Manager Assignment**: All Project Department users (Project Staff) are automatically assigned the Operation Manager as their manager
+  - **Approval Authority**: Operation Manager approves all Project Department payment requests
+  - **View**: Project Staff can view their own requests only
+  - **Approve/Reject**: Project Staff cannot approve/reject requests (Operation Manager handles all approvals)
+  - **Edit**: Payment date for their own recurring payment request installments only
+
 ### Other Department Managers and Staff
 For each listed department below, the rules are analogous:
-- Department Manager (PR, Maintenance, Marketing, Logistic, HR, Quality Control, Procurement, Customer Service, Project)
+- Department Manager (PR, Maintenance, Marketing, Logistic, HR, Quality Control, Procurement, Customer Service)
   - **View**: At minimum their domain; primary role is approval within their department
   - **Approve/Reject**: Their own department only
 
-- Department Staff (PR, Maintenance, Marketing, Logistic, HR, Quality Control, Procurement, Customer Service, Project)
+- Department Staff (PR, Maintenance, Marketing, Logistic, HR, Quality Control, Procurement, Customer Service)
   - **View**: Each user will only see their own requests
   - **Approve/Reject**: None
   - **Edit**: Payment date for their own recurring payment request installments only
 
-Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Quality Control, Procurement, Customer Service, Project.
+Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Quality Control, Procurement, Customer Service.
 
 ---
 
 ## Practical Notes
 - All roles can create/submit requests.
-- “All departments, all roles” visibility means listings and details are accessible, constrained by any role-based field masking (e.g., IT amount censoring).
-- Amount censoring for IT roles: IT manager and IT staff see uncensored amounts only for IT department requests; all other departments’ request amounts are masked.
+- "All departments, all roles" visibility means listings and details are accessible, constrained by any role-based field masking (e.g., IT amount censoring).
+- Amount censoring for IT roles: IT manager and IT staff see uncensored amounts only for IT department requests; all other departments' request amounts are masked.
 - Only the appropriate approver for a given stage can transition the status forward or reject at that stage.
+
+### Manager Assignment Rules
+- **Department Managers**: Assigned to General Manager
+- **General Manager**: Assigned to Abdalaziz (Finance Admin)
+- **Operation Department**: Assigned to Operation Manager
+- **Project Department**: Assigned to Operation Manager (same as Operation Department)
+- **Finance Department**: Assigned to Abdalaziz (Finance Admin)
+- **Office Department**: Assigned to General Manager
+- **Other Departments**: Assigned to their respective Department Manager (if exists)
 
 ---
 
@@ -129,7 +146,7 @@ Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Qual
 - **System-wide notifications** (all types)
 
 ### **Operation Manager**
-- **New submissions** from users with role "Operation Staff" only
+- **New submissions** from users with role "Operation Staff" and "Project Staff" only
 - **Updates on their own requests** (status changes, approvals, rejections, etc.)
 - **System-wide notifications** (all types)
 
@@ -312,7 +329,7 @@ The three-step approval process uses specific colors to indicate the current sta
 | Request Status | Tab Color | Visual State | Meaning |
 |----------------|-----------|--------------|---------|
 | `Rejected by Manager` | 🔴 Red | `rejected` | Manager has rejected this request |
-| `Pending Manager Approval` | 🔵 Blue | `active` | Waiting for manager approval |
+| `Pending Manager Approval` | 🟡 Yellow | `warning` | Waiting for manager approval |
 | `Pending Finance Approval` | 🟢 Green | `completed` | Manager approved, moved to finance |
 | `Payment Pending` | 🟢 Green | `completed` | Manager approved, moved to finance |
 | `Proof Pending` | 🟢 Green | `completed` | Manager approved, moved to finance |

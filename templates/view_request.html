@@ -97,6 +97,180 @@
     font-weight: bold !important;
     font-size: 1.1rem !important;
 }
+
+/* Manager Approval Required section - Light Blue - High specificity to override main CSS */
+.dashboard-container .card.manager-approval-required .card-header {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+    border-left: 4px solid #2196f3 !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.manager-approval-required .card-header h4 {
+    color: #1976d2 !important;
+    margin: 0 !important;
+}
+
+/* Your Approval Required section - Green - High specificity to override main CSS */
+.dashboard-container .card.your-approval-required .card-header {
+    background: #4caf50 !important;
+    color: white !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.your-approval-required .card-header h4 {
+    color: white !important;
+    margin: 0 !important;
+}
+
+.dashboard-container .card.your-approval-required .card-header p {
+    color: white !important;
+    margin: 0 !important;
+    opacity: 0.9 !important;
+}
+
+/* Additional high-specificity rules to ensure override */
+div.dashboard-container div.card.manager-approval-required div.card-header {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+    border-left: 4px solid #2196f3 !important;
+    border-top: none !important;
+}
+
+div.dashboard-container div.card.your-approval-required div.card-header {
+    background: #4caf50 !important;
+    color: white !important;
+    border-top: none !important;
+}
+
+/* Finance Admin Approval Required section - Light Blue - High specificity to override main CSS */
+.dashboard-container .card.finance-approval-required .card-header {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+    border-left: 4px solid #2196f3 !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.finance-approval-required .card-header h4 {
+    color: #1976d2 !important;
+    margin: 0 !important;
+}
+
+/* Finance Admin Approval form section - Green - High specificity to override main CSS */
+.dashboard-container .card.finance-approval-form .card-header {
+    background: #4caf50 !important;
+    color: white !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.finance-approval-form .card-header h4 {
+    color: white !important;
+    margin: 0 !important;
+}
+
+/* Post-Approval Actions section - Teal - High specificity to override main CSS */
+.dashboard-container .card.post-approval-actions .card-header {
+    background: #17a2b8 !important;
+    color: white !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.post-approval-actions .card-header h4 {
+    color: white !important;
+    margin: 0 !important;
+}
+
+.dashboard-container .card.post-approval-actions .card-header p {
+    color: white !important;
+    margin: 0 !important;
+    opacity: 0.9 !important;
+}
+
+/* Additional high-specificity rules for Finance Admin sections */
+div.dashboard-container div.card.finance-approval-required div.card-header {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+    border-left: 4px solid #2196f3 !important;
+    border-top: none !important;
+}
+
+div.dashboard-container div.card.finance-approval-form div.card-header {
+    background: #4caf50 !important;
+    color: white !important;
+    border-top: none !important;
+}
+
+div.dashboard-container div.card.post-approval-actions div.card-header {
+    background: #17a2b8 !important;
+    color: white !important;
+    border-top: none !important;
+}
+
+/* Manager Decision section - Light Blue - High specificity to override main CSS */
+.dashboard-container .card.manager-decision .card-header {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+    border-left: 4px solid #2196f3 !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.manager-decision .card-header h4 {
+    color: #1976d2 !important;
+    margin: 0 !important;
+}
+
+/* Additional high-specificity rule for Manager Decision section */
+div.dashboard-container div.card.manager-decision div.card-header {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+    border-left: 4px solid #2196f3 !important;
+    border-top: none !important;
+}
+
+/* Payment Schedule Management section - Blue - High specificity to override main CSS */
+.dashboard-container .card.payment-schedule-management .card-header {
+    background: #007bff !important;
+    color: white !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.payment-schedule-management .card-header h4 {
+    color: white !important;
+    margin: 0 !important;
+}
+
+.dashboard-container .card.payment-schedule-management .card-header p {
+    color: white !important;
+    margin: 0 !important;
+    opacity: 0.9 !important;
+}
+
+/* Finance Admin Decision section - Light Blue - High specificity to override main CSS */
+.dashboard-container .card.finance-admin-decision .card-header {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+    border-left: 4px solid #2196f3 !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.finance-admin-decision .card-header h4 {
+    color: #1976d2 !important;
+    margin: 0 !important;
+}
+
+/* Additional high-specificity rules for Finance Admin sections */
+div.dashboard-container div.card.payment-schedule-management div.card-header {
+    background: #007bff !important;
+    color: white !important;
+    border-top: none !important;
+}
+
+div.dashboard-container div.card.finance-admin-decision div.card-header {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+    border-left: 4px solid #2196f3 !important;
+    border-top: none !important;
+}
 </style>
 {% endblock %}
 
@@ -117,7 +291,7 @@
                     Submit Request
                 </div>
             </li>
-            <li class="step-tab {% if request.status == 'Rejected by Manager' %}rejected{% elif request.status == 'Pending Manager Approval' %}active{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="manager">
+            <li class="step-tab {% if request.status == 'Rejected by Manager' %}rejected{% elif request.status == 'Pending Manager Approval' %}warning{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="manager">
                 <div class="step-tab-content">
                     Manager Approval
                 </div>
@@ -401,7 +575,7 @@
                 </div>
                 
                 <!-- Show manager approval details -->
-                <div class="card" style="margin-bottom: 1.5rem;">
+                <div class="card manager-decision" style="margin-bottom: 1.5rem;">
                     <div class="card-header">
                         <h4>Manager Decision</h4>
                     </div>
@@ -498,8 +672,8 @@
                 </div>
             {% elif request.status == 'Pending Manager Approval' %}
                 <!-- Static message for non-managers -->
-                <div class="card" style="margin-bottom: 1.5rem;">
-                    <div class="card-header" style="background: #e3f2fd; color: #1976d2; border-left: 4px solid #2196f3;">
+                <div class="card manager-approval-required" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
                         <h4><i class="fas fa-user-tie"></i> Manager Approval Required</h4>
                     </div>
                     <div class="card-body">
@@ -519,6 +693,10 @@
                                         Abdalaziz Hamood Al Brashdi (Finance Admin)
                                     {% elif user.role == 'Operation Manager' and request.department == 'Operation' %}
                                         {{ user.name }} (You)
+                                    {% elif user.role == 'Operation Manager' and request.department == 'Project Department' %}
+                                        {{ user.name }} (You)
+                                    {% elif request.department == 'Project Department' %}
+                                        {{ manager_name if manager_name else 'Operation Manager' }}
                                     {% else %}
                                         {{ manager_name if manager_name else 'Department Manager for ' + request.department }}
                                     {% endif %}
@@ -576,11 +754,11 @@
                 </div>
 
                 <!-- Manager approval form (only visible to managers of the same department, but not Department Managers viewing their own requests) -->
-                {% if (user.role == 'Department Manager' and user.department == request.department and user.user_id != request.user_id) or (user.role == 'Operation Manager' and request.department == 'Operation') or (user.role == 'Finance Admin' and request.department == 'Finance') or (user.role == 'GM' and request.user.role == 'Department Manager') or (user.name == 'Abdalaziz Hamood Al Brashdi' and request.user.role in ['GM', 'Finance Staff', 'Operation Manager']) %}
-                    <div class="card">
-                        <div class="card-header" style="background: #4caf50; color: white;">
+                {% if (user.role == 'Department Manager' and user.department == request.department and user.user_id != request.user_id) or (user.role == 'Operation Manager' and request.department in ['Operation', 'Project Department']) or (user.role == 'Finance Admin' and request.department == 'Finance') or (user.role == 'GM' and request.user.role == 'Department Manager') or (user.name == 'Abdalaziz Hamood Al Brashdi' and request.user.role in ['GM', 'Finance Staff', 'Operation Manager']) %}
+                    <div class="card your-approval-required">
+                        <div class="card-header">
                             <h4><i class="fas fa-check-circle"></i> Your Approval Required</h4>
-                            <p style="margin: 0; opacity: 0.9;">As the manager of {{ request.user.name }}, please review and approve this request.</p>
+                            <p>As the manager of {{ request.user.name }}, please review and approve this request.</p>
                         </div>
                         <div class="card-body">
                             <form method="POST" action="{{ url_for('manager_approve_request', request_id=request.request_id) }}">
@@ -755,10 +933,10 @@
                     
                     <!-- Payment Schedule Management for Recurring Payments -->
                     {% if request.recurring_interval and ('monthly' in request.recurring_interval or request.recurring_interval.startswith('custom:')) %}
-                    <div class="card" style="margin-bottom: 1.5rem;">
-                        <div class="card-header" style="background: #007bff; color: white;">
+                    <div class="card payment-schedule-management" style="margin-bottom: 1.5rem;">
+                        <div class="card-header">
                             <h4><i class="fas fa-calendar-alt"></i> Payment Schedule Management</h4>
-                            <p style="margin: 0; opacity: 0.9;">Manage individual payment installments</p>
+                            <p>Manage individual payment installments</p>
                         </div>
                         <div class="card-body">
                             {% if schedule_rows %}
@@ -1175,7 +1353,7 @@
                 {% endif %}
                 
                 <!-- Show finance approval details -->
-                <div class="card" style="margin-bottom: 1.5rem;">
+                <div class="card finance-admin-decision" style="margin-bottom: 1.5rem;">
                     <div class="card-header">
                         <h4>Finance Admin Decision</h4>
                     </div>
@@ -1256,7 +1434,7 @@
             {% else %}
                 <!-- Finance admin approval form -->
                 {% if user.role == 'Finance Admin' %}
-                    <div class="card">
+                    <div class="card finance-approval-form">
                         <div class="card-header">
                             <h4>Finance Admin Approval</h4>
                         </div>
@@ -1353,8 +1531,8 @@
                     </div>
                 {% else %}
                     <!-- Static message for non-finance admins -->
-                    <div class="card" style="margin-bottom: 1.5rem;">
-                        <div class="card-header" style="background: #e3f2fd; color: #1976d2; border-left: 4px solid #2196f3;">
+                    <div class="card finance-approval-required" style="margin-bottom: 1.5rem;">
+                        <div class="card-header">
                             <h4><i class="fas fa-dollar-sign"></i> Finance Admin Approval Required</h4>
                         </div>
                         <div class="card-body">
@@ -1496,10 +1674,10 @@
             
             <!-- Post-approval editing section for Finance Admin -->
             {% if user.role == 'Finance Admin' and request.status in ['Payment Pending', 'Proof Sent', 'Paid', 'Completed', 'Recurring'] %}
-                <div class="card" style="margin-top: 1.5rem;">
-                    <div class="card-header" style="background: #17a2b8; color: white;">
+                <div class="card post-approval-actions" style="margin-top: 1.5rem;">
+                    <div class="card-header">
                         <h4><i class="fas fa-edit"></i> Post-Approval Actions</h4>
-                        <p style="margin: 0; opacity: 0.9;">Manage this approved request</p>
+                        <p>Manage this approved request</p>
                     </div>
                     <div class="card-body">
                         <div class="row">
@@ -1702,7 +1880,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set manager tab
     if (managerTab) {
         if (requestStatus === 'Pending Manager Approval') {
-            managerTab.classList.add('active');
+            managerTab.classList.add('warning');
             // Hide request details section when manager tab is active
             const requestDetailsSection = document.querySelector('.request-details-section');
             if (requestDetailsSection) {
