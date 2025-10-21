@@ -115,6 +115,9 @@
         dropdown.classList.add('show');
         notificationDropdownOpen = true;
         
+        // Update notification count first
+        updateNotificationBadge();
+        
         // Load notifications
         loadNotifications();
     }
@@ -135,7 +138,10 @@
         fetch('/api/notifications/recent')
             .then(response => response.json())
             .then(data => {
+                console.log('🔔 DEBUG: Loaded notifications:', data);
                 displayNotifications(data);
+                // Update notification count after loading
+                updateNotificationBadge();
             })
             .catch(error => {
                 console.error('Error loading notifications:', error);
@@ -253,17 +259,22 @@
             .then(response => response.json())
             .then(data => {
                 const badge = document.getElementById('nav-notification-badge');
-                if (data.count > 0) {
-                    badge.textContent = data.count;
-                    badge.style.display = 'flex';
-                } else {
-                    badge.style.display = 'none';
+                if (badge) {
+                    if (data.count > 0) {
+                        badge.textContent = data.count;
+                        badge.style.display = 'flex';
+                    } else {
+                        badge.style.display = 'none';
+                    }
                 }
             })
             .catch(error => {
                 console.error('Error updating notification count:', error);
             });
     }
+    
+    // Make updateNotificationBadge globally available for real-time updates
+    window.updateNotificationBadge = updateNotificationBadge;
     
     function markAllAsRead() {
         fetch('/notifications/mark_all_read', {
@@ -309,6 +320,14 @@
     // Update notification badge on page load
     document.addEventListener('DOMContentLoaded', function() {
         updateNotificationBadge();
+        
+        // Set up more frequent updates for real-time feel
+        setInterval(updateNotificationBadge, 5000); // Every 5 seconds
+        
+        // Also update when window gains focus (user switches back to tab)
+        window.addEventListener('focus', function() {
+            updateNotificationBadge();
+        });
     });
     </script>
     

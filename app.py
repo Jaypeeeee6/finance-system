@@ -254,6 +254,12 @@ def log_action(action):
 
 def create_notification(user_id, title, message, notification_type, request_id=None):
     """Helper function to create notifications"""
+    print(f"🔔 DEBUG: Creating notification for user_id: {user_id}")
+    print(f"   - title: {title}")
+    print(f"   - message: {message}")
+    print(f"   - notification_type: {notification_type}")
+    print(f"   - request_id: {request_id}")
+    
     notification = Notification(
         user_id=user_id,
         title=title,
@@ -263,6 +269,8 @@ def create_notification(user_id, title, message, notification_type, request_id=N
     )
     db.session.add(notification)
     db.session.commit()
+    
+    print(f"🔔 DEBUG: Notification created successfully with ID: {notification.notification_id}")
     return notification
 
 def notify_users_by_role(request, notification_type, title, message, request_id=None):
@@ -279,46 +287,106 @@ def notify_users_by_role(request, notification_type, title, message, request_id=
     requestor_role = request.user.role
     requestor_department = request.department
     
+    print(f"🔔 DEBUG: notify_users_by_role called")
+    print(f"   - notification_type: {notification_type}")
+    print(f"   - requestor_role: {requestor_role}")
+    print(f"   - requestor_department: {requestor_department}")
+    print(f"   - title: {title}")
+    
     # Finance Admin and Finance Staff - get notifications when requests reach Pending Finance Approval
     if notification_type in ['ready_for_finance_review']:
         finance_users = User.query.filter(User.role.in_(['Finance Staff', 'Finance Admin'])).all()
         for user in finance_users:
             create_notification(user.user_id, title, message, notification_type, request_id)
     
-    # General Manager - only from Department Manager submissions
-    elif notification_type == 'new_submission' and requestor_role == 'Department Manager':
-        gm_users = User.query.filter_by(role='GM').all()
-        for user in gm_users:
-            create_notification(user.user_id, title, message, notification_type, request_id)
-    
-    # Operation Manager - only from Operation Staff submissions
-    elif notification_type == 'new_submission' and requestor_role == 'Operation Staff':
-        op_manager_users = User.query.filter_by(role='Operation Manager').all()
-        for user in op_manager_users:
-            create_notification(user.user_id, title, message, notification_type, request_id)
-    
-    # IT Department Manager - only from IT Staff submissions
-    elif notification_type == 'new_submission' and requestor_role == 'IT Staff':
-        it_manager_users = User.query.filter_by(role='Department Manager', department='IT').all()
-        for user in it_manager_users:
-            create_notification(user.user_id, title, message, notification_type, request_id)
-    
-    # Department Managers (Non-IT) - only from their own department staff
-    elif notification_type == 'new_submission' and requestor_role.endswith(' Staff'):
-        print(f"DEBUG: Notifying Department Managers for {requestor_role} from {requestor_department}")
-        dept_managers = User.query.filter_by(role='Department Manager', department=requestor_department).all()
-        print(f"DEBUG: Found {len(dept_managers)} Department Managers for department {requestor_department}")
-        for user in dept_managers:
-            print(f"DEBUG: Notifying Department Manager {user.username} ({user.role}) from {user.department}")
-            create_notification(user.user_id, title, message, notification_type, request_id)
+    # Handle new_submission notifications
+    elif notification_type == 'new_submission':
+        print(f"🔔 DEBUG: Processing new_submission for role: {requestor_role}")
+        
+        # General Manager - only from Department Manager submissions
+        if requestor_role == 'Department Manager':
+            gm_users = User.query.filter_by(role='GM').all()
+            for user in gm_users:
+                create_notification(user.user_id, title, message, notification_type, request_id)
+        
+        # Operation Manager - only from Operation Staff submissions
+        elif requestor_role == 'Operation Staff':
+            op_manager_users = User.query.filter_by(role='Operation Manager').all()
+            for user in op_manager_users:
+                create_notification(user.user_id, title, message, notification_type, request_id)
+        
+        # IT Department Manager - only from IT Staff submissions
+        elif requestor_role == 'IT Staff':
+            it_manager_users = User.query.filter_by(role='Department Manager', department='IT').all()
+            for user in it_manager_users:
+                create_notification(user.user_id, title, message, notification_type, request_id)
+        
+        # Department Managers (Non-IT) - only from their own department staff
+        elif (requestor_role.endswith(' Staff') or requestor_role == 'Project Staff' or requestor_role in ['Finance Staff', 'HR Staff', 'Operation Staff', 'IT Staff']):
+            print(f"🔔 DEBUG: Notifying Department Managers for {requestor_role} from {requestor_department}")
+            dept_managers = User.query.filter_by(role='Department Manager', department=requestor_department).all()
+            print(f"🔔 DEBUG: Found {len(dept_managers)} Department Managers for department {requestor_department}")
+            for user in dept_managers:
+                print(f"🔔 DEBUG: Notifying Department Manager {user.username} ({user.role}) from {user.department}")
+                create_notification(user.user_id, title, message, notification_type, request_id)
+        else:
+            print(f"🔔 DEBUG: No notification rule matched for role: {requestor_role}")
     
     # Requestor - for updates on their own requests
     elif notification_type in ['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed']:
         create_notification(request.user_id, title, message, notification_type, request_id)
+        
+        # For proof_uploaded, also notify Finance Admin
+        if notification_type == 'proof_uploaded':
+            print(f"🔔 DEBUG: Also notifying Finance Admin about proof upload")
+            finance_users = User.query.filter(User.role.in_(['Finance Staff', 'Finance Admin'])).all()
+            for user in finance_users:
+                create_notification(
+                    user_id=user.user_id,
+                    title=title,
+                    message=message,
+                    notification_type=notification_type,
+                    request_id=request_id
+                )
+                print(f"🔔 DEBUG: Notified Finance user {user.username} about proof upload")
+        
+        # For request_approved, also notify Finance Admin if they didn't approve it
+        elif notification_type == 'request_approved':
+            print(f"🔔 DEBUG: Also notifying Finance Admin about request approval")
+            finance_users = User.query.filter(User.role.in_(['Finance Staff', 'Finance Admin'])).all()
+            for user in finance_users:
+                create_notification(
+                    user_id=user.user_id,
+                    title=title,
+                    message=message,
+                    notification_type=notification_type,
+                    request_id=request_id
+                )
+                print(f"🔔 DEBUG: Notified Finance user {user.username} about request approval")
+    
+    # Emit real-time notification to all users after creating database notifications
+    try:
+        socketio.emit('new_notification', {
+            'title': title,
+            'message': message,
+            'type': notification_type,
+            'request_id': request_id
+        }, room='all_users')
+        
+        # Also emit a general update event to trigger notification count updates
+        socketio.emit('notification_update', {
+            'action': 'new_notification',
+            'type': notification_type
+        }, room='all_users')
+        
+        print(f"🔔 DEBUG: WebSocket events emitted for {notification_type}")
+    except Exception as e:
+        print(f"Error emitting WebSocket notification: {e}")
 
 def notify_recurring_payment_due(request_id, user_id, title, message):
     """Notify specific user about recurring payment due"""
     create_notification(user_id, title, message, 'recurring_due', request_id)
+
 
 def notify_system_wide(title, message, notification_type):
     """Notify all users who should receive system-wide notifications"""
@@ -758,16 +826,26 @@ def get_notifications_for_user(user):
     
     elif user.role == 'Department Manager':
         # Other Department Managers: New submissions from their own department staff only + recurring payment due for their department + updates on their own requests
-        return Notification.query.filter(
+        print(f"🔔 DEBUG: Getting notifications for Department Manager {user.username} from {user.department}")
+        
+        # Get all notifications for this user first
+        all_user_notifications = Notification.query.filter_by(user_id=user.user_id).all()
+        print(f"🔔 DEBUG: Total notifications for user {user.username}: {len(all_user_notifications)}")
+        for notif in all_user_notifications:
+            print(f"🔔 DEBUG: Notification {notif.notification_id}: {notif.notification_type} - {notif.title}")
+        
+        notifications = Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
-                    db.and_(Notification.notification_type == 'new_submission', Notification.message.contains(user.department)),
+                    Notification.notification_type == 'new_submission',
                     Notification.notification_type == 'recurring_due',
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                 )
             )
         ).order_by(Notification.created_at.desc()).limit(5).all()
+        print(f"🔔 DEBUG: Found {len(notifications)} filtered notifications for Department Manager")
+        return notifications
     
     else:
         # Department Staff: Updates on their own requests only + recurring payment due for their own requests
@@ -891,7 +969,7 @@ def get_unread_count_for_user(user):
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
                 db.or_(
-                    db.and_(Notification.notification_type == 'new_submission', Notification.message.contains(user.department)),
+                    Notification.notification_type == 'new_submission',  # Simplified - same as get_notifications_for_user
                     Notification.notification_type == 'recurring_due',
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                 )
@@ -929,6 +1007,43 @@ def notify_finance_and_admin(title, message, notification_type, request_id=None)
         'type': notification_type,
         'request_id': request_id
     }, room='all_users')
+    
+    # Also emit a general update event to trigger notification count updates
+    socketio.emit('notification_update', {
+        'action': 'new_notification',
+        'type': notification_type
+    }, room='all_users')
+    
+    # Emit to specific role rooms based on notification type
+    if notification_type == 'ready_for_finance_review':
+        socketio.emit('notification_update', {
+            'action': 'new_notification',
+            'type': notification_type
+        }, room='finance_admin')
+    elif notification_type == 'new_submission':
+        # Emit to appropriate role rooms based on requestor role
+        if request and hasattr(request, 'user'):
+            requestor_role = request.user.role
+            if requestor_role == 'Department Manager':
+                socketio.emit('notification_update', {
+                    'action': 'new_notification',
+                    'type': notification_type
+                }, room='gm')
+            elif requestor_role == 'Operation Staff':
+                socketio.emit('notification_update', {
+                    'action': 'new_notification',
+                    'type': notification_type
+                }, room='operation_manager')
+            elif requestor_role == 'IT Staff':
+                socketio.emit('notification_update', {
+                    'action': 'new_notification',
+                    'type': notification_type
+                }, room='it_staff')
+            elif requestor_role.endswith(' Staff'):
+                socketio.emit('notification_update', {
+                    'action': 'new_notification',
+                    'type': notification_type
+                }, room='department_managers')
 
 
 def allowed_file(filename):
@@ -2002,6 +2117,23 @@ def new_request():
                     message=f"New {request_type} request submitted by {requestor_name} from {current_user.department} department for OMR {amount} - requires your approval",
                     request_id=new_req.request_id
                 )
+                
+                # Also directly notify Department Manager (same approach as Finance Admin)
+                print(f"🔔 DEBUG: Directly notifying Department Manager for new request #{new_req.request_id}")
+                dept_manager = User.query.filter_by(role='Department Manager', department=current_user.department).first()
+                if dept_manager:
+                    print(f"🔔 DEBUG: Found Department Manager: {dept_manager.username} from {dept_manager.department}")
+                    create_notification(
+                        user_id=dept_manager.user_id,
+                        title="New Payment Request for Approval",
+                        message=f"New {request_type} request submitted by {requestor_name} from {current_user.department} department for OMR {amount} - requires your approval",
+                        notification_type="new_submission",
+                        request_id=new_req.request_id
+                    )
+                    print(f"🔔 DEBUG: Created notification for Department Manager {dept_manager.username}")
+                else:
+                    print(f"🔔 ERROR: No Department Manager found for department: {current_user.department}")
+                
         except Exception as e:
             print(f"Error creating notifications: {e}")
             # Don't fail the request creation if notification fails
@@ -4201,7 +4333,7 @@ def debug_requests():
 
 @app.route('/notifications')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM')
 def notifications():
     """View all notifications based on RBAC permissions"""
     notifications = get_notifications_for_user(current_user)
@@ -4210,7 +4342,7 @@ def notifications():
 
 @app.route('/notifications/mark_read/<int:notification_id>')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM')
 def mark_notification_read(notification_id):
     """Mark a notification as read"""
     notification = Notification.query.filter_by(notification_id=notification_id, user_id=current_user.user_id).first()
@@ -4223,7 +4355,7 @@ def mark_notification_read(notification_id):
 
 @app.route('/notifications/mark_all_read')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM')
 def mark_all_notifications_read():
     """Mark all notifications as read for current user"""
     Notification.query.filter_by(user_id=current_user.user_id, is_read=False).update({'is_read': True})
@@ -4290,7 +4422,7 @@ def delete_all_notifications():
 
 @app.route('/api/notifications/unread_count')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM')
 def unread_notifications_count():
     """Get count of unread notifications based on RBAC"""
     count = get_unread_count_for_user(current_user)
@@ -4299,11 +4431,81 @@ def unread_notifications_count():
 
 @app.route('/api/notifications/recent')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM')
 def recent_notifications():
     """Get recent notifications for the user based on RBAC"""
     notifications = get_notifications_for_user(current_user)
     return jsonify([n.to_dict() for n in notifications])
+
+@app.route('/debug/notifications')
+@login_required
+@role_required('Admin')
+def debug_notifications():
+    """Debug route to check all notifications in database"""
+    all_notifications = Notification.query.order_by(Notification.created_at.desc()).limit(10).all()
+    debug_data = []
+    for notif in all_notifications:
+        user = User.query.get(notif.user_id)
+        debug_data.append({
+            'notification_id': notif.notification_id,
+            'user_id': notif.user_id,
+            'username': user.username if user else 'Unknown',
+            'user_role': user.role if user else 'Unknown',
+            'title': notif.title,
+            'message': notif.message,
+            'notification_type': notif.notification_type,
+            'is_read': notif.is_read,
+            'created_at': notif.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        })
+    return jsonify(debug_data)
+
+@app.route('/debug/my-notifications')
+@login_required
+def debug_my_notifications():
+    """Debug route to check current user's notifications"""
+    all_user_notifications = Notification.query.filter_by(user_id=current_user.user_id).order_by(Notification.created_at.desc()).all()
+    debug_data = []
+    for notif in all_user_notifications:
+        debug_data.append({
+            'notification_id': notif.notification_id,
+            'title': notif.title,
+            'message': notif.message,
+            'notification_type': notif.notification_type,
+            'is_read': notif.is_read,
+            'created_at': notif.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        })
+    return jsonify({
+        'user_id': current_user.user_id,
+        'username': current_user.username,
+        'role': current_user.role,
+        'department': current_user.department,
+        'total_notifications': len(all_user_notifications),
+        'notifications': debug_data
+    })
+
+@app.route('/debug/test-notification')
+@login_required
+@role_required('Admin')
+def debug_test_notification():
+    """Test route to create a notification for current user"""
+    try:
+        test_notification = create_notification(
+            user_id=current_user.user_id,
+            title="Test Notification",
+            message="This is a test notification to verify the system is working",
+            notification_type="test",
+            request_id=None
+        )
+        return jsonify({
+            'success': True,
+            'message': 'Test notification created successfully',
+            'notification_id': test_notification.notification_id
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 # Real-time dashboard API endpoints

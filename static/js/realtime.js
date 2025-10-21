@@ -20,10 +20,26 @@ function initRealTimeUpdates() {
         
         // Join appropriate room based on user role
         const userRole = document.body.getAttribute('data-user-role');
+        
+        // All users join the general room
+        socket.emit('join_room', { room: 'all_users' });
+        
+        // Role-specific rooms for targeted notifications
         if (userRole === 'Finance Staff' || userRole === 'Finance Admin') {
             socket.emit('join_room', { room: 'finance_admin' });
+        } else if (userRole === 'GM') {
+            socket.emit('join_room', { room: 'gm' });
+        } else if (userRole === 'Operation Manager') {
+            socket.emit('join_room', { room: 'operation_manager' });
+        } else if (userRole === 'IT Staff') {
+            socket.emit('join_room', { room: 'it_staff' });
+        } else if (userRole === 'Department Manager') {
+            socket.emit('join_room', { room: 'department_managers' });
+        } else if (userRole === 'Project Staff') {
+            socket.emit('join_room', { room: 'project_staff' });
         }
-        socket.emit('join_room', { room: 'all_users' });
+        
+        console.log(`User role: ${userRole} - Joined real-time notification rooms`);
     });
     
     // Listen for disconnection
@@ -36,18 +52,37 @@ function initRealTimeUpdates() {
     socket.on('new_request', function(data) {
         console.log('New payment request received:', data);
         handleNewRequest(data);
+        // Update notification count when new request is created
+        updateNotificationCount();
     });
     
     // Listen for request updates (approval/pending)
     socket.on('request_updated', function(data) {
         console.log('Payment request updated:', data);
         handleRequestUpdate(data);
+        // Update notification count when request is updated
+        updateNotificationCount();
     });
     
     // Listen for new notifications
     socket.on('new_notification', function(data) {
         console.log('New notification received:', data);
         handleNewNotification(data);
+    });
+    
+    // Listen for notification updates (triggers badge update)
+    socket.on('notification_update', function(data) {
+        console.log('🔔 DEBUG: Notification update received:', data);
+        // Force update notification count
+        updateNotificationCount();
+        
+        // Also refresh dropdown if it's open
+        if (typeof notificationDropdownOpen !== 'undefined' && notificationDropdownOpen) {
+            console.log('🔔 DEBUG: Dropdown is open, refreshing due to notification_update');
+            if (typeof loadNotifications === 'function') {
+                loadNotifications();
+            }
+        }
     });
     
     // Add visual indicator
@@ -60,6 +95,9 @@ function initRealTimeUpdates() {
 function handleNewRequest(data) {
     // Show notification
     showNewRequestNotification(1, data);
+    
+    // Update notification count immediately
+    updateNotificationCount();
     
     // Update dashboard table dynamically
     updateDashboardTable();
@@ -209,24 +247,36 @@ function addRefreshIndicator() {
  * Initialize when DOM is ready
  */
 document.addEventListener('DOMContentLoaded', function() {
-    // Only initialize on dashboard pages with data tables
-    if (document.querySelector('.data-table')) {
-        initRealTimeUpdates();
-        
-        console.log('%c Real-Time WebSocket Active ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
-        console.log('Instant updates - No refresh needed!');
+    // Initialize real-time updates on ALL pages for ALL roles
+    initRealTimeUpdates();
+    
+    // Update notification badge on page load
+    if (window.updateNotificationBadge) {
+        window.updateNotificationBadge();
     }
+    
+    console.log('%c Real-Time WebSocket Active for ALL ROLES ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+    console.log('Instant updates - No refresh needed!');
+    console.log('Works for: Finance Admin, Finance Staff, GM, Operation Manager, IT Staff, Department Manager, Project Staff, and all other roles');
 });
 
 /**
  * Handle new notification from WebSocket
  */
 function handleNewNotification(data) {
+    console.log('🔔 DEBUG: handleNewNotification called with:', data);
+    
     // Show notification popup
     showNotificationPopup(data);
     
-    // Update notification count if on dashboard
+    // Update notification count
     updateNotificationCount();
+    
+    // Update notification dropdown if it's open
+    if (notificationDropdownOpen) {
+        console.log('🔔 DEBUG: Dropdown is open, refreshing notifications');
+        loadNotifications();
+    }
     
     // Refresh notifications if on notifications page
     if (window.location.pathname.includes('/notifications')) {
@@ -264,30 +314,47 @@ function showNotificationPopup(data) {
  * Update notification count in navigation
  */
 function updateNotificationCount() {
-    fetch('/api/notifications/unread_count')
-        .then(response => response.json())
-        .then(data => {
-            // Update notification badge in navigation
-            const navLink = document.querySelector('a[href*="notifications"]');
-            if (navLink) {
-                let badge = navLink.querySelector('.notification-badge');
-                if (!badge) {
-                    badge = document.createElement('span');
-                    badge.className = 'notification-badge';
-                    navLink.appendChild(badge);
+    // Use the global function from base.html if available
+    if (window.updateNotificationBadge) {
+        window.updateNotificationBadge();
+    } else {
+        // Fallback to direct API call
+        fetch('/api/notifications/unread_count')
+            .then(response => response.json())
+            .then(data => {
+                // Update notification badge in navigation bell
+                const navBadge = document.getElementById('nav-notification-badge');
+                if (navBadge) {
+                    if (data.count > 0) {
+                        navBadge.textContent = data.count;
+                        navBadge.style.display = 'flex';
+                    } else {
+                        navBadge.style.display = 'none';
+                    }
                 }
                 
-                if (data.count > 0) {
-                    badge.textContent = data.count;
-                    badge.style.display = 'inline';
-                } else {
-                    badge.style.display = 'none';
+                // Also update any other notification badges
+                const navLink = document.querySelector('a[href*="notifications"]');
+                if (navLink) {
+                    let badge = navLink.querySelector('.notification-badge');
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'notification-badge';
+                        navLink.appendChild(badge);
+                    }
+                    
+                    if (data.count > 0) {
+                        badge.textContent = data.count;
+                        badge.style.display = 'inline';
+                    } else {
+                        badge.style.display = 'none';
+                    }
                 }
-            }
-        })
-        .catch(error => {
-            console.error('Error updating notification count:', error);
-        });
+            })
+            .catch(error => {
+                console.error('Error updating notification count:', error);
+            });
+    }
 }
 
 /**
