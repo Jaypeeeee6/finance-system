@@ -286,3 +286,149 @@ The calendar is accessible from:
 - Finance Admin Dashboard (via navigation)
 
 The calendar helps users track upcoming payment obligations and plan financial activities accordingly.
+
+---
+
+## View Request Tab Colors and Status Mapping
+
+**⚠️ CRITICAL: This section defines the EXACT tab color logic for the view request page. This logic MUST NOT be changed under any circumstances. Any modifications to tab colors must be approved by the system administrator and documented here first.**
+
+### Tab Color Meanings
+The three-step approval process uses specific colors to indicate the current state of each approval stage:
+
+- 🔴 **Red (rejected)**: This step has been rejected and requires attention
+- 🔵 **Blue (active)**: This step is currently pending action from the assigned approver
+- 🟡 **Yellow (warning)**: This step is in progress or awaiting review/verification
+- 🟢 **Green (completed)**: This step has been completed successfully
+- ⚫ **Gray (disabled)**: This step is not yet relevant to the current request status
+
+### Submit Request Tab
+**Status**: Always **Green (completed)** for all request statuses
+- This tab represents the initial submission and is always considered completed once a request exists
+
+### Manager Approval Tab
+**Color Logic** (applies to ALL users regardless of role):
+
+| Request Status | Tab Color | Visual State | Meaning |
+|----------------|-----------|--------------|---------|
+| `Rejected by Manager` | 🔴 Red | `rejected` | Manager has rejected this request |
+| `Pending Manager Approval` | 🔵 Blue | `active` | Waiting for manager approval |
+| `Pending Finance Approval` | 🟢 Green | `completed` | Manager approved, moved to finance |
+| `Payment Pending` | 🟢 Green | `completed` | Manager approved, moved to finance |
+| `Proof Pending` | 🟢 Green | `completed` | Manager approved, moved to finance |
+| `Proof Sent` | 🟢 Green | `completed` | Manager approved, moved to finance |
+| `Proof Rejected` | 🟢 Green | `completed` | Manager approved, moved to finance |
+| `Paid` | 🟢 Green | `completed` | Manager approved, moved to finance |
+| `Completed` | 🟢 Green | `completed` | Manager approved, moved to finance |
+| `Recurring` | 🟢 Green | `completed` | Manager approved, moved to finance |
+| All other statuses | ⚫ Gray | `disabled` | Not yet relevant |
+
+### Finance Admin Approval Tab
+**Color Logic** (applies to ALL users regardless of role):
+
+| Request Status | Tab Color | Visual State | Meaning |
+|----------------|-----------|--------------|---------|
+| `Rejected by Finance` | 🔴 Red | `rejected` | Finance has rejected this request |
+| `Pending Finance Approval` | 🟡 Yellow | `warning` | Waiting for finance approval |
+| `Payment Pending` | 🟡 Yellow | `warning` | Finance approved, awaiting payment |
+| `Proof Pending` | 🟡 Yellow | `warning` | Finance approved, awaiting proof |
+| `Proof Sent` | 🟡 Yellow | `warning` | Proof submitted, awaiting review |
+| `Proof Rejected` | 🟡 Yellow | `warning` | Proof rejected, awaiting resubmission |
+| `Proof Pending` + `Recurring` | 🟡 Yellow | `warning` | Recurring payment awaiting proof |
+| `Proof Sent` + `Recurring` | 🟡 Yellow | `warning` | Recurring payment proof submitted |
+| `Paid` | 🟢 Green | `completed` | Payment completed |
+| `Completed` | 🟢 Green | `completed` | Request fully completed |
+| `Recurring` | 🟢 Green | `completed` | Recurring payment active |
+| All other statuses | ⚫ Gray | `disabled` | Not yet relevant |
+
+### Implementation Requirements
+
+#### Server-Side Template Logic (templates/view_request.html)
+The server-side template MUST use this exact logic for tab colors:
+
+```html
+<!-- Manager Tab -->
+<li class="step-tab {% if request.status == 'Rejected by Manager' %}rejected{% elif request.status == 'Pending Manager Approval' %}active{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="manager">
+
+<!-- Finance Tab -->
+<li class="step-tab {% if request.status == 'Rejected by Finance' %}rejected{% elif request.status in ['Proof Pending', 'Proof Sent'] and request.recurring == 'Recurring' %}warning{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'] %}warning{% elif request.status in ['Completed', 'Paid', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="finance">
+```
+
+#### Client-Side JavaScript Logic (templates/view_request.html)
+The client-side JavaScript MUST use this exact logic for tab colors:
+
+```javascript
+// Manager Tab Logic
+if (requestStatus === 'Pending Manager Approval') {
+    managerTab.classList.add('active');
+} else if (requestStatus === 'Rejected by Manager') {
+    managerTab.classList.add('rejected');
+} else if (['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'].includes(requestStatus)) {
+    managerTab.classList.add('completed');
+} else {
+    managerTab.classList.add('disabled');
+}
+
+// Finance Tab Logic
+if (requestStatus === 'Rejected by Finance') {
+    financeTab.classList.add('rejected');
+} else if (['Proof Pending', 'Proof Sent'].includes(requestStatus) && requestRecurring === 'Recurring') {
+    financeTab.classList.add('warning');
+} else if (['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'].includes(requestStatus)) {
+    financeTab.classList.add('warning');
+} else if (['Paid', 'Completed', 'Recurring'].includes(requestStatus)) {
+    financeTab.classList.add('completed');
+} else {
+    financeTab.classList.add('disabled');
+}
+```
+
+### CSS Class Definitions
+The following CSS classes MUST be defined and MUST NOT be modified:
+
+```css
+.step-tab.rejected .step-tab-content {
+    background: #dc3545 !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+.step-tab.warning .step-tab-content {
+    background: #ffc107 !important;
+    color: #212529 !important;
+    font-weight: 600 !important;
+}
+
+.step-tab.completed .step-tab-content {
+    background: #28a745 !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+.step-tab.active .step-tab-content {
+    background: #007bff !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+.step-tab.disabled .step-tab-content {
+    background: #6c757d !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+```
+
+### Consistency Requirements
+1. **Server-side and client-side logic MUST be identical**
+2. **Tab colors MUST be consistent across all user roles**
+3. **No role-based differences in tab color display**
+4. **No brief color flashes due to server/client mismatches**
+5. **Proper class cleanup to prevent state conflicts**
+
+### Change Control
+- **Any changes to tab color logic require approval from system administrator**
+- **All changes must be documented in this section before implementation**
+- **Both server-side and client-side logic must be updated simultaneously**
+- **Testing must verify consistency across all user roles and request statuses**
+
+**⚠️ WARNING: Modifying tab color logic without following this documentation will result in inconsistent user experience and potential system errors.**
