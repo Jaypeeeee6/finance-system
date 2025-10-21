@@ -1199,7 +1199,7 @@ def department_dashboard():
     if tab == 'completed':
         query = base_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     elif tab == 'rejected':
-        query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance']))
+        query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     else:  # pending tab (default) - show all non-completed, non-rejected requests
         query = base_query.filter(
             db.and_(
@@ -1236,7 +1236,7 @@ def department_dashboard():
     
     # Get separate queries for each tab content
     completed_query = base_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
-    rejected_query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance']))
+    rejected_query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     
     # Apply urgent filter to separate queries
     if urgent_filter == 'urgent':
@@ -1536,7 +1536,7 @@ def gm_dashboard():
     if tab == 'completed':
         query = query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     elif tab == 'rejected':
-        query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance']))
+        query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     # 'pending' tab shows all requests (no additional filtering)
     
     # Get paginated requests
@@ -1571,7 +1571,7 @@ def gm_dashboard():
         rejected_query = rejected_query.filter(PaymentRequest.department == department_filter)
     
     completed_query = completed_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
-    rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance']))
+    rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     
     completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
@@ -1641,7 +1641,7 @@ def it_dashboard():
     if tab == 'completed':
         query = query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     elif tab == 'rejected':
-        query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance']))
+        query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     # 'pending' tab shows all requests (no additional filtering)
     
     # Get paginated requests
@@ -1670,7 +1670,7 @@ def it_dashboard():
         rejected_query = rejected_query.filter(PaymentRequest.department == department_filter)
     
     completed_query = completed_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
-    rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance']))
+    rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     
     completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
@@ -1748,7 +1748,7 @@ def project_dashboard():
     if tab == 'completed':
         query = query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     elif tab == 'rejected':
-        query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance']))
+        query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     elif tab == 'recurring':
         query = query.filter(PaymentRequest.recurring == 'Recurring')
     # 'pending' tab shows all requests (no additional filtering)
@@ -1780,7 +1780,7 @@ def project_dashboard():
         recurring_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
     
     completed_query = completed_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
-    rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance']))
+    rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     recurring_query = recurring_query.filter(PaymentRequest.recurring == 'Recurring')
     
     completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
@@ -1859,7 +1859,7 @@ def operation_dashboard():
     if tab == 'completed':
         query = query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     elif tab == 'rejected':
-        query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance']))
+        query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     # 'pending' tab shows all requests (no additional filtering)
     
     # Get paginated requests
@@ -1880,7 +1880,7 @@ def operation_dashboard():
         rejected_query = rejected_query.filter(PaymentRequest.department == department_filter)
     
     completed_query = completed_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
-    rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance']))
+    rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     
     completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
