@@ -4709,11 +4709,8 @@ def api_admin_recurring_events():
             if schedule:
                 # For variable payments, show only the specific installment dates
                 for installment in schedule:
-                    # Check if this specific installment is paid
-                    paid_notification = PaidNotification.query.filter_by(
-                        request_id=req.request_id,
-                        paid_date=installment.payment_date
-                    ).first()
+                    # Check if this specific installment is paid using the RecurringPaymentSchedule.is_paid field
+                    is_paid = installment.is_paid
                     
                     # Determine event color (red if marked late)
                     is_late = LateInstallment.query.filter_by(
@@ -4722,9 +4719,9 @@ def api_admin_recurring_events():
                     ).first() is not None
                     
                     # Debug: Log payment status determination
-                    print(f"Request {req.request_id}, Date {installment.payment_date}: Paid={paid_notification is not None}, Late={is_late}")
+                    print(f"Request {req.request_id}, Date {installment.payment_date}: Paid={is_paid}, Late={is_late}")
                     
-                    event_color = '#2e7d32' if paid_notification else ('#d32f2f' if is_late else '#8e24aa')
+                    event_color = '#2e7d32' if is_paid else ('#d32f2f' if is_late else '#8e24aa')
                     
                     # Calculate remaining amount
                     total_paid = sum(

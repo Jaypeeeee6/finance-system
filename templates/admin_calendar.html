@@ -13,16 +13,37 @@
         {% endif %}
     </div>
 
-    <div class="card">
-        <div class="card-body">
-             <div class="calendar-toolbar">
-                 <div class="legend">
-                     <span class="legend-item"><span class="legend-dot" style="background:#8e24aa"></span> Due</span>
-                     <span class="legend-item"><span class="legend-dot" style="background:#2e7d32"></span> Paid</span>
-                     <span class="legend-item"><span class="legend-dot" style="background:#d32f2f"></span> Late</span>
-                 </div>
-             </div>
-            <div id="calendar"></div>
+    <div class="calendar-layout">
+        <!-- Left Sidebar for Payment Details -->
+        <div class="payment-sidebar" id="paymentSidebar">
+            <div class="sidebar-header">
+                <h5><i class="fas fa-credit-card"></i> Payment Due Details</h5>
+                <button class="btn btn-sm btn-outline-secondary" id="closeSidebar" style="display: none;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="sidebar-content" id="sidebarContent">
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-calendar-day" style="font-size: 2rem; opacity: 0.3;"></i>
+                    <p class="mt-2">Click on a calendar date to view payment details</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Calendar Area -->
+        <div class="calendar-main">
+            <div class="card">
+                <div class="card-body">
+                     <div class="calendar-toolbar">
+                         <div class="legend">
+                             <span class="legend-item"><span class="legend-dot" style="background:#8e24aa"></span> Due</span>
+                             <span class="legend-item"><span class="legend-dot" style="background:#2e7d32"></span> Paid</span>
+                             <span class="legend-item"><span class="legend-dot" style="background:#d32f2f"></span> Late</span>
+                         </div>
+                     </div>
+                    <div id="calendar"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -76,13 +97,18 @@ document.addEventListener('DOMContentLoaded', function() {
     moreLinkClick: 'popover',
     eventOrder: 'title',
     events: '/api/admin/recurring-events',
+    dayCellContent: function(arg) {
+      // Just return the day number for now, dots will be added after events load
+      return {
+        html: `<div class="fc-daygrid-day-number">${arg.dayNumberText}</div>`
+      };
+    },
      eventContent: function(arg) {
        // Show count and status for the day
        const count = arg.event.extendedProps.count || 0;
-       const status = arg.event.extendedProps.status || 'due';
        
        let innerHtml = `<div class=\"fc-event-main-custom\">
-         <div class=\"amount\">${count} payment${count !== 1 ? 's' : ''} ${status}</div>
+         <div class=\"amount\">${count} PAYMENT${count !== 1 ? 'S' : ''}</div>
        </div>`;
        return { html: innerHtml };
      },
@@ -105,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function() {
      dateClick: function(info) {
        console.log('Date clicked:', info.dateStr);
        
-       // Show modal with detailed events for this date
+       // Show sidebar with detailed events for this date
        const clickedDate = info.dateStr;
        
        // Find the event for this date
@@ -123,9 +149,12 @@ document.addEventListener('DOMContentLoaded', function() {
          day: 'numeric' 
        });
        
-       // Update modal title
-       document.getElementById('eventsModalLabel').innerHTML = 
+       // Update sidebar header
+       document.querySelector('.sidebar-header h5').innerHTML = 
          `<i class="fas fa-calendar-day"></i> Payment Due Details - ${formattedDate}`;
+       
+       // Show close button
+       document.getElementById('closeSidebar').style.display = 'block';
        
        if (dateEvent && dateEvent.extendedProps && dateEvent.extendedProps.events) {
          const dayEvents = dateEvent.extendedProps.events;
@@ -140,44 +169,23 @@ document.addEventListener('DOMContentLoaded', function() {
          if (status === 'paid') statusColor = 'bg-success'; // green for paid
          else if (status === 'late') statusColor = 'bg-danger'; // red for late
          
-         // Populate modal content with improved layout for many payments
-         let modalContent = `
-           <div class="row mb-4">
-             <div class="col-md-3">
-               <div class="card ${statusColor} text-white">
-                 <div class="card-body text-center">
-                   <h4 class="card-title">${count}</h4>
-                   <p class="card-text mb-0">Payment${count !== 1 ? 's' : ''} ${status}</p>
-                 </div>
-               </div>
+         // Populate sidebar content with compact layout
+         let sidebarContent = `
+           <div class="summary-cards mb-3">
+             <div class="summary-card ${statusColor}">
+               <div class="summary-number">${count}</div>
+               <div class="summary-label">Payment${count !== 1 ? 's' : ''} ${status}</div>
              </div>
-             <div class="col-md-3">
-               <div class="card bg-success text-white">
-                 <div class="card-body text-center">
-                   <h4 class="card-title">${totalAmount.toFixed(3)} OMR</h4>
-                   <p class="card-text mb-0">Total Amount</p>
-                 </div>
-               </div>
+             <div class="summary-card bg-success">
+               <div class="summary-number">${totalAmount.toFixed(3)}</div>
+               <div class="summary-label">Total OMR</div>
              </div>
-             <div class="col-md-3">
-               <div class="card bg-info text-white">
-                 <div class="card-body text-center">
-                   <h4 class="card-title">${(totalAmount / count).toFixed(3)} OMR</h4>
-                   <p class="card-text mb-0">Average per Payment</p>
-                 </div>
-               </div>
-             </div>
-             <div class="col-md-3">
-               <div class="card bg-warning text-white">
-                 <div class="card-body text-center">
-                   <h4 class="card-title">${paidCount}/${count}</h4>
-                   <p class="card-text mb-0">Paid Status</p>
-                 </div>
-               </div>
+             <div class="summary-card bg-warning summary-card-wide">
+               <div class="summary-number">${paidCount}/${count}</div>
+               <div class="summary-label">Paid Status</div>
              </div>
            </div>
-           <hr>
-           <div class="events-list" style="max-height: 400px; overflow-y: auto;">
+           <div class="events-list">
          `;
          
          if (dayEvents.length > 0) {
@@ -206,78 +214,166 @@ document.addEventListener('DOMContentLoaded', function() {
                statusText = 'Late';
              }
              
-             modalContent += `
-               <div class="card mb-2 ${borderColor}">
-                 <div class="card-body py-2">
-                   <div class="row align-items-center">
-                     <div class="col-md-2">
-                       <span class="badge ${statusBadge}">#${index + 1} ${statusText}</span>
-                     </div>
-                     <div class="col-md-3">
-                       <strong class="text-primary">${event.title}</strong>
-                     </div>
-                     <div class="col-md-4">
-                       <small class="text-muted">
-                         <strong>${ep.requestType || 'N/A'}</strong><br>
-                         ${ep.companyName || 'N/A'} - ${ep.department || 'N/A'}
-                       </small>
-                     </div>
-                     <div class="col-md-3 text-right">
-                       <a href="${event.url}" class="btn btn-sm btn-outline-primary">
-                         <i class="fas fa-eye"></i> View
-                       </a>
-                     </div>
-                   </div>
-                   ${ep.purpose ? `<div class="row mt-1"><div class="col-12"><small class="text-muted"><strong>Purpose:</strong> ${ep.purpose}</small></div></div>` : ''}
+             sidebarContent += `
+               <div class="event-item ${borderColor}">
+                 <div class="event-header">
+                   <span class="event-badge ${statusBadge}">#${index + 1} ${statusText}</span>
+                   <span class="event-amount">${event.title}</span>
+                 </div>
+                 <div class="event-details">
+                   <div class="event-type">${ep.requestType || 'N/A'}</div>
+                   <div class="event-company">${ep.companyName || 'N/A'} - ${ep.department || 'N/A'}</div>
+                   ${ep.purpose ? `<div class="event-purpose">${ep.purpose}</div>` : ''}
+                 </div>
+                 <div class="event-actions">
+                   <a href="${event.url}" class="btn btn-sm btn-outline-primary">
+                     <i class="fas fa-eye"></i> View
+                   </a>
                  </div>
                </div>
              `;
            });
          } else {
-           modalContent += '<p class="text-muted text-center py-3">No events found for this date.</p>';
+           sidebarContent += '<p class="text-muted text-center py-3">No events found for this date.</p>';
          }
          
-         modalContent += '</div>';
+         sidebarContent += '</div>';
          
-         document.getElementById('eventsModalContent').innerHTML = modalContent;
+         document.getElementById('sidebarContent').innerHTML = sidebarContent;
        } else {
          // No events for this date
-         document.getElementById('eventsModalContent').innerHTML = 
-           '<div class="text-center py-4"><i class="fas fa-calendar-times text-muted" style="font-size: 3rem;"></i><p class="text-muted mt-3">No payments due on this date.</p></div>';
+         document.getElementById('sidebarContent').innerHTML = 
+           '<div class="text-center py-4"><i class="fas fa-calendar-times text-muted" style="font-size: 2rem;"></i><p class="text-muted mt-2">No payments due on this date.</p></div>';
        }
        
-       // Show the modal with proper error handling
-       try {
-         $('#eventsModal').modal('show');
-       } catch (error) {
-         console.error('Error showing modal:', error);
-         // Fallback: try to show modal using vanilla JS
-         const modal = document.getElementById('eventsModal');
-         if (modal) {
-           modal.style.display = 'block';
-           modal.classList.add('show');
-           modal.setAttribute('aria-hidden', 'false');
-         }
-       }
+       // Show the close button
+       document.getElementById('closeSidebar').style.display = 'block';
      }
   });
   calendar.render();
   
-  // Ensure modal works properly
-  $('#eventsModal').on('hidden.bs.modal', function () {
-    // Clear modal content when closed
-    document.getElementById('eventsModalContent').innerHTML = '';
+  // Function to add paid dots to calendar cells
+  function addPaidDots() {
+    const events = calendar.getEvents();
+    const eventsByDate = {};
+    
+    // Group events by date
+    events.forEach(event => {
+      const dateStr = event.startStr;
+      if (!eventsByDate[dateStr]) {
+        eventsByDate[dateStr] = [];
+      }
+      eventsByDate[dateStr].push(event);
+    });
+    
+    // Add dots to each date that has events
+    Object.keys(eventsByDate).forEach(dateStr => {
+      const dateEvents = eventsByDate[dateStr];
+      const firstEvent = dateEvents[0];
+      
+      if (firstEvent && firstEvent.extendedProps) {
+        const paidCount = firstEvent.extendedProps.paidCount || 0;
+        
+        if (paidCount > 0) {
+          // Find the day cell for this date
+          const dayEl = document.querySelector(`[data-date="${dateStr}"]`);
+          if (dayEl) {
+            // Check if dots already exist
+            if (!dayEl.querySelector('.paid-dots')) {
+              // Create green dots for paid installments
+              let paidDots = '<div class="paid-dots">';
+              for (let i = 0; i < paidCount; i++) {
+                paidDots += '<span class="paid-dot"></span>';
+              }
+              paidDots += '</div>';
+              
+              // Find the day-top element (contains the date number)
+              const dayTopEl = dayEl.querySelector('.fc-daygrid-day-top');
+              if (dayTopEl) {
+                // Insert dots inside the day-top element (next to the date)
+                dayTopEl.insertAdjacentHTML('beforeend', paidDots);
+              } else {
+                // Fallback: add to the day cell
+                dayEl.innerHTML += paidDots;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+  
+  // Add dots after events are loaded
+  calendar.on('eventsSet', function() {
+    setTimeout(addPaidDots, 100); // Small delay to ensure DOM is updated
   });
   
-  // Add click handler for modal backdrop
-  $('#eventsModal').on('click', function (e) {
-    if (e.target === this) {
-      $(this).modal('hide');
-    }
+  // Close sidebar functionality
+  document.getElementById('closeSidebar').addEventListener('click', function() {
+    document.getElementById('closeSidebar').style.display = 'none';
+    // Reset sidebar header
+    document.querySelector('.sidebar-header h5').innerHTML = 
+      '<i class="fas fa-credit-card"></i> Payment Due Details';
+    // Reset sidebar content
+    document.getElementById('sidebarContent').innerHTML = `
+      <div class="text-center text-muted py-4">
+        <i class="fas fa-calendar-day" style="font-size: 2rem; opacity: 0.3;"></i>
+        <p class="mt-2">Click on a calendar date to view payment details</p>
+      </div>
+    `;
   });
 });
 </script>
 <style>
+/* Calendar Layout */
+.calendar-layout {
+  display: flex;
+  gap: 20px;
+  height: calc(100vh - 200px);
+  min-height: 600px;
+}
+
+.payment-sidebar {
+  width: 350px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  transform: translateX(0);
+  opacity: 1;
+  visibility: visible;
+}
+
+
+.sidebar-header {
+  padding: 15px 20px;
+  border-bottom: 1px solid #dee2e6;
+  background: white;
+  border-radius: 8px 8px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sidebar-header h5 {
+  margin: 0;
+  color: #495057;
+  font-size: 1.1rem;
+}
+
+.sidebar-content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.calendar-main {
+  flex: 1;
+  min-width: 0;
+}
+
 #calendar { width: 100%; }
 .calendar-toolbar { display:flex; justify-content:flex-end; margin-bottom:10px; }
 .legend { display:flex; gap:12px; align-items:center; }
@@ -343,7 +439,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /* Calendar date cell hover effects */
 .fc-daygrid-day:hover { background-color: #f8f9fa; cursor: pointer; }
-.fc-daygrid-day { transition: background-color 0.2s ease; }
+.fc-daygrid-day { 
+  transition: background-color 0.2s ease;
+  position: relative;
+  padding: 2px;
+}
 
 /* Make event text more prominent */
 .fc-event-main-custom .amount { 
@@ -352,6 +452,171 @@ document.addEventListener('DOMContentLoaded', function() {
   color: #fff;
   text-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
+
+/* Paid dots styling */
+.paid-dots {
+  display: inline-flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  margin-left: 4px;
+  vertical-align: baseline;
+  align-items: center;
+}
+
+.paid-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #28a745;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  flex-shrink: 0;
+}
+
+
+/* Adjust day number positioning to make room for dots */
+.fc-daygrid-day-number {
+  position: relative;
+  z-index: 1;
+}
+
+/* Sidebar Content Styles */
+.summary-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 15px;
+}
+
+.summary-card-wide {
+  grid-column: span 2;
+}
+
+.summary-card {
+  background: white;
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border-left: 4px solid;
+}
+
+.summary-card.bg-primary { border-left-color: #007bff; }
+.summary-card.bg-success { border-left-color: #28a745; }
+.summary-card.bg-info { border-left-color: #17a2b8; }
+.summary-card.bg-warning { border-left-color: #ffc107; }
+.summary-card.bg-danger { border-left-color: #dc3545; }
+
+.summary-number {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #495057;
+  margin-bottom: 3px;
+}
+
+.summary-label {
+  font-size: 0.75rem;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.events-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.event-item {
+  background: white;
+  border-radius: 6px;
+  padding: 15px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border-left: 4px solid #007bff;
+  transition: all 0.2s ease;
+}
+
+.event-item.border-left-success { border-left-color: #28a745; }
+.event-item.border-left-danger { border-left-color: #dc3545; }
+
+.event-item:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  transform: translateY(-1px);
+}
+
+.event-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.event-badge {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.event-amount {
+  font-weight: bold;
+  color: #007bff;
+  font-size: 0.9rem;
+}
+
+.event-details {
+  margin-bottom: 10px;
+}
+
+.event-type {
+  font-weight: 600;
+  color: #495057;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.event-company {
+  color: #6c757d;
+  font-size: 0.8rem;
+  margin-bottom: 4px;
+}
+
+.event-purpose {
+  color: #6c757d;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.event-actions {
+  text-align: right;
+}
+
+.event-actions .btn {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .calendar-layout {
+    flex-direction: column;
+    height: auto;
+  }
+  
+  .payment-sidebar {
+    width: 100%;
+    transform: translateY(-100%);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    height: 50vh;
+  }
+  
+}
+
 </style>
 {% endblock %}
 
