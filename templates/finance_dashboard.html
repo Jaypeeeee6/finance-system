@@ -86,6 +86,7 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
+                                <th>Urgent</th>
                                 <th>Type</th>
                                 <th>Requestor</th>
                                 <th>Department</th>
@@ -100,12 +101,14 @@
                             {% for req in requests %}
                             <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
                                 <td>
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <span>#{{ req.request_id }}</span>
-                                        {% if req.is_urgent %}
-                                            <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px;">URGENT</span>
-                                        {% endif %}
-                                    </div>
+                                    <span>#{{ req.request_id }}</span>
+                                </td>
+                                <td>
+                                    {% if req.is_urgent %}
+                                        <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px;">URGENT</span>
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     <span class="badge badge-info">{{ req.request_type }}</span>
@@ -261,7 +264,7 @@ function filterTable() {
         
         if (cells.length >= 4) {
             const requestIdCell = cells[0]; // Request ID
-            const departmentCell = cells[3]; // Department
+            const departmentCell = cells[4]; // Department (updated index due to new Urgent column)
             const urgentBadge = row.querySelector('[style*="background: #dc3545"]'); // URGENT badge
             
             let showRow = true;

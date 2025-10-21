@@ -61,8 +61,8 @@ function handleNewRequest(data) {
     // Show notification
     showNewRequestNotification(1, data);
     
-    // Reload the page to get updated data
-    location.reload();
+    // Update dashboard table dynamically
+    updateDashboardTable();
 }
 
 /**
@@ -72,8 +72,8 @@ function handleRequestUpdate(data) {
     // Show update notification
     showUpdateNotification(data);
     
-    // Reload the page to get updated data
-    location.reload();
+    // Update dashboard table dynamically
+    updateDashboardTable();
 }
 
 /**
@@ -188,13 +188,18 @@ function addRefreshIndicator() {
     indicator.innerHTML = `
         <i class="fas fa-bolt"></i>
         <span>Real-Time: <strong>LIVE</strong></span>
-        <span class="last-update">Connected</span>
     `;
     
     // Add to dashboard header if it exists
     const dashboardHeader = document.querySelector('.dashboard-header');
     if (dashboardHeader) {
-        dashboardHeader.appendChild(indicator);
+        // Find the header content area and add the indicator there
+        const headerContent = dashboardHeader.querySelector('h1') || dashboardHeader.querySelector('.dashboard-title');
+        if (headerContent) {
+            headerContent.appendChild(indicator);
+        } else {
+            dashboardHeader.appendChild(indicator);
+        }
     }
 }
 
@@ -283,6 +288,92 @@ function updateNotificationCount() {
         .catch(error => {
             console.error('Error updating notification count:', error);
         });
+}
+
+/**
+ * Update dashboard table dynamically without page refresh
+ */
+function updateDashboardTable() {
+    // Get current page URL to determine which dashboard to update
+    const currentPath = window.location.pathname;
+    
+    // Fetch updated data from the appropriate dashboard endpoint
+    let fetchUrl = '';
+    if (currentPath.includes('/finance')) {
+        fetchUrl = '/api/dashboard/finance';
+    } else if (currentPath.includes('/admin')) {
+        fetchUrl = '/api/dashboard/admin';
+    } else if (currentPath.includes('/it')) {
+        fetchUrl = '/api/dashboard/it';
+    } else if (currentPath.includes('/gm')) {
+        fetchUrl = '/api/dashboard/gm';
+    } else if (currentPath.includes('/operation')) {
+        fetchUrl = '/api/dashboard/operation';
+    } else if (currentPath.includes('/project')) {
+        fetchUrl = '/api/dashboard/project';
+    } else {
+        // Default to current page
+        fetchUrl = window.location.pathname;
+    }
+    
+    // Fetch updated data
+    fetch(fetchUrl)
+        .then(response => response.text())
+        .then(html => {
+            // Parse the response and extract the table content
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newTable = doc.querySelector('.data-table');
+            const newPagination = doc.querySelector('.pagination-container');
+            
+            if (newTable) {
+                // Update the table content
+                const currentTable = document.querySelector('.data-table');
+                if (currentTable) {
+                    currentTable.innerHTML = newTable.innerHTML;
+                }
+                
+                // Update pagination if it exists
+                if (newPagination) {
+                    const currentPagination = document.querySelector('.pagination-container');
+                    if (currentPagination) {
+                        currentPagination.innerHTML = newPagination.innerHTML;
+                    }
+                }
+                
+                // Add visual indicator that table was updated
+                showTableUpdateIndicator();
+            }
+        })
+        .catch(error => {
+            console.error('Error updating dashboard:', error);
+            // Fallback to page reload if API fails
+            location.reload();
+        });
+}
+
+/**
+ * Show visual indicator that table was updated
+ */
+function showTableUpdateIndicator() {
+    // No visual effects - just silent real-time updates
+    // The real-time functionality itself is the indicator
+}
+
+/**
+ * Enhanced notification handling
+ */
+function handleNewNotification(data) {
+    // Show notification popup
+    showNotificationPopup(data);
+    
+    // Update notification count
+    updateNotificationCount();
+    
+    // Update dashboard if on dashboard page
+    if (document.querySelector('.data-table')) {
+        updateDashboardTable();
+    }
 }
 
 /**

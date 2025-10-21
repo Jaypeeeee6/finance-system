@@ -15,6 +15,91 @@
     --transition: all 0.3s ease;
 }
 
+/* ==================== REAL-TIME NOTIFICATIONS ==================== */
+.realtime-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, #4CAF50, #45a049);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 300px;
+    max-width: 400px;
+    transform: translateX(100%);
+    opacity: 0;
+    transition: all 0.3s ease;
+    border-left: 4px solid #2E7D32;
+}
+
+.realtime-notification.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.realtime-notification i {
+    font-size: 20px;
+    color: #fff;
+}
+
+.realtime-notification div {
+    flex: 1;
+}
+
+.realtime-notification strong {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.realtime-notification p {
+    font-size: 12px;
+    margin: 0;
+    opacity: 0.9;
+}
+
+.refresh-indicator {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(76, 175, 80, 0.9);
+    color: white;
+    padding: 6px 10px;
+    border-radius: 15px;
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    margin-left: 10px;
+}
+
+.refresh-indicator i {
+    font-size: 14px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.refresh-indicator strong {
+    color: #fff;
+    font-weight: 600;
+}
+
+.refresh-indicator .last-update {
+    font-size: 10px;
+    opacity: 0.8;
+}
+
 * {
     margin: 0;
     padding: 0;
