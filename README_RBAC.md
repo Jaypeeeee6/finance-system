@@ -181,3 +181,68 @@ These are notifications that affect the entire system or multiple users:
 - **System Errors/Issues**: "Payment processing is temporarily unavailable"
 - **Administrative Announcements**: "New user roles have been added"
 - **IT-Specific System Notifications**: "Server performance issues detected"
+
+---
+
+## Request Types by Department and Role
+
+When creating a new payment request, users can only select from request types that are available for their department or role. The following request types are available:
+
+### **General Manager (Role-based)**
+- Personal Expenses
+
+### **Finance Department**
+- Utilities Expenses
+- Coffee Shop Expenses
+- Supplier Expenses
+
+### **Operation Department**
+- Refund/Reimbursement
+
+### **PR Department**
+- Permission Bills
+- Flight Tickets
+- Petty Cash
+- Contract Expenses
+- Refund/Reimbursement
+
+### **Maintenance Department**
+- Purchase Items
+- AC Installment
+- Repair Expenses
+- Sewage Service Expenses
+
+### **Marketing Department**
+- Advertisement Expenses
+- Photoshoot Expenses
+- Subscription Expenses
+
+### **Logistic Department**
+- ROP Expenses
+- Truck Maintenance
+- Rent Expenses (Jawad)
+
+### **HR Department**
+- Salary Expenses
+- Refund/Reimbursement
+- Cash Advance Expenses
+- Allowance Expenses
+
+### **Quality Control Department**
+- Pest Control Expenses
+- Courses Expenses
+- Refund/Reimbursement
+
+### **Procurement Department**
+- Purchasing Expenses
+
+### **IT Department**
+- Subscription Expenses
+- Course Expenses
+
+### **Customer Service Department**
+- Refund/Reimbursement
+
+### **Project Department**
+- New Branch Expenses
+- Project Expenses

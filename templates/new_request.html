@@ -43,7 +43,7 @@
 
                     <div class="form-group">
                         <label for="requestor_name">Requestor Name *</label>
-                        <input type="text" name="requestor_name" id="requestor_name" required>
+                        <input type="text" name="requestor_name" id="requestor_name" value="{{ user.name if user else '' }}" required>
                     </div>
                 </div>
 
