@@ -15,6 +15,229 @@
     --transition: all 0.3s ease;
 }
 
+/* ==================== TAB NAVIGATION STYLES ==================== */
+.tab-navigation {
+    display: flex;
+    background: #ffffff;
+    border-radius: 8px 8px 0 0;
+    padding: 0;
+    margin-bottom: 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 10;
+    border: 1px solid #dee2e6;
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+
+.tab-button {
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    border-right: 1px solid #dee2e6;
+    padding: 15px 20px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: #6c757d;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 0;
+    flex: 1;
+    justify-content: center;
+    position: relative;
+}
+
+.tab-button:first-child {
+    border-top-left-radius: 8px;
+    border-left: 1px solid #dee2e6;
+}
+
+.tab-button:last-child {
+    border-top-right-radius: 8px;
+    border-right: none;
+}
+
+.tab-button:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: #000000;
+}
+
+.tab-button.active {
+    background-color: rgba(0, 0, 0, 0.1);
+    color: #000000;
+    font-weight: 600;
+    border-bottom-color: #000000;
+}
+
+.tab-button.active:hover {
+    background-color: rgba(0, 0, 0, 0.15);
+    color: #000000;
+}
+
+/* Individual tab colors when active */
+#tab-pending.active {
+    background-color: #000000;
+    color: white;
+    border-bottom-color: #000000;
+}
+
+#tab-completed.active {
+    background-color: #28a745;
+    color: white;
+    border-bottom-color: #28a745;
+}
+
+#tab-rejected.active {
+    background-color: #dc3545;
+    color: white;
+    border-bottom-color: #dc3545;
+}
+
+#tab-recurring.active {
+    background-color: #ffc107;
+    color: #212529;
+    border-bottom-color: #ffc107;
+}
+
+/* Hover effects for individual tabs */
+#tab-pending:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+    color: white;
+}
+
+#tab-completed:hover {
+    background-color: rgba(40, 167, 69, 0.1);
+    color: white;
+}
+
+#tab-rejected:hover {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: white;
+}
+
+#tab-recurring:hover {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: white;
+}
+
+.tab-button i {
+    font-size: 16px;
+}
+
+.tab-search {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+    padding: 0 15px;
+}
+
+.tab-search-input {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 200px;
+    margin-right: 5px;
+}
+
+.tab-search-input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.tab-search-btn {
+    background: #007bff;
+    border: none;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.tab-search-btn:hover {
+    background: #0056b3;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* ==================== CARD HEADER LAYOUT ==================== */
+.card-header .header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.card-header .header-top h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.card-header .header-top .btn {
+    margin: 0;
+}
+
+/* ==================== DASHBOARD ACTIONS ==================== */
+.dashboard-actions {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.dashboard-actions .btn {
+    margin: 0;
+}
+
+.card-header .filter-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-top: 15px;
+}
+
+.card-header .search-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.card-header .search-form .form-control {
+    min-width: 250px;
+}
+
+.card-header .form-select {
+    min-width: 150px;
+}
+
+/* ==================== CARD INTEGRATION WITH TABS ==================== */
+.card {
+    border-radius: 0 0 8px 8px;
+    margin-top: 0;
+    border-top: none;
+}
+
+.card-header {
+    border-radius: 0;
+    border-top: none;
+    background: white;
+}
+
 /* ==================== REAL-TIME NOTIFICATIONS ==================== */
 .realtime-notification {
     position: fixed;

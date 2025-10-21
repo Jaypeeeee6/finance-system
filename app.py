@@ -1134,6 +1134,7 @@ def admin_dashboard():
     department_filter = request.args.get('department', None)
     search_query = request.args.get('search', None)
     urgent_filter = request.args.get('urgent', None)
+    tab = request.args.get('tab', 'pending')  # New tab parameter
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -1164,6 +1165,27 @@ def admin_dashboard():
     else:
         # Other Finance Admins only see finance-related statuses
         query = PaymentRequest.query.filter(PaymentRequest.status.in_(finance_statuses))
+    
+    # Apply tab-based filtering
+    if tab == 'completed':
+        query = query.filter(PaymentRequest.status == 'Completed')
+    elif tab == 'rejected':
+        query = query.filter(db.or_(
+            PaymentRequest.status == 'Rejected by Manager',
+            PaymentRequest.status == 'Rejected by Finance'
+        ))
+    elif tab == 'recurring':
+        query = query.filter(PaymentRequest.status == 'Recurring')
+    elif tab == 'pending':
+        # For 'pending' tab, show only pending statuses including Proof Sent
+        query = query.filter(PaymentRequest.status.in_([
+            'Pending Manager Approval', 
+            'Pending Finance Approval', 
+            'Payment Pending', 
+            'Proof Pending', 
+            'Proof Sent'
+        ]))
+    
     if status_filter:
         query = query.filter(PaymentRequest.status == status_filter)
     if department_filter:
@@ -1201,7 +1223,8 @@ def admin_dashboard():
                          status_filter=status_filter,
                          department_filter=department_filter,
                          search_query=search_query,
-                         urgent_filter=urgent_filter)
+                         urgent_filter=urgent_filter,
+                         active_tab=tab)
 
 
 @app.route('/finance/dashboard')
@@ -1217,6 +1240,7 @@ def finance_dashboard():
     department_filter = request.args.get('department', None)
     search_query = request.args.get('search', None)
     urgent_filter = request.args.get('urgent', None)
+    tab = request.args.get('tab', 'pending')  # New tab parameter
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -1267,6 +1291,26 @@ def finance_dashboard():
         elif urgent_filter == 'not_urgent':
             query = query.filter(PaymentRequest.is_urgent == False)
     
+    # Apply tab-based filtering
+    if tab == 'completed':
+        query = query.filter(PaymentRequest.status == 'Completed')
+    elif tab == 'rejected':
+        query = query.filter(db.or_(
+            PaymentRequest.status == 'Rejected by Manager',
+            PaymentRequest.status == 'Rejected by Finance'
+        ))
+    elif tab == 'recurring':
+        query = query.filter(PaymentRequest.status == 'Recurring')
+    elif tab == 'pending':
+        # For 'pending' tab, show only pending statuses including Proof Sent
+        query = query.filter(PaymentRequest.status.in_([
+            'Pending Manager Approval', 
+            'Pending Finance Approval', 
+            'Payment Pending', 
+            'Proof Pending', 
+            'Proof Sent'
+        ]))
+    
     # Get paginated requests
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
@@ -1283,7 +1327,8 @@ def finance_dashboard():
                          unread_count=unread_count,
                          department_filter=department_filter,
                          search_query=search_query,
-                         urgent_filter=urgent_filter)
+                         urgent_filter=urgent_filter,
+                         active_tab=tab)
 
 
 @app.route('/gm/dashboard')
