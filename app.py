@@ -2381,34 +2381,91 @@ def approve_request(request_id):
         # Approve proof sent by requestor
         current_time = datetime.utcnow()
         
-        # Don't end finance approval timing here - it should continue until completed
-        # The timer should continue running through Payment Pending status
-        
-        req.status = 'Payment Pending'
-        req.approval_date = current_time.date()
-        req.updated_at = current_time
-        
-        db.session.commit()
-        
-        log_action(f"Finance admin approved proof for payment request #{request_id}")
-        
-        # Notify the requestor
-        create_notification(
-            user_id=req.user_id,
-            title="Proof Approved",
-            message=f"Your proof for payment request #{request_id} has been approved. Status updated to Payment Pending.",
-            notification_type="proof_approved",
-            request_id=request_id
-        )
-        
-        # Emit real-time update
-        socketio.emit('request_updated', {
-            'request_id': request_id,
-            'status': 'Payment Pending',
-            'proof_approved': True
-        })
-        
-        flash(f'Proof for payment request #{request_id} has been approved.', 'success')
+        # Check if this is a recurring payment
+        if req.recurring == 'Recurring':
+            # For recurring payments, set status to Recurring and handle payment schedule
+            req.status = 'Recurring'
+            req.approval_date = current_time.date()
+            
+            # End finance approval timing when recurring payment is approved
+            if req.finance_approval_start_time and not req.finance_approval_end_time:
+                req.finance_approval_end_time = current_time
+                duration = current_time - req.finance_approval_start_time
+                req.finance_approval_duration_minutes = int(duration.total_seconds())
+            
+            # Automatically mark the first installment as paid
+            first_installment = RecurringPaymentSchedule.query.filter_by(
+                request_id=request_id
+            ).order_by(RecurringPaymentSchedule.payment_order).first()
+            
+            if first_installment:
+                first_installment.is_paid = True
+                first_installment.paid_date = current_time.date()
+                # Copy the finance admin receipt to the first installment
+                first_installment.receipt_path = req.receipt_path
+                
+                # Create a paid notification for the first installment
+                create_notification(
+                    user_id=req.user_id,
+                    title="First Installment Paid",
+                    message=f'First installment for {first_installment.payment_date} has been automatically marked as paid (Amount: {first_installment.amount} OMR)',
+                    notification_type="installment_paid",
+                    request_id=request_id
+                )
+            
+            req.updated_at = current_time
+            db.session.commit()
+            
+            log_action(f"Finance admin approved proof for recurring payment request #{request_id}")
+            
+            # Notify the requestor
+            create_notification(
+                user_id=req.user_id,
+                title="Recurring Payment Approved",
+                message=f"Your proof for recurring payment request #{request_id} has been approved. Payment schedule is now active.",
+                notification_type="proof_approved",
+                request_id=request_id
+            )
+            
+            # Emit real-time update
+            socketio.emit('request_updated', {
+                'request_id': request_id,
+                'status': 'Recurring',
+                'proof_approved': True,
+                'recurring': True
+            })
+            
+            flash(f'Recurring payment request #{request_id} has been approved. Payment schedule is now active.', 'success')
+        else:
+            # For non-recurring payments, set status to Payment Pending
+            # Don't end finance approval timing here - it should continue until completed
+            # The timer should continue running through Payment Pending status
+            
+            req.status = 'Payment Pending'
+            req.approval_date = current_time.date()
+            req.updated_at = current_time
+            
+            db.session.commit()
+            
+            log_action(f"Finance admin approved proof for payment request #{request_id}")
+            
+            # Notify the requestor
+            create_notification(
+                user_id=req.user_id,
+                title="Proof Approved",
+                message=f"Your proof for payment request #{request_id} has been approved. Status updated to Payment Pending.",
+                notification_type="proof_approved",
+                request_id=request_id
+            )
+            
+            # Emit real-time update
+            socketio.emit('request_updated', {
+                'request_id': request_id,
+                'status': 'Payment Pending',
+                'proof_approved': True
+            })
+            
+            flash(f'Proof for payment request #{request_id} has been approved.', 'success')
     
     elif approval_status == 'proof_sent_reject':
         # Reject proof sent by requestor

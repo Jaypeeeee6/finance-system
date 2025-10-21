@@ -1528,8 +1528,17 @@
                             </div>
                             
                             <div class="col-md-6">
-                                
-                                {% if request.status not in ['Completed', 'Recurring'] %}
+                                {% if request.status == 'Proof Sent' and request.recurring == 'Recurring' %}
+                                <!-- Special handling for recurring payments in Proof Sent status -->
+                                <h5>Recurring Payment Approval</h5>
+                                <p style="color: #666; margin-bottom: 15px;">This is a recurring payment request. Approve the proof to proceed with payment schedule management.</p>
+                                <form method="POST" action="{{ url_for('approve_request', request_id=request.request_id) }}" style="margin-top: 10px;">
+                                    <input type="hidden" name="approval_status" value="proof_sent_approve">
+                                    <button type="submit" class="btn btn-success" style="background-color: #28a745; border-color: #28a745; color: white;" onmouseover="this.style.backgroundColor='#218838'; this.style.borderColor='#1e7e34';" onmouseout="this.style.backgroundColor='#28a745'; this.style.borderColor='#28a745';">
+                                        <i class="fas fa-check-circle"></i> Approve Request
+                                    </button>
+                                </form>
+                                {% elif request.status not in ['Completed', 'Recurring'] %}
                                 <form method="POST" action="{{ url_for('close_request', request_id=request.request_id) }}" style="margin-top: 10px;">
                                     <button type="submit" class="btn btn-success" style="background-color: #28a745; border-color: #28a745; color: white;" onmouseover="this.style.backgroundColor='#218838'; this.style.borderColor='#1e7e34';" onmouseout="this.style.backgroundColor='#28a745'; this.style.borderColor='#28a745';" onclick="return confirm('Mark this request as completed? This action cannot be undone.')">
                                         <i class="fas fa-check-circle"></i> Completed
