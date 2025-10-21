@@ -153,12 +153,12 @@ function updateManagerDisplay() {
         return;
     }
 
-    if (role === 'Department Manager' || (role === 'GM' && department === 'Office') || (role === 'Operation Manager' && department === 'Operation') || (role === 'Finance Admin' && department === 'Finance' && document.getElementById('name').value.trim() === 'Abdalaziz Hamood Al Brashdi')) {
+    if (role === 'Department Manager' || (role === 'GM' && department === 'Office') || (role === 'Operation Manager' && department === 'Operation') || (role === 'Finance Admin' && department === 'Finance' && document.getElementById('name').value.trim() === 'Abdalaziz Al-Brashdi')) {
         managerIdInput.value = '';
         if (role === 'Department Manager') {
             setDisplay('General Manager will be your assigned manager', '#d4edda', '#c3e6cb', 'As a Department Manager, the General Manager will approve your requests', '#28a745');
         } else if (role === 'GM') {
-            setDisplay('Abdalaziz Hamood Al Brashdi will be your assigned manager', '#d4edda', '#c3e6cb', 'As a General Manager, Abdalaziz will approve your requests', '#28a745');
+            setDisplay('Abdalaziz Al-Brashdi will be your assigned manager', '#d4edda', '#c3e6cb', 'As a General Manager, Abdalaziz will approve your requests', '#28a745');
         } else {
             setDisplay('You will be the assigned manager for this department', '#d4edda', '#c3e6cb', 'As a Manager, you will manage this department', '#28a745');
         }
@@ -176,7 +176,7 @@ function updateManagerDisplay() {
     } else if (department === 'Project Department') {
         managerUser = users.find(u => u.role === 'Operation Manager');
     } else if (department === 'Finance') {
-        managerUser = users.find(u => u.department === 'Finance' && u.name === 'Abdalaziz Hamood Al Brashdi');
+        managerUser = users.find(u => u.department === 'Finance' && u.name === 'Abdalaziz Al-Brashdi');
     } else {
         // Fallback: Department Manager of same department
         managerUser = users.find(u => u.department === department && u.role === 'Department Manager');

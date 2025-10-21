@@ -754,7 +754,7 @@ def get_notifications_for_user(user):
                     )
                 )
             ).order_by(Notification.created_at.desc()).limit(5).all()
-        elif user.name == 'Abdalaziz Hamood Al Brashdi':
+        elif user.name == 'Abdalaziz Al-Brashdi':
             # Abdalaziz gets finance notifications + updates on Finance Staff, GM, and Operation Manager requests
             return Notification.query.filter(
                 db.and_(
@@ -886,7 +886,7 @@ def get_unread_count_for_user(user):
                     )
                 )
             ).count()
-        elif user.name == 'Abdalaziz Hamood Al Brashdi':
+        elif user.name == 'Abdalaziz Al-Brashdi':
             # Abdalaziz gets finance notifications + updates on Finance Staff, GM, and Operation Manager requests
             return Notification.query.filter(
                 db.and_(
@@ -1320,7 +1320,7 @@ def admin_dashboard():
     finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
     
     # For Abdalaziz, also include Pending Manager Approval requests from Finance Staff, GM, and Operation Manager
-    if current_user.name == 'Abdalaziz Hamood Al Brashdi':
+    if current_user.name == 'Abdalaziz Al-Brashdi':
         # Include finance statuses + Pending Manager Approval from specific roles
         query = PaymentRequest.query.filter(
             db.or_(
@@ -1435,7 +1435,7 @@ def finance_dashboard():
         query = query.union(own_pending_requests)
     
     # Add Abdalaziz's special permissions for Finance Staff, GM, and Operation Manager requests
-    elif current_user.name == 'Abdalaziz Hamood Al Brashdi':
+    elif current_user.name == 'Abdalaziz Al-Brashdi':
         abdalaziz_special_requests = PaymentRequest.query.filter(
             db.and_(
                 PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager']),
@@ -2332,7 +2332,7 @@ def view_request(request_id):
         finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
         
         # For Abdalaziz, also allow viewing Pending Manager Approval and Rejected by Manager requests from Finance Staff, GM, and Operation Manager
-        if current_user.name == 'Abdalaziz Hamood Al Brashdi' and req.status in ['Pending Manager Approval', 'Rejected by Manager']:
+        if current_user.name == 'Abdalaziz Al-Brashdi' and req.status in ['Pending Manager Approval', 'Rejected by Manager']:
             if req.user.role in ['Finance Staff', 'GM', 'Operation Manager']:
                 pass  # Allow access
             else:
@@ -3307,15 +3307,15 @@ def manager_approve_request(request_id):
         is_authorized = True
         print("DEBUG: Authorized via GM role for Department Manager")
     # Special case: Abdalaziz can approve General Manager requests
-    elif (current_user.name == 'Abdalaziz Hamood Al Brashdi' and req.user.role == 'GM'):
+    elif (current_user.name == 'Abdalaziz Al-Brashdi' and req.user.role == 'GM'):
         is_authorized = True
         print("DEBUG: Authorized via Abdalaziz role for General Manager")
     # Special case: Abdalaziz can approve Finance Staff requests
-    elif (current_user.name == 'Abdalaziz Hamood Al Brashdi' and req.user.role == 'Finance Staff'):
+    elif (current_user.name == 'Abdalaziz Al-Brashdi' and req.user.role == 'Finance Staff'):
         is_authorized = True
         print("DEBUG: Authorized via Abdalaziz role for Finance Staff")
     # Special case: Abdalaziz can approve Operation Manager requests
-    elif (current_user.name == 'Abdalaziz Hamood Al Brashdi' and req.user.role == 'Operation Manager'):
+    elif (current_user.name == 'Abdalaziz Al-Brashdi' and req.user.role == 'Operation Manager'):
         is_authorized = True
         print("DEBUG: Authorized via Abdalaziz role for Operation Manager")
     # Special case: Operation Manager can approve Operation department and Project Department requests
@@ -4158,7 +4158,7 @@ def new_user():
             final_manager_id = gm_user.user_id if gm_user else None
         # If the new user IS a General Manager, they are managed by Abdalaziz (Finance Admin)
         elif role == 'GM':
-            abdalaziz_user = User.query.filter_by(name='Abdalaziz Hamood Al Brashdi', department='Finance').first()
+            abdalaziz_user = User.query.filter_by(name='Abdalaziz Al-Brashdi', department='Finance').first()
             final_manager_id = abdalaziz_user.user_id if abdalaziz_user else None
         else:
             # First preference: explicit manager selection from form
@@ -4181,7 +4181,7 @@ def new_user():
                         op_manager = User.query.filter_by(role='Operation Manager').first()
                         final_manager_id = op_manager.user_id if op_manager else None
                     elif department == 'Finance':
-                        named_manager = User.query.filter_by(name='Abdalaziz Hamood Al Brashdi', department='Finance').first()
+                        named_manager = User.query.filter_by(name='Abdalaziz Al-Brashdi', department='Finance').first()
                         final_manager_id = named_manager.user_id if named_manager else None
                     else:
                         # No fallback: manager assignment depends solely on users with 'Department Manager' role
@@ -4243,7 +4243,7 @@ def edit_user(user_id):
             gm_user = User.query.filter_by(role='GM').first()
             final_manager_id = gm_user.user_id if gm_user else None
         elif new_role == 'GM':
-            abdalaziz_user = User.query.filter_by(name='Abdalaziz Hamood Al Brashdi', department='Finance').first()
+            abdalaziz_user = User.query.filter_by(name='Abdalaziz Al-Brashdi', department='Finance').first()
             final_manager_id = abdalaziz_user.user_id if abdalaziz_user else None
         else:
             if new_manager_id:
@@ -4264,7 +4264,7 @@ def edit_user(user_id):
                         op_manager = User.query.filter_by(role='Operation Manager').first()
                         final_manager_id = op_manager.user_id if op_manager else None
                     elif new_department == 'Finance':
-                        named_manager = User.query.filter_by(name='Abdalaziz Hamood Al Brashdi', department='Finance').first()
+                        named_manager = User.query.filter_by(name='Abdalaziz Al-Brashdi', department='Finance').first()
                         final_manager_id = named_manager.user_id if named_manager else None
                     else:
                         # No fallback: manager assignment depends solely on users with 'Department Manager' role

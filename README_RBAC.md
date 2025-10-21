@@ -45,14 +45,14 @@ This document describes who can view what, who can approve/reject, and how a pay
   - **Approve/Reject**: Operation department and Project Department
 
 ### Finance Roles
-- **Finance Admin** (users: Mahmoud, Abdalaziz)
+- **Finance Admin** (users: Mahmood Al-Mandhari, Abdalaziz Al-Brashdi)
   - **View**: All departments, all roles; finance-related statuses across the board
     - Statuses of interest: Pending Finance Approval, Proof Pending, Proof Sent, Recurring, Completed, Rejected by Finance
-    - Additional for Abdalaziz: Pending Manager Approval (only for Finance Staff, General Manager, and Operation Manager requests)
-    - Additional for Abdalaziz: Rejected by Manager (only for Finance Staff, General Manager, and Operation Manager requests)
+    - Additional for Abdalaziz Al-Brashdi: Pending Manager Approval (only for Finance Staff, General Manager, and Operation Manager requests)
+    - Additional for Abdalaziz Al-Brashdi: Rejected by Manager (only for Finance Staff, General Manager, and Operation Manager requests)
   - **Approve/Reject**: All departments as Finance Admin approvers, only after manager approval
 
-- **Finance Admin (Abdalaziz)**
+- **Finance Admin (Abdalaziz Al-Brashdi)**
   - **View**: Same as Finance Admin
   - **Approve/Reject**: Same as Finance Admin
   - **Additional Responsibility**: Assigned Manager for Finance Staff, General Manager, and Operation Manager requests (performs manager approval for these roles before Finance Admin approval stage)
@@ -105,10 +105,10 @@ Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Qual
 
 ### Manager Assignment Rules
 - **Department Managers**: Assigned to General Manager
-- **General Manager**: Assigned to Abdalaziz (Finance Admin)
+- **General Manager**: Assigned to Abdalaziz Al-Brashdi (Finance Admin)
 - **Operation Department**: Assigned to Operation Manager
 - **Project Department**: Assigned to Operation Manager (same as Operation Department)
-- **Finance Department**: Assigned to Abdalaziz (Finance Admin)
+- **Finance Department**: Assigned to Abdalaziz Al-Brashdi (Finance Admin)
 - **Office Department**: Assigned to General Manager
 - **Other Departments**: Assigned to their respective Department Manager (if exists)
 
@@ -116,7 +116,7 @@ Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Qual
 
 ## RACI at a Glance
 - **Responsible**: Requestor (create/submit), Department Manager (mgr approval), Finance Approver (finance approval and payment steps)
-- **Accountable**: Department Manager for departmental gatekeeping; Finance Admin (Abdalaziz) for Finance approvals
+- **Accountable**: Department Manager for departmental gatekeeping; Finance Admin (Abdalaziz Al-Brashdi) for Finance approvals
 - **Consulted**: Finance Admin (oversight), GM/Operation Manager as needed
 - **Informed**: General Manager has full visibility across the process
 
@@ -124,14 +124,14 @@ Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Qual
 
 ## Notification Permissions by Role
 
-### **Finance Admin (Mahmoud, Abdalaziz)**
+### **Finance Admin (Mahmoud, Abdalaziz Al-Brashdi)**
 - **New submissions** when requests reach "Pending Finance Approval"
 - **Updates on their own requests** (status changes, approvals, rejections, etc.)
 - **Proof uploaded** notifications
 - **Recurring payment due** notifications
 - **Installment date edited** notifications (when requestors edit payment dates)
 - **System-wide notifications** (all types)
-- **Additional for Abdalaziz**: Updates on Finance Staff, General Manager, and Operation Manager requests (including rejections)
+- **Additional for Abdalaziz Al-Brashdi**: Updates on Finance Staff, General Manager, and Operation Manager requests (including rejections)
 
 ### **Finance Staff**
 - **New submissions** when requests reach "Pending Finance Approval"

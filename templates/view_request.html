@@ -686,11 +686,11 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                 <p style="margin-bottom: 0.5rem; color: #666;">
                                     <strong>Assigned Manager:</strong> 
                                     {% if user.role == 'GM' and user.user_id == request.user_id %}
-                                        Abdalaziz Hamood Al Brashdi (Finance Admin)
+                                        Abdalaziz Al-Brashdi (Finance Admin)
                                     {% elif user.role == 'Finance Staff' and user.user_id == request.user_id %}
-                                        Abdalaziz Hamood Al Brashdi (Finance Admin)
+                                        Abdalaziz Al-Brashdi (Finance Admin)
                                     {% elif user.role == 'Operation Manager' and user.user_id == request.user_id %}
-                                        Abdalaziz Hamood Al Brashdi (Finance Admin)
+                                        Abdalaziz Al-Brashdi (Finance Admin)
                                     {% elif user.role == 'Operation Manager' and request.department == 'Operation' %}
                                         {{ user.name }} (You)
                                     {% elif user.role == 'Operation Manager' and request.department == 'Project Department' %}
@@ -754,7 +754,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 </div>
 
                 <!-- Manager approval form (only visible to managers of the same department, but not Department Managers viewing their own requests) -->
-                {% if (user.role == 'Department Manager' and user.department == request.department and user.user_id != request.user_id) or (user.role == 'Operation Manager' and request.department in ['Operation', 'Project Department']) or (user.role == 'Finance Admin' and request.department == 'Finance') or (user.role == 'GM' and request.user.role == 'Department Manager') or (user.name == 'Abdalaziz Hamood Al Brashdi' and request.user.role in ['GM', 'Finance Staff', 'Operation Manager']) %}
+                {% if (user.role == 'Department Manager' and user.department == request.department and user.user_id != request.user_id) or (user.role == 'Operation Manager' and request.department in ['Operation', 'Project Department']) or (user.role == 'Finance Admin' and request.department == 'Finance') or (user.role == 'GM' and request.user.role == 'Department Manager') or (user.name == 'Abdalaziz Al-Brashdi' and request.user.role in ['GM', 'Finance Staff', 'Operation Manager']) %}
                     <div class="card your-approval-required">
                         <div class="card-header">
                             <h4><i class="fas fa-check-circle"></i> Your Approval Required</h4>
@@ -1495,7 +1495,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                     <select name="approver" id="finance_approver" required>
                                         <option value="">-- Select Finance Admin Approver --</option>
                                         <option value="Mahmoud">Mahmoud</option>
-                                        <option value="Abdalaziz">Abdalaziz</option>
+                                        <option value="Abdalaziz Al-Brashdi">Abdalaziz Al-Brashdi</option>
                                     </select>
                                 </div>
                                 
