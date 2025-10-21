@@ -304,10 +304,10 @@
                                             </span>
                                             <div>
                                                 <div class="installment-date">
-                                                    {{ installment.date.strftime('%B %d, %Y') }}
+                                                    {{ installment.payment_date.strftime('%B %d, %Y') }}
                                                 </div>
                                                 <div class="installment-day">
-                                                    {{ installment.date.strftime('%A') }}
+                                                    {{ installment.payment_date.strftime('%A') }}
                                                 </div>
                                             </div>
                                         </div>
@@ -780,11 +780,18 @@
                                                     {{ loop.index }}
                                                 </span>
                                                 <div>
-                                                    <div class="installment-date">
-                                                        {{ installment.date.strftime('%B %d, %Y') }}
+                                                    <div class="installment-date" style="position: relative;">
+                                                        {{ installment.payment_date.strftime('%B %d, %Y') }}
+                                                        {% if installment.has_been_edited %}
+                                                        <span class="edited-indicator" 
+                                                              onclick="showEditHistory({{ installment.schedule_id }})"
+                                                              style="background: linear-gradient(45deg, #007bff, #6f42c1); color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; margin-left: 8px; cursor: pointer; font-weight: 600; display: inline-block;">
+                                                            Edited
+                                                        </span>
+                                                        {% endif %}
                                                     </div>
                                                     <div class="installment-day">
-                                                        {{ installment.date.strftime('%A') }}
+                                                        {{ installment.payment_date.strftime('%A') }}
                                                     </div>
                                                 </div>
                                             </div>
@@ -822,7 +829,7 @@
                                             {% if not installment.is_paid %}
                                                 <button type="button" class="btn btn-success btn-sm mark-paid-btn" 
                                                         data-schedule-id="{{ installment.schedule_id }}" 
-                                                        data-payment-date="{{ installment.date.strftime('%Y-%m-%d') }}" 
+                                                        data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}" 
                                                         data-has-receipt="{{ 'true' if installment.receipt_path else 'false' }}"
                                                         data-tooltip="Please upload a receipt first"
                                                         style="margin-right: 5px;"
@@ -839,13 +846,33 @@
                                                    style="margin-right: 5px;">
                                                     <i class="fas fa-eye"></i> View Receipt
                                                 </a>
+                                                <!-- Edit button for requestor only (only if not paid) -->
+                                                {% if request.user_id == user.user_id and not installment.is_paid %}
+                                                <button type="button" class="btn btn-warning btn-sm edit-installment-btn" 
+                                                        data-schedule-id="{{ installment.schedule_id }}" 
+                                                        data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}"
+                                                        data-amount="{{ installment.amount }}"
+                                                        style="margin-right: 5px;">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                                {% endif %}
                                             {% elif not installment.is_paid %}
                                                 <!-- Unpaid installment without receipt - show Upload Receipt -->
                                                 <button type="button" class="btn btn-info btn-sm upload-receipt-btn" 
                                                         data-schedule-id="{{ installment.schedule_id }}" 
-                                                        data-payment-date="{{ installment.date.strftime('%Y-%m-%d') }}">
+                                                        data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}">
                                                     <i class="fas fa-upload"></i> Upload Receipt
                                                 </button>
+                                                <!-- Edit button for requestor only -->
+                                                {% if request.user_id == user.user_id %}
+                                                <button type="button" class="btn btn-warning btn-sm edit-installment-btn" 
+                                                        data-schedule-id="{{ installment.schedule_id }}" 
+                                                        data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}"
+                                                        data-amount="{{ installment.amount }}"
+                                                        style="margin-left: 5px;">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                                {% endif %}
                                             {% endif %}
                                         </div>
                                         {% else %}
@@ -859,6 +886,26 @@
                                                    style="margin-right: 5px;">
                                                     <i class="fas fa-eye"></i> View Receipt
                                                 </a>
+                                                <!-- Edit button for requestor only (only if not paid) -->
+                                                {% if request.user_id == user.user_id and not installment.is_paid %}
+                                                <button type="button" class="btn btn-warning btn-sm edit-installment-btn" 
+                                                        data-schedule-id="{{ installment.schedule_id }}" 
+                                                        data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}"
+                                                        data-amount="{{ installment.amount }}"
+                                                        style="margin-left: 5px;">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                                {% endif %}
+                                            {% elif not installment.is_paid %}
+                                                <!-- Unpaid installment - show Edit button for requestor only -->
+                                                {% if request.user_id == user.user_id %}
+                                                <button type="button" class="btn btn-warning btn-sm edit-installment-btn" 
+                                                        data-schedule-id="{{ installment.schedule_id }}" 
+                                                        data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}"
+                                                        data-amount="{{ installment.amount }}">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                                {% endif %}
                                             {% endif %}
                                         </div>
                                         {% endif %}
@@ -996,11 +1043,18 @@
                                                     {{ loop.index }}
                                                 </span>
                                                 <div>
-                                                    <div class="installment-date">
-                                                        {{ installment.date.strftime('%B %d, %Y') }}
+                                                    <div class="installment-date" style="position: relative;">
+                                                        {{ installment.payment_date.strftime('%B %d, %Y') }}
+                                                        {% if installment.has_been_edited %}
+                                                        <span class="edited-indicator" 
+                                                              onclick="showEditHistory({{ installment.schedule_id }})"
+                                                              style="background: linear-gradient(45deg, #007bff, #6f42c1); color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; margin-left: 8px; cursor: pointer; font-weight: 600; display: inline-block;">
+                                                            Edited
+                                                        </span>
+                                                        {% endif %}
                                                     </div>
                                                     <div class="installment-day">
-                                                        {{ installment.date.strftime('%A') }}
+                                                        {{ installment.payment_date.strftime('%A') }}
                                                     </div>
                                                 </div>
                                             </div>
@@ -1928,6 +1982,283 @@ function closeInstallmentReceiptModal() {
     }
 }
 
+function editInstallment(scheduleId, paymentDate, currentAmount) {
+    // Create a modal for editing installment
+    const modal = document.createElement('div');
+    modal.id = 'editInstallmentModal';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-container">
+            <div class="modal-content">
+                <div class="modal-header" style="background-color: #ffc107; color: #212529; padding: 15px 20px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center;">
+                    <h5 class="modal-title" style="margin: 0; font-size: 1.2rem;">
+                        <i class="fas fa-edit"></i> Edit Installment for ${paymentDate}
+                    </h5>
+                    <button type="button" class="close-btn" onclick="closeEditInstallmentModal()" style="background: none; border: none; color: #212529; font-size: 1.5rem; cursor: pointer; padding: 0; margin: 0;">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" style="padding: 25px;">
+                    <form id="editInstallmentForm" enctype="multipart/form-data">
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <label style="font-weight: 600; margin-bottom: 8px; color: #495057; display: block;">
+                                <i class="fas fa-money-bill-wave"></i> Amount (OMR)
+                            </label>
+                            <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 15px; font-size: 1rem; color: #6c757d; min-height: 20px;">
+                                <i class="fas fa-lock" style="color: #6c757d; margin-right: 8px;"></i>
+                                OMR ${currentAmount} (Amount cannot be changed)
+                            </div>
+                        </div>
+                        
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <label for="editPaymentDate" style="font-weight: 600; margin-bottom: 8px; color: #495057; display: block;">
+                                <i class="fas fa-calendar"></i> Payment Date
+                            </label>
+                            <input type="date" 
+                                   class="form-control" 
+                                   id="editPaymentDate" 
+                                   name="payment_date" 
+                                   value="${paymentDate}"
+                                   required
+                                   style="border: 2px solid #e9ecef; border-radius: 6px; padding: 12px; font-size: 1rem; width: 100%;">
+                        </div>
+                        
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <label for="editReason" style="font-weight: 600; margin-bottom: 8px; color: #495057; display: block;">
+                                <i class="fas fa-comment"></i> Reason for Edit <span style="color: #dc3545;">*</span>
+                            </label>
+                            <textarea class="form-control" 
+                                      id="editReason" 
+                                      name="edit_reason" 
+                                      rows="3"
+                                      placeholder="Please provide a reason for changing the payment date..."
+                                      required
+                                      style="border: 2px solid #e9ecef; border-radius: 6px; padding: 12px; font-size: 1rem; width: 100%; resize: vertical; min-height: 80px;"></textarea>
+                        </div>
+                        
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-weight: 600; margin-bottom: 8px; color: #495057; display: block;">
+                                <i class="fas fa-info-circle"></i> Note
+                            </label>
+                            <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 15px; font-size: 0.9rem; color: #6c757d; line-height: 1.4;">
+                                <i class="fas fa-exclamation-triangle" style="color: #ffc107; margin-right: 8px;"></i>
+                                You can only edit the payment date. Amount changes require Finance Admin approval. A reason is required for all edits.
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer" style="padding: 20px 25px; border-top: 1px solid #e9ecef; background: #f8f9fa; border-radius: 0 0 8px 8px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditInstallmentModal()" style="margin-right: 10px; padding: 8px 16px; border-radius: 4px;">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-warning" id="submitEditBtn" style="padding: 8px 16px; border-radius: 4px;">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+    
+    // Add event listener for form submission
+    document.getElementById('submitEditBtn').addEventListener('click', function() {
+        const form = document.getElementById('editInstallmentForm');
+        const formData = new FormData(form);
+        formData.append('schedule_id', scheduleId);
+        // Note: amount is not included as it cannot be changed
+        
+        // Validate required fields
+        const reason = document.getElementById('editReason').value.trim();
+        if (!reason) {
+            alert('Please provide a reason for editing the payment date.');
+            return;
+        }
+        
+        const submitBtn = this;
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        submitBtn.disabled = true;
+        
+        fetch('{{ url_for("edit_installment", request_id=request.request_id) }}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                closeEditInstallmentModal();
+                // Reload the page to show updated data
+                window.location.reload();
+            } else {
+                alert('Error: ' + (data.message || 'Failed to update installment'));
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating installment. Please try again.');
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        });
+    });
+}
+
+function closeEditInstallmentModal() {
+    const modal = document.getElementById('editInstallmentModal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = 'auto';
+    }
+}
+
+function showEditHistory(scheduleId) {
+    // Create a modal for showing edit history
+    const modal = document.createElement('div');
+    modal.id = 'editHistoryModal';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-container" style="max-width: 700px;">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(45deg, #007bff, #6f42c1); color: white; padding: 15px 20px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center;">
+                    <h5 class="modal-title" style="margin: 0; font-size: 1.2rem;">
+                        <i class="fas fa-history"></i> Edit History
+                    </h5>
+                    <button type="button" class="close-btn" onclick="closeEditHistoryModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; padding: 0; margin: 0;">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" style="padding: 25px;">
+                    <div id="editHistoryContent">
+                        <div style="text-align: center; padding: 20px;">
+                            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: #007bff;"></i>
+                            <p style="margin-top: 10px; color: #6c757d;">Loading edit history...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding: 15px 20px; border-top: 1px solid #e9ecef; background: #f8f9fa; border-radius: 0 0 8px 8px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditHistoryModal()" style="padding: 8px 16px; border-radius: 4px;">
+                        <i class="fas fa-times"></i> Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+    
+    // Fetch edit history
+    fetch(`/api/installment/${scheduleId}/edit-history`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayEditHistory(data.edit_history, data.installment_info);
+            } else {
+                document.getElementById('editHistoryContent').innerHTML = `
+                    <div style="text-align: center; padding: 20px; color: #dc3545;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                        <p>Error loading edit history: ${data.message}</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('editHistoryContent').innerHTML = `
+                <div style="text-align: center; padding: 20px; color: #dc3545;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                    <p>Error loading edit history. Please try again.</p>
+                </div>
+            `;
+        });
+}
+
+function displayEditHistory(editHistory, installmentInfo) {
+    const content = document.getElementById('editHistoryContent');
+    
+    if (editHistory.length === 0) {
+        content.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #6c757d;">
+                <i class="fas fa-info-circle" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                <p>No edit history found for this installment.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let historyHtml = `
+        <div style="margin-bottom: 20px;">
+            <h6 style="color: #495057; margin-bottom: 10px;">
+                <i class="fas fa-calendar-alt"></i> Installment Information
+            </h6>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; border-left: 4px solid #007bff;">
+                <p style="margin: 0; font-weight: 600;">Current Payment Date: ${installmentInfo.payment_date}</p>
+                <p style="margin: 5px 0 0 0; color: #6c757d;">Amount: OMR ${installmentInfo.amount}</p>
+            </div>
+        </div>
+        
+        <h6 style="color: #495057; margin-bottom: 15px;">
+            <i class="fas fa-history"></i> Edit History (${editHistory.length} edit${editHistory.length !== 1 ? 's' : ''})
+        </h6>
+    `;
+    
+    editHistory.forEach((edit, index) => {
+        const isLatest = index === 0;
+        historyHtml += `
+            <div style="background: ${isLatest ? '#e8f5e8' : '#f8f9fa'}; 
+                        border: 1px solid ${isLatest ? '#28a745' : '#e9ecef'}; 
+                        border-radius: 6px; 
+                        padding: 15px; 
+                        margin-bottom: 10px;
+                        border-left: 4px solid ${isLatest ? '#28a745' : '#007bff'};">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                    <div>
+                        <span style="font-weight: 600; color: #495057;">Edit #${editHistory.length - index}</span>
+                        ${isLatest ? '<span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7rem; margin-left: 8px;">Latest</span>' : ''}
+                    </div>
+                    <span style="color: #6c757d; font-size: 0.9rem;">${edit.created_at}</span>
+                </div>
+                
+                <div style="margin-bottom: 10px;">
+                    <strong>Edited by:</strong> ${edit.edited_by}
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
+                    <div>
+                        <strong style="color: #dc3545;">Previous Date:</strong><br>
+                        <span style="color: #6c757d;">${edit.old_payment_date}</span>
+                    </div>
+                    <div>
+                        <strong style="color: #28a745;">New Date:</strong><br>
+                        <span style="color: #6c757d;">${edit.new_payment_date}</span>
+                    </div>
+                </div>
+                
+                ${edit.edit_reason ? `
+                    <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 8px; margin-top: 10px;">
+                        <strong>Reason:</strong> ${edit.edit_reason}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    });
+    
+    content.innerHTML = historyHtml;
+}
+
+function closeEditHistoryModal() {
+    const modal = document.getElementById('editHistoryModal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = 'auto';
+    }
+}
+
 // Add event listeners for installment action buttons
 document.addEventListener('DOMContentLoaded', function() {
     // Mark as Paid button event listener
@@ -1947,6 +2278,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const scheduleId = button.getAttribute('data-schedule-id');
             const paymentDate = button.getAttribute('data-payment-date');
             uploadInstallmentReceipt(scheduleId, paymentDate);
+        }
+    });
+    
+    // Edit Installment button event listener
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.edit-installment-btn')) {
+            const button = e.target.closest('.edit-installment-btn');
+            const scheduleId = button.getAttribute('data-schedule-id');
+            const paymentDate = button.getAttribute('data-payment-date');
+            const amount = button.getAttribute('data-amount');
+            editInstallment(scheduleId, paymentDate, amount);
         }
     });
 });
@@ -2055,7 +2397,7 @@ document.addEventListener('keydown', function(event) {
     background: white;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    max-width: 500px;
+    max-width: 600px;
     width: 90%;
     max-height: 90vh;
     overflow-y: auto;

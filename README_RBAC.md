@@ -63,6 +63,7 @@ This document describes who can view what, who can approve/reject, and how a pay
     - **Additional**: Pending Manager Approval (only for their own requests)
     - **Additional**: Rejected by Manager (only for their own requests)
   - **Approve/Reject**: None
+  - **Edit**: Payment date for their own recurring payment request installments only
 
 ### IT Department
 - **IT Department Manager**
@@ -82,6 +83,7 @@ For each listed department below, the rules are analogous:
 - Department Staff (PR, Maintenance, Marketing, Logistic, HR, Quality Control, Procurement, Customer Service, Project)
   - **View**: Each user will only see their own requests
   - **Approve/Reject**: None
+  - **Edit**: Payment date for their own recurring payment request installments only
 
 Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Quality Control, Procurement, Customer Service, Project.
 
@@ -110,6 +112,7 @@ Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Qual
 - **Updates on their own requests** (status changes, approvals, rejections, etc.)
 - **Proof uploaded** notifications
 - **Recurring payment due** notifications
+- **Installment date edited** notifications (when requestors edit payment dates)
 - **System-wide notifications** (all types)
 - **Additional for Abdalaziz**: Updates on Finance Staff, General Manager, and Operation Manager requests (including rejections)
 
@@ -153,6 +156,22 @@ Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Qual
 ### **Department Staff (All departments)**
 - **Updates on their own requests** only (status changes, approvals, rejections, etc.)
 - **Recurring payment due** notifications for their own requests
+- **Edit payment date** for their own recurring payment request installments only
+
+### **Installment Edit Notifications**
+When requestors edit payment dates for recurring payment installments:
+
+- **Finance Admin receives**: "Installment Date Edited" notification with details of the change
+- **Notification includes**: Original date, new date, requestor name, and request ID
+- **Automatic cleanup**: Old payment due notifications for the original date are automatically removed
+- **Smart payment due**: If the new date is today, immediate payment due notifications are sent to Finance Admin and Finance Staff
+- **Prevents duplicates**: System ensures no notifications are sent on the old (pre-edited) date
+
+### **Payment Due Notification Behavior**
+- **Uses edited dates**: Payment due notifications are based on the current (edited) date, not the original date
+- **Acknowledges edits**: Messages include "Date was recently edited" when applicable
+- **Clean notifications**: Old date notifications are automatically cleaned up when dates are edited
+- **Immediate alerts**: Same-day edits trigger immediate payment due notifications
 
 ### **System-Wide Notifications**
 These are notifications that affect the entire system or multiple users:

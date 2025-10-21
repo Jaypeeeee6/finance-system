@@ -198,6 +198,7 @@ class RecurringPaymentSchedule(db.Model):
     is_paid = db.Column(db.Boolean, default=False)  # Whether this specific payment has been made
     paid_date = db.Column(db.Date)  # When this payment was actually made
     receipt_path = db.Column(db.String(255))  # Receipt file path for this installment
+    has_been_edited = db.Column(db.Boolean, default=False)  # Whether this installment has been edited
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationship to the main payment request
@@ -233,4 +234,43 @@ class LateInstallment(db.Model):
     
     def __repr__(self):
         return f'<LateInstallment {self.id} - Request {self.request_id} - {self.payment_date}>'
+
+
+class InstallmentEditHistory(db.Model):
+    """Track edit history for recurring payment installments"""
+    __tablename__ = 'installment_edit_history'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    schedule_id = db.Column(db.Integer, db.ForeignKey('recurring_payment_schedules.schedule_id'), nullable=False)
+    request_id = db.Column(db.Integer, db.ForeignKey('payment_requests.request_id'), nullable=False)
+    edited_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    old_payment_date = db.Column(db.Date, nullable=False)
+    new_payment_date = db.Column(db.Date, nullable=False)
+    old_amount = db.Column(db.Numeric(12, 3), nullable=False)
+    new_amount = db.Column(db.Numeric(12, 3), nullable=False)
+    edit_reason = db.Column(db.Text)  # Optional reason for the edit
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    schedule = db.relationship('RecurringPaymentSchedule', backref='edit_history')
+    request = db.relationship('PaymentRequest', backref='installment_edit_history')
+    edited_by = db.relationship('User', backref='installment_edits')
+    
+    def to_dict(self):
+        """Convert edit history to dictionary"""
+        return {
+            'id': self.id,
+            'schedule_id': self.schedule_id,
+            'request_id': self.request_id,
+            'edited_by': self.edited_by.name if self.edited_by else 'Unknown',
+            'old_payment_date': self.old_payment_date.strftime('%Y-%m-%d') if self.old_payment_date else None,
+            'new_payment_date': self.new_payment_date.strftime('%Y-%m-%d') if self.new_payment_date else None,
+            'old_amount': float(self.old_amount),
+            'new_amount': float(self.new_amount),
+            'edit_reason': self.edit_reason,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
+    
+    def __repr__(self):
+        return f'<InstallmentEditHistory {self.id} - Schedule {self.schedule_id} - Edited by {self.edited_by.name if self.edited_by else "Unknown"}>'
 

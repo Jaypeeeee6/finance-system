@@ -6,7 +6,7 @@ from functools import wraps
 import os
 from datetime import datetime, date, timedelta
 import re
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment
+from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory
 from config import Config
 
 # Initialize Flask app
@@ -678,7 +678,7 @@ def get_notifications_for_user(user):
                 db.and_(
                     Notification.user_id == user.user_id,
                     db.or_(
-                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                         Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                     )
                 )
@@ -689,7 +689,7 @@ def get_notifications_for_user(user):
                 db.and_(
                     Notification.user_id == user.user_id,
                     db.or_(
-                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                         Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                     )
                 )
@@ -698,7 +698,7 @@ def get_notifications_for_user(user):
             return Notification.query.filter(
                 db.and_(
                     Notification.user_id == user.user_id,
-                    Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
+                    Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
                 )
             ).order_by(Notification.created_at.desc()).limit(5).all()
     
@@ -800,7 +800,7 @@ def get_unread_count_for_user(user):
                     Notification.user_id == user.user_id,
                     Notification.is_read == False,
                     db.or_(
-                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                         Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                     )
                 )
@@ -812,7 +812,7 @@ def get_unread_count_for_user(user):
                     Notification.user_id == user.user_id,
                     Notification.is_read == False,
                     db.or_(
-                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                         Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                     )
                 )
@@ -822,7 +822,7 @@ def get_unread_count_for_user(user):
                 db.and_(
                     Notification.user_id == user.user_id,
                     Notification.is_read == False,
-                    Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
+                    Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
                 )
             ).count()
     
@@ -2020,10 +2020,12 @@ def view_request(request_id):
                 schedule_rows.append({
                     'schedule_id': entry.schedule_id,
                     'date': entry.payment_date,
+                    'payment_date': entry.payment_date,  # Add both for compatibility
                     'amount': entry.amount,
                     'is_paid': is_paid,
                     'is_late': is_late,
-                    'receipt_path': entry.receipt_path
+                    'receipt_path': entry.receipt_path,
+                    'has_been_edited': entry.has_been_edited
                 })
     
     # Determine the manager's name for display
@@ -3224,6 +3226,152 @@ def upload_installment_receipt(request_id):
         flash('Error uploading receipt.', 'error')
     
     return redirect(url_for('view_request', request_id=request_id))
+
+
+@app.route('/request/<int:request_id>/edit_installment', methods=['POST'])
+@login_required
+def edit_installment(request_id):
+    """Edit installment details (Requestor only)"""
+    try:
+        # Get the request
+        req = PaymentRequest.query.get_or_404(request_id)
+        
+        # Check if user is the requestor
+        if req.user_id != current_user.user_id:
+            return jsonify({'success': False, 'message': 'You can only edit your own request installments.'}), 403
+        
+        # Check if request is recurring
+        if req.status != 'Recurring':
+            return jsonify({'success': False, 'message': 'Can only edit installments for recurring payments.'}), 400
+        
+        # Get form data
+        schedule_id = request.form.get('schedule_id')
+        new_payment_date = request.form.get('payment_date')
+        edit_reason = request.form.get('edit_reason', '').strip()
+        
+        if not all([schedule_id, new_payment_date, edit_reason]):
+            return jsonify({'success': False, 'message': 'Missing required fields. Please provide a reason for the edit.'}), 400
+        
+        # Get the schedule entry
+        schedule_entry = RecurringPaymentSchedule.query.get(int(schedule_id))
+        if not schedule_entry or schedule_entry.request_id != request_id:
+            return jsonify({'success': False, 'message': 'Installment not found.'}), 404
+        
+        # Check if installment is already paid
+        if schedule_entry.is_paid:
+            return jsonify({'success': False, 'message': 'Cannot edit paid installments.'}), 400
+        
+        # Validate date
+        try:
+            payment_date = datetime.strptime(new_payment_date, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'success': False, 'message': 'Invalid date format.'}), 400
+        
+        # Store original values for logging and history
+        original_date = schedule_entry.payment_date
+        original_amount = schedule_entry.amount
+        
+        # Update only the payment date (amount cannot be changed)
+        schedule_entry.payment_date = payment_date
+        schedule_entry.has_been_edited = True
+        
+        # Create edit history record
+        edit_history = InstallmentEditHistory(
+            schedule_id=schedule_entry.schedule_id,
+            request_id=request_id,
+            edited_by_user_id=current_user.user_id,
+            old_payment_date=original_date,
+            new_payment_date=payment_date,
+            old_amount=original_amount,
+            new_amount=original_amount,  # Amount doesn't change
+            edit_reason=edit_reason
+        )
+        db.session.add(edit_history)
+        
+        # Log the changes
+        log_action(f"Edited installment {schedule_id} for request #{request_id}: Payment date changed from {original_date} to {payment_date}")
+        
+        # Clean up any existing notifications for the old date
+        # This prevents notifications from being sent on the old date
+        old_date_notifications = Notification.query.filter(
+            Notification.request_id == request_id,
+            Notification.notification_type == 'recurring_due',
+            Notification.message.contains(str(original_date))
+        ).all()
+        
+        for notification in old_date_notifications:
+            db.session.delete(notification)
+        
+        # Send notification to Finance Admin about the edit
+        finance_admin_users = User.query.filter_by(role='Finance Admin').all()
+        for admin in finance_admin_users:
+            create_notification(
+                user_id=admin.user_id,
+                title="Installment Date Edited",
+                message=f"Recurring request #{request_id} installment payment date has been edited from {original_date} to {payment_date} by {current_user.name}",
+                notification_type='installment_edited',
+                request_id=request_id
+            )
+        
+        # If the new date is today, create immediate notifications
+        if payment_date == date.today():
+            # Create notifications for Finance Admin and Finance Staff about the payment due today
+            finance_users = User.query.filter(User.role.in_(['Finance Admin', 'Finance Staff'])).all()
+            for user in finance_users:
+                create_notification(
+                    user_id=user.user_id,
+                    title="Recurring Payment Due",
+                    message=f'Recurring payment due today for {req.request_type} - {req.purpose} (Amount: {schedule_entry.amount} OMR) - Date was recently edited',
+                    notification_type='recurring_due',
+                    request_id=request_id
+                )
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Installment updated successfully.'})
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error editing installment: {str(e)}")
+        return jsonify({'success': False, 'message': 'Error updating installment.'}), 500
+
+
+@app.route('/api/installment/<int:schedule_id>/edit-history', methods=['GET'])
+@login_required
+def get_installment_edit_history(schedule_id):
+    """Get edit history for a specific installment"""
+    try:
+        # Get the schedule entry
+        schedule_entry = RecurringPaymentSchedule.query.get(schedule_id)
+        if not schedule_entry:
+            return jsonify({'success': False, 'message': 'Installment not found.'}), 404
+        
+        # Check if user has permission to view this installment
+        if schedule_entry.request.user_id != current_user.user_id and current_user.role not in ['Finance Admin', 'Finance Staff', 'GM', 'IT Staff', 'Operation Manager']:
+            return jsonify({'success': False, 'message': 'You do not have permission to view this installment.'}), 403
+        
+        # Get edit history for this installment
+        edit_history = InstallmentEditHistory.query.filter_by(
+            schedule_id=schedule_id
+        ).order_by(InstallmentEditHistory.created_at.desc()).all()
+        
+        # Convert to dictionary format
+        history_data = [edit.to_dict() for edit in edit_history]
+        
+        return jsonify({
+            'success': True, 
+            'edit_history': history_data,
+            'installment_info': {
+                'schedule_id': schedule_entry.schedule_id,
+                'payment_date': schedule_entry.payment_date.strftime('%Y-%m-%d'),
+                'amount': float(schedule_entry.amount),
+                'has_been_edited': schedule_entry.has_been_edited
+            }
+        })
+        
+    except Exception as e:
+        print(f"Error fetching installment edit history: {str(e)}")
+        return jsonify({'success': False, 'message': 'Error fetching edit history.'}), 500
 
 
 # ==================== REPORTS ROUTES ====================
