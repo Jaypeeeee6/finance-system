@@ -1150,7 +1150,7 @@ def dashboard():
     elif role in ['HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 
                   'Customer Service Staff', 'Marketing Staff', 'Operation Staff', 
                   'Quality Control Staff', 'Research and Development Staff', 
-                  'Office Staff', 'Maintenance Staff', 'Procurement Staff']:
+                  'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff']:
         return redirect(url_for('department_dashboard'))
     else:
         # Fallback for any unrecognized roles
@@ -1164,7 +1164,7 @@ def dashboard():
     # Department-specific Staff roles (excluding Finance Staff, Project Staff, and IT Staff who have their own dashboards)
     'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff',
     'Customer Service Staff', 'Marketing Staff', 'Operation Staff', 'Quality Control Staff',
-    'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff',
+    'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff',
     # Other roles that can access this dashboard
     'Department Manager', 'Operation Manager'
 )
@@ -3910,8 +3910,8 @@ def reports():
     
     # Role-based department filtering
     if current_user.role == 'Operation Manager':
-        # Operation Manager can only see Maintenance, Operation, Project Department, and Procurement
-        query = query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project Department', 'Procurement']))
+        # Operation Manager can only see Maintenance, Operation, Project Department, Procurement, and Logistic
+        query = query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project Department', 'Procurement', 'Logistic']))
     
     if department_filter:
         query = query.filter_by(department=department_filter)
@@ -3942,7 +3942,7 @@ def reports():
     # Get unique departments for filter
     if current_user.role == 'Operation Manager':
         # Operation Manager can only see specific departments
-        departments = ['Maintenance', 'Operation', 'Project Department', 'Procurement']
+        departments = ['Maintenance', 'Operation', 'Project Department', 'Procurement', 'Logistic']
     else:
         # Other roles can see all departments
         departments = db.session.query(PaymentRequest.department).distinct().all()
@@ -3995,8 +3995,8 @@ def export_reports_pdf():
     
     # Role-based department filtering
     if current_user.role == 'Operation Manager':
-        # Operation Manager can only see Maintenance, Operation, Project Department, and Procurement
-        query = query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project Department', 'Procurement']))
+        # Operation Manager can only see Maintenance, Operation, Project Department, Procurement, and Logistic
+        query = query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project Department', 'Procurement', 'Logistic']))
     
     if department_filter:
         query = query.filter_by(department=department_filter)
