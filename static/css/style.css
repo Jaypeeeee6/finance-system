@@ -2845,6 +2845,12 @@ input:checked + .toggle-slider:before {
     color: #adb5bd;
 }
 
+.step-tab.warning .step-tab-content {
+    background: #ffc107;
+    color: #212529;
+    font-weight: 600;
+}
+
 .step-content {
     display: none;
     padding: 2rem;

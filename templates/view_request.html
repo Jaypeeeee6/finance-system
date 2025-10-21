@@ -122,7 +122,7 @@
                     Manager Approval
                 </div>
             </li>
-            <li class="step-tab {% if request.status == 'Rejected by Finance' %}rejected{% elif request.status in ['Completed', 'Paid', 'Recurring'] %}completed{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'] %}warning{% elif request.status == 'Pending Finance Approval' %}active{% else %}disabled{% endif %}" data-step="finance">
+            <li class="step-tab {% if request.status == 'Rejected by Finance' %}rejected{% elif request.status in ['Proof Pending', 'Proof Sent'] and request.recurring == 'Recurring' %}warning{% elif request.status in ['Completed', 'Paid', 'Recurring'] %}completed{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'] %}warning{% elif request.status == 'Pending Finance Approval' %}active{% else %}disabled{% endif %}" data-step="finance">
                 <div class="step-tab-content">
                     Finance Admin Approval
                 </div>
@@ -1648,6 +1648,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Set initial active tab based on request status
     const requestStatus = '{{ request.status }}';
+    const requestRecurring = '{{ request.recurring }}';
     let initialStep = 'submit';
     
     // Check for URL parameter to override initial step
@@ -1734,6 +1735,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (requestDetailsSection) {
                 requestDetailsSection.style.display = 'none';
             }
+        } else if (['Proof Pending', 'Proof Sent'].includes(requestStatus) && requestRecurring === 'Recurring') {
+            financeTab.classList.remove('completed', 'active', 'disabled');
+            financeTab.classList.add('warning');
         } else if (['Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'].includes(requestStatus)) {
             financeTab.classList.remove('warning', 'active', 'disabled');
             financeTab.classList.add('completed');
