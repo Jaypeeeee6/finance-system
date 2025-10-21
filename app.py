@@ -1317,7 +1317,7 @@ def admin_dashboard():
     
     # Build query with optional status, department, and search filters
     # Finance Admin can see finance-related statuses + Pending Manager Approval from Finance Staff, GM, and Operation Manager
-    finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Recurring', 'Completed', 'Rejected by Finance']
+    finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
     
     # For Abdalaziz, also include Pending Manager Approval requests from Finance Staff, GM, and Operation Manager
     if current_user.name == 'Abdalaziz Hamood Al Brashdi':
@@ -1419,7 +1419,7 @@ def finance_dashboard():
     # Build query with optional department and search filters
     # Finance Staff can see finance-related statuses + their own requests with Pending Manager Approval + their own requests with Rejected by Manager
     # Abdalaziz can see finance-related statuses + Pending Manager Approval + Rejected by Manager for Finance Staff, GM, and Operation Manager
-    finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Recurring', 'Completed', 'Rejected by Finance']
+    finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
     
     # Base query for finance-related statuses
     query = PaymentRequest.query.filter(PaymentRequest.status.in_(finance_statuses))
@@ -2329,7 +2329,7 @@ def view_request(request_id):
             return redirect(url_for('dashboard'))
     elif current_user.role in ['Finance Admin', 'Finance Staff']:
         # Finance users can only view requests in finance-related statuses
-        finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Recurring', 'Completed', 'Rejected by Finance']
+        finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
         
         # For Abdalaziz, also allow viewing Pending Manager Approval and Rejected by Manager requests from Finance Staff, GM, and Operation Manager
         if current_user.name == 'Abdalaziz Hamood Al Brashdi' and req.status in ['Pending Manager Approval', 'Rejected by Manager']:
@@ -2603,6 +2603,17 @@ def approve_request(request_id):
                         notification_type="installment_paid",
                         request_id=request_id
                     )
+                    
+                    # Also notify Finance Admin and Finance Staff
+                    finance_users = User.query.filter(User.role.in_(['Finance Staff', 'Finance Admin'])).all()
+                    for user in finance_users:
+                        create_notification(
+                            user_id=user.user_id,
+                            title="First Installment Paid",
+                            message=f'First installment for {first_installment.payment_date} has been automatically marked as paid (Amount: {first_installment.amount} OMR)',
+                            notification_type="installment_paid",
+                            request_id=request_id
+                        )
                 
                 flash(f'Recurring payment request #{request_id} approved. First installment automatically marked as paid. Payment schedule will be managed.', 'success')
                 log_action(f"Approved recurring payment request #{request_id} - No proof required - First installment marked as paid")
@@ -2757,6 +2768,17 @@ def approve_request(request_id):
                     notification_type="installment_paid",
                     request_id=request_id
                 )
+                
+                # Also notify Finance Admin and Finance Staff
+                finance_users = User.query.filter(User.role.in_(['Finance Staff', 'Finance Admin'])).all()
+                for user in finance_users:
+                    create_notification(
+                        user_id=user.user_id,
+                        title="First Installment Paid",
+                        message=f'First installment for {first_installment.payment_date} has been automatically marked as paid (Amount: {first_installment.amount} OMR)',
+                        notification_type="installment_paid",
+                        request_id=request_id
+                    )
             
             req.updated_at = current_time
             db.session.commit()
@@ -3615,6 +3637,17 @@ def mark_installment_paid_finance(request_id):
             notification_type="installment_paid",
             request_id=request_id
         )
+        
+        # Also notify Finance Admin and Finance Staff
+        finance_users = User.query.filter(User.role.in_(['Finance Staff', 'Finance Admin'])).all()
+        for user in finance_users:
+            create_notification(
+                user_id=user.user_id,
+                title="Installment Paid",
+                message=f'Installment for {payment_date} has been marked as paid (Amount: {schedule_entry.amount} OMR)',
+                notification_type="installment_paid",
+                request_id=request_id
+            )
         
         db.session.commit()
         
