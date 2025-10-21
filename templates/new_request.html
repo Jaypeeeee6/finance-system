@@ -738,6 +738,9 @@ function switchToMonthly() {
     
     // Initialize calendar for monthly mode
     initializeCalendar();
+    
+    // Update amount summary to ensure proper button state
+    updateAmountSummary();
     updateSchedulePreview();
 }
 
@@ -752,7 +755,31 @@ function switchToCustom() {
     
     // Initialize custom dates if not already done
     if (document.getElementById('customDatesList').children.length === 0) {
-        showCustomDatesEmpty();
+        if (customDates && customDates.length > 0) {
+            // Create DOM elements for existing custom dates
+            customDates.forEach((dateObj, index) => {
+                const customDatesList = document.getElementById('customDatesList');
+                const dateItem = document.createElement('div');
+                dateItem.className = 'custom-date-item';
+                dateItem.id = dateObj.id;
+                
+                // Use the correct index for event handlers
+                const currentIndex = index;
+                dateItem.innerHTML = `
+                    <span class="date-label">Date:</span>
+                    <input type="date" id="${dateObj.id}_date" value="${dateObj.date}" onchange="updateCustomDate(${currentIndex})">
+                    <span class="amount-label">Amount:</span>
+                    <input type="number" id="${dateObj.id}_amount" value="${dateObj.amount}" step="0.001" min="0" onchange="updateCustomDate(${currentIndex})" onkeydown="handleAmountKeyPress(event, ${currentIndex})">
+                    <button type="button" class="btn-remove-date" onclick="removeCustomDate('${dateObj.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                `;
+                
+                customDatesList.appendChild(dateItem);
+            });
+        } else {
+            showCustomDatesEmpty();
+        }
     }
     
     // Update custom amount summary (this will also update button state)
@@ -895,6 +922,24 @@ function updateCustomAmountSummary() {
         }
     }
     
+    // Check if total allocated doesn't match the total amount
+    const isMismatch = totalAmount > 0 && Math.abs(totalAllocated - totalAmount) > 0.001;
+    
+    // Enable/disable Save Configuration button based on amount match
+    // Only disable if we're not in post-save mode (i.e., during active editing)
+    const saveButton = document.querySelector('button[onclick="saveRecurringConfig()"]');
+    if (saveButton && !window.isPostSaveMode) {
+        if (isMismatch) {
+            saveButton.disabled = true;
+            saveButton.style.opacity = '0.5';
+            saveButton.style.cursor = 'not-allowed';
+        } else {
+            saveButton.disabled = false;
+            saveButton.style.opacity = '1';
+            saveButton.style.cursor = 'pointer';
+        }
+    }
+    
     // Enable/disable Add Date button based on remaining amount
     const addDateButton = document.querySelector('.btn-add-date');
     if (addDateButton) {
@@ -939,6 +984,7 @@ function clearSavedPreferences() {
     // Clear saved preferences from localStorage
     localStorage.removeItem('paymentScheduleInterval');
     localStorage.removeItem('paymentScheduleStartDate');
+    localStorage.removeItem('customPaymentDates');
     
     // Reset the form to defaults
     document.getElementById('intervalValue').value = '1';
@@ -954,6 +1000,10 @@ function clearSavedPreferences() {
     document.querySelectorAll('#monthlyOptions .calendar-day.selected').forEach(day => {
         day.classList.remove('selected');
     });
+    
+    // Clear custom dates
+    customDates = [];
+    document.getElementById('customDatesList').innerHTML = '';
     
     updateSchedulePreview();
     
@@ -1021,14 +1071,88 @@ function loadExistingConfig() {
     const config = document.getElementById('recurring_interval').value || tempRecurringConfig;
     console.log('Loading config:', config);
     
-    // Only load saved preferences if there's no existing configuration
-    // This prevents new payment requests from inheriting previous choices
+    // Load saved preferences if there's no existing configuration
     if (!config) {
-        console.log('No existing config, starting fresh...');
+        console.log('No existing config, loading saved preferences...');
         
-        // Don't automatically load saved preferences for new requests
-        // User can click "Start Fresh" if they want to use saved preferences
-        console.log('Starting with default values - no saved preferences loaded');
+        // Load saved preferences from localStorage
+        const savedInterval = localStorage.getItem('paymentScheduleInterval');
+        const savedStartDate = localStorage.getItem('paymentScheduleStartDate');
+        
+        if (savedInterval) {
+            console.log('Loading saved interval:', savedInterval);
+            document.getElementById('intervalValue').value = savedInterval;
+        }
+        
+        if (savedStartDate) {
+            console.log('Loading saved start date:', savedStartDate);
+            // Parse and set the saved start date
+            const date = new Date(savedStartDate);
+            if (!isNaN(date.getTime())) {
+                selectedDates = [{
+                    year: date.getFullYear(),
+                    month: date.getMonth(),
+                    day: date.getDate()
+                }];
+                updateCalendar();
+            }
+        }
+        
+               // Load saved custom dates if any
+               const savedCustomDates = localStorage.getItem('customPaymentDates');
+               if (savedCustomDates) {
+                   try {
+                       const customDatesData = JSON.parse(savedCustomDates);
+                       if (Array.isArray(customDatesData) && customDatesData.length > 0) {
+                           customDates = customDatesData;
+                           // Note: DOM elements will be created when switching to custom tab
+                           switchToCustom();
+                       }
+                   } catch (e) {
+                       console.log('Error loading saved custom dates:', e);
+                   }
+               }
+        
+        // Load variable amounts state and payment schedule data
+        const savedVariableAmounts = localStorage.getItem('variableAmountsEnabled');
+        const savedPaymentSchedule = localStorage.getItem('paymentScheduleData');
+        
+        if (savedVariableAmounts === 'true') {
+            console.log('Loading saved variable amounts configuration');
+            
+            // Enable variable amounts toggle
+            const variableAmountsToggle = document.getElementById('variableAmountsToggle');
+            if (variableAmountsToggle) {
+                variableAmountsToggle.checked = true;
+                toggleVariableAmounts();
+            }
+            
+            // Load payment schedule data
+            if (savedPaymentSchedule) {
+                try {
+                    const paymentSchedule = JSON.parse(savedPaymentSchedule);
+                    console.log('Loading saved payment schedule:', paymentSchedule);
+                    
+                    // Set the payment schedule field
+                    document.getElementById('payment_schedule').value = savedPaymentSchedule;
+                    
+                    // Store the payment schedule for later use
+                    window.savedPaymentSchedule = paymentSchedule;
+                    
+                    // Generate payment inputs after a delay to ensure the modal is fully loaded
+                    setTimeout(() => {
+                        if (window.savedPaymentSchedule) {
+                            generatePaymentAmountInputsFromSchedule(window.savedPaymentSchedule);
+                            updateAmountSummary();
+                        }
+                    }, 300);
+                } catch (e) {
+                    console.log('Error loading saved payment schedule:', e);
+                }
+            }
+        }
+        
+        console.log('Saved preferences loaded successfully');
     } else {
         console.log('Existing config found, loading from config...');
         
@@ -1041,16 +1165,14 @@ function loadExistingConfig() {
             // Load custom configuration
             console.log('Loading custom configuration');
             
-            // Switch to custom tab
-            switchToCustom();
-            
             // Clear existing custom dates
             customDates = [];
             document.getElementById('customDatesList').innerHTML = '';
             
             // Load custom dates from config
             if (parts.length > 1) {
-                const customDatesString = parts[1];
+                // Join all parts after the first one (frequency) to get the full custom dates string
+                const customDatesString = parts.slice(1).join(':');
                 const customDatesArray = customDatesString.split(',');
                 
                 customDatesArray.forEach((dateAmountPair, index) => {
@@ -1063,32 +1185,18 @@ function loadExistingConfig() {
                             date: date,
                             amount: parseFloat(amount) || 0
                         });
-                        
-                        // Create DOM element
-                        const customDatesList = document.getElementById('customDatesList');
-                        const dateItem = document.createElement('div');
-                        dateItem.className = 'custom-date-item';
-                        dateItem.id = dateId;
-                        
-                        dateItem.innerHTML = `
-                            <span class="date-label">Date:</span>
-                            <input type="date" id="${dateId}_date" value="${date}" onchange="updateCustomDate(${customDates.length - 1})">
-                            <span class="amount-label">Amount:</span>
-                            <input type="number" id="${dateId}_amount" value="${amount}" step="0.001" min="0" onchange="updateCustomDate(${customDates.length - 1})" onkeydown="handleAmountKeyPress(event, ${customDates.length - 1})">
-                            <button type="button" class="btn-remove-date" onclick="removeCustomDate('${dateId}')">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        `;
-                        
-                        customDatesList.appendChild(dateItem);
                     }
                 });
             }
             
-            // Update preview
+            // Switch to custom tab AFTER populating customDates array
+            switchToCustom();
+            
+            // Update preview and amount summary after all DOM elements are created
             setTimeout(() => {
                 updateSchedulePreview();
-            }, 100);
+                updateCustomAmountSummary();
+            }, 200);
             
         } else {
             // Load monthly configuration
@@ -1125,6 +1233,28 @@ function loadExistingConfig() {
                 setTimeout(() => {
                     updateSchedulePreview();
                 }, 100);
+            } else if (frequency === 'monthly' && parts[2] === 'date') {
+                // Handle single date configuration
+                const dateString = parts[3];
+                const [year, month, day] = dateString.split('-').map(num => parseInt(num));
+                
+                // Set the correct month and year
+                document.getElementById('yearSelect').value = year;
+                document.getElementById('monthSelect').value = month - 1; // Convert to 0-based
+                
+                // Add the single date to selectedDates
+                selectedDates = [{
+                    year: year,
+                    month: month - 1, // Convert to 0-based
+                    day: day
+                }];
+                
+                updateCalendarDays();
+                
+                // Update preview
+                setTimeout(() => {
+                    updateSchedulePreview();
+                }, 100);
             }
             
             // Load end date if it exists
@@ -1133,23 +1263,59 @@ function loadExistingConfig() {
                 const endDate = parts[endDateIndex + 1];
                 console.log('Loading end date:', endDate);
                 
-                // Parse end date and set the selectors (always 30th)
+                // Parse end date and set the selectors
                 const [year, month] = endDate.split('-').map(num => parseInt(num));
                 document.getElementById('endDateToggle').checked = true;
                 document.getElementById('endDateSection').style.display = 'block';
                 
+                // Populate end year options BEFORE setting the values
+                populateEndYearOptions();
+                
                 // Set the month and year for end date
                 document.getElementById('endMonthSelect').value = month - 1; // Convert to 0-based
                 document.getElementById('endYearSelect').value = year;
-                
-                // Initialize end date selectors
-                initializeEndDateSelectors();
                 
                 // Update display and preview
                 setTimeout(() => {
                     updateEndDateDisplay();
                     updateSchedulePreview();
                 }, 200);
+            }
+            
+            // Load variable amounts state and data
+            const variableAmountsFieldElement = document.getElementById('variable_amounts');
+            const paymentScheduleFieldElement = document.getElementById('payment_schedule');
+            
+            if (variableAmountsFieldElement && variableAmountsFieldElement.value === 'true') {
+                console.log('Loading variable amounts configuration');
+                
+                // Enable variable amounts toggle
+                const variableAmountsToggleElement = document.getElementById('variableAmountsToggle');
+                if (variableAmountsToggleElement) {
+                    variableAmountsToggleElement.checked = true;
+                    toggleVariableAmounts();
+                }
+                
+                // Load payment schedule data
+                if (paymentScheduleFieldElement && paymentScheduleFieldElement.value) {
+                    try {
+                        const paymentSchedule = JSON.parse(paymentScheduleFieldElement.value);
+                        console.log('Loading payment schedule:', paymentSchedule);
+                        
+                        // Store the payment schedule for later use
+                        window.savedPaymentSchedule = paymentSchedule;
+                        
+                        // Generate payment inputs after a delay to ensure the modal is fully loaded
+                        setTimeout(() => {
+                            if (window.savedPaymentSchedule) {
+                                generatePaymentAmountInputsFromSchedule(window.savedPaymentSchedule);
+                                updateAmountSummary();
+                            }
+                        }, 300);
+                    } catch (e) {
+                        console.log('Error loading payment schedule:', e);
+                    }
+                }
             }
         }
     }
@@ -1532,10 +1698,54 @@ function saveRecurringConfig() {
         const sortedDates = [...customDates].sort((a, b) => new Date(a.date) - new Date(b.date));
         const dateStrings = sortedDates.map(date => `${date.date}:${date.amount}`);
         config += dateStrings.join(',');
+        
+        // Save custom dates to localStorage for future use
+        localStorage.setItem('customPaymentDates', JSON.stringify(customDates));
     }
     
     console.log('Final config being saved:', config);
     document.getElementById('recurring_interval').value = config;
+    
+    // Save variable amounts state and payment schedule data
+    const variableAmountsToggleElement = document.getElementById('variableAmountsToggle');
+    const variableAmountsField = document.getElementById('variable_amounts');
+    const paymentScheduleField = document.getElementById('payment_schedule');
+    
+    if (variableAmountsToggleElement && variableAmountsToggleElement.checked) {
+        console.log('Saving variable amounts configuration');
+        variableAmountsField.value = 'true';
+        
+        // Update payment schedule before saving
+        updatePaymentSchedule();
+        
+        // Save variable amounts state to localStorage
+        localStorage.setItem('variableAmountsEnabled', 'true');
+        localStorage.setItem('paymentScheduleData', paymentScheduleField.value);
+    } else {
+        variableAmountsField.value = 'false';
+        paymentScheduleField.value = '[]';
+        
+        // Clear variable amounts state from localStorage
+        localStorage.removeItem('variableAmountsEnabled');
+        localStorage.removeItem('paymentScheduleData');
+    }
+    
+    // Save preferences to localStorage for future use
+    if (isMonthlyActive) {
+        const interval = document.getElementById('intervalValue').value;
+        localStorage.setItem('paymentScheduleInterval', interval);
+        
+        // Save start date if selected
+        if (selectedDates && selectedDates.length > 0) {
+            const date = selectedDates[0];
+            const startDate = {
+                year: date.year,
+                month: date.month,
+                day: date.day
+            };
+            localStorage.setItem('paymentScheduleStartDate', JSON.stringify(startDate));
+        }
+    }
     
     // Verify the config was saved
     setTimeout(() => {
@@ -1554,7 +1764,8 @@ function saveRecurringConfig() {
         // Add a small delay to ensure the configuration is properly saved
         setTimeout(() => {
             generatePaymentAmountInputs();
-            updateAmountSummary();
+            // Don't disable save button after successful save - just update amounts
+            updateAmountSummaryAfterSave();
         }, 100);
     }
     
@@ -1748,6 +1959,73 @@ function generatePaymentAmountInputs() {
     updateAmountSummary();
     
     console.log('🔧 DEBUG: generatePaymentAmountInputs - completed successfully');
+}
+
+function generatePaymentAmountInputsFromSchedule(paymentSchedule) {
+    console.log('🔧 DEBUG: generatePaymentAmountInputsFromSchedule - starting with schedule:', paymentSchedule);
+    
+    const container = document.getElementById('paymentAmountsList');
+    if (!container) {
+        console.error('Payment amounts list container not found!');
+        return;
+    }
+    
+    // Clear existing inputs
+    container.innerHTML = '';
+    
+    // Get the current amount
+    const currentAmount = document.getElementById('amount').value;
+    const totalAmount = parseAmountWithCommas(currentAmount);
+    console.log('🔧 DEBUG: generatePaymentAmountInputsFromSchedule - total amount:', totalAmount);
+    
+    if (!paymentSchedule || paymentSchedule.length === 0) {
+        console.log('🔧 DEBUG: generatePaymentAmountInputsFromSchedule - no payment schedule data');
+        return;
+    }
+    
+    // Create payment inputs for each scheduled payment
+    paymentSchedule.forEach((payment, index) => {
+        const paymentDiv = document.createElement('div');
+        paymentDiv.className = 'payment-amount-item';
+        paymentDiv.innerHTML = `
+            <div class="payment-info">
+                <label>Payment ${index + 1}:</label>
+                <span class="payment-date">${payment.date}</span>
+            </div>
+            <div class="amount-input-container">
+                <span class="currency-symbol">OMR</span>
+                <input type="number" 
+                       class="payment-amount-input" 
+                       value="${payment.amount}" 
+                       step="0.001" 
+                       min="0" 
+                       max="${totalAmount}"
+                       data-payment-date="${payment.date}"
+                       data-payment-index="${index}"
+                       onchange="validateAndUpdateAmount(this)" 
+                       onkeydown="handleVariableAmountKeyPress(event, this)">
+            </div>
+            <div class="payment-actions">
+                <button type="button" class="btn-remove-payment" onclick="removePayment(this)" title="Remove Payment">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+        
+        container.appendChild(paymentDiv);
+    });
+    
+    // Update total amount display
+    const totalAmountDisplay = document.getElementById('totalAmountDisplay');
+    if (totalAmountDisplay) {
+        totalAmountDisplay.textContent = totalAmount.toFixed(3);
+    }
+    
+    // Update add button state and amount summary
+    updateAddButtonState();
+    updateAmountSummary();
+    
+    console.log('🔧 DEBUG: generatePaymentAmountInputsFromSchedule - completed');
 }
 
 function generateDefaultDates() {
@@ -2045,8 +2323,9 @@ function updateAmountSummary() {
     }
     
     // Enable/disable Save Configuration button based on amount match
+    // Only disable if we're not in post-save mode (i.e., during active editing)
     const saveButton = document.querySelector('button[onclick="saveRecurringConfig()"]');
-    if (saveButton) {
+    if (saveButton && !window.isPostSaveMode) {
         if (isMismatch) {
             saveButton.disabled = true;
             saveButton.style.opacity = '0.5';
@@ -2063,6 +2342,59 @@ function updateAmountSummary() {
     
     // Update the add button state
     updateAddButtonState();
+}
+
+function updateAmountSummaryAfterSave() {
+    // Set post-save mode to temporarily disable amount validation
+    window.isPostSaveMode = true;
+    
+    const inputs = document.querySelectorAll('.payment-amount-input');
+    let totalAllocated = 0;
+    
+    inputs.forEach(input => {
+        const amount = parseFloat(input.value) || 0;
+        totalAllocated += amount;
+    });
+    
+    const totalAmount = parseAmountWithCommas(document.getElementById('amount').value);
+    const remaining = totalAmount - totalAllocated;
+    
+    document.getElementById('totalAllocated').textContent = totalAllocated.toFixed(3);
+    document.getElementById('remainingAmount').textContent = remaining.toFixed(3);
+    
+    // Check if total allocated doesn't match the total amount
+    const isMismatch = totalAmount > 0 && Math.abs(totalAllocated - totalAmount) > 0.001;
+    
+    if (isMismatch) {
+        // Show alert if there's a mismatch
+        const mismatchAlert = document.getElementById('amountMismatchAlert');
+        if (mismatchAlert) {
+            mismatchAlert.style.display = 'block';
+        } else {
+            // Create alert if it doesn't exist
+            createAmountMismatchAlert();
+        }
+    } else {
+        // Hide alert if amounts match
+        const mismatchAlert = document.getElementById('amountMismatchAlert');
+        if (mismatchAlert) {
+            mismatchAlert.style.display = 'none';
+        }
+    }
+    
+    // Update the payment schedule data
+    updatePaymentSchedule();
+    
+    // Update the add button state
+    updateAddButtonState();
+    
+    // After a successful save, we need to re-enable validation for future edits
+    // Set a flag to indicate we're now in "editing mode" again
+    setTimeout(() => {
+        window.isPostSaveMode = false;
+        // Re-enable amount validation for future edits
+        updateAmountSummary();
+    }, 100);
 }
 
 // Prevent form submission when Enter is pressed in recurring payment modal
