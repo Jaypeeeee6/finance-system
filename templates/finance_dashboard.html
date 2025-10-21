@@ -86,7 +86,6 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Urgent</th>
                                 <th>Type</th>
                                 <th>Requestor</th>
                                 <th>Department</th>
@@ -102,12 +101,8 @@
                             <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
                                 <td>
                                     <span>#{{ req.request_id }}</span>
-                                </td>
-                                <td>
                                     {% if req.is_urgent %}
-                                        <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px;">URGENT</span>
-                                    {% else %}
-                                        <span style="color: #999;">-</span>
+                                        <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -264,7 +259,7 @@ function filterTable() {
         
         if (cells.length >= 4) {
             const requestIdCell = cells[0]; // Request ID
-            const departmentCell = cells[4]; // Department (updated index due to new Urgent column)
+            const departmentCell = cells[3]; // Department (updated index after removing Urgent column)
             const urgentBadge = row.querySelector('[style*="background: #dc3545"]'); // URGENT badge
             
             let showRow = true;
