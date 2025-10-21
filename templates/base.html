@@ -47,6 +47,9 @@
                             </div>
                         </div>
                         <div class="notification-dropdown-footer">
+                            <button onclick="markAllAsRead()" class="btn btn-sm btn-secondary">
+                                <i class="fas fa-check-double"></i> Mark All as Read
+                            </button>
                             <a href="{{ url_for('notifications') }}" class="btn btn-sm btn-primary">
                                 <i class="fas fa-list"></i> View All
                             </a>
@@ -260,6 +263,37 @@
             .catch(error => {
                 console.error('Error updating notification count:', error);
             });
+    }
+    
+    function markAllAsRead() {
+        fetch('/notifications/mark_all_read', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Remove unread styling from all notifications in dropdown
+                document.querySelectorAll('.notification-item-dropdown.unread').forEach(item => {
+                    item.classList.remove('unread');
+                    const dot = item.querySelector('.notification-dot');
+                    if (dot) {
+                        dot.remove();
+                    }
+                    const markButton = item.querySelector('button[onclick*="markAsRead"]');
+                    if (markButton) {
+                        markButton.remove();
+                    }
+                });
+                // Update notification badge
+                updateNotificationBadge();
+            }
+        })
+        .catch(error => {
+            console.error('Error marking all notifications as read:', error);
+        });
     }
     
     // Close dropdown when clicking outside

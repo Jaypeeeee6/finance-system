@@ -1177,14 +1177,9 @@ def admin_dashboard():
     elif tab == 'recurring':
         query = query.filter(PaymentRequest.status == 'Recurring')
     elif tab == 'pending':
-        # For 'pending' tab, show only pending statuses including Proof Sent
-        query = query.filter(PaymentRequest.status.in_([
-            'Pending Manager Approval', 
-            'Pending Finance Approval', 
-            'Payment Pending', 
-            'Proof Pending', 
-            'Proof Sent'
-        ]))
+        # For 'pending' tab (now "All Requests"), show all requests that the user can see
+        # No additional filtering needed - show all requests based on the base query
+        pass
     
     if status_filter:
         query = query.filter(PaymentRequest.status == status_filter)
@@ -1302,14 +1297,9 @@ def finance_dashboard():
     elif tab == 'recurring':
         query = query.filter(PaymentRequest.status == 'Recurring')
     elif tab == 'pending':
-        # For 'pending' tab, show only pending statuses including Proof Sent
-        query = query.filter(PaymentRequest.status.in_([
-            'Pending Manager Approval', 
-            'Pending Finance Approval', 
-            'Payment Pending', 
-            'Proof Pending', 
-            'Proof Sent'
-        ]))
+        # For 'pending' tab (now "All Requests"), show all requests that the user can see
+        # No additional filtering needed - show all requests based on the base query
+        pass
     
     # Get paginated requests
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
@@ -4060,6 +4050,19 @@ def delete_notification(notification_id):
         db.session.commit()
         return jsonify({'success': True})
     return jsonify({'success': False, 'error': 'Notification not found'}), 404
+
+@app.route('/notifications/delete_all')
+@login_required
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager')
+def delete_all_notifications():
+    """Delete all notifications for current user"""
+    try:
+        deleted_count = Notification.query.filter_by(user_id=current_user.user_id).delete()
+        db.session.commit()
+        return jsonify({'success': True, 'deleted_count': deleted_count})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/api/notifications/unread_count')

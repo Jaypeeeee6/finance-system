@@ -21,7 +21,7 @@
     <!-- Tab Navigation -->
     <div class="tab-navigation">
         <button class="tab-button {% if active_tab == 'pending' %}active{% endif %}" onclick="switchTab('pending')" id="tab-pending">
-            <i class="fas fa-clock"></i> Pending
+            <i class="fas fa-list"></i> All Requests
         </button>
         <button class="tab-button {% if active_tab == 'completed' %}active{% endif %}" onclick="switchTab('completed')" id="tab-completed">
             <i class="fas fa-check-circle"></i> Completed
@@ -43,18 +43,7 @@
     <div class="card">
         <div class="card-header">
             <div class="header-top">
-                <h2><i class="fas fa-list"></i> Payment Requests</h2>
-            </div>
-            <div class="card-header-actions">
                 <div class="filter-controls">
-                    <div class="search-form" style="display: inline-flex; align-items: center; margin-right: 10px;">
-                        <input type="text" id="searchInput" placeholder="Search by request ID..." 
-                               value="{{ search_query or '' }}" class="form-control" style="width: 300px; margin-right: 5px;"
-                               onkeyup="filterTable()">
-                        <button type="button" onclick="clearSearch()" class="btn btn-outline btn-sm" style="margin-left: 5px;">
-                            <i class="fas fa-times"></i> Clear
-                        </button>
-                    </div>
                     <select id="departmentFilter" onchange="filterTable()" class="form-select">
                         <option value="">All Departments</option>
                         <option value="HR" {% if department_filter == 'HR' %}selected{% endif %}>HR</option>
@@ -72,12 +61,15 @@
                         <option value="Office" {% if department_filter == 'Office' %}selected{% endif %}>Office</option>
                         <option value="Maintenance" {% if department_filter == 'Maintenance' %}selected{% endif %}>Maintenance</option>
                     </select>
-                    <select id="urgentFilter" onchange="filterTable()" class="form-select" style="margin-left: 10px;">
+                    <select id="urgentFilter" onchange="filterTable()" class="form-select">
                         <option value="">All Requests</option>
                         <option value="urgent" {% if urgent_filter == 'urgent' %}selected{% endif %}>🔴 Urgent Only</option>
                         <option value="not_urgent" {% if urgent_filter == 'not_urgent' %}selected{% endif %}>⚪ Not Urgent</option>
                     </select>
                 </div>
+                <h2><i class="fas fa-list"></i> Payment Requests</h2>
+            </div>
+            <div class="card-header-actions">
                 {% if status_filter or department_filter or search_query %}
                 <div class="filter-indicator">
                     <span class="badge" style="background: #f57c00; color: white;">
@@ -97,7 +89,7 @@
         </div>
         <div class="card-body">
             <h4 class="card-title mb-4">Payment Requests</h4>
-            <!-- Pending Tab -->
+            <!-- All Requests Tab -->
             <div id="tab-content-pending" class="tab-content {% if active_tab == 'pending' %}active{% endif %}">
                 {% if requests %}
                     <div class="table-responsive">
@@ -425,6 +417,18 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize tab functionality
     initializeTabs();
+    
+    // Set up tab search functionality
+    const tabSearchInput = document.getElementById('tabSearchInput');
+    if (tabSearchInput) {
+        tabSearchInput.addEventListener('keyup', filterTable);
+    }
+    
+    // Set up tab search button
+    const tabSearchBtn = document.querySelector('.tab-search-btn');
+    if (tabSearchBtn) {
+        tabSearchBtn.addEventListener('click', filterTable);
+    }
 });
 
 function initializeTabs() {
@@ -468,7 +472,7 @@ function filterByUrgent(urgent) {
 }
 
 function filterTable() {
-    const searchInput = document.getElementById('searchInput');
+    const searchInput = document.getElementById('tabSearchInput');
     const departmentFilter = document.getElementById('departmentFilter');
     const urgentFilter = document.getElementById('urgentFilter');
     
@@ -525,7 +529,7 @@ function filterTable() {
 }
 
 function clearSearch() {
-    document.getElementById('searchInput').value = '';
+    document.getElementById('tabSearchInput').value = '';
     filterTable();
 }
 

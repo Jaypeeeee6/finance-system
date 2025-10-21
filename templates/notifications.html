@@ -10,6 +10,9 @@
             <button onclick="markAllAsRead()" class="btn btn-secondary">
                 <i class="fas fa-check-double"></i> Mark All as Read
             </button>
+            <button onclick="deleteAllNotifications()" class="btn btn-danger">
+                <i class="fas fa-trash-alt"></i> Delete All
+            </button>
             <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
                 <i class="fas fa-arrow-left"></i> Back to Dashboard
             </a>
@@ -162,6 +165,40 @@ function deleteNotification(notificationId) {
         .catch(error => {
             console.error('Error:', error);
             alert('Error deleting notification');
+        });
+    }
+}
+
+function deleteAllNotifications() {
+    if (confirm('Are you sure you want to delete ALL notifications? This action cannot be undone.')) {
+        fetch('/notifications/delete_all', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Remove all notifications from the page
+                const notificationsList = document.querySelector('.notifications-list');
+                if (notificationsList) {
+                    notificationsList.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-bell-slash"></i>
+                            <p>No notifications yet.</p>
+                        </div>
+                    `;
+                }
+                updateUnreadCount();
+                alert(`Successfully deleted ${data.deleted_count} notifications.`);
+            } else {
+                alert('Error deleting notifications: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting notifications');
         });
     }
 }
