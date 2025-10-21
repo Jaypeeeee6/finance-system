@@ -117,12 +117,12 @@
                     Submit Request
                 </div>
             </li>
-            <li class="step-tab {% if request.status == 'Rejected by Manager' %}rejected{% elif request.status == 'Pending Manager Approval' %}warning{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="manager">
+            <li class="step-tab {% if request.status == 'Rejected by Manager' %}rejected{% elif request.status == 'Pending Manager Approval' %}active{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="manager">
                 <div class="step-tab-content">
                     Manager Approval
                 </div>
             </li>
-            <li class="step-tab {% if request.status == 'Rejected by Finance' %}rejected{% elif request.status in ['Proof Pending', 'Proof Sent'] and request.recurring == 'Recurring' %}warning{% elif request.status in ['Completed', 'Paid', 'Recurring'] %}completed{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'] %}warning{% elif request.status == 'Pending Finance Approval' %}active{% else %}disabled{% endif %}" data-step="finance">
+            <li class="step-tab {% if request.status == 'Rejected by Finance' %}rejected{% elif request.status in ['Proof Pending', 'Proof Sent'] and request.recurring == 'Recurring' %}warning{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'] %}warning{% elif request.status in ['Completed', 'Paid', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="finance">
                 <div class="step-tab-content">
                     Finance Admin Approval
                 </div>
@@ -1690,7 +1690,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Remove all existing classes from all tabs
     [submitTab, managerTab, financeTab].forEach(tab => {
         if (tab) {
-            tab.classList.remove('active', 'completed', 'disabled');
+            tab.classList.remove('active', 'completed', 'disabled', 'rejected', 'warning');
         }
     });
     
@@ -1708,7 +1708,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (requestDetailsSection) {
                 requestDetailsSection.style.display = 'none';
             }
-        } else if (['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Rejected by Manager', 'Completed', 'Recurring'].includes(requestStatus)) {
+        } else if (requestStatus === 'Rejected by Manager') {
+            managerTab.classList.add('rejected');
+        } else if (['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'].includes(requestStatus)) {
             managerTab.classList.add('completed');
         } else {
             managerTab.classList.add('disabled');
@@ -1727,22 +1729,20 @@ document.addEventListener('DOMContentLoaded', function() {
             if (requestDetailsSection) {
                 requestDetailsSection.style.display = 'none';
             }
-        } else if (requestStatus === 'Pending Finance Approval') {
-            financeTab.classList.remove('warning', 'completed', 'disabled');
-            financeTab.classList.add('active');
-            // Hide request details section when finance tab is active
-            const requestDetailsSection = document.querySelector('.request-details-section');
-            if (requestDetailsSection) {
-                requestDetailsSection.style.display = 'none';
-            }
+        } else if (requestStatus === 'Rejected by Finance') {
+            financeTab.classList.remove('warning', 'completed', 'active', 'disabled');
+            financeTab.classList.add('rejected');
         } else if (['Proof Pending', 'Proof Sent'].includes(requestStatus) && requestRecurring === 'Recurring') {
-            financeTab.classList.remove('completed', 'active', 'disabled');
+            financeTab.classList.remove('completed', 'active', 'disabled', 'rejected');
             financeTab.classList.add('warning');
-        } else if (['Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'].includes(requestStatus)) {
-            financeTab.classList.remove('warning', 'active', 'disabled');
+        } else if (['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'].includes(requestStatus)) {
+            financeTab.classList.remove('completed', 'active', 'disabled', 'rejected');
+            financeTab.classList.add('warning');
+        } else if (['Paid', 'Completed', 'Recurring'].includes(requestStatus)) {
+            financeTab.classList.remove('warning', 'active', 'disabled', 'rejected');
             financeTab.classList.add('completed');
         } else {
-            financeTab.classList.remove('warning', 'active', 'completed');
+            financeTab.classList.remove('warning', 'active', 'completed', 'rejected');
             financeTab.classList.add('disabled');
         }
     }
