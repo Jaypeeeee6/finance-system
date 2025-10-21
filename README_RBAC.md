@@ -246,3 +246,43 @@ When creating a new payment request, users can only select from request types th
 ### **Project Department**
 - New Branch Expenses
 - Project Expenses
+
+---
+
+## Calendar Access Permissions
+
+The calendar feature (`/admin/calendar`) provides a visual view of upcoming recurring payment due dates. Access is role-based with different data visibility:
+
+### **Roles with Calendar Access**
+- **Finance Admin** - Full calendar access to all departments' recurring payments
+- **Finance Staff** - Full calendar access to all departments' recurring payments  
+- **General Manager (GM)** - Full calendar access to all departments' recurring payments
+- **Operation Manager** - Full calendar access to all departments' recurring payments
+- **IT Staff** - Full calendar access to all departments' recurring payments
+- **IT Department Manager** - Full calendar access to all departments' recurring payments
+- **Project Staff** - Calendar access limited to their own department's recurring payments
+- **Admin** - Full calendar access to all departments' recurring payments
+
+### **Calendar Features**
+- **Visual Calendar View**: Shows recurring payment due dates in a monthly calendar format
+- **Color-coded Events**: 
+  - Purple dots indicate upcoming due dates
+  - Green dots indicate paid installments
+- **Department Filtering**: Project Staff only see their department's payments
+- **Real-time Updates**: Calendar reflects current payment status and due dates
+- **Interactive Navigation**: Users can navigate between months to view upcoming payments
+
+### **Calendar Data Visibility**
+- **Finance Admin/Staff, GM, Operation Manager, IT Staff, IT Department Manager, Admin**: Can view all departments' recurring payment schedules
+- **Project Staff**: Can only view their own department's recurring payment schedules
+- **Other Roles**: No calendar access
+
+### **Calendar Integration**
+The calendar is accessible from:
+- General Manager Dashboard
+- Operation Manager Dashboard  
+- IT Dashboard
+- Project Dashboard
+- Finance Admin Dashboard (via navigation)
+
+The calendar helps users track upcoming payment obligations and plan financial activities accordingly.

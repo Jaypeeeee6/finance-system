@@ -7,21 +7,48 @@
     <div class="dashboard-header">
         <h1><i class="fas fa-calendar-alt"></i> Upcoming Due Calendar</h1>
         {% if current_user.role == 'Finance Admin' %}
-        <p>Approved recurring payment due dates across all departments</p>
+        <p>Active recurring payment due dates across all departments</p>
         {% else %}
-        <p>Approved recurring payment due dates for {{ current_user.department }} department</p>
+        <p>Active recurring payment due dates for {{ current_user.department }} department</p>
         {% endif %}
     </div>
 
     <div class="card">
         <div class="card-body">
-            <div class="calendar-toolbar">
-                <div class="legend">
-                    <span class="legend-item"><span class="legend-dot" style="background:#8e24aa"></span> Due</span>
-                    <span class="legend-item"><span class="legend-dot" style="background:#2e7d32"></span> Paid</span>
-                </div>
-            </div>
+             <div class="calendar-toolbar">
+                 <div class="legend">
+                     <span class="legend-item"><span class="legend-dot" style="background:#8e24aa"></span> Due</span>
+                     <span class="legend-item"><span class="legend-dot" style="background:#2e7d32"></span> Paid</span>
+                     <span class="legend-item"><span class="legend-dot" style="background:#d32f2f"></span> Late</span>
+                 </div>
+             </div>
             <div id="calendar"></div>
+        </div>
+    </div>
+
+    <!-- Modal for showing detailed events for a specific date -->
+    <div class="modal fade" id="eventsModal" tabindex="-1" role="dialog" aria-labelledby="eventsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="eventsModalLabel">
+                        <i class="fas fa-calendar-day"></i> Payment Due Details
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="eventsModalContent">
+                        <!-- Events will be populated here -->
+                    </div>
+                </div>
+                 <div class="modal-footer">
+                     <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                         <i class="fas fa-times"></i> Close
+                     </button>
+                 </div>
+            </div>
         </div>
     </div>
 </div>
@@ -30,6 +57,8 @@
 {% block extra_js %}
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   const calendarEl = document.getElementById('calendar');
@@ -47,42 +76,205 @@ document.addEventListener('DOMContentLoaded', function() {
     moreLinkClick: 'popover',
     eventOrder: 'title',
     events: '/api/admin/recurring-events',
-    eventContent: function(arg) {
-      // Custom content: show amount (title) large, then a small subtitle
-      const amount = arg.event.title;
-      const type = arg.event.extendedProps.requestType || '';
-      const company = arg.event.extendedProps.companyName || '';
-      const dept = arg.event.extendedProps.department || '';
-      const baseAmount = arg.event.extendedProps.baseAmount;
-      const remainingAmount = arg.event.extendedProps.remainingAmount;
-      const parts = [];
-      if (type) parts.push(type);
-      if (company) parts.push(company);
-      if (dept) parts.push(dept);
-      if (baseAmount && remainingAmount) parts.push(`Base: ${baseAmount} · Remaining: ${remainingAmount}`);
-      const subtitle = parts.join(' · ');
-      let innerHtml = `<div class=\"fc-event-main-custom\"><div class=\"amount\">${amount}</div><div class=\"meta\">${subtitle}</div></div>`;
-      return { html: innerHtml };
-    },
-    eventDidMount: function(info) {
-      // Native tooltip with full content
-      const ep = info.event.extendedProps || {};
-      const amount = info.event.title;
-      const parts = [];
-      if (ep.requestType) parts.push(ep.requestType);
-      if (ep.companyName) parts.push(ep.companyName);
-      if (ep.department) parts.push(ep.department);
-      if (ep.purpose) parts.push(ep.purpose);
-      if (ep.baseAmount && ep.remainingAmount) parts.push(`Base: ${ep.baseAmount} • Remaining: ${ep.remainingAmount}`);
-      info.el.title = `${amount} | ${parts.join(' • ')}`;
-    },
-    eventClick: function(info) {
-      if (info.event.url) {
-        // allow navigating to request view
-      }
-    }
+     eventContent: function(arg) {
+       // Show count and status for the day
+       const count = arg.event.extendedProps.count || 0;
+       const status = arg.event.extendedProps.status || 'due';
+       
+       let innerHtml = `<div class=\"fc-event-main-custom\">
+         <div class=\"amount\">${count} payment${count !== 1 ? 's' : ''} ${status}</div>
+       </div>`;
+       return { html: innerHtml };
+     },
+     eventDidMount: function(info) {
+       // Show count, status, and total amount in tooltip
+       const ep = info.event.extendedProps || {};
+       const count = ep.count || 0;
+       const totalAmount = ep.totalAmount || 0;
+       const date = ep.date || '';
+       const status = ep.status || 'due';
+       const paidCount = ep.paidCount || 0;
+       const lateCount = ep.lateCount || 0;
+       
+       let statusDetails = '';
+       if (paidCount > 0) statusDetails += ` (${paidCount} paid)`;
+       if (lateCount > 0) statusDetails += ` (${lateCount} late)`;
+       
+       info.el.title = `${count} payment${count !== 1 ? 's' : ''} ${status} on ${date}${statusDetails} - Total: ${totalAmount.toFixed(3)} OMR`;
+     },
+     dateClick: function(info) {
+       console.log('Date clicked:', info.dateStr);
+       
+       // Show modal with detailed events for this date
+       const clickedDate = info.dateStr;
+       
+       // Find the event for this date
+       const events = calendar.getEvents();
+       const dateEvent = events.find(event => event.startStr === clickedDate);
+       
+       console.log('Found event for date:', dateEvent);
+       
+       // Format the date for display
+       const dateObj = new Date(clickedDate);
+       const formattedDate = dateObj.toLocaleDateString('en-US', { 
+         weekday: 'long', 
+         year: 'numeric', 
+         month: 'long', 
+         day: 'numeric' 
+       });
+       
+       // Update modal title
+       document.getElementById('eventsModalLabel').innerHTML = 
+         `<i class="fas fa-calendar-day"></i> Payment Due Details - ${formattedDate}`;
+       
+       if (dateEvent && dateEvent.extendedProps && dateEvent.extendedProps.events) {
+         const dayEvents = dateEvent.extendedProps.events;
+         const count = dateEvent.extendedProps.count || 0;
+         const totalAmount = dateEvent.extendedProps.totalAmount || 0;
+         const status = dateEvent.extendedProps.status || 'due';
+         const paidCount = dateEvent.extendedProps.paidCount || 0;
+         const lateCount = dateEvent.extendedProps.lateCount || 0;
+         
+         // Determine status color
+         let statusColor = 'bg-primary'; // default purple for due
+         if (status === 'paid') statusColor = 'bg-success'; // green for paid
+         else if (status === 'late') statusColor = 'bg-danger'; // red for late
+         
+         // Populate modal content with improved layout for many payments
+         let modalContent = `
+           <div class="row mb-4">
+             <div class="col-md-3">
+               <div class="card ${statusColor} text-white">
+                 <div class="card-body text-center">
+                   <h4 class="card-title">${count}</h4>
+                   <p class="card-text mb-0">Payment${count !== 1 ? 's' : ''} ${status}</p>
+                 </div>
+               </div>
+             </div>
+             <div class="col-md-3">
+               <div class="card bg-success text-white">
+                 <div class="card-body text-center">
+                   <h4 class="card-title">${totalAmount.toFixed(3)} OMR</h4>
+                   <p class="card-text mb-0">Total Amount</p>
+                 </div>
+               </div>
+             </div>
+             <div class="col-md-3">
+               <div class="card bg-info text-white">
+                 <div class="card-body text-center">
+                   <h4 class="card-title">${(totalAmount / count).toFixed(3)} OMR</h4>
+                   <p class="card-text mb-0">Average per Payment</p>
+                 </div>
+               </div>
+             </div>
+             <div class="col-md-3">
+               <div class="card bg-warning text-white">
+                 <div class="card-body text-center">
+                   <h4 class="card-title">${paidCount}/${count}</h4>
+                   <p class="card-text mb-0">Paid Status</p>
+                 </div>
+               </div>
+             </div>
+           </div>
+           <hr>
+           <div class="events-list" style="max-height: 400px; overflow-y: auto;">
+         `;
+         
+         if (dayEvents.length > 0) {
+           dayEvents.forEach((event, index) => {
+             const ep = event.extendedProps || {};
+             
+             // Debug: Log the event color to console
+             console.log(`Event ${index + 1}:`, {
+               title: event.title,
+               color: event.color,
+               requestId: ep.requestId
+             });
+             
+             // Determine border color based on payment status
+             let borderColor = 'border-left-primary'; // default purple for due
+             let statusBadge = 'badge-primary';
+             let statusText = 'Due';
+             
+             if (event.color === '#2e7d32') {
+               borderColor = 'border-left-success';
+               statusBadge = 'badge-success';
+               statusText = 'Paid';
+             } else if (event.color === '#d32f2f') {
+               borderColor = 'border-left-danger';
+               statusBadge = 'badge-danger';
+               statusText = 'Late';
+             }
+             
+             modalContent += `
+               <div class="card mb-2 ${borderColor}">
+                 <div class="card-body py-2">
+                   <div class="row align-items-center">
+                     <div class="col-md-2">
+                       <span class="badge ${statusBadge}">#${index + 1} ${statusText}</span>
+                     </div>
+                     <div class="col-md-3">
+                       <strong class="text-primary">${event.title}</strong>
+                     </div>
+                     <div class="col-md-4">
+                       <small class="text-muted">
+                         <strong>${ep.requestType || 'N/A'}</strong><br>
+                         ${ep.companyName || 'N/A'} - ${ep.department || 'N/A'}
+                       </small>
+                     </div>
+                     <div class="col-md-3 text-right">
+                       <a href="${event.url}" class="btn btn-sm btn-outline-primary">
+                         <i class="fas fa-eye"></i> View
+                       </a>
+                     </div>
+                   </div>
+                   ${ep.purpose ? `<div class="row mt-1"><div class="col-12"><small class="text-muted"><strong>Purpose:</strong> ${ep.purpose}</small></div></div>` : ''}
+                 </div>
+               </div>
+             `;
+           });
+         } else {
+           modalContent += '<p class="text-muted text-center py-3">No events found for this date.</p>';
+         }
+         
+         modalContent += '</div>';
+         
+         document.getElementById('eventsModalContent').innerHTML = modalContent;
+       } else {
+         // No events for this date
+         document.getElementById('eventsModalContent').innerHTML = 
+           '<div class="text-center py-4"><i class="fas fa-calendar-times text-muted" style="font-size: 3rem;"></i><p class="text-muted mt-3">No payments due on this date.</p></div>';
+       }
+       
+       // Show the modal with proper error handling
+       try {
+         $('#eventsModal').modal('show');
+       } catch (error) {
+         console.error('Error showing modal:', error);
+         // Fallback: try to show modal using vanilla JS
+         const modal = document.getElementById('eventsModal');
+         if (modal) {
+           modal.style.display = 'block';
+           modal.classList.add('show');
+           modal.setAttribute('aria-hidden', 'false');
+         }
+       }
+     }
   });
   calendar.render();
+  
+  // Ensure modal works properly
+  $('#eventsModal').on('hidden.bs.modal', function () {
+    // Clear modal content when closed
+    document.getElementById('eventsModalContent').innerHTML = '';
+  });
+  
+  // Add click handler for modal backdrop
+  $('#eventsModal').on('click', function (e) {
+    if (e.target === this) {
+      $(this).modal('hide');
+    }
+  });
 });
 </script>
 <style>
@@ -96,6 +288,70 @@ document.addEventListener('DOMContentLoaded', function() {
 .fc-event-main-custom { display:flex; flex-direction:column; line-height:1.15; padding:2px 0; }
 .fc-event-main-custom .amount { font-weight:600; font-size:12px; }
 .fc-event-main-custom .meta { font-size:10px; opacity:0.85; }
+
+/* Modal styles */
+.modal-lg { max-width: 900px; }
+.modal-body { max-height: 70vh; overflow-y: auto; }
+
+/* Summary cards in modal */
+.bg-primary, .bg-success, .bg-info { 
+  border-radius: 8px; 
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Events list styling */
+.events-list { 
+  border-radius: 8px; 
+  padding: 10px;
+  background-color: #f8f9fa;
+}
+
+.events-list .card { 
+  border-left: 4px solid #007bff; 
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.events-list .card:hover { 
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+  transform: translateY(-1px);
+}
+
+.events-list .card-body { 
+  padding: 12px 16px; 
+}
+
+.events-list .badge { 
+  font-size: 0.8rem; 
+  padding: 4px 8px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .events-list .card-body .row > div {
+    margin-bottom: 8px;
+  }
+  
+  .events-list .card-body .text-right {
+    text-align: left !important;
+  }
+}
+
+/* Calendar event hover effects */
+.fc-event:hover { transform: scale(1.02); transition: transform 0.2s ease; }
+.fc-event { cursor: pointer; }
+
+/* Calendar date cell hover effects */
+.fc-daygrid-day:hover { background-color: #f8f9fa; cursor: pointer; }
+.fc-daygrid-day { transition: background-color 0.2s ease; }
+
+/* Make event text more prominent */
+.fc-event-main-custom .amount { 
+  font-weight: 700; 
+  font-size: 13px; 
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
 </style>
 {% endblock %}
 

@@ -430,10 +430,10 @@ def check_recurring_payments_due():
     """Check for recurring payments due today and create notifications"""
     today = date.today()
     
-    # Get all approved recurring payment requests
+    # Get all recurring payment requests with Recurring status
     recurring_requests = PaymentRequest.query.filter_by(
         recurring='Recurring',
-        status='Approved'
+        status='Recurring'
     ).all()
     
     for request in recurring_requests:
@@ -4655,11 +4655,11 @@ def admin_calendar():
 def api_admin_recurring_events():
     """API endpoint for calendar events (Admin and Project roles)"""
     try:
-        # Build query for approved recurring payment requests
+        # Build query for recurring payment requests with Recurring status
         query = PaymentRequest.query.filter(
             PaymentRequest.recurring_interval.isnot(None),
             PaymentRequest.recurring_interval != '',
-            PaymentRequest.status == 'Approved'
+            PaymentRequest.status == 'Recurring'
         )
         
         # Project users can only see their department's requests
@@ -4668,7 +4668,8 @@ def api_admin_recurring_events():
         
         recurring_requests = query.all()
         
-        events = []
+        # Group events by date
+        events_by_date = {}
         today = date.today()
         
         for req in recurring_requests:
@@ -4719,6 +4720,10 @@ def api_admin_recurring_events():
                         request_id=req.request_id,
                         payment_date=installment.payment_date
                     ).first() is not None
+                    
+                    # Debug: Log payment status determination
+                    print(f"Request {req.request_id}, Date {installment.payment_date}: Paid={paid_notification is not None}, Late={is_late}")
+                    
                     event_color = '#2e7d32' if paid_notification else ('#d32f2f' if is_late else '#8e24aa')
                     
                     # Calculate remaining amount
@@ -4728,7 +4733,12 @@ def api_admin_recurring_events():
                     )
                     remaining_amount = req.amount - total_paid
                     
-                    events.append({
+                    # Add to events_by_date
+                    date_key = installment.payment_date.isoformat()
+                    if date_key not in events_by_date:
+                        events_by_date[date_key] = []
+                    
+                    events_by_date[date_key].append({
                         'title': f'OMR {installment.amount:.3f}',
                         'start': installment.payment_date.isoformat(),
                         'color': event_color,
@@ -4762,9 +4772,18 @@ def api_admin_recurring_events():
                         request_id=req.request_id,
                         payment_date=due_date
                     ).first() is not None
+                    
+                    # Debug: Log payment status determination
+                    print(f"Request {req.request_id}, Date {due_date}: Paid={paid_notification is not None}, Late={is_late}")
+                    
                     event_color = '#2e7d32' if paid_notification else ('#d32f2f' if is_late else '#8e24aa')
                     
-                    events.append({
+                    # Add to events_by_date
+                    date_key = due_date.isoformat()
+                    if date_key not in events_by_date:
+                        events_by_date[date_key] = []
+                    
+                    events_by_date[date_key].append({
                         'title': f'OMR {amount:.3f}',
                         'start': due_date.isoformat(),
                         'color': event_color,
@@ -4780,7 +4799,47 @@ def api_admin_recurring_events():
                         }
                     })
         
-        return jsonify(events)
+        # Convert grouped events to calendar format
+        calendar_events = []
+        for date_key, day_events in events_by_date.items():
+            # Create a summary event for the day
+            total_amount = sum(float(event['title'].replace('OMR ', '')) for event in day_events)
+            count = len(day_events)
+            
+            # Determine the overall color for this date
+            # Check if all payments are paid (green), all are late (red), or mixed/due (purple)
+            paid_count = sum(1 for event in day_events if event['color'] == '#2e7d32')
+            late_count = sum(1 for event in day_events if event['color'] == '#d32f2f')
+            
+            if paid_count == count:
+                # All payments are paid - green
+                date_color = '#2e7d32'
+                status_text = 'paid'
+            elif late_count > 0:
+                # Some or all payments are late - red
+                date_color = '#d32f2f'
+                status_text = 'late'
+            else:
+                # All payments are due - purple
+                date_color = '#8e24aa'
+                status_text = 'due'
+            
+            calendar_events.append({
+                'title': f'{count} payment{"s" if count != 1 else ""} {status_text}',
+                'start': date_key,
+                'color': date_color,
+                'extendedProps': {
+                    'count': count,
+                    'totalAmount': total_amount,
+                    'date': date_key,
+                    'status': status_text,
+                    'paidCount': paid_count,
+                    'lateCount': late_count,
+                    'events': day_events  # Store all events for this date
+                }
+            })
+        
+        return jsonify(calendar_events)
         
     except Exception as e:
         print(f"Error generating calendar events: {e}")
