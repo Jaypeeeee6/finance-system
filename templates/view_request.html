@@ -476,9 +476,7 @@
                                 
                                 <p style="margin-bottom: 0.5rem; color: #666;">
                                     <strong>Assigned Manager:</strong> 
-                                    {% if user.role == 'Department Manager' and user.department == request.department %}
-                                        General Manager ({{ manager_name if manager_name else 'General Manager' }})
-                                    {% elif user.role == 'GM' and user.user_id == request.user_id %}
+                                    {% if user.role == 'GM' and user.user_id == request.user_id %}
                                         Abdalaziz Hamood Al Brashdi (Finance Admin)
                                     {% elif user.role == 'Finance Staff' and user.user_id == request.user_id %}
                                         Abdalaziz Hamood Al Brashdi (Finance Admin)

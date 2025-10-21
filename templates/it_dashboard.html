@@ -9,6 +9,11 @@
         <p>Full system access and management</p>
     </div>
 
+    <div class="dashboard-actions">
+        <a href="{{ url_for('new_request') }}" class="btn btn-primary">
+            <i class="fas fa-plus-circle"></i> New Payment Request
+        </a>
+    </div>
 
     <div class="dashboard-tabs">
         <button class="tab-btn active" onclick="showTab('requests')">
@@ -34,9 +39,6 @@
                     {% endif %}
                 </h2>
                 <div class="card-header-actions">
-                    <a href="{{ url_for('new_request') }}" class="btn btn-primary">
-                        <i class="fas fa-plus-circle"></i> New Request
-                    </a>
                     <div class="filter-controls">
                         <div class="search-form" style="display: inline-flex; align-items: center; margin-right: 10px;">
                             <input type="text" id="searchInput" placeholder="Search by request ID..." 

@@ -19,12 +19,6 @@
             <ul class="nav-menu">
                 <li><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="fas fa-home"></i> Dashboard</a></li>
                 
-                {% if current_user.role in ['Department Manager', 'Finance Staff', 'Project Staff', 'IT Staff',
-                'HR Staff', 'Finance Staff', 'IT Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff',
-                'Customer Service Staff', 'Marketing Staff', 'Operation Staff', 'Quality Control Staff',
-                'Project Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff'] %}
-                <li><a href="{{ url_for('new_request') }}" class="nav-link"><i class="fas fa-plus-circle"></i> New Request</a></li>
-                {% endif %}
                 
                 {% if current_user.role in ['Finance Admin', 'Finance Staff', 'GM', 'IT Staff', 'Operation Manager'] or (current_user.role == 'Department Manager' and current_user.department == 'IT') %}
                 <li><a href="{{ url_for('reports') }}" class="nav-link"><i class="fas fa-chart-bar"></i> Reports</a></li>
