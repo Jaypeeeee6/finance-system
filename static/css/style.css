@@ -2854,3 +2854,248 @@ input:checked + .toggle-slider:before {
     color: #6c757d;
 }
 
+/* Payment Interval Tabs */
+.interval-tabs {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 25px;
+    padding: 0;
+}
+
+.interval-tab {
+    flex: 1;
+    padding: 20px;
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: #6c757d;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    text-align: center;
+    min-height: 100px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.interval-tab:hover {
+    background: #e9ecef;
+    color: #495057;
+    border-color: #dee2e6;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.interval-tab.active {
+    color: #007bff;
+    border-color: #007bff;
+    background: #e7f3ff;
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+.interval-tab i {
+    font-size: 24px;
+    margin-bottom: 5px;
+}
+
+.interval-tab span {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* Interval Config Content */
+.interval-config-content {
+    min-height: 200px;
+}
+
+/* Custom Date Configuration */
+.custom-date-config {
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.custom-dates-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.custom-dates-header label {
+    font-weight: 600;
+    color: #495057;
+    margin: 0;
+}
+
+.btn-add-date {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background-color 0.3s ease;
+}
+
+.btn-add-date:hover {
+    background: #0056b3;
+}
+
+.btn-add-date:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.btn-add-date:disabled:hover {
+    background: #6c757d;
+}
+
+.custom-dates-list {
+    margin-bottom: 20px;
+}
+
+.custom-date-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+}
+
+.custom-date-item:hover {
+    border-color: #007bff;
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.1);
+}
+
+.custom-date-item input[type="date"] {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.custom-date-item input[type="number"] {
+    width: 100px;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+    text-align: center;
+}
+
+.custom-date-item .date-label {
+    font-weight: 500;
+    color: #495057;
+    min-width: 80px;
+}
+
+.custom-date-item .amount-label {
+    font-weight: 500;
+    color: #495057;
+    min-width: 60px;
+}
+
+.btn-remove-date {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.3s ease;
+}
+
+.btn-remove-date:hover {
+    background: #c82333;
+}
+
+.custom-dates-info {
+    padding: 12px;
+    background: #e7f3ff;
+    border: 1px solid #b3d9ff;
+    border-radius: 6px;
+    color: #004085;
+}
+
+.custom-dates-info p {
+    margin: 0;
+    font-size: 14px;
+}
+
+.custom-dates-info i {
+    margin-right: 6px;
+    color: #007bff;
+}
+
+/* Custom date empty state */
+.custom-dates-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+}
+
+.custom-dates-empty i {
+    font-size: 48px;
+    margin-bottom: 15px;
+    color: #dee2e6;
+}
+
+.custom-dates-empty p {
+    margin: 0;
+    font-size: 16px;
+}
+
+/* Custom Amount Summary */
+.custom-amount-summary {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+}
+
+.custom-amount-summary .summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #e9ecef;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.custom-amount-summary .summary-row:last-child {
+    border-bottom: none;
+    font-weight: 600;
+    font-size: 15px;
+    color: #495057;
+}
+
+.custom-amount-summary .summary-row:last-child span:last-child {
+    color: #28a745;
+    font-weight: 700;
+}
+

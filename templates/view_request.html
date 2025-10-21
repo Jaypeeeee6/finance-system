@@ -83,6 +83,20 @@
 .step-tab.warning:hover .step-tab-content {
     background: #e0a800 !important;
 }
+
+/* Ensure completed state overrides warning state */
+.step-tab.completed .step-tab-content {
+    background: #28a745 !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+.step-tab.completed .step-tab-content::before {
+    content: "✓" !important;
+    margin-right: 0.5rem !important;
+    font-weight: bold !important;
+    font-size: 1.1rem !important;
+}
 </style>
 {% endblock %}
 
@@ -108,7 +122,7 @@
                     Manager Approval
                 </div>
             </li>
-            <li class="step-tab {% if request.status == 'Rejected by Finance' %}rejected{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Recurring'] %}warning{% elif request.status in ['Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'] %}completed{% elif request.status == 'Pending Finance Approval' %}active{% else %}disabled{% endif %}" data-step="finance">
+            <li class="step-tab {% if request.status == 'Rejected by Finance' %}rejected{% elif request.status in ['Completed', 'Paid', 'Recurring'] %}completed{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'] %}warning{% elif request.status == 'Pending Finance Approval' %}active{% else %}disabled{% endif %}" data-step="finance">
                 <div class="step-tab-content">
                     Finance Admin Approval
                 </div>
@@ -245,9 +259,30 @@
 
 
                 <!-- Payment Installments Display for Recurring Payments -->
-                {% if request.recurring_interval and 'monthly' in request.recurring_interval %}
+                {% if request.recurring_interval and ('monthly' in request.recurring_interval or request.recurring_interval.startswith('custom:')) %}
                 <div class="form-group">
                     <label><i class="fas fa-calendar-alt"></i> Payment Schedule</label>
+                    {% if request.recurring_interval.startswith('custom:') %}
+                        <div class="payment-schedule-type" style="background: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 6px; padding: 12px; margin-bottom: 15px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <i class="fas fa-calendar-plus" style="color: #007bff; font-size: 18px;"></i>
+                                <div>
+                                    <h4 style="margin: 0; color: #007bff; font-size: 16px; font-weight: 600;">Custom Payment Schedule</h4>
+                                    <p style="margin: 0; color: #495057; font-size: 14px;">This is a custom payment schedule with specific dates and amounts.</p>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="payment-schedule-type" style="background: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 6px; padding: 12px; margin-bottom: 15px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <i class="fas fa-calendar-alt" style="color: #007bff; font-size: 18px;"></i>
+                                <div>
+                                    <h4 style="margin: 0; color: #007bff; font-size: 16px; font-weight: 600;">Monthly Recurring Payment</h4>
+                                    <p style="margin: 0; color: #495057; font-size: 14px;">This is a recurring monthly payment. The same amount will be due each month.</p>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
                     <div class="installments-container">
                         {% if schedule_rows %}
                             <div class="installments-header">
@@ -719,7 +754,7 @@
                     </div>
                     
                     <!-- Payment Schedule Management for Recurring Payments -->
-                    {% if request.recurring_interval and 'monthly' in request.recurring_interval %}
+                    {% if request.recurring_interval and ('monthly' in request.recurring_interval or request.recurring_interval.startswith('custom:')) %}
                     <div class="card" style="margin-bottom: 1.5rem;">
                         <div class="card-header" style="background: #007bff; color: white;">
                             <h4><i class="fas fa-calendar-alt"></i> Payment Schedule Management</h4>
@@ -935,7 +970,7 @@
                         {% endif %}
                     </div>
 
-                    {% if request.recurring_interval and 'monthly' in request.recurring_interval %}
+                    {% if request.recurring_interval and ('monthly' in request.recurring_interval or request.recurring_interval.startswith('custom:')) %}
                     <div class="card" style="margin-top: 1rem; margin-bottom: 1.5rem;">
                         <div class="card-header" style="background: #6c757d; color: white;">
                             <h4><i class="fas fa-calendar-alt"></i> Payment Schedule</h4>
@@ -1555,6 +1590,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (financeTab) {
         if (requestedTab === 'finance') {
             // Force finance tab to be active when requested via URL parameter
+            financeTab.classList.remove('warning', 'completed', 'disabled');
             financeTab.classList.add('active');
             
             // Hide request details section when forcing finance tab
@@ -1563,6 +1599,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 requestDetailsSection.style.display = 'none';
             }
         } else if (requestStatus === 'Pending Finance Approval') {
+            financeTab.classList.remove('warning', 'completed', 'disabled');
             financeTab.classList.add('active');
             // Hide request details section when finance tab is active
             const requestDetailsSection = document.querySelector('.request-details-section');
@@ -1570,8 +1607,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 requestDetailsSection.style.display = 'none';
             }
         } else if (['Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'].includes(requestStatus)) {
+            financeTab.classList.remove('warning', 'active', 'disabled');
             financeTab.classList.add('completed');
         } else {
+            financeTab.classList.remove('warning', 'active', 'completed');
             financeTab.classList.add('disabled');
         }
     }
@@ -1674,6 +1713,31 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Function to switch to finance tab
+function switchToFinanceTab() {
+    const stepTabs = document.querySelectorAll('.step-tab');
+    const stepContents = document.querySelectorAll('.step-content');
+    
+    // Remove active class from all tabs and contents
+    stepTabs.forEach(t => t.classList.remove('active'));
+    stepContents.forEach(c => c.classList.remove('active'));
+    
+    // Add active class to finance tab and corresponding content
+    const financeTab = document.querySelector('[data-step="finance"]');
+    const financeContent = document.getElementById('step-finance');
+    
+    if (financeTab && financeContent) {
+        financeTab.classList.add('active');
+        financeContent.classList.add('active');
+        
+        // Hide request details section for non-submit tabs
+        const requestDetailsSection = document.querySelector('.request-details-section');
+        if (requestDetailsSection) {
+            requestDetailsSection.style.display = 'none';
+        }
+    }
+}
+
 // Functions for managing recurring payment installments
 function markInstallmentAsPaid(scheduleId, paymentDate) {
     // Check if receipt is uploaded
@@ -1738,15 +1802,22 @@ function uploadInstallmentReceipt(scheduleId, paymentDate) {
                     <div class="modal-body" style="padding: 20px;">
                         <input type="hidden" name="schedule_id" value="${scheduleId}">
                         <input type="hidden" name="payment_date" value="${paymentDate}">
-                        <div id="installment-receipt-upload-container" 
-                             data-multiple-file-upload
-                             data-input-name="receipt_files"
-                             data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                             data-max-size="10485760"
-                             data-max-files="10"
-                             data-required="true"
-                             data-label="Upload Receipt"
-                             data-help-text="Upload receipt files (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
+                        <div class="form-group">
+                            <label for="installment-receipt-file">Upload Receipt *</label>
+                            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                                <button type="button" id="select-installment-receipt-btn" class="btn btn-primary" style="white-space: nowrap;">
+                                    <i class="fas fa-upload"></i> Select File
+                                </button>
+                                <span id="selected-file-name" style="color: #666; font-size: 14px; display: none;">
+                                    <i class="fas fa-file" style="margin-right: 5px;"></i>
+                                    <span id="file-name-text"></span>
+                                </span>
+                            </div>
+                            <small>Upload receipt file (PDF, JPG, PNG, DOC, DOCX - Max 10MB)</small>
+                            
+                            <!-- Hidden file input for actual file selection -->
+                            <input type="file" name="receipt_file" id="installment-receipt-file" 
+                                   accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display: none;">
                         </div>
                     </div>
                     <div class="modal-footer" style="padding: 15px 20px; border-top: 1px solid #dee2e6; text-align: right;">
@@ -1765,10 +1836,56 @@ function uploadInstallmentReceipt(scheduleId, paymentDate) {
     document.body.appendChild(modal);
     document.body.style.overflow = 'hidden';
     
+    // Add single file selection functionality for installment receipt
+    const selectBtn = document.getElementById('select-installment-receipt-btn');
+    const fileInput = document.getElementById('installment-receipt-file');
+    const fileNameSpan = document.getElementById('selected-file-name');
+    const fileNameText = document.getElementById('file-name-text');
+    
+    selectBtn.addEventListener('click', function() {
+        fileInput.click();
+    });
+    
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file size (10MB max)
+            const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+            if (file.size > maxSize) {
+                alert(`File "${file.name}" is too large. Maximum size is 10MB.`);
+                fileInput.value = '';
+                return;
+            }
+            
+            // Validate file type
+            const allowedTypes = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'];
+            const fileExtension = file.name.split('.').pop().toLowerCase();
+            if (!allowedTypes.includes(fileExtension)) {
+                alert(`Invalid file type for "${file.name}". Allowed types: PDF, JPG, PNG, DOC, DOCX`);
+                fileInput.value = '';
+                return;
+            }
+            
+            // Show selected file name
+            fileNameText.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+            fileNameSpan.style.display = 'inline';
+            
+            // Update button text
+            selectBtn.innerHTML = '<i class="fas fa-check"></i> File Selected';
+            selectBtn.className = 'btn btn-success';
+        }
+    });
+    
     // Add form submission handler
     const form = document.getElementById('installmentReceiptForm');
     form.addEventListener('submit', function(e) {
         e.preventDefault();
+        
+        // Validate that a file is selected
+        if (!fileInput.files || fileInput.files.length === 0) {
+            alert('Please select a file to upload.');
+            return;
+        }
         
         const submitBtn = document.getElementById('uploadReceiptBtn');
         const originalText = submitBtn.innerHTML;

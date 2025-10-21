@@ -1652,28 +1652,75 @@ def new_request():
         db.session.add(new_req)
         db.session.commit()
         
-        # Handle variable amount recurring payments
-        if recurring == 'Recurring' and request.form.get('variable_amounts') == 'true':
-            try:
-                # Get the payment schedule data from the form
-                payment_schedule_data = []
-                schedule_data = request.form.get('payment_schedule', '[]')
-                import json
-                schedule_list = json.loads(schedule_data)
-                
-                for payment in schedule_list:
-                    payment_schedule_data.append({
-                        'date': payment['date'],
-                        'amount': payment['amount']
-                    })
-                
-                # Create the payment schedule
-                if payment_schedule_data:
-                    create_recurring_payment_schedule(new_req.request_id, amount_clean if amount else amount, payment_schedule_data)
-                    log_action(f"Created variable amount payment schedule for request #{new_req.request_id}")
-            except Exception as e:
-                print(f"Error creating payment schedule: {e}")
-                flash('Payment request created but schedule configuration failed. Please contact admin.', 'warning')
+        # Handle recurring payment schedules (both variable amounts and custom)
+        if recurring == 'Recurring':
+            recurring_interval = request.form.get('recurring_interval', '')
+            print(f"🔧 DEBUG: Processing recurring payment - interval: {recurring_interval}")
+            
+            # Check if it's a custom payment schedule
+            if recurring_interval.startswith('custom:'):
+                print(f"🔧 DEBUG: Detected custom payment schedule")
+                try:
+                    # Parse custom payment schedule
+                    custom_data = recurring_interval[7:]  # Remove 'custom:' prefix
+                    print(f"🔧 DEBUG: Custom data: {custom_data}")
+                    payment_schedule_data = []
+                    
+                    if custom_data:
+                        # Split by comma to get individual date:amount pairs
+                        date_amount_pairs = custom_data.split(',')
+                        print(f"🔧 DEBUG: Date amount pairs: {date_amount_pairs}")
+                        
+                        for i, pair in enumerate(date_amount_pairs, 1):
+                            if ':' in pair:
+                                date_str, amount_str = pair.split(':', 1)
+                                payment_schedule_data.append({
+                                    'date': date_str,
+                                    'amount': float(amount_str)
+                                })
+                                print(f"🔧 DEBUG: Added payment {i}: {date_str} - {amount_str}")
+                    
+                    print(f"🔧 DEBUG: Final payment schedule data: {payment_schedule_data}")
+                    
+                    # Create the payment schedule
+                    if payment_schedule_data:
+                        success = create_recurring_payment_schedule(new_req.request_id, amount_clean if amount else amount, payment_schedule_data)
+                        if success:
+                            print(f"🔧 DEBUG: Successfully created custom payment schedule for request #{new_req.request_id}")
+                            log_action(f"Created custom payment schedule for request #{new_req.request_id}")
+                        else:
+                            print(f"🔧 DEBUG: Failed to create custom payment schedule for request #{new_req.request_id}")
+                    else:
+                        print(f"🔧 DEBUG: No payment schedule data to create")
+                        
+                except Exception as e:
+                    print(f"Error creating custom payment schedule: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    flash('Payment request created but custom schedule configuration failed. Please contact admin.', 'warning')
+            
+            # Handle variable amount recurring payments (monthly)
+            elif request.form.get('variable_amounts') == 'true':
+                try:
+                    # Get the payment schedule data from the form
+                    payment_schedule_data = []
+                    schedule_data = request.form.get('payment_schedule', '[]')
+                    import json
+                    schedule_list = json.loads(schedule_data)
+                    
+                    for payment in schedule_list:
+                        payment_schedule_data.append({
+                            'date': payment['date'],
+                            'amount': payment['amount']
+                        })
+                    
+                    # Create the payment schedule
+                    if payment_schedule_data:
+                        create_recurring_payment_schedule(new_req.request_id, amount_clean if amount else amount, payment_schedule_data)
+                        log_action(f"Created variable amount payment schedule for request #{new_req.request_id}")
+                except Exception as e:
+                    print(f"Error creating payment schedule: {e}")
+                    flash('Payment request created but schedule configuration failed. Please contact admin.', 'warning')
         
         log_action(f"Created payment request #{new_req.request_id} - {request_type}")
         
@@ -1936,12 +1983,15 @@ def view_request(request_id):
     schedule_rows = []
     total_paid_amount = 0
     
-    # Only process schedule if it's a recurring monthly payment
-    if req.recurring_interval and 'monthly' in req.recurring_interval:
+    # Process schedule if it's a recurring payment (monthly or custom)
+    print(f"🔧 DEBUG: view_request - recurring_interval: {req.recurring_interval}")
+    if req.recurring_interval and ('monthly' in req.recurring_interval or req.recurring_interval.startswith('custom:')):
+        print(f"🔧 DEBUG: Processing recurring payment schedule")
         # Get variable payment schedule if exists - use single query with ordering
         schedule = RecurringPaymentSchedule.query.filter_by(
             request_id=request_id
         ).order_by(RecurringPaymentSchedule.payment_order).all()
+        print(f"🔧 DEBUG: Found {len(schedule)} schedule entries")
         
         if schedule:
             # Optimize: Get all paid notifications and late installments in single queries
@@ -3121,39 +3171,30 @@ def upload_installment_receipt(request_id):
         flash('Missing required parameters.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
-    # Handle multiple receipt uploads
-    if 'receipt_files' not in request.files:
-        flash('No receipt files uploaded.', 'error')
+    # Handle single receipt upload for installment
+    if 'receipt_file' not in request.files:
+        flash('No receipt file uploaded.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
-    receipt_files = request.files.getlist('receipt_files')
-    if not receipt_files or not any(f.filename for f in receipt_files):
-        flash('No receipt files selected.', 'error')
+    receipt_file = request.files['receipt_file']
+    if not receipt_file or not receipt_file.filename:
+        flash('No receipt file selected.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
-    uploaded_files = []
     allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
     
-    for receipt_file in receipt_files:
-        if receipt_file and receipt_file.filename:
-            # Validate file size (10MB max)
-            if len(receipt_file.read()) > 10 * 1024 * 1024:  # 10MB
-                flash(f'File "{receipt_file.filename}" is too large. Maximum size is 10MB.', 'error')
-                return redirect(url_for('view_request', request_id=request_id))
-            
-            # Reset file pointer
-            receipt_file.seek(0)
-            
-            # Validate file extension
-            file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
-            if file_extension not in allowed_extensions:
-                flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
-                return redirect(url_for('view_request', request_id=request_id))
-            
-            uploaded_files.append(receipt_file)
+    # Validate file size (10MB max)
+    if len(receipt_file.read()) > 10 * 1024 * 1024:  # 10MB
+        flash(f'File "{receipt_file.filename}" is too large. Maximum size is 10MB.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
     
-    if not uploaded_files:
-        flash('No valid receipt files were uploaded.', 'error')
+    # Reset file pointer
+    receipt_file.seek(0)
+    
+    # Validate file extension
+    file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
+    if file_extension not in allowed_extensions:
+        flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
     try:
@@ -3163,19 +3204,15 @@ def upload_installment_receipt(request_id):
             flash('Installment not found.', 'error')
             return redirect(url_for('view_request', request_id=request_id))
         
-        # Handle multiple receipt uploads
-        uploaded_filenames = []
+        # Handle single receipt upload for installment
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = secure_filename(receipt_file.filename)
+        filename = f"installment_{schedule_id}_{timestamp}_{filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        receipt_file.save(filepath)
         
-        for i, receipt_file in enumerate(uploaded_files):
-            filename = secure_filename(receipt_file.filename)
-            filename = f"installment_{schedule_id}_{timestamp}_{i+1}_{filename}"
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            receipt_file.save(filepath)
-            uploaded_filenames.append(filename)
-        
-        # Store the first file as primary receipt, others are additional
-        schedule_entry.receipt_path = uploaded_filenames[0]
+        # Store the file as primary receipt
+        schedule_entry.receipt_path = filename
         db.session.commit()
         
         log_action(f"Uploaded receipt for installment {schedule_id} for request #{request_id}")

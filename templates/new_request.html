@@ -183,16 +183,29 @@
                             </div>
                             
                             <div class="recurring-modal-body">
-
-                                <!-- Interval Configuration -->
-                                <div class="config-section">
-                                    <h3><i class="fas fa-repeat"></i> Payment Schedule</h3>
-                                    <div class="interval-config">
-                                        <label>Every</label>
-                                        <input type="number" id="intervalValue" value="1" min="1" max="99" onchange="updateSchedulePreview()">
-                                        <span>month(s)</span>
-                                    </div>
+                                <!-- Payment Interval Tabs -->
+                                <div class="interval-tabs">
+                                    <button type="button" class="interval-tab active" id="monthlyTab" onclick="switchToMonthly()">
+                                        <i class="fas fa-calendar-alt"></i>
+                                        <span>Monthly</span>
+                                    </button>
+                                    <button type="button" class="interval-tab" id="customTab" onclick="switchToCustom()">
+                                        <i class="fas fa-calendar-plus"></i>
+                                        <span>Custom</span>
+                                    </button>
                                 </div>
+
+                                <!-- Monthly Configuration -->
+                                <div id="monthlyConfig" class="interval-config-content">
+                                    <!-- Interval Configuration -->
+                                    <div class="config-section">
+                                        <h3><i class="fas fa-repeat"></i> Payment Schedule</h3>
+                                        <div class="interval-config">
+                                            <label>Every</label>
+                                            <input type="number" id="intervalValue" value="1" min="1" max="99" onchange="updateSchedulePreview()">
+                                            <span>month(s)</span>
+                                        </div>
+                                    </div>
 
                                 <!-- Specific Options -->
                                 <div class="config-section" id="specificOptions">
@@ -282,21 +295,7 @@
 
                                 </div>
 
-                                <!-- Schedule Preview -->
-                                <div class="config-section">
-                                    <h3><i class="fas fa-eye"></i> Preview</h3>
-                                    <div class="schedule-preview">
-                                        <div class="preview-content">
-                                            <i class="fas fa-calendar-check"></i>
-                                            <div class="preview-text">
-                                                <strong>Payment Schedule:</strong>
-                                                <span id="schedulePreview">Every month</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Variable Amount Configuration -->
+                                <!-- Variable Amount Configuration (Monthly only) -->
                                 <div class="config-section">
                                     <h3><i class="fas fa-money-bill-wave"></i> Variable Amounts</h3>
                                     <div class="variable-amount-config">
@@ -338,6 +337,60 @@
                                         </div>
                                     </div>
                                 </div>
+                                </div>
+
+                                <!-- Custom Configuration -->
+                                <div id="customConfig" class="interval-config-content" style="display: none;">
+                                    <div class="config-section">
+                                        <h3><i class="fas fa-calendar-plus"></i> Custom Payment Schedule</h3>
+                                        <div class="custom-date-config">
+                                            <div class="custom-dates-header">
+                                                <label>Add custom payment dates:</label>
+                                                <button type="button" class="btn-add-date" onclick="addCustomDate()">
+                                                    <i class="fas fa-plus"></i> Add Date
+                                                </button>
+                                            </div>
+                                            
+                                            <div id="customDatesList" class="custom-dates-list">
+                                                <!-- Custom dates will be added here -->
+                                            </div>
+                                            
+                                            <div class="custom-dates-info">
+                                                <p><i class="fas fa-info-circle"></i> Add specific dates for your payment schedule. You can add as many dates as needed.</p>
+                                            </div>
+                                            
+                                            <!-- Custom Amount Summary -->
+                                            <div class="custom-amount-summary">
+                                                <div class="summary-row">
+                                                    <span>Total Amount:</span>
+                                                    <span id="customTotalAmount">0.000</span> OMR
+                                                </div>
+                                                <div class="summary-row">
+                                                    <span>Total Allocated:</span>
+                                                    <span id="customTotalAllocated">0.000</span> OMR
+                                                </div>
+                                                <div class="summary-row">
+                                                    <span>Remaining:</span>
+                                                    <span id="customRemainingAmount">0.000</span> OMR
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Schedule Preview -->
+                                <div class="config-section">
+                                    <h3><i class="fas fa-eye"></i> Preview</h3>
+                                    <div class="schedule-preview">
+                                        <div class="preview-content">
+                                            <i class="fas fa-calendar-check"></i>
+                                            <div class="preview-text">
+                                                <strong>Payment Schedule:</strong>
+                                                <span id="schedulePreview">Every month</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             
                             <div class="recurring-modal-footer">
@@ -353,7 +406,7 @@
                 </div>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary" onclick="saveConfigurationBeforeSubmit()">
                         <i class="fas fa-paper-plane"></i> Submit Request
                     </button>
                     <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
@@ -673,6 +726,202 @@ function toggleCalendarDay(dayElement) {
     }
 }
 
+// Tab switching functions
+function switchToMonthly() {
+    // Update tab appearance
+    document.getElementById('monthlyTab').classList.add('active');
+    document.getElementById('customTab').classList.remove('active');
+    
+    // Show monthly config, hide custom config
+    document.getElementById('monthlyConfig').style.display = 'block';
+    document.getElementById('customConfig').style.display = 'none';
+    
+    // Initialize calendar for monthly mode
+    initializeCalendar();
+    updateSchedulePreview();
+}
+
+function switchToCustom() {
+    // Update tab appearance
+    document.getElementById('customTab').classList.add('active');
+    document.getElementById('monthlyTab').classList.remove('active');
+    
+    // Show custom config, hide monthly config
+    document.getElementById('customConfig').style.display = 'block';
+    document.getElementById('monthlyConfig').style.display = 'none';
+    
+    // Initialize custom dates if not already done
+    if (document.getElementById('customDatesList').children.length === 0) {
+        showCustomDatesEmpty();
+    }
+    
+    // Update custom amount summary (this will also update button state)
+    updateCustomAmountSummary();
+    updateSchedulePreview();
+}
+
+// Custom date management
+let customDates = [];
+
+function addCustomDate() {
+    // Check if button is disabled (all amount allocated)
+    const addDateButton = document.querySelector('.btn-add-date');
+    if (addDateButton && addDateButton.disabled) {
+        return; // Don't add date if button is disabled
+    }
+    
+    const customDatesList = document.getElementById('customDatesList');
+    
+    // Remove empty state if it exists
+    const emptyState = customDatesList.querySelector('.custom-dates-empty');
+    if (emptyState) {
+        emptyState.remove();
+    }
+    
+    const dateId = 'customDate_' + Date.now();
+    const dateItem = document.createElement('div');
+    dateItem.className = 'custom-date-item';
+    dateItem.id = dateId;
+    
+    // Get today's date as default
+    const today = new Date();
+    const todayString = today.toISOString().split('T')[0];
+    
+    dateItem.innerHTML = `
+        <span class="date-label">Date:</span>
+        <input type="date" id="${dateId}_date" value="${todayString}" onchange="updateCustomDate(${customDates.length})">
+        <span class="amount-label">Amount:</span>
+        <input type="number" id="${dateId}_amount" value="0.000" step="0.001" min="0" onchange="updateCustomDate(${customDates.length})" onkeydown="handleAmountKeyPress(event, ${customDates.length})">
+        <button type="button" class="btn-remove-date" onclick="removeCustomDate('${dateId}')">
+            <i class="fas fa-trash"></i>
+        </button>
+    `;
+    
+    customDatesList.appendChild(dateItem);
+    
+    // Add to customDates array
+    customDates.push({
+        id: dateId,
+        date: todayString,
+        amount: 0.000
+    });
+    
+    updateCustomAmountSummary();
+    updateSchedulePreview();
+}
+
+function removeCustomDate(dateId) {
+    // Remove from DOM
+    const dateItem = document.getElementById(dateId);
+    if (dateItem) {
+        dateItem.remove();
+    }
+    
+    // Remove from customDates array
+    customDates = customDates.filter(date => date.id !== dateId);
+    
+    // Show empty state if no dates left
+    if (customDates.length === 0) {
+        showCustomDatesEmpty();
+    }
+    
+    updateCustomAmountSummary();
+    updateSchedulePreview();
+}
+
+function updateCustomDate(index) {
+    console.log('🔧 DEBUG: updateCustomDate - called with index:', index, 'customDates.length:', customDates.length);
+    if (index >= 0 && index < customDates.length) {
+        const dateId = customDates[index].id;
+        const dateInput = document.getElementById(dateId + '_date');
+        const amountInput = document.getElementById(dateId + '_amount');
+        
+        console.log('🔧 DEBUG: updateCustomDate - dateId:', dateId, 'dateInput:', dateInput, 'amountInput:', amountInput);
+        
+        if (dateInput && amountInput) {
+            const oldAmount = customDates[index].amount;
+            customDates[index].date = dateInput.value;
+            customDates[index].amount = parseFloat(amountInput.value) || 0;
+            console.log('🔧 DEBUG: updateCustomDate - updated amount from', oldAmount, 'to', customDates[index].amount);
+        }
+    }
+    
+    console.log('🔧 DEBUG: updateCustomDate - calling updateCustomAmountSummary');
+    updateCustomAmountSummary();
+    updateSchedulePreview();
+}
+
+function handleAmountKeyPress(event, index) {
+    console.log('🔧 DEBUG: handleAmountKeyPress - key pressed:', event.key, 'index:', index);
+    if (event.key === 'Enter') {
+        console.log('🔧 DEBUG: handleAmountKeyPress - Enter key detected, calling updateCustomDate');
+        event.preventDefault();
+        updateCustomDate(index);
+    }
+}
+
+function updateCustomAmountSummary() {
+    const totalAmount = parseAmountWithCommas(document.getElementById('amount').value);
+    let totalAllocated = 0;
+    
+    // Calculate total allocated from custom dates
+    customDates.forEach(date => {
+        totalAllocated += date.amount || 0;
+    });
+    
+    const remaining = totalAmount - totalAllocated;
+    
+    // Update the display
+    const totalAmountElement = document.getElementById('customTotalAmount');
+    const totalAllocatedElement = document.getElementById('customTotalAllocated');
+    const remainingElement = document.getElementById('customRemainingAmount');
+    
+    if (totalAmountElement) {
+        totalAmountElement.textContent = totalAmount.toFixed(3);
+    }
+    if (totalAllocatedElement) {
+        totalAllocatedElement.textContent = totalAllocated.toFixed(3);
+    }
+    if (remainingElement) {
+        remainingElement.textContent = remaining.toFixed(3);
+        
+        // Color code the remaining amount
+        if (remaining < 0) {
+            remainingElement.style.color = '#dc3545'; // Red for over-allocated
+        } else if (remaining === 0) {
+            remainingElement.style.color = '#28a745'; // Green for fully allocated
+        } else {
+            remainingElement.style.color = '#6c757d'; // Gray for partially allocated
+        }
+    }
+    
+    // Enable/disable Add Date button based on remaining amount
+    const addDateButton = document.querySelector('.btn-add-date');
+    if (addDateButton) {
+        if (remaining <= 0) {
+            addDateButton.disabled = true;
+            addDateButton.style.opacity = '0.5';
+            addDateButton.style.cursor = 'not-allowed';
+            addDateButton.title = 'Cannot add more dates. All amount has been allocated.';
+        } else {
+            addDateButton.disabled = false;
+            addDateButton.style.opacity = '1';
+            addDateButton.style.cursor = 'pointer';
+            addDateButton.title = 'Add a new payment date';
+        }
+    }
+}
+
+function showCustomDatesEmpty() {
+    const customDatesList = document.getElementById('customDatesList');
+    customDatesList.innerHTML = `
+        <div class="custom-dates-empty">
+            <i class="fas fa-calendar-plus"></i>
+            <p>No custom dates added yet. Click "Add Date" to start building your payment schedule.</p>
+        </div>
+    `;
+}
+
 function openRecurringModal() {
     document.getElementById('recurringModal').style.display = 'block';
     document.body.style.overflow = 'hidden';
@@ -715,29 +964,49 @@ function clearSavedPreferences() {
 let tempRecurringConfig = '';
 
 function saveTempConfig() {
-    const interval = document.getElementById('intervalValue').value;
-    let config = `monthly:${interval}`;
+    // Check which tab is active
+    const customTab = document.getElementById('customTab');
+    const isCustomActive = customTab && customTab.classList.contains('active');
     
-    // Handle monthly options - store the single selected date
-    if (selectedDates && selectedDates.length > 0) {
-        // Get the first (and only) selected date
-        const date = selectedDates[0];
-        const monthNum = String(date.month + 1).padStart(2, '0'); // Convert 0-based to 1-based and pad
-        const dayNum = String(date.day).padStart(2, '0');
-        const dateString = `${date.year}-${monthNum}-${dayNum}`;
+    let config = '';
+    
+    if (isCustomActive) {
+        // Save custom configuration
+        console.log('saveTempConfig - saving custom configuration');
+        if (customDates.length === 0) {
+            config = '';
+        } else {
+            config = 'custom:';
+            const sortedDates = [...customDates].sort((a, b) => new Date(a.date) - new Date(b.date));
+            const dateStrings = sortedDates.map(date => `${date.date}:${date.amount}`);
+            config += dateStrings.join(',');
+        }
+    } else {
+        // Save monthly configuration
+        const interval = document.getElementById('intervalValue').value;
+        config = `monthly:${interval}`;
         
-        // Store the single date in the config
-        config += `:date:${dateString}`;
-        console.log('saveTempConfig - Selected date for config:', dateString);
-    }
-    
-    // Add end date if set
-    const endDateToggle = document.getElementById('endDateToggle');
-    if (endDateToggle && endDateToggle.checked) {
-        const endDate = getSelectedEndDate();
-        if (endDate) {
-            config += `:end:${endDate}`;
-            console.log('saveTempConfig - Added end date to config:', endDate);
+        // Handle monthly options - store the single selected date
+        if (selectedDates && selectedDates.length > 0) {
+            // Get the first (and only) selected date
+            const date = selectedDates[0];
+            const monthNum = String(date.month + 1).padStart(2, '0'); // Convert 0-based to 1-based and pad
+            const dayNum = String(date.day).padStart(2, '0');
+            const dateString = `${date.year}-${monthNum}-${dayNum}`;
+            
+            // Store the single date in the config
+            config += `:date:${dateString}`;
+            console.log('saveTempConfig - Selected date for config:', dateString);
+        }
+        
+        // Add end date if set
+        const endDateToggle = document.getElementById('endDateToggle');
+        if (endDateToggle && endDateToggle.checked) {
+            const endDate = getSelectedEndDate();
+            if (endDate) {
+                config += `:end:${endDate}`;
+                console.log('saveTempConfig - Added end date to config:', endDate);
+            }
         }
     }
     
@@ -768,66 +1037,127 @@ function loadExistingConfig() {
         const frequency = parts[0];
         const interval = parts[1];
         
-        // All configurations are monthly now
-        updateFrequencyOptions();
-        
-        // Set interval from config
-        document.getElementById('intervalValue').value = interval;
-        
-        // Load monthly settings
-        if (frequency === 'monthly' && parts[2] === 'days') {
-            const days = parts[3].split(',');
-            // Set the correct month and year first if they exist
-            if (parts.length > 5) {
-                const year = parseInt(parts[5]);
-                const month = parseInt(parts[4]) - 1; // Convert 1-based to 0-based for dropdown
-                document.getElementById('yearSelect').value = year;
-                document.getElementById('monthSelect').value = month;
+        if (frequency === 'custom') {
+            // Load custom configuration
+            console.log('Loading custom configuration');
+            
+            // Switch to custom tab
+            switchToCustom();
+            
+            // Clear existing custom dates
+            customDates = [];
+            document.getElementById('customDatesList').innerHTML = '';
+            
+            // Load custom dates from config
+            if (parts.length > 1) {
+                const customDatesString = parts[1];
+                const customDatesArray = customDatesString.split(',');
                 
-                // Add days to selectedDates array
-                selectedDates = [];
-            days.forEach(day => {
-                    addSelectedDate(year, month, parseInt(day));
+                customDatesArray.forEach((dateAmountPair, index) => {
+                    const [date, amount] = dateAmountPair.split(':');
+                    if (date) {
+                        // Add to customDates array
+                        const dateId = 'customDate_' + Date.now() + '_' + index;
+                        customDates.push({
+                            id: dateId,
+                            date: date,
+                            amount: parseFloat(amount) || 0
+                        });
+                        
+                        // Create DOM element
+                        const customDatesList = document.getElementById('customDatesList');
+                        const dateItem = document.createElement('div');
+                        dateItem.className = 'custom-date-item';
+                        dateItem.id = dateId;
+                        
+                        dateItem.innerHTML = `
+                            <span class="date-label">Date:</span>
+                            <input type="date" id="${dateId}_date" value="${date}" onchange="updateCustomDate(${customDates.length - 1})">
+                            <span class="amount-label">Amount:</span>
+                            <input type="number" id="${dateId}_amount" value="${amount}" step="0.001" min="0" onchange="updateCustomDate(${customDates.length - 1})" onkeydown="handleAmountKeyPress(event, ${customDates.length - 1})">
+                            <button type="button" class="btn-remove-date" onclick="removeCustomDate('${dateId}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        `;
+                        
+                        customDatesList.appendChild(dateItem);
+                    }
                 });
-                
-                updateCalendarDays();
             }
-            // Then select the days
+            
+            // Update preview
             setTimeout(() => {
                 updateSchedulePreview();
             }, 100);
-        }
-        
-        // Load end date if it exists
-        const endDateIndex = parts.indexOf('end');
-        if (endDateIndex !== -1 && endDateIndex + 1 < parts.length) {
-            const endDate = parts[endDateIndex + 1];
-            console.log('Loading end date:', endDate);
             
-            // Parse end date and set the selectors (always 30th)
-            const [year, month] = endDate.split('-').map(num => parseInt(num));
-            document.getElementById('endDateToggle').checked = true;
-            document.getElementById('endDateSection').style.display = 'block';
+        } else {
+            // Load monthly configuration
+            console.log('Loading monthly configuration');
             
-            // Set the month and year for end date
-            document.getElementById('endMonthSelect').value = month - 1; // Convert to 0-based
-            document.getElementById('endYearSelect').value = year;
+            // Switch to monthly tab
+            switchToMonthly();
             
-            // Initialize end date selectors
-            initializeEndDateSelectors();
+            // All configurations are monthly now
+            updateFrequencyOptions();
             
-            // Update display and preview
-            setTimeout(() => {
-                updateEndDateDisplay();
-                updateSchedulePreview();
-            }, 200);
+            // Set interval from config
+            document.getElementById('intervalValue').value = interval;
+            
+            // Load monthly settings
+            if (frequency === 'monthly' && parts[2] === 'days') {
+                const days = parts[3].split(',');
+                // Set the correct month and year first if they exist
+                if (parts.length > 5) {
+                    const year = parseInt(parts[5]);
+                    const month = parseInt(parts[4]) - 1; // Convert 1-based to 0-based for dropdown
+                    document.getElementById('yearSelect').value = year;
+                    document.getElementById('monthSelect').value = month;
+                    
+                    // Add days to selectedDates array
+                    selectedDates = [];
+                days.forEach(day => {
+                        addSelectedDate(year, month, parseInt(day));
+                    });
+                    
+                    updateCalendarDays();
+                }
+                // Then select the days
+                setTimeout(() => {
+                    updateSchedulePreview();
+                }, 100);
+            }
+            
+            // Load end date if it exists
+            const endDateIndex = parts.indexOf('end');
+            if (endDateIndex !== -1 && endDateIndex + 1 < parts.length) {
+                const endDate = parts[endDateIndex + 1];
+                console.log('Loading end date:', endDate);
+                
+                // Parse end date and set the selectors (always 30th)
+                const [year, month] = endDate.split('-').map(num => parseInt(num));
+                document.getElementById('endDateToggle').checked = true;
+                document.getElementById('endDateSection').style.display = 'block';
+                
+                // Set the month and year for end date
+                document.getElementById('endMonthSelect').value = month - 1; // Convert to 0-based
+                document.getElementById('endYearSelect').value = year;
+                
+                // Initialize end date selectors
+                initializeEndDateSelectors();
+                
+                // Update display and preview
+                setTimeout(() => {
+                    updateEndDateDisplay();
+                    updateSchedulePreview();
+                }, 200);
+            }
         }
     }
 }
 
 function closeRecurringModal() {
-    // Save current configuration to temporary storage before closing
-    saveTempConfig();
+    // Don't save temp config here as it overwrites the saved configuration
+    // The configuration should already be saved by saveRecurringConfig()
     
     // Update payment schedule if variable amounts are enabled
     const variableAmountsToggle = document.getElementById('variableAmountsToggle');
@@ -968,51 +1298,99 @@ function getSelectedEndDate() {
 }
 
 function updateSchedulePreview() {
-    const interval = document.getElementById('intervalValue').value;
-    console.log('🔧 DEBUG: updateSchedulePreview - interval:', interval);
-    console.log('🔧 DEBUG: updateSchedulePreview - selectedDates:', selectedDates);
+    console.log('🔧 DEBUG: updateSchedulePreview - starting');
     
-    let preview = `Every ${interval} month(s)`;
+    // Check which tab is active
+    const monthlyTab = document.getElementById('monthlyTab');
+    const isMonthlyActive = monthlyTab && monthlyTab.classList.contains('active');
     
-    // Save configuration to hidden field in real-time
-    saveConfigurationToHiddenField();
+    let preview = '';
     
-    // Handle monthly options - use all selected dates across months
-    if (selectedDates && selectedDates.length > 0) {
-        const selectedDays = selectedDates
-            .map(date => {
-                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                return `${monthNames[date.month]} ${date.day}, ${date.year}`;
-            })
-            .sort((a, b) => {
-                // Sort by actual date
-                const dateA = new Date(a);
-                const dateB = new Date(b);
-                return dateA - dateB;
-            });
+    if (isMonthlyActive) {
+        // Monthly configuration
+        const interval = document.getElementById('intervalValue').value;
+        console.log('🔧 DEBUG: updateSchedulePreview - monthly mode, interval:', interval);
+        console.log('🔧 DEBUG: updateSchedulePreview - selectedDates:', selectedDates);
         
-        console.log('🔧 DEBUG: updateSchedulePreview - selected days:', selectedDays);
+        preview = `Every ${interval} month(s)`;
         
-        if (selectedDays.length > 0) {
-            preview += ` starting on ${selectedDays.join(', ')}`;
-        }
-    }
-    
-    // Add end date information if set
-    const endDateToggle = document.getElementById('endDateToggle');
-    if (endDateToggle && endDateToggle.checked) {
-        const endDate = getSelectedEndDate();
-        if (endDate) {
-            // Parse date string to avoid timezone issues
-            const [year, month, day] = endDate.split('-').map(num => parseInt(num));
-            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-            const formattedEndDate = `${monthNames[month - 1]} 30, ${year}`;
-            preview += ` until ${formattedEndDate}`;
-            console.log('🔧 DEBUG: updateSchedulePreview - end date string:', endDate, '-> formatted:', formattedEndDate);
+        // Save configuration to hidden field in real-time
+        saveConfigurationToHiddenField();
+        
+        // Handle monthly options - use all selected dates across months
+        if (selectedDates && selectedDates.length > 0) {
+            const selectedDays = selectedDates
+                .map(date => {
+                    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                    return `${monthNames[date.month]} ${date.day}, ${date.year}`;
+                })
+                .sort((a, b) => {
+                    // Sort by actual date
+                    const dateA = new Date(a);
+                    const dateB = new Date(b);
+                    return dateA - dateB;
+                });
             
-            // Update the end date display
-            updateEndDateDisplay();
+            console.log('🔧 DEBUG: updateSchedulePreview - selected days:', selectedDays);
+            
+            if (selectedDays.length > 0) {
+                preview += ` starting on ${selectedDays.join(', ')}`;
+            }
         }
+        
+        // Add end date information if set
+        const endDateToggle = document.getElementById('endDateToggle');
+        if (endDateToggle && endDateToggle.checked) {
+            const endDate = getSelectedEndDate();
+            if (endDate) {
+                // Parse date string to avoid timezone issues
+                const [year, month, day] = endDate.split('-').map(num => parseInt(num));
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                const formattedEndDate = `${monthNames[month - 1]} 30, ${year}`;
+                preview += ` until ${formattedEndDate}`;
+                console.log('🔧 DEBUG: updateSchedulePreview - end date string:', endDate, '-> formatted:', formattedEndDate);
+                
+                // Update the end date display
+                updateEndDateDisplay();
+            }
+        }
+    } else {
+        // Custom configuration
+        console.log('🔧 DEBUG: updateSchedulePreview - custom mode, customDates:', customDates);
+        
+        if (customDates.length === 0) {
+            preview = 'No custom dates added yet';
+        } else {
+            // Sort custom dates by date
+            const sortedDates = [...customDates].sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            if (sortedDates.length === 1) {
+                const date = new Date(sortedDates[0].date);
+                const formattedDate = date.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                preview = `Custom payment on ${formattedDate}`;
+            } else {
+                const firstDate = new Date(sortedDates[0].date);
+                const lastDate = new Date(sortedDates[sortedDates.length - 1].date);
+                const firstFormatted = firstDate.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                const lastFormatted = lastDate.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                preview = `Custom payments: ${sortedDates.length} installments from ${firstFormatted} to ${lastFormatted}`;
+            }
+        }
+        
+        // Save custom configuration to hidden field
+        saveCustomConfigurationToHiddenField();
     }
     
     console.log('🔧 DEBUG: updateSchedulePreview - final preview:', preview);
@@ -1021,12 +1399,14 @@ function updateSchedulePreview() {
         previewElement.textContent = preview;
     }
     
-    // If variable amounts are enabled, refresh the payment inputs
-    const variableAmountsToggle = document.getElementById('variableAmountsToggle');
-    if (variableAmountsToggle && variableAmountsToggle.checked) {
-        console.log('🔧 DEBUG: updateSchedulePreview - schedule preview updated, refreshing variable amounts...');
-        generatePaymentAmountInputs();
-        updateAmountSummary();
+    // Handle variable amounts for monthly mode only
+    if (isMonthlyActive) {
+        const variableAmountsToggle = document.getElementById('variableAmountsToggle');
+        if (variableAmountsToggle && variableAmountsToggle.checked) {
+            console.log('🔧 DEBUG: updateSchedulePreview - schedule preview updated, refreshing variable amounts...');
+            generatePaymentAmountInputs();
+            updateAmountSummary();
+        }
     }
 }
 
@@ -1080,34 +1460,78 @@ function saveConfigurationToHiddenField() {
     }
 }
 
-function saveRecurringConfig() {
-    const interval = document.getElementById('intervalValue').value;
+function saveCustomConfigurationToHiddenField() {
+    console.log('🔧 DEBUG: saveCustomConfigurationToHiddenField - customDates:', customDates);
     
-    let config = `monthly:${interval}`;
-    
-    console.log('Saving recurring config - frequency: monthly, interval:', interval);
-    
-    // Handle monthly options - store the single selected date
-    if (selectedDates && selectedDates.length > 0) {
-        // Get the first (and only) selected date
-        const date = selectedDates[0];
-        const monthNum = String(date.month + 1).padStart(2, '0'); // Convert 0-based to 1-based and pad
-        const dayNum = String(date.day).padStart(2, '0');
-        const dateString = `${date.year}-${monthNum}-${dayNum}`;
-        
-        // Store the single date in the config
-        config += `:date:${dateString}`;
-        console.log('Selected date for config:', dateString);
+    if (customDates.length === 0) {
+        document.getElementById('recurring_interval').value = '';
+        return;
     }
     
-    // Add end date if set
-    const endDateToggle = document.getElementById('endDateToggle');
-    if (endDateToggle && endDateToggle.checked) {
-        const endDate = getSelectedEndDate();
-        if (endDate) {
-            config += `:end:${endDate}`;
-            console.log('Added end date to config:', endDate);
+    // Create custom configuration string
+    let config = 'custom:';
+    
+    // Add all custom dates
+    const sortedDates = [...customDates].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const dateStrings = sortedDates.map(date => `${date.date}:${date.amount}`);
+    config += dateStrings.join(',');
+    
+    console.log('🔧 DEBUG: saveCustomConfigurationToHiddenField - final config:', config);
+    document.getElementById('recurring_interval').value = config;
+}
+
+function saveRecurringConfig() {
+    // Check which tab is active
+    const monthlyTab = document.getElementById('monthlyTab');
+    const isMonthlyActive = monthlyTab && monthlyTab.classList.contains('active');
+    
+    let config = '';
+    
+    if (isMonthlyActive) {
+        // Monthly configuration
+        const interval = document.getElementById('intervalValue').value;
+        config = `monthly:${interval}`;
+        
+        console.log('Saving recurring config - frequency: monthly, interval:', interval);
+        
+        // Handle monthly options - store the single selected date
+        if (selectedDates && selectedDates.length > 0) {
+            // Get the first (and only) selected date
+            const date = selectedDates[0];
+            const monthNum = String(date.month + 1).padStart(2, '0'); // Convert 0-based to 1-based and pad
+            const dayNum = String(date.day).padStart(2, '0');
+            const dateString = `${date.year}-${monthNum}-${dayNum}`;
+            
+            // Store the single date in the config
+            config += `:date:${dateString}`;
+            console.log('Selected date for config:', dateString);
         }
+        
+        // Add end date if set
+        const endDateToggle = document.getElementById('endDateToggle');
+        if (endDateToggle && endDateToggle.checked) {
+            const endDate = getSelectedEndDate();
+            if (endDate) {
+                config += `:end:${endDate}`;
+                console.log('Added end date to config:', endDate);
+            }
+        }
+    } else {
+        // Custom configuration
+        console.log('Saving recurring config - frequency: custom, customDates:', customDates);
+        
+        if (customDates.length === 0) {
+            alert('Please add at least one custom payment date before saving.');
+            return;
+        }
+        
+        // Create custom configuration string
+        config = 'custom:';
+        
+        // Add all custom dates
+        const sortedDates = [...customDates].sort((a, b) => new Date(a.date) - new Date(b.date));
+        const dateStrings = sortedDates.map(date => `${date.date}:${date.amount}`);
+        config += dateStrings.join(',');
     }
     
     console.log('Final config being saved:', config);
@@ -1143,6 +1567,24 @@ function saveRecurringConfig() {
 function showCurrentConfig() {
     // Always show the edit button when this function is called
     document.getElementById('configureButton').style.display = 'block';
+}
+
+function saveConfigurationBeforeSubmit() {
+    console.log('🔧 DEBUG: saveConfigurationBeforeSubmit - saving configuration before form submission');
+    
+    // Check if we're in custom mode and save the configuration
+    const customTab = document.getElementById('customTab');
+    if (customTab && customTab.classList.contains('active')) {
+        console.log('🔧 DEBUG: saveConfigurationBeforeSubmit - custom tab is active, saving custom configuration');
+        saveCustomConfigurationToHiddenField();
+    } else {
+        console.log('🔧 DEBUG: saveConfigurationBeforeSubmit - monthly tab is active, saving monthly configuration');
+        saveConfigurationToHiddenField();
+    }
+    
+    // Log the final configuration
+    const finalConfig = document.getElementById('recurring_interval').value;
+    console.log('🔧 DEBUG: saveConfigurationBeforeSubmit - final recurring_interval value:', finalConfig);
 }
 
 // Helper function to parse amount with commas
@@ -1441,10 +1883,37 @@ function getScheduleDates() {
     // Parse the configuration and generate dates
     const parts = config.split(':');
     const frequency = parts[0];
-    const interval = parseInt(parts[1]);
-    console.log('🔧 DEBUG: getScheduleDates - frequency:', frequency, 'interval:', interval);
+    console.log('🔧 DEBUG: getScheduleDates - frequency:', frequency);
     
     const dates = [];
+    
+    if (frequency === 'custom') {
+        // Handle custom dates
+        console.log('🔧 DEBUG: getScheduleDates - processing custom dates');
+        
+        if (parts.length > 1) {
+            const customDatesString = parts[1];
+            const customDatesArray = customDatesString.split(',');
+            
+            customDatesArray.forEach(dateAmountPair => {
+                const [date, amount] = dateAmountPair.split(':');
+                if (date) {
+                    dates.push(date);
+                    console.log('🔧 DEBUG: getScheduleDates - custom date:', date, 'amount:', amount);
+                }
+            });
+        }
+        
+        // Sort dates chronologically
+        dates.sort((a, b) => new Date(a) - new Date(b));
+        
+        console.log('🔧 DEBUG: getScheduleDates - final custom dates:', dates, 'total:', dates.length);
+        return dates;
+    }
+    
+    // Handle monthly configuration
+    const interval = parseInt(parts[1]);
+    console.log('🔧 DEBUG: getScheduleDates - interval:', interval);
     
     // Get the start date from the specific settings using the flexible extractor
     let startDate = extractStartDateFromConfig(parts);
