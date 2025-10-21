@@ -1440,27 +1440,70 @@ function updateEndDateDisplay() {
         return;
     }
     
-    const month = parseInt(monthSelect.value);
-    const year = parseInt(yearSelect.value);
+    // Get the calculated end date
+    const endDate = getSelectedEndDate();
+    if (!endDate) {
+        return;
+    }
+    
+    // Parse the end date to get month, day, and year
+    const [year, month, day] = endDate.split('-').map(num => parseInt(num));
     
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     
-    endDateDisplay.textContent = `${monthNames[month]} 30, ${year}`;
+    endDateDisplay.textContent = `${monthNames[month - 1]} ${day}, ${year}`;
 }
 
-// No longer needed - end date is always 30th
+// End date is now calculated as one day before the same day of month as starting date
 
 function getSelectedEndDate() {
-    // Always return the 30th of the selected month/year
-    const month = parseInt(document.getElementById('endMonthSelect').value) + 1; // Convert to 1-based
-    const year = parseInt(document.getElementById('endYearSelect').value);
-    const day = 30; // Always 30th
+    // Get the selected end month/year
+    const endMonth = parseInt(document.getElementById('endMonthSelect').value) + 1; // Convert to 1-based
+    const endYear = parseInt(document.getElementById('endYearSelect').value);
     
-    console.log('🔧 DEBUG: getSelectedEndDate - year:', year, 'month:', month, 'day:', day);
+    // Get the starting date from selectedDates
+    let startDay = 1; // Default fallback
+    if (selectedDates && selectedDates.length > 0) {
+        startDay = selectedDates[0].day;
+        console.log('🔧 DEBUG: getSelectedEndDate - using start day from selectedDates:', startDay);
+    } else {
+        console.log('🔧 DEBUG: getSelectedEndDate - no selectedDates, using default start day:', startDay);
+    }
     
-    const result = `${year}-${month.toString().padStart(2, '0')}-30`;
+    // Calculate the end date as one day before the same day of the month
+    // For example, if start date is Nov 5, 2025 and end is March 2026, result should be March 4, 2026
+    let endDay = startDay - 1;
+    
+    // Handle edge case where start day is 1 (result would be 0)
+    if (endDay <= 0) {
+        // If start day is 1, use the last day of the selected end month
+        const tempDate = new Date(endYear, endMonth, 0); // Last day of the selected end month
+        endDay = tempDate.getDate();
+        console.log('🔧 DEBUG: getSelectedEndDate - start day is 1, using last day of selected end month:', endDay);
+    }
+    
+    // Handle February 29th in non-leap years
+    if (endMonth === 2 && endDay === 29 && !isLeapYear(endYear)) {
+        endDay = 28;
+        console.log('🔧 DEBUG: getSelectedEndDate - adjusted for non-leap year February:', endDay);
+    }
+    
+    // Handle cases where the calculated day doesn't exist in the target month
+    const daysInMonth = new Date(endYear, endMonth, 0).getDate();
+    if (endDay > daysInMonth) {
+        endDay = daysInMonth;
+        console.log('🔧 DEBUG: getSelectedEndDate - adjusted to last day of month:', endDay);
+    }
+    
+    console.log('🔧 DEBUG: getSelectedEndDate - year:', endYear, 'month:', endMonth, 'day:', endDay);
+    
+    const result = `${endYear}-${endMonth.toString().padStart(2, '0')}-${endDay.toString().padStart(2, '0')}`;
     console.log('🔧 DEBUG: getSelectedEndDate - returning:', result);
     return result;
+}
+
+function isLeapYear(year) {
+    return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
 }
 
 function updateSchedulePreview() {
@@ -1512,7 +1555,7 @@ function updateSchedulePreview() {
                 // Parse date string to avoid timezone issues
                 const [year, month, day] = endDate.split('-').map(num => parseInt(num));
                 const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                const formattedEndDate = `${monthNames[month - 1]} 30, ${year}`;
+                const formattedEndDate = `${monthNames[month - 1]} ${day}, ${year}`;
                 preview += ` until ${formattedEndDate}`;
                 console.log('🔧 DEBUG: updateSchedulePreview - end date string:', endDate, '-> formatted:', formattedEndDate);
                 
