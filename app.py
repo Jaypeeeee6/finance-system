@@ -737,7 +737,7 @@ def get_notifications_for_user(user):
                 Notification.user_id == user.user_id,
                 db.or_(
                     Notification.notification_type == 'recurring_due',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                 )
             )
         ).order_by(Notification.created_at.desc()).limit(5).all()
@@ -751,7 +751,7 @@ def get_notifications_for_user(user):
                     Notification.user_id == user.user_id,
                     db.or_(
                         Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                     )
                 )
             ).order_by(Notification.created_at.desc()).limit(5).all()
@@ -762,7 +762,7 @@ def get_notifications_for_user(user):
                     Notification.user_id == user.user_id,
                     db.or_(
                         Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                     )
                 )
             ).order_by(Notification.created_at.desc()).limit(5).all()
@@ -781,7 +781,7 @@ def get_notifications_for_user(user):
                 Notification.user_id == user.user_id,
                 db.or_(
                     db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('Department Manager')),
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
                 )
             )
@@ -794,7 +794,7 @@ def get_notifications_for_user(user):
                 Notification.user_id == user.user_id,
                 db.or_(
                     db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('Operation Staff')),
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
                 )
             )
@@ -841,7 +841,7 @@ def get_notifications_for_user(user):
                 db.or_(
                     Notification.notification_type == 'new_submission',
                     Notification.notification_type == 'recurring_due',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                 )
             )
         ).order_by(Notification.created_at.desc()).limit(5).all()
@@ -853,7 +853,7 @@ def get_notifications_for_user(user):
         return Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
-                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
             )
         ).order_by(Notification.created_at.desc()).limit(5).all()
 
@@ -868,7 +868,7 @@ def get_unread_count_for_user(user):
                 Notification.is_read == False,
                 db.or_(
                     Notification.notification_type == 'recurring_due',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                 )
             )
         ).count()
@@ -883,7 +883,7 @@ def get_unread_count_for_user(user):
                     Notification.is_read == False,
                     db.or_(
                         Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                     )
                 )
             ).count()
@@ -895,7 +895,7 @@ def get_unread_count_for_user(user):
                     Notification.is_read == False,
                     db.or_(
                         Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                     )
                 )
             ).count()
@@ -906,7 +906,7 @@ def get_unread_count_for_user(user):
                     Notification.is_read == False,
                     db.or_(
                         Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                     )
                 )
             ).count()
@@ -919,7 +919,7 @@ def get_unread_count_for_user(user):
                 Notification.is_read == False,
                 db.or_(
                     db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('Department Manager')),
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
                 )
             )
@@ -933,7 +933,7 @@ def get_unread_count_for_user(user):
                 Notification.is_read == False,
                 db.or_(
                     db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('Operation Staff')),
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
                 )
             )
@@ -975,7 +975,7 @@ def get_unread_count_for_user(user):
                 db.or_(
                     Notification.notification_type == 'new_submission',  # Simplified - same as get_notifications_for_user
                     Notification.notification_type == 'recurring_due',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                 )
             )
         ).count()
@@ -986,7 +986,7 @@ def get_unread_count_for_user(user):
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
-                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
             )
         ).count()
 
@@ -2122,21 +2122,6 @@ def new_request():
                     request_id=new_req.request_id
                 )
                 
-                # Also directly notify Department Manager (same approach as Finance Admin)
-                print(f"🔔 DEBUG: Directly notifying Department Manager for new request #{new_req.request_id}")
-                dept_manager = User.query.filter_by(role='Department Manager', department=current_user.department).first()
-                if dept_manager:
-                    print(f"🔔 DEBUG: Found Department Manager: {dept_manager.username} from {dept_manager.department}")
-                    create_notification(
-                        user_id=dept_manager.user_id,
-                        title="New Payment Request for Approval",
-                        message=f"New {request_type} request submitted by {requestor_name} from {current_user.department} department for OMR {amount} - requires your approval",
-                        notification_type="new_submission",
-                        request_id=new_req.request_id
-                    )
-                    print(f"🔔 DEBUG: Created notification for Department Manager {dept_manager.username}")
-                else:
-                    print(f"🔔 ERROR: No Department Manager found for department: {current_user.department}")
                 
         except Exception as e:
             print(f"Error creating notifications: {e}")
