@@ -686,6 +686,7 @@ def check_recurring_payment_completion(request_id):
                 # Mark the request as completed
                 req.status = 'Completed'
                 req.completion_date = datetime.utcnow().date()
+                req.approval_date = datetime.utcnow().date()  # Set approval_date when status becomes Completed
                 req.updated_at = datetime.utcnow()
                 
                 # End finance approval timing when completed
@@ -2578,7 +2579,6 @@ def approve_request(request_id):
             if req.recurring == 'Recurring':
                 # Recurring payment - set status to Recurring
                 req.status = 'Recurring'
-                req.approval_date = today
                 
                 # End finance approval timing when recurring payment is approved
                 if req.finance_approval_start_time and not req.finance_approval_end_time:
@@ -2643,8 +2643,8 @@ def approve_request(request_id):
             else:
                 # One-time payment - set status to Completed
                 req.status = 'Completed'
-                req.approval_date = today
                 req.completion_date = today
+                req.approval_date = today  # Set approval_date when status becomes Completed
                 
                 # End finance approval timing when completed
                 if req.finance_approval_start_time and not req.finance_approval_end_time:
@@ -2720,7 +2720,7 @@ def approve_request(request_id):
         req.receipt_path = uploaded_files[0]
         
         req.status = 'Paid'
-        req.approval_date = datetime.utcnow().date()
+        req.approval_date = datetime.utcnow().date()  # Set approval_date when status becomes Paid
         req.updated_at = datetime.utcnow()
         
         db.session.commit()
@@ -2744,7 +2744,6 @@ def approve_request(request_id):
         if req.recurring == 'Recurring':
             # For recurring payments, set status to Recurring and handle payment schedule
             req.status = 'Recurring'
-            req.approval_date = current_time.date()
             
             # End finance approval timing when recurring payment is approved
             if req.finance_approval_start_time and not req.finance_approval_end_time:
@@ -2812,7 +2811,6 @@ def approve_request(request_id):
             # The timer should continue running through Payment Pending status
             
             req.status = 'Payment Pending'
-            req.approval_date = current_time.date()
             req.updated_at = current_time
             
             db.session.commit()
@@ -3038,6 +3036,7 @@ def mark_as_paid(request_id):
     
     # Mark as paid
     req.status = 'Approved'
+    req.approval_date = datetime.utcnow().date()  # Set approval_date when status becomes Approved
     req.updated_at = datetime.utcnow()
     
     db.session.commit()
@@ -3079,6 +3078,7 @@ def close_request(request_id):
     # Close the request
     req.status = 'Completed'
     req.completion_date = datetime.utcnow().date()
+    req.approval_date = datetime.utcnow().date()  # Set approval_date when status becomes Completed
     req.updated_at = datetime.utcnow()
     
     # End finance approval timing when completed
@@ -3268,7 +3268,7 @@ def final_approve_request(request_id):
     
     # Final approval
     req.status = 'Approved'
-    req.approval_date = datetime.utcnow().date()  # Set approval date
+    req.approval_date = datetime.utcnow().date()  # Set approval_date when status becomes Approved
     req.updated_at = datetime.utcnow()
     
     db.session.commit()
@@ -3900,16 +3900,15 @@ def reports():
         flash('You do not have permission to access this page.', 'danger')
         return redirect(url_for('dashboard'))
     
-    # Get filter parameters
+    # Get filter parameters (no status filter - only show Completed requests)
     department_filter = request.args.get('department', '')
-    status_filter = request.args.get('status', '')
     request_type_filter = request.args.get('request_type', '')
     company_filter = request.args.get('company', '')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
     
-    # Build query
-    query = PaymentRequest.query
+    # Build query - only show Completed requests
+    query = PaymentRequest.query.filter_by(status='Completed')
     
     # Role-based department filtering
     if current_user.role == 'Operation Manager':
@@ -3918,29 +3917,18 @@ def reports():
     
     if department_filter:
         query = query.filter_by(department=department_filter)
-    if status_filter:
-        query = query.filter_by(status=status_filter)
     if request_type_filter:
         query = query.filter_by(request_type=request_type_filter)
     if company_filter:
-        # Only filter by company name for approved requests with company_name
+        # Only filter by company name for completed requests with company_name
         query = query.filter(PaymentRequest.company_name.ilike(f'%{company_filter}%'))
     
-    # Date filtering and sorting based on status
-    if status_filter == 'Approved':
-        # For approved requests, filter and sort by approval_date
-        if date_from:
-            query = query.filter(PaymentRequest.approval_date >= datetime.strptime(date_from, '%Y-%m-%d').date())
-        if date_to:
-            query = query.filter(PaymentRequest.approval_date <= datetime.strptime(date_to, '%Y-%m-%d').date())
-        requests = query.order_by(PaymentRequest.approval_date.desc()).all()
-    else:
-        # For all other statuses (Pending, Proof Pending, Proof Sent, or All), use submission date
-        if date_from:
-            query = query.filter(PaymentRequest.date >= datetime.strptime(date_from, '%Y-%m-%d').date())
-        if date_to:
-            query = query.filter(PaymentRequest.date <= datetime.strptime(date_to, '%Y-%m-%d').date())
-        requests = query.order_by(PaymentRequest.date.desc()).all()
+    # Date filtering and sorting for completed requests (use approval_date)
+    if date_from:
+        query = query.filter(PaymentRequest.approval_date >= datetime.strptime(date_from, '%Y-%m-%d').date())
+    if date_to:
+        query = query.filter(PaymentRequest.approval_date <= datetime.strptime(date_to, '%Y-%m-%d').date())
+    requests = query.order_by(PaymentRequest.approval_date.desc()).all()
     
     # Get unique departments for filter
     if current_user.role == 'Operation Manager':
@@ -3951,9 +3939,9 @@ def reports():
         departments = db.session.query(PaymentRequest.department).distinct().all()
         departments = [d[0] for d in departments]
     
-    # Get unique companies for filter (only for approved requests with company_name)
+    # Get unique companies for filter (only for completed requests with company_name)
     companies = db.session.query(PaymentRequest.company_name).filter(
-        PaymentRequest.status == 'Approved',
+        PaymentRequest.status == 'Completed',
         PaymentRequest.company_name.isnot(None),
         PaymentRequest.company_name != ''
     ).distinct().all()
@@ -3986,15 +3974,14 @@ def export_reports_pdf():
         flash(f'Error importing PDF library: {str(e)}', 'error')
         return redirect(url_for('reports', **request.args))
 
-    # Reuse the same filters as the reports() view
+    # Reuse the same filters as the reports() view (no status filter - only show Completed requests)
     department_filter = request.args.get('department', '')
-    status_filter = request.args.get('status', '')
     request_type_filter = request.args.get('request_type', '')
     company_filter = request.args.get('company', '')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
 
-    query = PaymentRequest.query
+    query = PaymentRequest.query.filter_by(status='Completed')
     
     # Role-based department filtering
     if current_user.role == 'Operation Manager':
@@ -4003,41 +3990,35 @@ def export_reports_pdf():
     
     if department_filter:
         query = query.filter_by(department=department_filter)
-    if status_filter:
-        query = query.filter_by(status=status_filter)
     if request_type_filter:
         query = query.filter_by(request_type=request_type_filter)
     if company_filter:
-        # Only filter by company name for approved requests with company_name
+        # Only filter by company name for completed requests with company_name
         query = query.filter(PaymentRequest.company_name.ilike(f'%{company_filter}%'))
 
-    if status_filter == 'Approved':
-        if date_from:
-            query = query.filter(PaymentRequest.approval_date >= datetime.strptime(date_from, '%Y-%m-%d').date())
-        if date_to:
-            query = query.filter(PaymentRequest.approval_date <= datetime.strptime(date_to, '%Y-%m-%d').date())
-        result_requests = query.order_by(PaymentRequest.approval_date.desc()).all()
-    else:
-        if date_from:
-            query = query.filter(PaymentRequest.date >= datetime.strptime(date_from, '%Y-%m-%d').date())
-        if date_to:
-            query = query.filter(PaymentRequest.date <= datetime.strptime(date_to, '%Y-%m-%d').date())
-        result_requests = query.order_by(PaymentRequest.date.desc()).all()
+    # Date filtering and sorting for completed requests (use approval_date)
+    if date_from:
+        query = query.filter(PaymentRequest.approval_date >= datetime.strptime(date_from, '%Y-%m-%d').date())
+    if date_to:
+        query = query.filter(PaymentRequest.approval_date <= datetime.strptime(date_to, '%Y-%m-%d').date())
+    result_requests = query.order_by(PaymentRequest.approval_date.desc()).all()
 
-    # Compute total amount (masking not applied for exports by design)
+    # Compute total amount (all requests are completed)
     def to_float(value):
         try:
             return float(value)
         except Exception:
             return 0.0
 
+    # All requests are completed, so sum all amounts
     total_amount = sum(to_float(r.amount) for r in result_requests)
 
     try:
-        # Build PDF
+        # Build PDF in landscape orientation
         buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=A4)
-        width, height = A4
+        from reportlab.lib.pagesizes import landscape
+        c = canvas.Canvas(buffer, pagesize=landscape(A4))
+        width, height = landscape(A4)
 
         # Margins
         left = 15 * mm
@@ -4050,12 +4031,27 @@ def export_reports_pdf():
         c.drawString(left, y, 'Payment Reports')
         c.setFont('Helvetica', 10)
         y -= 14
-        filters_line = f"Dept: {department_filter or 'All'} | Status: {status_filter or 'All'} | Type: {request_type_filter or 'All'}"
+        
+        # Report generation date
+        generation_date = datetime.now().strftime('%Y-%m-%d %H:%M')
+        c.drawString(left, y, f"Report Generated: {generation_date}")
+        y -= 12
+        
+        # Filters
+        filters_line = f"Dept: {department_filter or 'All'} | Type: {request_type_filter or 'All'}"
         c.drawString(left, y, filters_line)
         y -= 12
-        if date_from or date_to:
-            c.drawString(left, y, f"Date: {date_from or '...'} to {date_to or '...'}")
-            y -= 12
+        
+        # Date scope
+        if date_from and date_to:
+            c.drawString(left, y, f"Date Range: {date_from} to {date_to}")
+        elif date_from:
+            c.drawString(left, y, f"Date From: {date_from} (no end date)")
+        elif date_to:
+            c.drawString(left, y, f"Date To: {date_to} (no start date)")
+        else:
+            c.drawString(left, y, "Date Range: All dates (no filter applied)")
+        y -= 12
 
         # Total amount
         c.setFont('Helvetica-Bold', 11)
@@ -4064,8 +4060,9 @@ def export_reports_pdf():
 
         # Table header
         c.setFont('Helvetica-Bold', 9)
-        headers = ['ID', 'Type', 'Requestor', 'Dept', 'Submitted', 'Approved', 'Amount', 'Status', 'Approver']
-        col_x = [left, left+18*mm, left+42*mm, left+80*mm, left+105*mm, left+135*mm, left+165*mm, left+195*mm, left+225*mm]
+        headers = ['ID', 'Type', 'Requestor', 'Dept', 'Submitted', 'Approved', 'Amount', 'Approver']
+        # Column positions optimized for landscape A4 (297mm width) - removed Status column
+        col_x = [left, left+20*mm, left+45*mm, left+85*mm, left+115*mm, left+145*mm, left+175*mm, left+205*mm]
         for hx, text in zip(col_x, headers):
             c.drawString(hx, y, text)
         y -= 10
@@ -4090,12 +4087,11 @@ def export_reports_pdf():
             c.drawString(col_x[0], y, f"#{r.request_id}")
             c.drawString(col_x[1], y, str(r.request_type or ''))
             c.drawString(col_x[2], y, (r.requestor_name or '')[:20])
-            c.drawString(col_x[3], y, (r.department or '')[:12])
+            c.drawString(col_x[3], y, (r.department or '')[:15])
             c.drawString(col_x[4], y, r.date.strftime('%Y-%m-%d') if getattr(r, 'date', None) else '')
             c.drawString(col_x[5], y, r.approval_date.strftime('%Y-%m-%d') if getattr(r, 'approval_date', None) else '')
-            c.drawRightString(col_x[6]+18*mm, y, f"OMR {to_float(r.amount):.3f}")
-            c.drawString(col_x[7], y, str(r.status or '')[:18])
-            c.drawString(col_x[8], y, (r.approver or '')[:12])
+            c.drawRightString(col_x[6]+25*mm, y, f"OMR {to_float(r.amount):.3f}")
+            c.drawString(col_x[7], y, (r.approver or '')[:20])
             y -= row_height
 
         c.showPage()

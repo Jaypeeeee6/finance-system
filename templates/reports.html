@@ -27,17 +27,6 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="status">Status</label>
-                        <select name="status" id="status">
-                            <option value="">All Statuses</option>
-                            <option value="Pending" {% if request.args.get('status') == 'Pending' %}selected{% endif %}>⏳ Pending</option>
-                            <option value="Proof Pending" {% if request.args.get('status') == 'Proof Pending' %}selected{% endif %}>📤 Proof Pending</option>
-                            <option value="Proof Sent" {% if request.args.get('status') == 'Proof Sent' %}selected{% endif %}>📥 Proof Sent</option>
-                            <option value="Approved" {% if request.args.get('status') == 'Approved' %}selected{% endif %}>✓ Approved</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
                         <label for="request_type">Request Type</label>
                         <select name="request_type" id="request_type">
                             <option value="">All Types</option>
@@ -99,8 +88,8 @@
                 <i class="fas fa-check-circle"></i>
             </div>
             <div class="stat-info">
-                <h3>{{ requests|selectattr('status', 'equalto', 'Approved')|list|length }}</h3>
-                <p>Approved</p>
+                <h3>{{ requests|selectattr('status', 'equalto', 'Completed')|list|length }}</h3>
+                <p>Completed</p>
             </div>
         </div>
         <div class="stat-card">
@@ -108,7 +97,7 @@
                 <i class="fas fa-clock"></i>
             </div>
             <div class="stat-info">
-                <h3>{{ requests|selectattr('status', 'equalto', 'Pending')|list|length }}</h3>
+                <h3>{{ requests|selectattr('status', 'in', ['Pending Manager Approval', 'Pending Finance Approval'])|list|length }}</h3>
                 <p>Pending</p>
             </div>
         </div>
@@ -118,16 +107,15 @@
             </div>
             <div class="stat-info">
                 {% if user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT') %}
-                    {% set it_approved_requests = requests|selectattr('status', 'equalto', 'Approved')|selectattr('department', 'equalto', 'IT')|list %}
-                    {% set other_approved_requests = requests|selectattr('status', 'equalto', 'Approved')|rejectattr('department', 'equalto', 'IT')|list %}
-                    {% if it_approved_requests|length > 0 %}
-                        <h3>OMR {{ "%.3f"|format(it_approved_requests|map(attribute='amount')|sum) }}</h3>
-                        <small style="color: #666;">(IT Department Only)</small>
+                    {% set it_requests = requests|selectattr('department', 'equalto', 'IT')|list %}
+                    {% if it_requests|length > 0 %}
+                        <h3>OMR {{ "%.3f"|format(it_requests|map(attribute='amount')|sum) }}</h3>
+                        <small style="color: #666;">(IT Department Only - Completed)</small>
                     {% else %}
                         <h3 style="color: #999;">***</h3>
                     {% endif %}
                 {% else %}
-                    <h3>OMR {{ "%.3f"|format(requests|selectattr('status', 'equalto', 'Approved')|map(attribute='amount')|sum) }}</h3>
+                    <h3>OMR {{ "%.3f"|format(requests|map(attribute='amount')|sum) }}</h3>
                 {% endif %}
                 <p>Total Amount</p>
             </div>
@@ -139,7 +127,7 @@
             <h2><i class="fas fa-table"></i> Report Results</h2>
             {% if requests and requests|length > 0 %}
             <div class="header-actions">
-                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf', department=request.args.get('department',''), status=request.args.get('status',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to','')) }}" onclick="showExportLoading()">
+                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to','')) }}" onclick="showExportLoading()">
                     <i class="fas fa-file-pdf"></i> <span id="export-text">Export PDF</span>
                 </a>
             </div>
@@ -194,18 +182,24 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if req.status == 'Approved' %}
-                                        <span class="badge badge-success">✓ {{ req.status }}</span>
-                                    {% elif req.status == 'Payment Pending' %}
-                                        <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
+                                    {% if req.status == 'Completed' %}
+                                        <span class="badge" style="background: #28a745; color: white; font-weight: 600;">✅ {{ req.status }}</span>
+                                    {% elif req.status == 'Pending Manager Approval' %}
+                                        <span class="badge" style="background: #ffc107; color: #212529; font-weight: 600;">⏳ {{ req.status }}</span>
+                                    {% elif req.status == 'Pending Finance Approval' %}
+                                        <span class="badge" style="background: #007bff; color: white; font-weight: 600;">⏳ {{ req.status }}</span>
+                                    {% elif req.status == 'Rejected by Manager' %}
+                                        <span class="badge" style="background: #dc3545; color: white; font-weight: 600;">❌ {{ req.status }}</span>
+                                    {% elif req.status == 'Rejected by Finance' %}
+                                        <span class="badge" style="background: #dc3545; color: white; font-weight: 600;">❌ {{ req.status }}</span>
                                     {% elif req.status == 'Proof Pending' %}
                                         <span class="badge" style="background: #17a2b8; color: white;">📤 {{ req.status }}</span>
                                     {% elif req.status == 'Proof Sent' %}
                                         <span class="badge" style="background: #28a745; color: white;">📥 {{ req.status }}</span>
-                                    {% elif req.status == 'Paid' %}
-                                        <span class="badge" style="background: #6f42c1; color: white;">💰 {{ req.status }}</span>
+                                    {% elif req.status == 'Recurring' %}
+                                        <span class="badge" style="background: #6f42c1; color: white;">🔄 {{ req.status }}</span>
                                     {% else %}
-                                        <span class="badge badge-warning">⏳ {{ req.status }}</span>
+                                        <span class="badge badge-secondary">❓ {{ req.status }}</span>
                                     {% endif %}
                                 </td>
                                 <td>{{ req.approver or 'N/A' }}</td>
@@ -232,24 +226,70 @@
 
 {% block extra_js %}
 <script>
+let exportTimeout;
+let isExporting = false;
+
 function showExportLoading() {
+    if (isExporting) return; // Prevent multiple clicks
+    
     const btn = document.getElementById('export-pdf-btn');
     const text = document.getElementById('export-text');
     if (btn && text) {
+        isExporting = true;
         btn.style.pointerEvents = 'none';
         text.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
+        
+        // Clear any existing timeout
+        if (exportTimeout) {
+            clearTimeout(exportTimeout);
+        }
+        
+        // Reset button state after 5 seconds
+        exportTimeout = setTimeout(function() {
+            resetExportButton();
+        }, 5000);
     }
 }
 
-// Reset button state after a delay (in case of errors)
-setTimeout(function() {
+function resetExportButton() {
     const btn = document.getElementById('export-pdf-btn');
     const text = document.getElementById('export-text');
     if (btn && text) {
         btn.style.pointerEvents = 'auto';
         text.innerHTML = 'Export PDF';
+        isExporting = false;
+        if (exportTimeout) {
+            clearTimeout(exportTimeout);
+            exportTimeout = null;
+        }
     }
-}, 10000); // Reset after 10 seconds
+}
+
+// Reset button state when page becomes visible again
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+        resetExportButton();
+    }
+});
+
+// Reset button state when user clicks anywhere on the page (except the export button)
+document.addEventListener('click', function(e) {
+    if (e.target.id !== 'export-pdf-btn' && e.target.closest('#export-pdf-btn') === null) {
+        resetExportButton();
+    }
+});
+
+// Reset button state when user presses Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        resetExportButton();
+    }
+});
+
+// Reset button state when the page loads (in case of refresh)
+document.addEventListener('DOMContentLoaded', function() {
+    resetExportButton();
+});
 </script>
 {% endblock %}
 
