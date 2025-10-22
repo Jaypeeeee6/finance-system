@@ -1024,33 +1024,54 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                                    style="margin-right: 5px;">
                                                     <i class="fas fa-eye"></i> View Receipt
                                                 </a>
-                                                <!-- Edit button for requestor only (only if not paid) -->
-                                                {% if request.user_id == user.user_id and not installment.is_paid %}
-                                                <button type="button" class="btn btn-warning btn-sm edit-installment-btn" 
-                                                        data-schedule-id="{{ installment.schedule_id }}" 
-                                                        data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}"
-                                                        data-amount="{{ installment.amount }}"
-                                                        style="margin-right: 5px;">
-                                                    <i class="fas fa-edit"></i> Edit
-                                                </button>
-                                                {% endif %}
-                                            {% elif not installment.is_paid %}
-                                                <!-- Unpaid installment without receipt - show Upload Receipt -->
+                                            {% else %}
+                                                <!-- No receipt - show Upload Receipt button for Finance Admin -->
                                                 <button type="button" class="btn btn-info btn-sm upload-receipt-btn" 
                                                         data-schedule-id="{{ installment.schedule_id }}" 
-                                                        data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}">
+                                                        data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}"
+                                                        style="margin-right: 5px;">
                                                     <i class="fas fa-upload"></i> Upload Receipt
                                                 </button>
-                                                <!-- Edit button for requestor only -->
-                                                {% if request.user_id == user.user_id %}
-                                                <button type="button" class="btn btn-warning btn-sm edit-installment-btn" 
-                                                        data-schedule-id="{{ installment.schedule_id }}" 
-                                                        data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}"
-                                                        data-amount="{{ installment.amount }}"
-                                                        style="margin-left: 5px;">
-                                                    <i class="fas fa-edit"></i> Edit
-                                                </button>
-                                                {% endif %}
+                                            {% endif %}
+                                            
+                                            {% if installment.invoice_path and installment.invoice_path.strip() %}
+                                                <!-- View Invoice button for Finance Admin when invoice exists -->
+                                                <a href="{{ url_for('uploaded_file', filename=installment.invoice_path) }}" 
+                                                   target="_blank" 
+                                                   class="btn btn-success btn-sm" 
+                                                   style="margin-right: 5px;">
+                                                    <i class="fas fa-file-invoice"></i> View Invoice
+                                                </a>
+                                            {% endif %}
+                                            
+                                            <!-- Edit button for requestor only (only if not paid) -->
+                                            {% if request.user_id == user.user_id and not installment.is_paid %}
+                                            <button type="button" class="btn btn-warning btn-sm edit-installment-btn" 
+                                                    data-schedule-id="{{ installment.schedule_id }}" 
+                                                    data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}"
+                                                    data-amount="{{ installment.amount }}"
+                                                    style="margin-right: 5px;">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </button>
+                                            {% if not installment.invoice_path or not installment.invoice_path.strip() %}
+                                            <!-- Upload Invoice button when no invoice -->
+                                            <button type="button" class="btn btn-primary btn-sm upload-invoice-btn" 
+                                                    data-schedule-id="{{ installment.schedule_id }}" 
+                                                    data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}"
+                                                    style="margin-right: 5px; background-color: #007bff !important; border-color: #007bff !important;">
+                                                <i class="fas fa-file-invoice"></i> Upload Invoice
+                                            </button>
+                                            {% endif %}
+                                            {% endif %}
+                                            
+                                            <!-- View Invoice button for requestor (works for both paid and unpaid) -->
+                                            {% if request.user_id == user.user_id and installment.invoice_path and installment.invoice_path.strip() %}
+                                            <a href="{{ url_for('uploaded_file', filename=installment.invoice_path) }}" 
+                                               target="_blank" 
+                                               class="btn btn-success btn-sm" 
+                                               style="margin-right: 5px;">
+                                                <i class="fas fa-eye"></i> View Invoice
+                                            </a>
                                             {% endif %}
                                         </div>
                                         {% else %}
@@ -1064,27 +1085,40 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                                    style="margin-right: 5px;">
                                                     <i class="fas fa-eye"></i> View Receipt
                                                 </a>
-                                                <!-- Edit button for requestor only (only if not paid) -->
-                                                {% if request.user_id == user.user_id and not installment.is_paid %}
-                                                <button type="button" class="btn btn-warning btn-sm edit-installment-btn" 
-                                                        data-schedule-id="{{ installment.schedule_id }}" 
-                                                        data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}"
-                                                        data-amount="{{ installment.amount }}"
-                                                        style="margin-left: 5px;">
-                                                    <i class="fas fa-edit"></i> Edit
-                                                </button>
-                                                {% endif %}
-                                            {% elif not installment.is_paid %}
-                                                <!-- Unpaid installment - show Edit button for requestor only -->
-                                                {% if request.user_id == user.user_id %}
-                                                <button type="button" class="btn btn-warning btn-sm edit-installment-btn" 
-                                                        data-schedule-id="{{ installment.schedule_id }}" 
-                                                        data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}"
-                                                        data-amount="{{ installment.amount }}">
-                                                    <i class="fas fa-edit"></i> Edit
-                                                </button>
-                                                {% endif %}
                                             {% endif %}
+                                            
+                                            <!-- Edit button for requestor only (only if not paid) -->
+                                            {% if request.user_id == user.user_id and not installment.is_paid %}
+                                            <button type="button" class="btn btn-warning btn-sm edit-installment-btn" 
+                                                    data-schedule-id="{{ installment.schedule_id }}" 
+                                                    data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}"
+                                                    data-amount="{{ installment.amount }}"
+                                                    style="margin-left: 5px;">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </button>
+                                            
+                                            
+                                            <!-- Upload Invoice button for requestor when no invoice -->
+                                            {% if not installment.invoice_path or not installment.invoice_path.strip() %}
+                                            <button type="button" class="btn btn-primary btn-sm upload-invoice-btn" 
+                                                    data-schedule-id="{{ installment.schedule_id }}" 
+                                                    data-payment-date="{{ installment.payment_date.strftime('%Y-%m-%d') }}"
+                                                    style="margin-left: 5px; background-color: #007bff !important; border-color: #007bff !important;">
+                                                <i class="fas fa-file-invoice"></i> Upload Invoice
+                                            </button>
+                                            {% endif %}
+                                            {% endif %}
+                                            
+                                            <!-- View Invoice button for requestor (works for both paid and unpaid) -->
+                                            {% if request.user_id == user.user_id and installment.invoice_path and installment.invoice_path.strip() %}
+                                            <a href="{{ url_for('uploaded_file', filename=installment.invoice_path) }}" 
+                                               target="_blank" 
+                                               class="btn btn-success btn-sm" 
+                                               style="margin-left: 5px;">
+                                                <i class="fas fa-eye"></i> View Invoice
+                                            </a>
+                                            {% endif %}
+                                            
                                         </div>
                                         {% endif %}
                                     </div>
@@ -1297,6 +1331,16 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                                    class="btn btn-info btn-sm" 
                                                    style="margin-right: 5px;">
                                                     <i class="fas fa-eye"></i> View Receipt
+                                                </a>
+                                            {% endif %}
+                                            
+                                            {% if installment.invoice_path and installment.invoice_path.strip() %}
+                                                <!-- View Invoice button for completed requests -->
+                                                <a href="{{ url_for('uploaded_file', filename=installment.invoice_path) }}" 
+                                                   target="_blank" 
+                                                   class="btn btn-success btn-sm" 
+                                                   style="margin-right: 5px;">
+                                                    <i class="fas fa-file-invoice"></i> View Invoice
                                                 </a>
                                             {% endif %}
                                         </div>
@@ -2238,6 +2282,155 @@ function closeInstallmentReceiptModal() {
     }
 }
 
+function uploadInstallmentInvoice(scheduleId, paymentDate) {
+    // Create a modal for invoice upload
+    const modal = document.createElement('div');
+    modal.id = 'installmentInvoiceModal';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-container">
+            <div class="modal-content">
+                <div class="modal-header" style="background-color: #28a745; color: white; padding: 15px 20px; border-radius: 8px 8px 0 0;">
+                    <h5 class="modal-title" style="margin: 0; font-size: 1.2rem;">
+                        <i class="fas fa-file-invoice"></i> Upload Invoice for ${paymentDate}
+                    </h5>
+                    <button type="button" class="close-btn" onclick="closeInstallmentInvoiceModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; float: right;">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <form method="POST" action="{{ url_for('upload_installment_invoice', request_id=request.request_id) }}" enctype="multipart/form-data" id="installmentInvoiceForm">
+                    <div class="modal-body" style="padding: 20px;">
+                        <input type="hidden" name="schedule_id" value="${scheduleId}">
+                        <input type="hidden" name="payment_date" value="${paymentDate}">
+                        <div class="form-group">
+                            <label for="installment-invoice-file">Upload Invoice *</label>
+                            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                                <button type="button" id="select-installment-invoice-btn" class="btn btn-success" style="white-space: nowrap;">
+                                    <i class="fas fa-file-invoice"></i> Select File
+                                </button>
+                                <span id="selected-invoice-file-name" style="color: #666; font-size: 14px; display: none;">
+                                    <i class="fas fa-file" style="margin-right: 5px;"></i>
+                                    <span id="invoice-file-name-text"></span>
+                                </span>
+                            </div>
+                            <small>Upload invoice file (PDF, JPG, PNG, DOC, DOCX - Max 10MB)</small>
+                            
+                            <!-- Hidden file input for actual file selection -->
+                            <input type="file" name="invoice_file" id="installment-invoice-file" 
+                                   accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display: none;">
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="padding: 15px 20px; border-top: 1px solid #dee2e6; text-align: right;">
+                        <button type="button" class="btn btn-secondary" onclick="closeInstallmentInvoiceModal()" style="background-color: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; margin-right: 10px; cursor: pointer;">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                        <button type="submit" id="uploadInvoiceBtn" class="btn btn-success" style="background-color: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                            <i class="fas fa-file-invoice"></i> Upload Invoice
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    // Add modal to body
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+    
+    // Add click handler for file selection button
+    const selectBtn = document.getElementById('select-installment-invoice-btn');
+    const fileInput = document.getElementById('installment-invoice-file');
+    const fileNameSpan = document.getElementById('selected-invoice-file-name');
+    const fileNameText = document.getElementById('invoice-file-name-text');
+    
+    selectBtn.addEventListener('click', function() {
+        fileInput.click();
+    });
+    
+    // Handle file selection
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file size (10MB max)
+            const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+            if (file.size > maxSize) {
+                alert(`File "${file.name}" is too large. Maximum size is 10MB.`);
+                fileInput.value = '';
+                return;
+            }
+            
+            // Validate file type
+            const allowedTypes = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'];
+            const fileExtension = file.name.split('.').pop().toLowerCase();
+            if (!allowedTypes.includes(fileExtension)) {
+                alert(`Invalid file type for "${file.name}". Allowed types: PDF, JPG, PNG, DOC, DOCX`);
+                fileInput.value = '';
+                return;
+            }
+            
+            // Show selected file name
+            fileNameText.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+            fileNameSpan.style.display = 'inline';
+            
+            // Update button text
+            selectBtn.innerHTML = '<i class="fas fa-check"></i> File Selected';
+            selectBtn.className = 'btn btn-success';
+        }
+    });
+    
+    // Add form submission handler
+    const form = document.getElementById('installmentInvoiceForm');
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Validate that a file is selected
+        if (!fileInput.files || fileInput.files.length === 0) {
+            alert('Please select a file to upload.');
+            return;
+        }
+        
+        const submitBtn = document.getElementById('uploadInvoiceBtn');
+        const originalText = submitBtn.innerHTML;
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+        
+        // Create FormData and submit via fetch
+        const formData = new FormData(form);
+        
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            redirect: 'follow'
+        })
+        .then(response => {
+            if (response.ok || response.redirected) {
+                // Success - close modal and reload page to show updated invoice status
+                closeInstallmentInvoiceModal();
+                window.location.reload();
+            } else {
+                throw new Error('Upload failed');
+            }
+        })
+        .catch(error => {
+            console.error('Upload error:', error);
+            alert('Failed to upload invoice. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        });
+    });
+}
+
+function closeInstallmentInvoiceModal() {
+    const modal = document.getElementById('installmentInvoiceModal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = 'auto';
+    }
+}
+
 function editInstallment(scheduleId, paymentDate, currentAmount) {
     // Create a modal for editing installment
     const modal = document.createElement('div');
@@ -2534,6 +2727,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const scheduleId = button.getAttribute('data-schedule-id');
             const paymentDate = button.getAttribute('data-payment-date');
             uploadInstallmentReceipt(scheduleId, paymentDate);
+        }
+    });
+    
+    // Upload Invoice button event listener
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.upload-invoice-btn')) {
+            const button = e.target.closest('.upload-invoice-btn');
+            const scheduleId = button.getAttribute('data-schedule-id');
+            const paymentDate = button.getAttribute('data-payment-date');
+            uploadInstallmentInvoice(scheduleId, paymentDate);
         }
     });
     

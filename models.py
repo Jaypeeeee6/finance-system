@@ -198,6 +198,7 @@ class RecurringPaymentSchedule(db.Model):
     is_paid = db.Column(db.Boolean, default=False)  # Whether this specific payment has been made
     paid_date = db.Column(db.Date)  # When this payment was actually made
     receipt_path = db.Column(db.String(255))  # Receipt file path for this installment
+    invoice_path = db.Column(db.String(255))  # Invoice file path for this installment
     has_been_edited = db.Column(db.Boolean, default=False)  # Whether this installment has been edited
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -215,6 +216,7 @@ class RecurringPaymentSchedule(db.Model):
             'is_paid': self.is_paid,
             'paid_date': self.paid_date.strftime('%Y-%m-%d') if self.paid_date else None,
             'receipt_path': self.receipt_path,
+            'invoice_path': self.invoice_path,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S')
         }
     

@@ -2405,6 +2405,7 @@ def view_request(request_id):
                     'is_paid': is_paid,
                     'is_late': is_late,
                     'receipt_path': entry.receipt_path,
+                    'invoice_path': entry.invoice_path,
                     'has_been_edited': entry.has_been_edited
                 })
     
@@ -3741,6 +3742,83 @@ def upload_installment_receipt(request_id):
     
     return redirect(url_for('view_request', request_id=request_id))
 
+
+@app.route('/request/<int:request_id>/upload-installment-invoice', methods=['POST'])
+@login_required
+def upload_installment_invoice(request_id):
+    """Upload invoice for a specific installment (Requestor only)"""
+    req = PaymentRequest.query.get_or_404(request_id)
+    
+    # Check if request is recurring
+    if req.status != 'Recurring':
+        flash('This endpoint is only for recurring payments.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Check if user is the requestor
+    if req.user_id != current_user.user_id:
+        flash('You are not authorized to upload invoices for this request.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    schedule_id = request.form.get('schedule_id')
+    payment_date = request.form.get('payment_date')
+    
+    if not schedule_id or not payment_date:
+        flash('Missing required parameters.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Handle single invoice upload for installment
+    if 'invoice_file' not in request.files:
+        flash('No invoice file uploaded.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    invoice_file = request.files['invoice_file']
+    if not invoice_file or not invoice_file.filename:
+        flash('No invoice file selected.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+    
+    # Validate file size (10MB max)
+    if len(invoice_file.read()) > 10 * 1024 * 1024:  # 10MB
+        flash(f'File "{invoice_file.filename}" is too large. Maximum size is 10MB.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Reset file pointer
+    invoice_file.seek(0)
+    
+    # Validate file extension
+    file_extension = invoice_file.filename.rsplit('.', 1)[1].lower() if '.' in invoice_file.filename else ''
+    if file_extension not in allowed_extensions:
+        flash(f'Invalid file type for "{invoice_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    try:
+        # Get the schedule entry
+        schedule_entry = RecurringPaymentSchedule.query.get(int(schedule_id))
+        if not schedule_entry or schedule_entry.request_id != request_id:
+            flash('Installment not found.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        # Handle single invoice upload for installment
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = secure_filename(invoice_file.filename)
+        filename = f"invoice_{schedule_id}_{timestamp}_{filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        invoice_file.save(filepath)
+        
+        # Store the file as invoice
+        schedule_entry.invoice_path = filename
+        db.session.commit()
+        
+        log_action(f"Uploaded invoice for installment {schedule_id} for request #{request_id}")
+        flash(f'Invoice uploaded successfully for installment on {payment_date}.', 'success')
+        
+    except (ValueError, TypeError) as e:
+        flash('Invalid parameters.', 'error')
+    except Exception as e:
+        flash('Error uploading invoice.', 'error')
+    
+    return redirect(url_for('view_request', request_id=request_id))
 
 @app.route('/request/<int:request_id>/edit_installment', methods=['POST'])
 @login_required
