@@ -2982,6 +2982,55 @@ input:checked + .toggle-slider:before {
     font-weight: 600;
 }
 
+/* ==================== VIEW REQUEST PAGE SPECIFIC TAB STYLES ==================== */
+/* These styles are specifically for the view request page tabs and override the general step tab styles */
+.view-request-page .step-tab.rejected .step-tab-content {
+    background: #dc3545 !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+.view-request-page .step-tab.rejected .step-tab-content::before {
+    content: "✗" !important;
+    margin-right: 0.5rem !important;
+    font-weight: bold !important;
+    font-size: 1.1rem !important;
+}
+
+.view-request-page .step-tab.warning .step-tab-content::before {
+    content: "⏳" !important;
+    margin-right: 0.5rem !important;
+    font-weight: bold !important;
+    font-size: 1.1rem !important;
+}
+
+.view-request-page .step-tab.rejected:hover .step-tab-content {
+    background: #c82333 !important;
+}
+
+.view-request-page .step-tab.warning .step-tab-content {
+    background: #ffc107 !important;
+    color: #212529 !important;
+    font-weight: 600 !important;
+}
+
+.view-request-page .step-tab.warning:hover .step-tab-content {
+    background: #e0a800 !important;
+}
+
+.view-request-page .step-tab.completed .step-tab-content {
+    background: #28a745 !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+.view-request-page .step-tab.completed .step-tab-content::before {
+    content: "✓" !important;
+    margin-right: 0.5rem !important;
+    font-weight: bold !important;
+    font-size: 1.1rem !important;
+}
+
 .step-content {
     display: none;
     padding: 2rem;

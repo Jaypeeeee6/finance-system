@@ -1050,6 +1050,25 @@ def notify_finance_and_admin(title, message, notification_type, request_id=None)
                 }, room='department_managers')
 
 
+def emit_request_update_to_all_rooms(event_name, data):
+    """Helper function to emit request updates to all relevant rooms"""
+    try:
+        # Emit to all users
+        socketio.emit(event_name, data, room='all_users')
+        
+        # Emit to specific role rooms
+        socketio.emit(event_name, data, room='finance_admin')
+        socketio.emit(event_name, data, room='department_staff')
+        socketio.emit(event_name, data, room='department_managers')
+        socketio.emit(event_name, data, room='gm')
+        socketio.emit(event_name, data, room='operation_manager')
+        socketio.emit(event_name, data, room='it_staff')
+        socketio.emit(event_name, data, room='project_staff')
+        
+        print(f"🔔 DEBUG: Emitted {event_name} to all relevant rooms")
+    except Exception as e:
+        print(f"Error emitting {event_name} to all rooms: {e}")
+
 def allowed_file(filename):
     """Check if file extension is allowed"""
     return '.' in filename and \
@@ -1204,16 +1223,8 @@ def department_dashboard():
         query = base_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     elif tab == 'rejected':
         query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
-    else:  # pending tab (default) - show all non-completed, non-rejected requests
-        query = base_query.filter(
-            db.and_(
-                PaymentRequest.status != 'Completed',
-                PaymentRequest.status != 'Paid',
-                PaymentRequest.status != 'Approved',
-                PaymentRequest.status != 'Rejected by Manager',
-                PaymentRequest.status != 'Rejected by Finance'
-            )
-        )
+    else:  # pending tab (default) - show ALL requests (no filtering)
+        query = base_query
     
     # Apply urgent filter if provided
     if urgent_filter == 'urgent':
@@ -1541,7 +1552,10 @@ def gm_dashboard():
         query = query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     elif tab == 'rejected':
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
-    # 'pending' tab shows all requests (no additional filtering)
+    elif tab == 'pending':
+        # 'pending' tab (All Requests) shows all requests (no additional filtering)
+        pass
+    # Default case also shows all requests
     
     # Get paginated requests
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
@@ -1646,7 +1660,10 @@ def it_dashboard():
         query = query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     elif tab == 'rejected':
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
-    # 'pending' tab shows all requests (no additional filtering)
+    elif tab == 'pending':
+        # 'pending' tab (All Requests) shows all requests (no additional filtering)
+        pass
+    # Default case also shows all requests
     
     # Get paginated requests
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
@@ -1755,7 +1772,10 @@ def project_dashboard():
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     elif tab == 'recurring':
         query = query.filter(PaymentRequest.recurring == 'Recurring')
-    # 'pending' tab shows all requests (no additional filtering)
+    elif tab == 'pending':
+        # 'pending' tab (All Requests) shows all requests (no additional filtering)
+        pass
+    # Default case also shows all requests
     
     # Get paginated requests
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
@@ -1864,7 +1884,10 @@ def operation_dashboard():
         query = query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     elif tab == 'rejected':
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
-    # 'pending' tab shows all requests (no additional filtering)
+    elif tab == 'pending':
+        # 'pending' tab (All Requests) shows all requests (no additional filtering)
+        pass
+    # Default case also shows all requests
     
     # Get paginated requests
     requests_pagination = query.paginate(
@@ -2138,6 +2161,41 @@ def new_request():
                 'status': new_req.status,
                 'date': new_req.date.strftime('%Y-%m-%d')
             }, room='all_users')
+            
+            # Also emit specifically to finance admin room for immediate updates
+            socketio.emit('new_request', {
+                'request_id': new_req.request_id,
+                'request_type': new_req.request_type,
+                'requestor_name': new_req.requestor_name,
+                'department': new_req.department,
+                'amount': float(new_req.amount),
+                'status': new_req.status,
+                'date': new_req.date.strftime('%Y-%m-%d')
+            }, room='finance_admin')
+            
+            # Also emit to department staff room for department dashboard users
+            socketio.emit('new_request', {
+                'request_id': new_req.request_id,
+                'request_type': new_req.request_type,
+                'requestor_name': new_req.requestor_name,
+                'department': new_req.department,
+                'amount': float(new_req.amount),
+                'status': new_req.status,
+                'date': new_req.date.strftime('%Y-%m-%d')
+            }, room='department_staff')
+            
+            # Also emit to department managers room
+            socketio.emit('new_request', {
+                'request_id': new_req.request_id,
+                'request_type': new_req.request_type,
+                'requestor_name': new_req.requestor_name,
+                'department': new_req.department,
+                'amount': float(new_req.amount),
+                'status': new_req.status,
+                'date': new_req.date.strftime('%Y-%m-%d')
+            }, room='department_managers')
+            
+            print(f"🔔 DEBUG: Emitted new_request event to all_users, finance_admin, department_staff, and department_managers rooms")
         except Exception as e:
             print(f"Error emitting real-time notification: {e}")
             # Don't fail the request creation if real-time notification fails
@@ -2422,7 +2480,7 @@ def view_request(request_id):
     # Get all proof files for this request grouped by batch
     proof_files = []
     proof_batches = []
-    if req.status in ['Proof Sent', 'Proof Rejected', 'Payment Pending', 'Paid', 'Completed']:
+    if req.status in ['Proof Sent', 'Proof Rejected', 'Payment Pending', 'Paid', 'Completed', 'Recurring']:
         import os
         import glob
         upload_folder = app.config['UPLOAD_FOLDER']
@@ -2714,11 +2772,11 @@ def approve_request(request_id):
         log_action(f"Finance admin marked payment request #{request_id} as paid")
         
         # Emit real-time update to all users
-        socketio.emit('request_updated', {
+        emit_request_update_to_all_rooms('request_updated', {
             'request_id': request_id,
             'status': 'Paid',
             'paid': True
-        }, room='all_users')
+        })
         
         flash(f'Payment request #{request_id} has been marked as paid.', 'success')
     
@@ -3227,11 +3285,11 @@ def upload_proof(request_id):
         )
         
         # Emit real-time update to all users
-        socketio.emit('request_updated', {
+        emit_request_update_to_all_rooms('request_updated', {
             'request_id': request_id,
             'status': 'Proof Sent',
             'requestor': current_user.username
-        }, room='all_users')
+        })
         
         flash(f'Successfully uploaded {len(uploaded_files)} proof file(s)! Finance will review your proof.', 'success')
     else:

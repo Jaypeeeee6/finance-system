@@ -10,7 +10,6 @@ This document describes who can view what, who can approve/reject, and how a pay
 - **Proof Sent**: Proof uploaded/sent; pending any final checks or reconciliation.
 - **Recurring**: Recurring payment schedule item.
 - **Completed**: Fully processed and finalized.
-- **Rejected by Finance**: Finance rejected after manager approval.
 
 ### High-Level Approval Flow
 1. Requestor submits a request → status becomes **Pending Manager Approval**.
@@ -315,7 +314,6 @@ The calendar helps users track upcoming payment obligations and plan financial a
 The three-step approval process uses specific colors to indicate the current state of each approval stage:
 
 - 🔴 **Red (rejected)**: This step has been rejected and requires attention
-- 🔵 **Blue (active)**: This step is currently pending action from the assigned approver
 - 🟡 **Yellow (warning)**: This step is in progress or awaiting review/verification
 - 🟢 **Green (completed)**: This step has been completed successfully
 - ⚫ **Gray (disabled)**: This step is not yet relevant to the current request status
@@ -366,10 +364,10 @@ The server-side template MUST use this exact logic for tab colors:
 
 ```html
 <!-- Manager Tab -->
-<li class="step-tab {% if request.status == 'Rejected by Manager' %}rejected{% elif request.status == 'Pending Manager Approval' %}active{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="manager">
+<li class="step-tab {% if request.status == 'Rejected by Manager' %}rejected{% elif request.status == 'Pending Manager Approval' %}warning{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="manager">
 
 <!-- Finance Tab -->
-<li class="step-tab {% if request.status == 'Rejected by Finance' %}rejected{% elif request.status in ['Proof Pending', 'Proof Sent'] and request.recurring == 'Recurring' %}warning{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'] %}warning{% elif request.status in ['Completed', 'Paid', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="finance">
+<li class="step-tab {% if request.status == 'Rejected by Finance' %}rejected{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'] %}warning{% elif request.status in ['Paid', 'Completed', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="finance">
 ```
 
 #### Client-Side JavaScript Logic (templates/view_request.html)
@@ -378,7 +376,7 @@ The client-side JavaScript MUST use this exact logic for tab colors:
 ```javascript
 // Manager Tab Logic
 if (requestStatus === 'Pending Manager Approval') {
-    managerTab.classList.add('active');
+    managerTab.classList.add('warning');
 } else if (requestStatus === 'Rejected by Manager') {
     managerTab.classList.add('rejected');
 } else if (['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'].includes(requestStatus)) {
@@ -390,49 +388,12 @@ if (requestStatus === 'Pending Manager Approval') {
 // Finance Tab Logic
 if (requestStatus === 'Rejected by Finance') {
     financeTab.classList.add('rejected');
-} else if (['Proof Pending', 'Proof Sent'].includes(requestStatus) && requestRecurring === 'Recurring') {
-    financeTab.classList.add('warning');
 } else if (['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'].includes(requestStatus)) {
     financeTab.classList.add('warning');
 } else if (['Paid', 'Completed', 'Recurring'].includes(requestStatus)) {
     financeTab.classList.add('completed');
 } else {
     financeTab.classList.add('disabled');
-}
-```
-
-### CSS Class Definitions
-The following CSS classes MUST be defined and MUST NOT be modified:
-
-```css
-.step-tab.rejected .step-tab-content {
-    background: #dc3545 !important;
-    color: white !important;
-    font-weight: 600 !important;
-}
-
-.step-tab.warning .step-tab-content {
-    background: #ffc107 !important;
-    color: #212529 !important;
-    font-weight: 600 !important;
-}
-
-.step-tab.completed .step-tab-content {
-    background: #28a745 !important;
-    color: white !important;
-    font-weight: 600 !important;
-}
-
-.step-tab.active .step-tab-content {
-    background: #007bff !important;
-    color: white !important;
-    font-weight: 600 !important;
-}
-
-.step-tab.disabled .step-tab-content {
-    background: #6c757d !important;
-    color: white !important;
-    font-weight: 600 !important;
 }
 ```
 

@@ -20,13 +20,16 @@ function initRealTimeUpdates() {
         
         // Join appropriate room based on user role
         const userRole = document.body.getAttribute('data-user-role');
+        console.log('🔔 DEBUG: User role detected:', userRole);
         
         // All users join the general room
         socket.emit('join_room', { room: 'all_users' });
+        console.log('🔔 DEBUG: Joined all_users room');
         
         // Role-specific rooms for targeted notifications
         if (userRole === 'Finance Staff' || userRole === 'Finance Admin') {
             socket.emit('join_room', { room: 'finance_admin' });
+            console.log('🔔 DEBUG: Joined finance_admin room for real-time updates');
         } else if (userRole === 'GM') {
             socket.emit('join_room', { room: 'gm' });
         } else if (userRole === 'Operation Manager') {
@@ -35,11 +38,16 @@ function initRealTimeUpdates() {
             socket.emit('join_room', { room: 'it_staff' });
         } else if (userRole === 'Department Manager') {
             socket.emit('join_room', { room: 'department_managers' });
+            console.log('🔔 DEBUG: Joined department_managers room for real-time updates');
         } else if (userRole === 'Project Staff') {
             socket.emit('join_room', { room: 'project_staff' });
+        } else if (userRole && userRole.endsWith(' Staff')) {
+            // All Staff roles (including PR Staff, HR Staff, etc.) join department_staff room
+            socket.emit('join_room', { room: 'department_staff' });
+            console.log('🔔 DEBUG: Joined department_staff room for real-time updates');
         }
         
-        console.log(`User role: ${userRole} - Joined real-time notification rooms`);
+        console.log(`🔔 DEBUG: User role: ${userRole} - Joined real-time notification rooms`);
     });
     
     // Listen for disconnection
@@ -50,7 +58,9 @@ function initRealTimeUpdates() {
     
     // Listen for new payment requests
     socket.on('new_request', function(data) {
-        console.log('New payment request received:', data);
+        console.log('🔔 DEBUG: New payment request received:', data);
+        console.log('🔔 DEBUG: Current user role:', document.body.getAttribute('data-user-role'));
+        console.log('🔔 DEBUG: Current page:', window.location.pathname);
         handleNewRequest(data);
         // Update notification count when new request is created
         updateNotificationCount();
@@ -93,6 +103,8 @@ function initRealTimeUpdates() {
  * Handle new payment request from WebSocket
  */
 function handleNewRequest(data) {
+    console.log('🔔 DEBUG: handleNewRequest called with:', data);
+    
     // Show notification
     showNewRequestNotification(1, data);
     
@@ -101,17 +113,29 @@ function handleNewRequest(data) {
     
     // Update dashboard table dynamically
     updateDashboardTable();
+    
+    // Force a small delay to ensure the server has processed the request
+    setTimeout(() => {
+        updateDashboardTable();
+    }, 1000);
 }
 
 /**
  * Handle request update from WebSocket
  */
 function handleRequestUpdate(data) {
+    console.log('🔔 DEBUG: handleRequestUpdate called with:', data);
+    
     // Show update notification
     showUpdateNotification(data);
     
     // Update dashboard table dynamically
     updateDashboardTable();
+    
+    // Force a small delay to ensure the server has processed the update
+    setTimeout(() => {
+        updateDashboardTable();
+    }, 1000);
 }
 
 /**
@@ -364,38 +388,40 @@ function updateDashboardTable() {
     // Get current page URL to determine which dashboard to update
     const currentPath = window.location.pathname;
     
-    // Fetch updated data from the appropriate dashboard endpoint
-    let fetchUrl = '';
-    if (currentPath.includes('/finance')) {
-        fetchUrl = '/api/dashboard/finance';
-    } else if (currentPath.includes('/admin')) {
-        fetchUrl = '/api/dashboard/admin';
-    } else if (currentPath.includes('/it')) {
-        fetchUrl = '/api/dashboard/it';
-    } else if (currentPath.includes('/gm')) {
-        fetchUrl = '/api/dashboard/gm';
-    } else if (currentPath.includes('/operation')) {
-        fetchUrl = '/api/dashboard/operation';
-    } else if (currentPath.includes('/project')) {
-        fetchUrl = '/api/dashboard/project';
-    } else {
-        // Default to current page
-        fetchUrl = window.location.pathname;
+    // Only update if we're on a dashboard page
+    if (!currentPath.includes('/finance') && 
+        !currentPath.includes('/admin') && 
+        !currentPath.includes('/it') && 
+        !currentPath.includes('/gm') && 
+        !currentPath.includes('/operation') && 
+        !currentPath.includes('/project') &&
+        !currentPath.includes('/department')) {
+        return;
     }
     
-    // Fetch updated data
-    fetch(fetchUrl)
+    // Preserve current URL parameters
+    const currentUrl = new URL(window.location);
+    const params = new URLSearchParams(currentUrl.search);
+    
+    // Fetch updated data from the current page with same parameters
+    fetch(window.location.href)
         .then(response => response.text())
         .then(html => {
             // Parse the response and extract the table content
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
-            const newTable = doc.querySelector('.data-table');
+            
+            // Get the active tab
+            const activeTab = getActiveTab();
+            if (!activeTab) return;
+            
+            // Find the table in the active tab
+            const newTable = doc.querySelector(`#tab-content-${activeTab} .data-table`);
             const newPagination = doc.querySelector('.pagination-container');
             
             if (newTable) {
-                // Update the table content
-                const currentTable = document.querySelector('.data-table');
+                // Update the table content in the active tab
+                const currentTable = document.querySelector(`#tab-content-${activeTab} .data-table`);
                 if (currentTable) {
                     currentTable.innerHTML = newTable.innerHTML;
                 }
@@ -408,23 +434,77 @@ function updateDashboardTable() {
                     }
                 }
                 
+                // Re-apply any active filters
+                if (typeof filterTable === 'function') {
+                    filterTable();
+                }
+                
                 // Add visual indicator that table was updated
                 showTableUpdateIndicator();
+                
+                console.log('Dashboard table updated successfully');
             }
         })
         .catch(error => {
             console.error('Error updating dashboard:', error);
-            // Fallback to page reload if API fails
-            location.reload();
+            // Don't reload the page, just log the error
+            console.log('Continuing with current data...');
         });
+}
+
+/**
+ * Get the currently active tab
+ */
+function getActiveTab() {
+    const activeTabButton = document.querySelector('.tab-button.active');
+    if (activeTabButton) {
+        const onclick = activeTabButton.getAttribute('onclick');
+        if (onclick) {
+            const match = onclick.match(/switchTab\('([^']+)'\)/);
+            if (match) {
+                return match[1];
+            }
+        }
+    }
+    
+    // Fallback: check URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('tab') || 'pending';
 }
 
 /**
  * Show visual indicator that table was updated
  */
 function showTableUpdateIndicator() {
-    // No visual effects - just silent real-time updates
-    // The real-time functionality itself is the indicator
+    // Add a subtle visual indicator that the table was updated
+    const table = document.querySelector('.data-table');
+    if (table) {
+        // Add a temporary highlight effect
+        table.style.transition = 'background-color 0.3s ease';
+        table.style.backgroundColor = '#f8f9fa';
+        
+        setTimeout(() => {
+            table.style.backgroundColor = '';
+        }, 1000);
+    }
+    
+    // Show a brief notification
+    const notification = document.createElement('div');
+    notification.className = 'realtime-notification show';
+    notification.innerHTML = `
+        <i class="fas fa-sync-alt"></i>
+        <div>
+            <strong>Dashboard Updated</strong>
+            <div style="font-size: 0.85rem; margin-top: 0.3rem;">New data loaded automatically</div>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto remove after 2 seconds
+    setTimeout(() => {
+        notification.remove();
+    }, 2000);
 }
 
 /**

@@ -49,49 +49,50 @@
     pointer-events: none;
 }
 
-.step-tab.rejected .step-tab-content {
+/* View Request Page Specific Tab Styles */
+.view-request-page .step-tab.rejected .step-tab-content {
     background: #dc3545 !important;
     color: white !important;
     font-weight: 600 !important;
 }
 
-.step-tab.rejected .step-tab-content::before {
+.view-request-page .step-tab.rejected .step-tab-content::before {
     content: "✗" !important;
     margin-right: 0.5rem !important;
     font-weight: bold !important;
     font-size: 1.1rem !important;
 }
 
-.step-tab.warning .step-tab-content::before {
+.view-request-page .step-tab.warning .step-tab-content::before {
     content: "⏳" !important;
     margin-right: 0.5rem !important;
     font-weight: bold !important;
     font-size: 1.1rem !important;
 }
 
-.step-tab.rejected:hover .step-tab-content {
+.view-request-page .step-tab.rejected:hover .step-tab-content {
     background: #c82333 !important;
 }
 </style>
 <style>
-/* Finance tab warning state (yellow) */
-.step-tab.warning .step-tab-content {
+/* View Request Page Specific Tab Styles - Finance tab warning state (yellow) */
+.view-request-page .step-tab.warning .step-tab-content {
     background: #ffc107 !important;
     color: #212529 !important;
     font-weight: 600 !important;
 }
-.step-tab.warning:hover .step-tab-content {
+.view-request-page .step-tab.warning:hover .step-tab-content {
     background: #e0a800 !important;
 }
 
-/* Ensure completed state overrides warning state */
-.step-tab.completed .step-tab-content {
+/* View Request Page Specific Tab Styles - Ensure completed state overrides warning state */
+.view-request-page .step-tab.completed .step-tab-content {
     background: #28a745 !important;
     color: white !important;
     font-weight: 600 !important;
 }
 
-.step-tab.completed .step-tab-content::before {
+.view-request-page .step-tab.completed .step-tab-content::before {
     content: "✓" !important;
     margin-right: 0.5rem !important;
     font-weight: bold !important;
@@ -275,7 +276,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-container">
+<div class="dashboard-container view-request-page">
     <div class="dashboard-header">
         <h1><i class="fas fa-file-invoice"></i> Payment Request #{{ request.request_id }}</h1>
         <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
@@ -296,7 +297,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     Manager Approval
                 </div>
             </li>
-            <li class="step-tab {% if request.status == 'Rejected by Finance' %}rejected{% elif request.status in ['Proof Pending', 'Proof Sent'] and request.recurring == 'Recurring' %}warning{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'] %}warning{% elif request.status in ['Completed', 'Paid', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="finance">
+            <li class="step-tab {% if request.status == 'Rejected by Finance' %}rejected{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'] %}warning{% elif request.status in ['Paid', 'Completed', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="finance">
                 <div class="step-tab-content">
                     Finance Admin Approval
                 </div>
@@ -1954,9 +1955,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (requestStatus === 'Rejected by Finance') {
             financeTab.classList.remove('warning', 'completed', 'active', 'disabled');
             financeTab.classList.add('rejected');
-        } else if (['Proof Pending', 'Proof Sent'].includes(requestStatus) && requestRecurring === 'Recurring') {
-            financeTab.classList.remove('completed', 'active', 'disabled', 'rejected');
-            financeTab.classList.add('warning');
         } else if (['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'].includes(requestStatus)) {
             financeTab.classList.remove('completed', 'active', 'disabled', 'rejected');
             financeTab.classList.add('warning');
