@@ -306,6 +306,63 @@ The calendar helps users track upcoming payment obligations and plan financial a
 
 ---
 
+## Urgent Payment Request Marking and Visual Indicators
+
+### Urgent Request Functionality
+The system includes functionality for managers to mark payment requests as urgent during the approval process. This provides visual indicators to help prioritize urgent requests across all dashboards.
+
+### Who Can Mark Requests as Urgent
+- **Department Managers**: Can mark requests as urgent when approving requests from their department
+- **General Manager**: Can mark requests as urgent when approving requests from Department Managers
+- **Operation Manager**: Can mark requests as urgent when approving requests from Operation and Project departments
+- **Finance Admin (Abdalaziz Al-Brashdi)**: Can mark requests as urgent when approving requests from Finance Staff, General Manager, and Operation Manager
+
+### Visual Indicators for Urgent Requests
+When a payment request is marked as urgent, the following visual indicators are applied across all dashboards:
+
+#### 1. Red Left Border
+- **Style**: `border-left: 4px solid #dc3545;`
+- **Color**: Bootstrap danger red (#dc3545)
+- **Application**: Applied to the entire table row containing the urgent request
+
+#### 2. URGENT Badge
+- **Text**: "URGENT" in white text
+- **Background**: Bootstrap danger red (#dc3545)
+- **Style**: Small badge with rounded corners
+- **Position**: Displayed next to the request ID
+- **Font**: Bold, small size (0.7em)
+
+### Implementation Details
+- **Database Field**: `is_urgent` (Boolean, default: False)
+- **Setting Location**: Manager approval form (`/request/<id>/manager_approve`)
+- **Form Control**: Checkbox input with name "is_urgent"
+- **Persistence**: Set during manager approval and persists throughout the request lifecycle
+
+### Dashboard Display
+Urgent requests are displayed with visual indicators on all dashboards:
+- **Admin Dashboard**: Both completed and rejected request tables
+- **Finance Dashboard**: All finance-related request tables
+- **Department Dashboards**: All department-specific request tables
+- **IT Dashboard**: All IT-related request tables
+- **Operation Dashboard**: All operation-related request tables
+- **Project Dashboard**: All project-related request tables
+- **General Manager Dashboard**: All GM-related request tables
+
+### Filtering Capabilities
+All dashboards support filtering by urgent status:
+- **"Urgent Only"**: Shows only requests marked as urgent
+- **"Not Urgent"**: Shows only requests not marked as urgent
+- **"All"**: Shows all requests regardless of urgent status
+
+### Business Rules
+1. **Manager Authority**: Only the assigned manager for a request can mark it as urgent
+2. **Approval Stage**: Urgent marking occurs during manager approval, not during initial submission
+3. **Persistence**: Once marked urgent, the status persists throughout the request lifecycle
+4. **Visibility**: Urgent indicators are visible to all users who can view the request
+5. **No Override**: Once set by a manager, urgent status cannot be changed by other roles
+
+---
+
 ## View Request Tab Colors and Status Mapping
 
 **⚠️ CRITICAL: This section defines the EXACT tab color logic for the view request page. This logic MUST NOT be changed under any circumstances. Any modifications to tab colors must be approved by the system administrator and documented here first.**
