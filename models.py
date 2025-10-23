@@ -45,6 +45,7 @@ class PaymentRequest(db.Model):
     request_id = db.Column(db.Integer, primary_key=True)
     request_type = db.Column(db.String(50), nullable=False)  # Item, Person, Supplier/Rental, Company
     requestor_name = db.Column(db.String(100), nullable=False)
+    branch_name = db.Column(db.String(100), nullable=False)  # Branch name for the request
     
     # Dynamic fields based on request type
     item_name = db.Column(db.String(200))  # For Item type
@@ -306,3 +307,34 @@ class RequestType(db.Model):
     
     def __repr__(self):
         return f'<RequestType {self.id} - {self.name} ({self.department})>'
+
+
+class Branch(db.Model):
+    """Branch locations for the company"""
+    __tablename__ = 'branches'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)  # e.g., "Main Branch", "Muscat Branch"
+    restaurant = db.Column(db.String(100), nullable=False)  # Location name for grouping branches
+    is_active = db.Column(db.Boolean, default=True)  # Whether this branch is currently active
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    
+    # Relationship to User who created this branch
+    created_by = db.relationship('User', backref='created_branches')
+    
+    def to_dict(self):
+        """Convert branch to dictionary"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'restaurant': self.restaurant,
+            'is_active': self.is_active,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'created_by': self.created_by.name if self.created_by else 'System'
+        }
+    
+    def __repr__(self):
+        return f'<Branch {self.id} - {self.name}>'

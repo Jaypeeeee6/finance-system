@@ -4,7 +4,7 @@ This script creates the database tables and populates them with initial data.
 """
 
 from app import app
-from models import db, User, PaymentRequest, AuditLog, RecurringPaymentSchedule
+from models import db, User, PaymentRequest, AuditLog, RecurringPaymentSchedule, Branch
 from datetime import datetime, date
 
 def init_database():
@@ -94,6 +94,44 @@ def init_database():
             print(f"  ✓ Created user: {user_data['username']} ({user_data['role']})")
         
         db.session.commit()
+        
+        # Create sample branches
+        print("\nCreating sample branches...")
+        
+        branches_data = [
+            {
+                'name': 'Main Branch',
+                'location': 'Muscat, Sultanate of Oman',
+                'is_active': True,
+                'created_by_user_id': 1  # Admin user
+            },
+            {
+                'name': 'Salalah Branch',
+                'location': 'Salalah, Sultanate of Oman',
+                'is_active': True,
+                'created_by_user_id': 1  # Admin user
+            },
+            {
+                'name': 'Sohar Branch',
+                'location': 'Sohar, Sultanate of Oman',
+                'is_active': True,
+                'created_by_user_id': 1  # Admin user
+            },
+            {
+                'name': 'Nizwa Branch',
+                'location': 'Nizwa, Sultanate of Oman',
+                'is_active': False,  # Inactive branch
+                'created_by_user_id': 1  # Admin user
+            }
+        ]
+        
+        for branch_data in branches_data:
+            branch = Branch(**branch_data)
+            db.session.add(branch)
+            print(f"  ✓ Created branch: {branch_data['name']} - {branch_data['location']}")
+        
+        db.session.commit()
+        print(f"  ✓ Created {len(branches_data)} branches")
         
         # Create sample payment requests
         print("\nCreating sample payment requests...")

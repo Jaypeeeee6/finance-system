@@ -38,6 +38,104 @@
                         <label for="requestor_name">Requestor Name *</label>
                         <input type="text" name="requestor_name" id="requestor_name" value="{{ user.name if user else '' }}" required>
                     </div>
+
+                    <div class="form-group">
+                        <label for="branch_name">Branch Name *</label>
+                        <div class="branch-select-container">
+                            <input type="text" id="branch_search" class="form-control" placeholder="Search branches..." autocomplete="off">
+                            <select name="branch_name" id="branch_name" class="form-control" required style="display: none;">
+                                <option value="">-- Select Branch --</option>
+                                {% if available_branches %}
+                                    {% set current_restaurant = "" %}
+                                    {% for branch in available_branches %}
+                                        {% set restaurant = branch.restaurant %}
+                                        {% if restaurant != current_restaurant %}
+                                            {% if current_restaurant != "" %}
+                                                </optgroup>
+                                            {% endif %}
+                                            <optgroup label="{{ restaurant }} (Location)" data-restaurant="{{ restaurant }}">
+                                            {% set current_restaurant = restaurant %}
+                                        {% endif %}
+                                        <option value="{{ branch.name }}" data-restaurant="{{ restaurant }}">{{ branch.name }}</option>
+                                    {% endfor %}
+                                    {% if current_restaurant != "" %}
+                                        </optgroup>
+                                    {% endif %}
+                                {% endif %}
+                            </select>
+                            <div id="branch_dropdown" class="branch-dropdown" style="display: none;"></div>
+                        </div>
+                        <small class="form-text text-muted">Type to search or select the branch location for this request</small>
+                    </div>
+                    
+                    <style>
+                    /* Style for grouped dropdown */
+                    .branch-select-container {
+                        position: relative;
+                    }
+                    
+                    .branch-dropdown {
+                        position: absolute;
+                        top: 100%;
+                        left: 0;
+                        right: 0;
+                        background: white;
+                        border: 1px solid #ced4da;
+                        border-top: none;
+                        border-radius: 0 0 0.375rem 0.375rem;
+                        max-height: 200px;
+                        overflow-y: auto;
+                        z-index: 1000;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    }
+                    
+                    .branch-group {
+                        background-color: #f8f9fa;
+                        padding: 8px 12px;
+                        font-weight: bold;
+                        color: #495057;
+                        border-bottom: 1px solid #dee2e6;
+                        font-size: 12px;
+                        text-transform: uppercase;
+                    }
+                    
+                    .branch-option {
+                        padding: 8px 20px;
+                        cursor: pointer;
+                        border-bottom: 1px solid #f1f3f4;
+                        transition: background-color 0.2s;
+                    }
+                    
+                    .branch-option:hover {
+                        background-color: #e9ecef;
+                    }
+                    
+                    .branch-option.selected {
+                        background-color: #007bff;
+                        color: white;
+                    }
+                    
+                    .branch-option.hidden {
+                        display: none;
+                    }
+                    
+                    optgroup {
+                        font-weight: bold;
+                        color: #495057;
+                        background-color: #f8f9fa;
+                        padding: 5px 0;
+                    }
+                    
+                    optgroup option {
+                        font-weight: normal;
+                        color: #212529;
+                        padding-left: 20px;
+                    }
+                    
+                    #branch_name {
+                        font-size: 14px;
+                    }
+                    </style>
                 </div>
 
                 <!-- Dynamic field based on request type -->
@@ -443,7 +541,137 @@ if (amountField) {
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize the modal
     initializeRecurringModal();
+    
+    // Initialize searchable branch dropdown
+    initializeBranchSearch();
 });
+
+function initializeBranchSearch() {
+    const searchInput = document.getElementById('branch_search');
+    const hiddenSelect = document.getElementById('branch_name');
+    const dropdown = document.getElementById('branch_dropdown');
+    
+    if (!searchInput || !hiddenSelect || !dropdown) return;
+    
+    // Build dropdown from select options
+    function buildDropdown() {
+        dropdown.innerHTML = '';
+        const options = hiddenSelect.querySelectorAll('option');
+        let currentGroup = null;
+        
+        options.forEach(option => {
+            if (option.value === '') return; // Skip placeholder
+            
+            const restaurant = option.getAttribute('data-restaurant') || 'Other';
+            
+            // Create group header if needed
+            if (!currentGroup || currentGroup !== restaurant) {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'branch-group';
+                groupDiv.textContent = restaurant + ' (Location)';
+                groupDiv.setAttribute('data-restaurant', restaurant);
+                dropdown.appendChild(groupDiv);
+                currentGroup = restaurant;
+            }
+            
+            // Create option
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'branch-option';
+            optionDiv.textContent = option.textContent;
+            optionDiv.setAttribute('data-value', option.value);
+            optionDiv.setAttribute('data-restaurant', restaurant);
+            
+            optionDiv.addEventListener('click', function() {
+                selectBranch(option.value, option.textContent);
+            });
+            
+            dropdown.appendChild(optionDiv);
+        });
+    }
+    
+    function selectBranch(value, text) {
+        searchInput.value = text;
+        hiddenSelect.value = value;
+        dropdown.style.display = 'none';
+        searchInput.blur();
+    }
+    
+    function filterBranches(searchTerm) {
+        const options = dropdown.querySelectorAll('.branch-option');
+        const groups = dropdown.querySelectorAll('.branch-group');
+        
+        let hasVisibleOptions = false;
+        
+        options.forEach(option => {
+            const text = option.textContent.toLowerCase();
+            const restaurant = option.getAttribute('data-restaurant').toLowerCase();
+            const matches = text.includes(searchTerm.toLowerCase()) || restaurant.includes(searchTerm.toLowerCase());
+            
+            if (matches) {
+                option.classList.remove('hidden');
+                hasVisibleOptions = true;
+            } else {
+                option.classList.add('hidden');
+            }
+        });
+        
+        // Show/hide groups based on visible options
+        groups.forEach(group => {
+            const restaurant = group.getAttribute('data-restaurant');
+            const hasVisibleOptionsInGroup = Array.from(options).some(option => 
+                option.getAttribute('data-restaurant') === restaurant && !option.classList.contains('hidden')
+            );
+            
+            if (hasVisibleOptionsInGroup) {
+                group.style.display = 'block';
+            } else {
+                group.style.display = 'none';
+            }
+        });
+        
+        dropdown.style.display = hasVisibleOptions ? 'block' : 'none';
+    }
+    
+    // Event listeners
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.trim();
+        if (searchTerm.length > 0) {
+            filterBranches(searchTerm);
+        } else {
+            // Show all options when search is empty
+            dropdown.querySelectorAll('.branch-option').forEach(option => {
+                option.classList.remove('hidden');
+            });
+            dropdown.querySelectorAll('.branch-group').forEach(group => {
+                group.style.display = 'block';
+            });
+            dropdown.style.display = 'block';
+        }
+    });
+    
+    searchInput.addEventListener('focus', function() {
+        if (this.value.trim() === '') {
+            dropdown.style.display = 'block';
+        }
+    });
+    
+    searchInput.addEventListener('blur', function() {
+        // Delay hiding to allow clicks on options
+        setTimeout(() => {
+            dropdown.style.display = 'none';
+        }, 200);
+    });
+    
+    // Hide dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+    
+    // Initialize dropdown
+    buildDropdown();
+}
 
 function handleRequestTypeChange() {
     const requestType = document.getElementById('request_type').value;
@@ -2946,6 +3174,15 @@ document.getElementById('amount').addEventListener('keydown', function(e) {
 
 // Form validation
 document.getElementById('requestForm').addEventListener('submit', function(e) {
+    // Validate branch name
+    const branchName = document.getElementById('branch_name').value;
+    if (!branchName) {
+        e.preventDefault();
+        alert('Please select a branch name.');
+        document.getElementById('branch_search').focus();
+        return false;
+    }
+    
     const accountNumber = document.getElementById('account_number').value;
     if (!/^\d+$/.test(accountNumber)) {
         e.preventDefault();

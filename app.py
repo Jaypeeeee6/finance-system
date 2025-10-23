@@ -6,7 +6,7 @@ from functools import wraps
 import os
 from datetime import datetime, date, timedelta
 import re
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType
+from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType, Branch
 from config import Config
 
 # Initialize Flask app
@@ -1619,6 +1619,7 @@ def it_dashboard():
     department_filter = request.args.get('department', None)
     search_query = request.args.get('search', None)
     urgent_filter = request.args.get('urgent', None)
+    location_filter = request.args.get('location', None)
     tab = request.args.get('tab', 'pending')  # New tab parameter
     
     # If department filter is provided, default to request-types tab
@@ -1712,6 +1713,15 @@ def it_dashboard():
     
     request_types = request_types_query.order_by(RequestType.id).all()
     
+    # Get branches for the Branches Management section
+    branches_query = Branch.query.filter_by(is_active=True)
+    
+    # Apply location filter if specified
+    if location_filter:
+        branches_query = branches_query.filter(Branch.restaurant == location_filter)
+    
+    branches = branches_query.order_by(Branch.id).all()
+    
     # Get all departments for the filter dropdown
     all_departments = db.session.query(RequestType.department).distinct().order_by(RequestType.department).all()
     departments = [dept[0] for dept in all_departments]
@@ -1722,12 +1732,14 @@ def it_dashboard():
                          users=users, 
                          logs=logs, 
                          request_types=request_types,
+                         branches=branches,
                          departments=departments,
                          user=current_user,
                          notifications=notifications,
                          unread_count=unread_count,
                          department_filter=department_filter,
                          search_query=search_query,
+                         location_filter=location_filter,
                          urgent_filter=urgent_filter,
                          completed_requests=completed_requests,
                          rejected_requests=rejected_requests,
@@ -2019,6 +2031,255 @@ def toggle_request_type(request_type_id):
     return redirect(url_for('manage_request_types'))
 
 
+# Branch Management Routes
+@app.route('/it/branches')
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def manage_branches():
+    """Manage branches - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    search_query = request.args.get('search', '')
+    restaurant_filter = request.args.get('restaurant', '')
+    
+    # Validate per_page to prevent abuse
+    if per_page not in [10, 20, 50, 100]:
+        per_page = 20
+    
+    # Build query
+    query = Branch.query
+    
+    if search_query:
+        query = query.filter(Branch.name.contains(search_query))
+    
+    if restaurant_filter:
+        query = query.filter(Branch.restaurant == restaurant_filter)
+    
+    # Get paginated results
+    branches_pagination = query.order_by(Branch.id).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    return render_template('manage_branches.html',
+                         branches=branches_pagination.items,
+                         pagination=branches_pagination,
+                         search_query=search_query,
+                         restaurant_filter=restaurant_filter,
+                         user=current_user)
+
+
+@app.route('/it/branches/add', methods=['GET', 'POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def add_branch():
+    """Add new branch - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        restaurant = request.form.get('restaurant', '').strip()
+        is_active = request.form.get('is_active') == 'on'
+        
+        if not restaurant:
+            flash('Location is required.', 'danger')
+            return redirect(url_for('add_branch'))
+        
+        if not name:
+            flash('Name is required.', 'danger')
+            return redirect(url_for('add_branch'))
+        
+        # Check if branch already exists
+        existing = Branch.query.filter_by(name=name).first()
+        if existing:
+            flash(f'Branch "{name}" already exists.', 'danger')
+            return redirect(url_for('add_branch'))
+        
+        try:
+            branch = Branch(
+                name=name,
+                restaurant=restaurant,
+                is_active=is_active,
+                created_by_user_id=current_user.user_id
+            )
+            
+            db.session.add(branch)
+            db.session.commit()
+            
+            # Log the action
+            log_action(f'Added branch: {name}')
+            
+            flash(f'Branch "{name}" added successfully.', 'success')
+            return redirect(url_for('manage_branches'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding branch: {str(e)}', 'danger')
+            return redirect(url_for('add_branch'))
+    
+    return render_template('add_branch.html', user=current_user)
+
+
+@app.route('/it/branches/edit/<int:branch_id>', methods=['GET', 'POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def edit_branch(branch_id):
+    """Edit branch - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    branch = Branch.query.get_or_404(branch_id)
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        restaurant = request.form.get('restaurant', '').strip()
+        is_active = request.form.get('is_active') == 'on'
+        
+        if not restaurant:
+            flash('Location is required.', 'danger')
+            return redirect(url_for('edit_branch', branch_id=branch_id))
+        
+        if not name:
+            flash('Name is required.', 'danger')
+            return redirect(url_for('edit_branch', branch_id=branch_id))
+        
+        # Check if another branch with same name exists
+        existing = Branch.query.filter(Branch.name == name, Branch.id != branch_id).first()
+        if existing:
+            flash(f'Branch "{name}" already exists.', 'danger')
+            return redirect(url_for('edit_branch', branch_id=branch_id))
+        
+        try:
+            old_name = branch.name
+            old_restaurant = branch.restaurant
+            
+            branch.name = name
+            branch.restaurant = restaurant
+            branch.is_active = is_active
+            branch.updated_at = datetime.utcnow()
+            
+            db.session.commit()
+            
+            # Log the action
+            log_action(f'Updated branch: {old_name} ({old_restaurant}) -> {name} ({restaurant})')
+            
+            flash(f'Branch "{name}" updated successfully.', 'success')
+            return redirect(url_for('manage_branches'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating branch: {str(e)}', 'danger')
+            return redirect(url_for('edit_branch', branch_id=branch_id))
+    
+    return render_template('edit_branch.html', branch=branch, user=current_user)
+
+
+@app.route('/it/branches/delete/<int:branch_id>', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def delete_branch(branch_id):
+    """Delete branch - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    branch = Branch.query.get_or_404(branch_id)
+    
+    try:
+        branch_name = branch.name
+        db.session.delete(branch)
+        db.session.commit()
+        
+        # Log the action
+        log_action(f'Deleted branch: {branch_name}')
+        
+        flash(f'Branch "{branch_name}" deleted successfully.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting branch: {str(e)}', 'danger')
+    
+    return redirect(url_for('manage_branches'))
+
+
+@app.route('/it/branches/bulk-delete', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def bulk_delete_branches():
+    """Bulk delete branches - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    branch_ids = request.form.getlist('branch_ids')
+    
+    if not branch_ids:
+        flash('No branches selected for deletion.', 'warning')
+        return redirect(url_for('manage_branches'))
+    
+    try:
+        deleted_count = 0
+        for branch_id in branch_ids:
+            branch = Branch.query.get(branch_id)
+            if branch:
+                db.session.delete(branch)
+                deleted_count += 1
+        
+        db.session.commit()
+        
+        # Log the action
+        log_action(f'Bulk deleted {deleted_count} branches')
+        
+        flash(f'{deleted_count} branch(es) deleted successfully.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting branches: {str(e)}', 'danger')
+    
+    return redirect(url_for('manage_branches'))
+
+
+@app.route('/it/branches/toggle/<int:branch_id>', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def toggle_branch(branch_id):
+    """Toggle branch active status - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    branch = Branch.query.get_or_404(branch_id)
+    
+    try:
+        branch.is_active = not branch.is_active
+        branch.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        status = 'activated' if branch.is_active else 'deactivated'
+        log_action(f'{status.title()} branch: {branch.name}')
+        
+        flash(f'Branch "{branch.name}" {status} successfully.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating branch: {str(e)}', 'danger')
+    
+    return redirect(url_for('manage_branches'))
+
+
 @app.route('/project/dashboard')
 @login_required
 @role_required('Project Staff', 'Department Manager')
@@ -2285,8 +2546,26 @@ def new_request():
     if request.method == 'POST':
         request_type = request.form.get('request_type')
         requestor_name = request.form.get('requestor_name')
+        branch_name = request.form.get('branch_name')
         date = datetime.utcnow().date()  # Automatically use today's date
         purpose = request.form.get('purpose')
+        
+        # Validate required fields
+        if not branch_name:
+            flash('Branch name is required.', 'error')
+            available_request_types = get_available_request_types()
+            # Custom order: Office, Kucu, Boom, Thoum, Kitchen
+            from sqlalchemy import case
+            location_order = case(
+                (Branch.restaurant == 'Office', 1),
+                (Branch.restaurant == 'Kucu', 2),
+                (Branch.restaurant == 'Boom', 3),
+                (Branch.restaurant == 'Thoum', 4),
+                (Branch.restaurant == 'Kitchen', 5),
+                else_=6
+            )
+            available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         account_name = request.form.get('account_name')
         account_number = request.form.get('account_number')
         bank_name = request.form.get('bank_name')
@@ -2298,19 +2577,52 @@ def new_request():
         if account_number and len(account_number) > 16:
             flash('Account number cannot exceed 16 digits.', 'error')
             available_request_types = get_available_request_types()
-            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
+            # Custom order: Office, Kucu, Boom, Thoum, Kitchen
+            from sqlalchemy import case
+            location_order = case(
+                (Branch.restaurant == 'Office', 1),
+                (Branch.restaurant == 'Kucu', 2),
+                (Branch.restaurant == 'Boom', 3),
+                (Branch.restaurant == 'Thoum', 4),
+                (Branch.restaurant == 'Kitchen', 5),
+                else_=6
+            )
+            available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         
         # Validate account number contains only digits
         if account_number and not account_number.isdigit():
             flash('Account number must contain only numbers.', 'error')
             available_request_types = get_available_request_types()
-            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
+            # Custom order: Office, Kucu, Boom, Thoum, Kitchen
+            from sqlalchemy import case
+            location_order = case(
+                (Branch.restaurant == 'Office', 1),
+                (Branch.restaurant == 'Kucu', 2),
+                (Branch.restaurant == 'Boom', 3),
+                (Branch.restaurant == 'Thoum', 4),
+                (Branch.restaurant == 'Kitchen', 5),
+                else_=6
+            )
+            available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         
         # Validate bank name is selected
         if not bank_name:
             flash('Please select a bank name.', 'error')
             available_request_types = get_available_request_types()
-            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
+            # Custom order: Office, Kucu, Boom, Thoum, Kitchen
+            from sqlalchemy import case
+            location_order = case(
+                (Branch.restaurant == 'Office', 1),
+                (Branch.restaurant == 'Kucu', 2),
+                (Branch.restaurant == 'Boom', 3),
+                (Branch.restaurant == 'Thoum', 4),
+                (Branch.restaurant == 'Kitchen', 5),
+                else_=6
+            )
+            available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         
         # Validate "Others" description if "Others" is selected
         if request_type == 'Others':
@@ -2400,6 +2712,7 @@ def new_request():
         new_req = PaymentRequest(
             request_type=final_request_type,
             requestor_name=requestor_name,
+            branch_name=branch_name,
             item_name=item_name if request_type == 'Item' else None,
             person_company=person_company if request_type in ['Person', 'Company'] else None,
             company_name=company_name if request_type == 'Supplier/Rental' else None,
@@ -2577,9 +2890,22 @@ def new_request():
     # Get available request types for the user's department and role
     available_request_types = get_available_request_types()
     
-    # Pass today's date and available request types to template for display
+    # Get active branches for the branch dropdown, sorted by custom location order then branch name
+    # Custom order: Office, Kucu, Boom, Thoum, Kitchen
+    from sqlalchemy import case
+    location_order = case(
+        (Branch.restaurant == 'Office', 1),
+        (Branch.restaurant == 'Kucu', 2),
+        (Branch.restaurant == 'Boom', 3),
+        (Branch.restaurant == 'Thoum', 4),
+        (Branch.restaurant == 'Kitchen', 5),
+        else_=6
+    )
+    available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+    
+    # Pass today's date, available request types, and branches to template for display
     today = datetime.utcnow().date().strftime('%Y-%m-%d')
-    return render_template('new_request.html', user=current_user, today=today, available_request_types=available_request_types)
+    return render_template('new_request.html', user=current_user, today=today, available_request_types=available_request_types, available_branches=available_branches)
 
 
 @app.route('/populate-request-types')
