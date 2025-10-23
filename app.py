@@ -2234,6 +2234,50 @@ def operation_dashboard():
 
 # ==================== PAYMENT REQUEST ROUTES ====================
 
+def get_available_request_types():
+    """Helper function to get available request types for the current user"""
+    # Get user's department and role
+    user_department = current_user.department
+    user_role = current_user.role
+    
+    # Query request types based on user's department and role
+    if user_role == 'GM':
+        # General Manager can only see Personal Expenses request type
+        return RequestType.query.filter(
+            RequestType.name == 'Personal Expenses',
+            RequestType.is_active == True
+        ).order_by(RequestType.id).all()
+    elif user_role in ['Finance Admin', 'Finance Staff']:
+        # Finance users can see Finance department request types
+        return RequestType.query.filter(
+            RequestType.department == 'Finance',
+            RequestType.is_active == True
+        ).order_by(RequestType.id).all()
+    elif user_role == 'Operation Manager':
+        # Operation Manager can see Operation and Project request types
+        return RequestType.query.filter(
+            RequestType.department.in_(['Operation', 'Project']),
+            RequestType.is_active == True
+        ).order_by(RequestType.id).all()
+    elif user_role == 'Project Staff':
+        # Project Staff can see Project request types
+        return RequestType.query.filter(
+            RequestType.department == 'Project',
+            RequestType.is_active == True
+        ).order_by(RequestType.id).all()
+    elif user_role == 'Department Manager':
+        # Department Managers can see their department's request types
+        return RequestType.query.filter(
+            RequestType.department == user_department,
+            RequestType.is_active == True
+        ).order_by(RequestType.id).all()
+    else:
+        # Other staff roles can see their department's request types
+        return RequestType.query.filter(
+            RequestType.department == user_department,
+            RequestType.is_active == True
+        ).order_by(RequestType.id).all()
+
 @app.route('/request/new', methods=['GET', 'POST'])
 @login_required
 def new_request():
@@ -2253,17 +2297,28 @@ def new_request():
         # Validate account number length (maximum 16 digits)
         if account_number and len(account_number) > 16:
             flash('Account number cannot exceed 16 digits.', 'error')
-            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+            available_request_types = get_available_request_types()
+            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
         
         # Validate account number contains only digits
         if account_number and not account_number.isdigit():
             flash('Account number must contain only numbers.', 'error')
-            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+            available_request_types = get_available_request_types()
+            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
         
         # Validate bank name is selected
         if not bank_name:
             flash('Please select a bank name.', 'error')
-            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+            available_request_types = get_available_request_types()
+            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
+        
+        # Validate "Others" description if "Others" is selected
+        if request_type == 'Others':
+            others_description = request.form.get('others_description')
+            if not others_description or not others_description.strip():
+                flash('Please specify the type of request when selecting "Others".', 'error')
+                available_request_types = get_available_request_types()
+                return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
         
         # Handle comma-formatted amount
         if amount:
@@ -2273,10 +2328,12 @@ def new_request():
                 amount_float = float(amount_clean)
                 if amount_float <= 0:
                     flash('Amount must be greater than 0.', 'error')
-                    return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+                    available_request_types = get_available_request_types()
+                    return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
             except ValueError:
                 flash('Invalid amount format.', 'error')
-                return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+                available_request_types = get_available_request_types()
+                return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
         
         # Handle multiple file uploads for receipts
         receipt_path = None  # Initialize receipt_path
@@ -2299,7 +2356,8 @@ def new_request():
                         # Validate file size (10MB max)
                         if len(receipt_file.read()) > 10 * 1024 * 1024:  # 10MB
                             flash(f'File "{receipt_file.filename}" is too large. Maximum size is 10MB.', 'error')
-                            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+                            available_request_types = get_available_request_types()
+                            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
                         
                         # Reset file pointer
                         receipt_file.seek(0)
@@ -2308,7 +2366,8 @@ def new_request():
                         file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
                         if file_extension not in allowed_extensions:
                             flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
-                            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+                            available_request_types = get_available_request_types()
+                            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
                         
                         # Generate unique filename
                         filename = f"{uuid.uuid4()}_{receipt_file.filename}"
@@ -2325,14 +2384,21 @@ def new_request():
         item_name = request.form.get('item_name')
         person_company = request.form.get('person_company')
         company_name = request.form.get('company_name')
+        others_description = request.form.get('others_description')
         
         # All departments go to their manager first for approval
         initial_status = 'Pending Manager Approval'
         
         # Create new request
         current_time = datetime.utcnow()
+        
+        # Handle "Others" request type with description
+        final_request_type = request_type
+        if request_type == 'Others' and others_description:
+            final_request_type = f"Others: {others_description}"
+        
         new_req = PaymentRequest(
-            request_type=request_type,
+            request_type=final_request_type,
             requestor_name=requestor_name,
             item_name=item_name if request_type == 'Item' else None,
             person_company=person_company if request_type in ['Person', 'Company'] else None,
@@ -2509,49 +2575,7 @@ def new_request():
         return redirect(url_for('dashboard'))
     
     # Get available request types for the user's department and role
-    available_request_types = []
-    
-    # Get user's department and role
-    user_department = current_user.department
-    user_role = current_user.role
-    
-    # Query request types based on user's department and role
-    if user_role == 'GM':
-        # General Manager can only see Personal Expenses request type
-        available_request_types = RequestType.query.filter(
-            RequestType.name == 'Personal Expenses',
-            RequestType.is_active == True
-        ).order_by(RequestType.id).all()
-    elif user_role in ['Finance Admin', 'Finance Staff']:
-        # Finance users can see Finance department request types
-        available_request_types = RequestType.query.filter(
-            RequestType.department == 'Finance',
-            RequestType.is_active == True
-        ).order_by(RequestType.id).all()
-    elif user_role == 'Operation Manager':
-        # Operation Manager can see Operation and Project request types
-        available_request_types = RequestType.query.filter(
-            RequestType.department.in_(['Operation', 'Project']),
-            RequestType.is_active == True
-        ).order_by(RequestType.id).all()
-    elif user_role == 'Project Staff':
-        # Project Staff can see Project request types
-        available_request_types = RequestType.query.filter(
-            RequestType.department == 'Project',
-            RequestType.is_active == True
-        ).order_by(RequestType.id).all()
-    elif user_role == 'Department Manager':
-        # Department Managers can see their department's request types
-        available_request_types = RequestType.query.filter(
-            RequestType.department == user_department,
-            RequestType.is_active == True
-        ).order_by(RequestType.id).all()
-    else:
-        # Other staff roles can see their department's request types
-        available_request_types = RequestType.query.filter(
-            RequestType.department == user_department,
-            RequestType.is_active == True
-        ).order_by(RequestType.id).all()
+    available_request_types = get_available_request_types()
     
     # Pass today's date and available request types to template for display
     today = datetime.utcnow().date().strftime('%Y-%m-%d')

@@ -56,6 +56,12 @@
                     <input type="text" name="company_name" id="company_name">
                 </div>
 
+                <div id="othersDescriptionGroup" class="form-group" style="display: none;">
+                    <label for="others_description">Please specify the type of request *</label>
+                    <input type="text" name="others_description" id="others_description" placeholder="Enter the specific type of request">
+                    <small class="form-text text-muted">Please provide a brief description of what this request is for.</small>
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label for="department">Department *</label>
@@ -447,16 +453,24 @@ function handleRequestTypeChange() {
     document.getElementById('itemNameGroup').style.display = 'none';
     document.getElementById('personCompanyGroup').style.display = 'none';
     document.getElementById('companyNameGroup').style.display = 'none';
+    document.getElementById('othersDescriptionGroup').style.display = 'none';
     
     // Remove required attribute from all dynamic fields
     document.getElementById('item_name').required = false;
     document.getElementById('person_company').required = false;
     document.getElementById('company_name').required = false;
+    document.getElementById('others_description').required = false;
     
     // Show appropriate field based on request type
-    // For all request types, show person/company field by default
-    document.getElementById('personCompanyGroup').style.display = 'block';
-    document.getElementById('person_company').required = true;
+    if (requestType === 'Others') {
+        // Show others description field
+        document.getElementById('othersDescriptionGroup').style.display = 'block';
+        document.getElementById('others_description').required = true;
+    } else {
+        // For all other request types, show person/company field by default
+        document.getElementById('personCompanyGroup').style.display = 'block';
+        document.getElementById('person_company').required = true;
+    }
     
     // Always show Payment Type dropdown for all request types
     recurringFields.style.display = 'block';

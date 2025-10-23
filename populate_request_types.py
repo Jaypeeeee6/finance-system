@@ -15,14 +15,17 @@ def populate_request_types():
     request_types_data = [
         # General Manager (Role-based)
         ('General Manager', 'Personal Expenses'),
+        ('General Manager', 'Others'),
         
         # Finance Department
         ('Finance', 'Utilities Expenses'),
         ('Finance', 'Coffee Shop Expenses'),
         ('Finance', 'Supplier Expenses'),
+        ('Finance', 'Others'),
         
         # Operation Department
         ('Operation', 'Refund/Reimbursement'),
+        ('Operation', 'Others'),
         
         # PR Department
         ('PR', 'Permission Bills'),
@@ -30,47 +33,57 @@ def populate_request_types():
         ('PR', 'Petty Cash'),
         ('PR', 'Contract Expenses'),
         ('PR', 'Refund/Reimbursement'),
+        ('PR', 'Others'),
         
         # Maintenance Department
         ('Maintenance', 'Purchase Items'),
         ('Maintenance', 'AC Installment'),
         ('Maintenance', 'Repair Expenses'),
         ('Maintenance', 'Sewage Service Expenses'),
+        ('Maintenance', 'Others'),
         
         # Marketing Department
         ('Marketing', 'Advertisement Expenses'),
         ('Marketing', 'Photoshoot Expenses'),
         ('Marketing', 'Subscription Expenses'),
+        ('Marketing', 'Others'),
         
         # Logistic Department
         ('Logistic', 'ROP Expenses'),
         ('Logistic', 'Truck Maintenance'),
+        ('Logistic', 'Others'),
         
         # HR Department
         ('HR', 'Salary Expenses'),
         ('HR', 'Refund/Reimbursement'),
         ('HR', 'Cash Advance Expenses'),
         ('HR', 'Allowance Expenses'),
+        ('HR', 'Others'),
         
         # Quality Control Department
         ('Quality Control', 'Pest Control Expenses'),
         ('Quality Control', 'Course Expenses'),
         ('Quality Control', 'Refund/Reimbursement'),
+        ('Quality Control', 'Others'),
         
         # Procurement Department
         ('Procurement', 'Purchasing Expenses'),
+        ('Procurement', 'Others'),
         
         # IT Department
         ('IT', 'Subscription Expenses'),
         ('IT', 'Course Expenses'),
+        ('IT', 'Others'),
         
         # Customer Service Department
         ('Customer Service', 'Refund/Reimbursement'),
+        ('Customer Service', 'Others'),
         
         # Project
         ('Project', 'New Branch Expenses'),
         ('Project', 'Project Expenses'),
         ('Project', 'Rent Expenses'),
+        ('Project', 'Others'),
     ]
     
     print("🚀 Starting to populate request types...")
@@ -94,7 +107,7 @@ def populate_request_types():
     created_count = 0
     skipped_count = 0
     
-    for request_type_name, department, is_active in request_types_data:
+    for department, request_type_name in request_types_data:
         # Check if this request type already exists
         existing = RequestType.query.filter_by(
             name=request_type_name, 
