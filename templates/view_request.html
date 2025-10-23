@@ -326,6 +326,11 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     </div>
                 </div>
 
+                <div class="form-group">
+                    <label for="branch_name">Branch Name</label>
+                    <input type="text" id="branch_name" value="{{ request.branch_name }}" readonly style="background: #f5f5f5;">
+                </div>
+
                 <!-- Dynamic fields based on request type -->
                 {% if request.item_name %}
                 <div class="form-group">
@@ -590,14 +595,14 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                 </div>
                             {% elif request.status == 'Proof Rejected' %}
                                 <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
-                                    <span style="color: #155724; font-weight: bold; font-size: 1.1rem;">APPROVED</span>
+                                    <span style="color: #155724; font-weight: bold; font-size: 1.1rem;">APPROVED BY MANAGER</span>
                                     {% if request.is_urgent %}
                                         <span style="background-color: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; margin-left: 8px; font-size: 0.9rem;">URGENT</span>
                                     {% endif %}
                                 </div>
                             {% else %}
                                 <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
-                                    <span style="color: #155724; font-weight: bold; font-size: 1.1rem;">APPROVED</span>
+                                    <span style="color: #155724; font-weight: bold; font-size: 1.1rem;">APPROVED BY MANAGER</span>
                                     {% if request.is_urgent %}
                                         <span style="background-color: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; margin-left: 8px; font-size: 0.9rem;">URGENT</span>
                                     {% endif %}
@@ -807,6 +812,38 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
         <!-- Step 3: Finance Admin Approval -->
         <div class="step-content" id="step-finance">
             <h3><i class="fas fa-dollar-sign"></i> Finance Admin Approval</h3>
+            
+            <!-- Finance Admin Notes Section (at top when status is Pending Finance Approval) -->
+            {% if request.status == 'Pending Finance Approval' %}
+            <div class="finance-admin-notes-section" style="margin-bottom: 25px;">
+                <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px;">
+                    <h5 style="margin: 0 0 10px 0; color: #495057;"><i class="fas fa-sticky-note" style="color: #007bff; margin-right: 8px;"></i> Finance Admin Notes</h5>
+                    
+                    {% if finance_notes %}
+                        {% for note in finance_notes %}
+                        <div class="finance-note-item" style="margin-bottom: 6px; padding: 3px 8px; background-color: #ffffff; border-radius: 4px; border: 1px solid #e3f2fd;">
+                            <div class="finance-note-content" style="white-space: pre-wrap; line-height: 1.2; font-size: 0.9rem; color: #333; margin-bottom: 2px; padding-left: 0; text-align: left;">
+                                {{ note.note_content }}
+                            </div>
+                            <div class="finance-note-meta" style="font-size: 0.75rem; color: #6c757d; border-top: 1px solid #dee2e6; padding-top: 2px; margin-top: 2px;">
+                                <i class="fas fa-user" style="margin-right: 5px; color: #007bff;"></i>
+                                <strong>Added by:</strong> {{ note.added_by }}
+                                <span style="margin-left: 15px;">
+                                    <i class="fas fa-clock" style="margin-right: 5px; color: #007bff;"></i>
+                                    <strong>Date:</strong> {{ utc_to_local(note.created_at).strftime('%B %d, %Y at %I:%M %p') }}
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="no-notes-message" style="color: #6c757d; font-style: italic; text-align: center; padding: 30px; background-color: #ffffff; border-radius: 6px; border: 1px solid #e3f2fd;">
+                            <i class="fas fa-info-circle" style="font-size: 1.5rem; margin-bottom: 10px; color: #007bff; display: block;"></i>
+                            No notes added by Finance Admin yet
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
             
             {% if request.status in ['Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'] %}
                 {% if request.status == 'Proof Pending' %}
@@ -1435,6 +1472,13 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         </div>
                         {% endif %}
                         
+                        <!-- Pre-Approval Notes Button -->
+                        <div class="form-group">
+                            <button type="button" class="btn btn-info" onclick="openPreApprovalNotesModal()" style="background-color: #17a2b8; border-color: #17a2b8; color: white;">
+                                <i class="fas fa-sticky-note"></i> Pre-Approval Notes
+                            </button>
+                            <small class="form-text text-muted">View notes added during the approval process</small>
+                        </div>
                         
                         {% if proof_batches and proof_batches|length > 0 %}
                         <div class="form-group">
@@ -1488,7 +1532,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                             <div class="status-display" style="margin-bottom: 1.5rem;">
                                 <div style="font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 0.5rem;">Status</div>
                                 <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
-                                    <span style="color: #155724; font-weight: bold; font-size: 1.1rem;">APPROVED</span>
+                                    <span style="color: #155724; font-weight: bold; font-size: 1.1rem;">APPROVED BY MANAGER</span>
                                 </div>
                             </div>
                             
@@ -1536,12 +1580,28 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                 <input type="hidden" name="approval_status" value="approve">
                                 
                                 <div class="form-group">
-                                    <label for="finance_approver">Select Finance Admin Approver *</label>
-                                    <select name="approver" id="finance_approver" required>
-                                        <option value="">-- Select Finance Admin Approver --</option>
-                                        <option value="Mahmoud">Mahmoud</option>
-                                        <option value="Abdalaziz Al-Brashdi">Abdalaziz Al-Brashdi</option>
-                                    </select>
+                                    <label>Finance Admin Approver</label>
+                                    <div class="form-control" style="background-color: #f8f9fa; border: 1px solid #ced4da; padding: 0.375rem 0.75rem;">
+                                        <strong>{{ user.name }}</strong>
+                                        <small class="text-muted d-block">Automatically assigned as the approver</small>
+                                    </div>
+                                    <input type="hidden" name="approver" value="{{ user.name }}">
+                                </div>
+                                
+                                <!-- Finance Admin Note Section -->
+                                <div class="form-group">
+                                    <label for="finance_note">Finance Admin Note</label>
+                                    <textarea name="finance_note" id="finance_note" class="form-control" rows="3" 
+                                              placeholder="Add a note about this request (visible to requestor and other users)..."></textarea>
+                                    <small class="form-text text-muted">
+                                        This note will be visible to the requestor, general manager, and other relevant users.
+                                    </small>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <button type="button" class="btn btn-info" onclick="saveFinanceNote()">
+                                        <i class="fas fa-save"></i> Save Note
+                                    </button>
                                 </div>
                                 
                                 <div id="finance-receipt-upload-container" 
@@ -1827,12 +1887,120 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     </div>
                 {% endif %}
             {% endif %}
+            
         </div>
     </div>
 </div>
+
+<!-- Pre-Approval Notes Modal -->
+<div id="preApprovalNotesModal" class="modal-overlay" style="display: none;">
+    <div class="modal-container">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: #17a2b8; color: white; padding: 15px 20px; border-radius: 8px 8px 0 0;">
+                <h5 class="modal-title" style="margin: 0; font-size: 1.2rem;">
+                    <i class="fas fa-sticky-note"></i> Pre-Approval Notes
+                </h5>
+                <button type="button" class="close-btn" onclick="closePreApprovalNotesModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; float: right;">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                {% if finance_notes %}
+                    {% for note in finance_notes %}
+                    <div class="finance-note-item" style="margin-bottom: 8px; padding: 5px 10px; background-color: #f8f9fa; border-radius: 4px; border: 1px solid #e3f2fd;">
+                        <div class="finance-note-content" style="white-space: pre-wrap; line-height: 1.2; font-size: 0.9rem; color: #333; margin-bottom: 3px; padding-left: 0; text-align: left;">
+                            {{ note.note_content }}
+                        </div>
+                        <div class="finance-note-meta" style="font-size: 0.75rem; color: #6c757d; border-top: 1px solid #dee2e6; padding-top: 3px; margin-top: 3px;">
+                            <i class="fas fa-user" style="margin-right: 5px; color: #007bff;"></i>
+                            <strong>Added by:</strong> {{ note.added_by }}
+                            <span style="margin-left: 15px;">
+                                <i class="fas fa-clock" style="margin-right: 5px; color: #007bff;"></i>
+                                <strong>Date:</strong> {{ utc_to_local(note.created_at).strftime('%B %d, %Y at %I:%M %p') }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="no-notes-message" style="color: #6c757d; font-style: italic; text-align: center; padding: 40px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e3f2fd;">
+                        <i class="fas fa-info-circle" style="font-size: 2rem; margin-bottom: 15px; color: #007bff; display: block;"></i>
+                        <p style="margin: 0; font-size: 1.1rem;">No notes added by Finance Admin yet</p>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer" style="padding: 15px 20px; border-top: 1px solid #dee2e6; text-align: right;">
+                <button type="button" class="btn btn-secondary" onclick="closePreApprovalNotesModal()" style="background-color: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
+<style>
+/* Styling for Finance Admin Notes section to match other section headings */
+.finance-admin-notes-section h5 {
+    margin: 0 0 10px 0 !important;
+    color: #495057 !important;
+}
+
+.finance-admin-notes-section h5 i {
+    color: #007bff !important;
+    margin-right: 8px !important;
+}
+
+.finance-admin-notes-section .finance-note-item {
+    margin-bottom: 6px !important;
+    padding: 3px 8px !important;
+    background-color: #ffffff !important;
+    border-radius: 4px !important;
+    border: 1px solid #e3f2fd !important;
+}
+
+.finance-admin-notes-section .finance-note-content {
+    white-space: pre-wrap !important;
+    line-height: 1.2 !important;
+    font-size: 0.9rem !important;
+    color: #333 !important;
+    margin-bottom: 2px !important;
+    padding-left: 0 !important;
+    text-align: left !important;
+}
+
+.finance-admin-notes-section .finance-note-meta {
+    font-size: 0.75rem !important;
+    color: #6c757d !important;
+    border-top: 1px solid #dee2e6 !important;
+    padding-top: 2px !important;
+    margin-top: 2px !important;
+}
+
+.finance-admin-notes-section .finance-note-meta i {
+    color: #007bff !important;
+    margin-right: 5px !important;
+}
+
+.finance-admin-notes-section .no-notes-message {
+    color: #6c757d !important;
+    font-style: italic !important;
+    text-align: center !important;
+    padding: 30px !important;
+    background-color: #ffffff !important;
+    border-radius: 6px !important;
+    border: 1px solid #e3f2fd !important;
+}
+
+.finance-admin-notes-section .no-notes-message i {
+    font-size: 1.5rem !important;
+    margin-bottom: 10px !important;
+    color: #007bff !important;
+    display: block !important;
+}
+</style>
+
 <script>
 // Step tabs functionality
 document.addEventListener('DOMContentLoaded', function() {
@@ -3192,6 +3360,133 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initial update
     updateServerBasedTimers();
+});
+
+// Function to save finance admin note
+function saveFinanceNote() {
+    const noteText = document.getElementById('finance_note').value.trim();
+    
+    if (!noteText) {
+        alert('Please enter a note before saving.');
+        return;
+    }
+    
+    // Create form data
+    const formData = new FormData();
+    formData.append('finance_note', noteText);
+    
+    // Send POST request to save note
+    fetch('{{ url_for("save_finance_note", request_id=request.request_id) }}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            // Show success message
+            const successAlert = document.createElement('div');
+            successAlert.className = 'alert alert-success alert-dismissible fade show';
+            successAlert.innerHTML = `
+                <i class="fas fa-check-circle"></i> Note added successfully!
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            // Insert after the Finance Admin Notes section
+            const financeNotesSection = document.querySelector('.finance-admin-notes-section');
+            const financeTab = document.getElementById('step-finance');
+            if (financeNotesSection) {
+                financeNotesSection.insertAdjacentElement('afterend', successAlert);
+            } else if (financeTab) {
+                financeTab.insertBefore(successAlert, financeTab.firstChild);
+            }
+            
+            // Clear the textarea immediately and disable it briefly
+            const textarea = document.getElementById('finance_note');
+            textarea.value = '';
+            textarea.disabled = true;
+            
+            // Re-enable textarea after a short delay
+            setTimeout(() => {
+                textarea.disabled = false;
+                textarea.focus();
+            }, 500);
+            
+            // Auto-remove success message after 3 seconds
+            setTimeout(() => {
+                if (successAlert.parentNode) {
+                    successAlert.remove();
+                }
+            }, 3000);
+            
+            // Reload the page to show the updated note
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } else {
+            alert('Error saving note. Please try again.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving note. Please try again.');
+    });
+}
+
+// Function to open Pre-Approval Notes Modal
+function openPreApprovalNotesModal() {
+    const modal = document.getElementById('preApprovalNotesModal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+// Function to close Pre-Approval Notes Modal
+function closePreApprovalNotesModal() {
+    const modal = document.getElementById('preApprovalNotesModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Protection for Finance Admin Notes Section - prevent it from being removed
+document.addEventListener('DOMContentLoaded', function() {
+    const financeNotesSection = document.querySelector('.finance-admin-notes-section');
+    if (financeNotesSection) {
+        // Add a mutation observer to prevent the section from being removed
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'childList') {
+                    mutation.removedNodes.forEach(function(node) {
+                        if (node === financeNotesSection || (node.contains && node.contains(financeNotesSection))) {
+                            console.log('Finance Admin Notes section was removed, restoring...');
+                            // Restore the section
+                            const financeTab = document.getElementById('step-finance');
+                            if (financeTab && !document.querySelector('.finance-admin-notes-section')) {
+                                // Recreate the section if it was removed
+                                const sectionDiv = document.createElement('div');
+                                sectionDiv.className = 'finance-admin-notes-section';
+                                sectionDiv.style.marginBottom = '25px';
+                                         sectionDiv.innerHTML = `
+                                             <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px;">
+                                                 <h5 style="margin: 0 0 10px 0; color: #495057;"><i class="fas fa-sticky-note" style="color: #007bff; margin-right: 8px;"></i> Finance Admin Notes</h5>
+                                                 <div class="no-notes-message" style="color: #6c757d; font-style: italic; text-align: center; padding: 20px; background-color: #ffffff; border-radius: 6px; border: 1px solid #e3f2fd;">
+                                                     <i class="fas fa-info-circle" style="font-size: 1.2rem; margin-bottom: 8px; color: #007bff; display: block;"></i>
+                                                     No notes added by Finance Admin yet
+                                                 </div>
+                                             </div>
+                                         `;
+                                financeTab.insertBefore(sectionDiv, financeTab.firstChild);
+                            }
+                        }
+                    });
+                }
+            });
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
 });
 </script>
 

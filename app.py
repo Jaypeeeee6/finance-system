@@ -6,7 +6,7 @@ from functools import wraps
 import os
 from datetime import datetime, date, timedelta
 import re
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType, Branch
+from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType, Branch, FinanceAdminNote
 from config import Config
 
 # Initialize Flask app
@@ -3241,12 +3241,15 @@ def view_request(request_id):
     # Get current server time for timer calculations
     current_server_time = datetime.utcnow()
     
+    # Get finance admin notes for this request (ordered by creation date, newest first)
+    finance_notes = FinanceAdminNote.query.filter_by(request_id=request_id).order_by(FinanceAdminNote.created_at.desc()).all()
+    
     # Ensure finance approval duration is calculated if needed
     calculate_finance_approval_duration(req)
     if req.finance_approval_duration_minutes is not None:
         db.session.commit()
     
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time)
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes)
 
 
 @app.route('/request/<int:request_id>/approve', methods=['POST'])
@@ -3265,7 +3268,8 @@ def approve_request(request_id):
     approval_status = request.form.get('approval_status')
     
     if approval_status == 'approve':
-        approver = request.form.get('approver')
+        # Automatically assign the logged-in finance admin user as the approver
+        approver = current_user.name
         proof_required = request.form.get('proof_required') == 'on'
         today = datetime.utcnow().date()
         
@@ -4019,6 +4023,61 @@ def upload_proof(request_id):
     return redirect(url_for('view_request', request_id=request_id))
 
 
+@app.route('/request/<int:request_id>/save_finance_note', methods=['POST'])
+@login_required
+@role_required('Finance Admin')
+def save_finance_note(request_id):
+    """Save a note from Finance Admin for a request in Pending Finance Approval status"""
+    req = PaymentRequest.query.get_or_404(request_id)
+    
+    # Check if request is in correct status for Finance admin to add notes
+    if req.status != 'Pending Finance Approval':
+        flash('Notes can only be added to requests in Pending Finance Approval status.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Get the note from form data
+    note = request.form.get('finance_note', '').strip()
+    
+    if not note:
+        flash('Note cannot be empty.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Create a new finance admin note entry
+    finance_note = FinanceAdminNote(
+        request_id=request_id,
+        note_content=note,
+        added_by=current_user.name,
+        added_by_id=current_user.user_id,
+        created_at=datetime.utcnow()
+    )
+    
+    db.session.add(finance_note)
+    req.updated_at = datetime.utcnow()
+    
+    db.session.commit()
+    
+    log_action(f"Finance admin added note to payment request #{request_id}")
+    
+    # Notify the requestor about the note
+    create_notification(
+        user_id=req.user_id,
+        title="Finance Admin Note Added",
+        message=f"Finance admin has added a note to your payment request #{request_id}. Please check the request details.",
+        notification_type="finance_note_added",
+        request_id=request_id
+    )
+    
+    # Emit real-time update
+    socketio.emit('request_updated', {
+        'request_id': request_id,
+        'finance_note_added': True,
+        'note': note
+    })
+    
+    flash('Note saved successfully.', 'success')
+    return redirect(url_for('view_request', request_id=request_id))
+
+
 @app.route('/request/<int:request_id>/final_approve', methods=['POST'])
 @login_required
 @role_required('Admin')
@@ -4318,6 +4377,9 @@ def delete_request(request_id):
     # Delete related Notification records
     Notification.query.filter_by(request_id=request_id).delete()
     
+    # Delete related FinanceAdminNote records
+    FinanceAdminNote.query.filter_by(request_id=request_id).delete()
+    
     # Now delete the main request
     db.session.delete(req)
     db.session.commit()
@@ -4354,6 +4416,7 @@ def bulk_delete_requests():
                 LateInstallment.query.filter_by(request_id=request_id).delete()
                 PaidNotification.query.filter_by(request_id=request_id).delete()
                 Notification.query.filter_by(request_id=request_id).delete()
+                FinanceAdminNote.query.filter_by(request_id=request_id).delete()
                 
                 # Log the deletion before deleting
                 log_action(f"Bulk deleted payment request #{request_id} - {req.request_type} - {req.purpose}")
@@ -4746,6 +4809,7 @@ def reports():
     department_filter = request.args.get('department', '')
     request_type_filter = request.args.get('request_type', '')
     company_filter = request.args.get('company', '')
+    branch_filter = request.args.get('branch', '')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
     
@@ -4764,6 +4828,9 @@ def reports():
     if company_filter:
         # Only filter by company name for completed requests with company_name
         query = query.filter(PaymentRequest.company_name.ilike(f'%{company_filter}%'))
+    if branch_filter:
+        # Filter by branch name
+        query = query.filter(PaymentRequest.branch_name == branch_filter)
     
     # Date filtering and sorting for completed requests (use approval_date)
     if date_from:
@@ -4789,11 +4856,16 @@ def reports():
     ).distinct().all()
     companies = [c[0] for c in companies if c[0]]
     
+    # Get unique branches for filter
+    branches = Branch.query.filter_by(is_active=True).order_by(Branch.name).all()
+    
     return render_template('reports.html', 
                          requests=requests, 
                          departments=departments,
                          companies=companies,
+                         branches=branches,
                          company_filter=company_filter,
+                         branch_filter=branch_filter,
                          user=current_user)
 
 
@@ -4820,6 +4892,7 @@ def export_reports_pdf():
     department_filter = request.args.get('department', '')
     request_type_filter = request.args.get('request_type', '')
     company_filter = request.args.get('company', '')
+    branch_filter = request.args.get('branch', '')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
 
@@ -4837,6 +4910,9 @@ def export_reports_pdf():
     if company_filter:
         # Only filter by company name for completed requests with company_name
         query = query.filter(PaymentRequest.company_name.ilike(f'%{company_filter}%'))
+    if branch_filter:
+        # Filter by branch name
+        query = query.filter(PaymentRequest.branch_name == branch_filter)
 
     # Date filtering and sorting for completed requests (use approval_date)
     if date_from:
@@ -4880,7 +4956,7 @@ def export_reports_pdf():
         y -= 12
         
         # Filters
-        filters_line = f"Dept: {department_filter or 'All'} | Type: {request_type_filter or 'All'}"
+        filters_line = f"Dept: {department_filter or 'All'} | Type: {request_type_filter or 'All'} | Branch: {branch_filter or 'All'}"
         c.drawString(left, y, filters_line)
         y -= 12
         
@@ -4902,9 +4978,9 @@ def export_reports_pdf():
 
         # Table header
         c.setFont('Helvetica-Bold', 9)
-        headers = ['ID', 'Type', 'Requestor', 'Dept', 'Submitted', 'Approved', 'Amount', 'Approver']
-        # Column positions optimized for landscape A4 (297mm width) - removed Status column
-        col_x = [left, left+20*mm, left+45*mm, left+85*mm, left+115*mm, left+145*mm, left+175*mm, left+205*mm]
+        headers = ['ID', 'Type', 'Requestor', 'Dept', 'Branch', 'Submitted', 'Approved', 'Amount', 'Approver']
+        # Column positions optimized for landscape A4 (297mm width) - added Branch column
+        col_x = [left, left+15*mm, left+35*mm, left+65*mm, left+90*mm, left+115*mm, left+140*mm, left+170*mm, left+200*mm]
         for hx, text in zip(col_x, headers):
             c.drawString(hx, y, text)
         y -= 10
@@ -4930,10 +5006,11 @@ def export_reports_pdf():
             c.drawString(col_x[1], y, str(r.request_type or ''))
             c.drawString(col_x[2], y, (r.requestor_name or '')[:20])
             c.drawString(col_x[3], y, (r.department or '')[:15])
-            c.drawString(col_x[4], y, r.date.strftime('%Y-%m-%d') if getattr(r, 'date', None) else '')
-            c.drawString(col_x[5], y, r.approval_date.strftime('%Y-%m-%d') if getattr(r, 'approval_date', None) else '')
-            c.drawRightString(col_x[6]+25*mm, y, f"OMR {to_float(r.amount):.3f}")
-            c.drawString(col_x[7], y, (r.approver or '')[:20])
+            c.drawString(col_x[4], y, (r.branch_name or '')[:15])
+            c.drawString(col_x[5], y, r.date.strftime('%Y-%m-%d') if getattr(r, 'date', None) else '')
+            c.drawString(col_x[6], y, r.approval_date.strftime('%Y-%m-%d') if getattr(r, 'approval_date', None) else '')
+            c.drawRightString(col_x[7]+25*mm, y, f"OMR {to_float(r.amount):.3f}")
+            c.drawString(col_x[8], y, (r.approver or '')[:20])
             y -= row_height
 
         c.showPage()
@@ -5174,6 +5251,15 @@ def delete_user(user_id):
                 proof_file = os.path.join(app.config['UPLOAD_FOLDER'], req.proof_of_payment)
                 if os.path.exists(proof_file):
                     os.remove(proof_file)
+            
+            # Delete related records first
+            InstallmentEditHistory.query.filter_by(request_id=req.request_id).delete()
+            RecurringPaymentSchedule.query.filter_by(request_id=req.request_id).delete()
+            LateInstallment.query.filter_by(request_id=req.request_id).delete()
+            PaidNotification.query.filter_by(request_id=req.request_id).delete()
+            Notification.query.filter_by(request_id=req.request_id).delete()
+            FinanceAdminNote.query.filter_by(request_id=req.request_id).delete()
+            
             db.session.delete(req)
     
     # Update audit logs to preserve history (user_id will be NULL, but username_snapshot kept)

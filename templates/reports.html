@@ -51,6 +51,18 @@
 
                 <div class="form-row">
                     <div class="form-group">
+                        <label for="branch">Branch Name</label>
+                        <select name="branch" id="branch">
+                            <option value="">All Branches</option>
+                            {% for branch in branches %}
+                            <option value="{{ branch.name }}" {% if branch_filter == branch.name %}selected{% endif %}>{{ branch.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
                         <label for="date_from">Date From</label>
                         <input type="date" name="date_from" id="date_from" value="{{ request.args.get('date_from', '') }}">
                     </div>
@@ -127,7 +139,7 @@
             <h2><i class="fas fa-table"></i> Report Results</h2>
             {% if requests and requests|length > 0 %}
             <div class="header-actions">
-                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to','')) }}" onclick="showExportLoading()">
+                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to','')) }}" onclick="showExportLoading()">
                     <i class="fas fa-file-pdf"></i> <span id="export-text">Export PDF</span>
                 </a>
             </div>
@@ -143,6 +155,7 @@
                                 <th>Type</th>
                                 <th>Requestor</th>
                                 <th>Department</th>
+                                <th>Branch Name</th>
                                 <th>Company Name</th>
                                 <th>Submission Date</th>
                                 <th>Approval Date</th>
@@ -159,6 +172,13 @@
                                 <td><span class="badge badge-info">{{ req.request_type }}</span></td>
                                 <td>{{ req.requestor_name }}</td>
                                 <td>{{ req.department }}</td>
+                                <td>
+                                    {% if req.branch_name %}
+                                        <span class="badge badge-primary">{{ req.branch_name }}</span>
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if req.company_name %}
                                         <span class="badge badge-secondary">{{ req.company_name }}</span>

@@ -74,6 +74,8 @@ class PaymentRequest(db.Model):
     rejection_reason = db.Column(db.Text)  # Reason for manager rejection
     is_urgent = db.Column(db.Boolean, default=False)  # Whether request is marked as urgent
     manager_approval_reason = db.Column(db.Text)  # Manager's notes when approving
+    finance_admin_note = db.Column(db.Text)  # Finance admin's note when reviewing
+    finance_admin_note_added_by = db.Column(db.String(100))  # Name of user who added the note
     finance_rejection_date = db.Column(db.Date)  # Date when finance rejected
     completion_date = db.Column(db.Date)  # Date when request was completed
     additional_files = db.Column(db.Text)  # JSON string containing additional file paths uploaded by Finance Admin
@@ -115,6 +117,8 @@ class PaymentRequest(db.Model):
             'receipt_path': self.receipt_path,
             'approver': self.approver,
             'proof_of_payment': self.proof_of_payment,
+            'finance_admin_note': self.finance_admin_note,
+            'finance_admin_note_added_by': self.finance_admin_note_added_by,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S')
         }
@@ -338,3 +342,32 @@ class Branch(db.Model):
     
     def __repr__(self):
         return f'<Branch {self.id} - {self.name}>'
+
+
+class FinanceAdminNote(db.Model):
+    """Model for storing multiple finance admin notes for payment requests"""
+    __tablename__ = 'finance_admin_notes'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    request_id = db.Column(db.Integer, db.ForeignKey('payment_requests.request_id'), nullable=False)
+    note_content = db.Column(db.Text, nullable=False)
+    added_by = db.Column(db.String(100), nullable=False)  # Name of the user who added the note
+    added_by_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)  # ID of the user who added the note
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    request = db.relationship('PaymentRequest', backref='finance_notes')
+    user = db.relationship('User', backref='finance_notes_added')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'request_id': self.request_id,
+            'note_content': self.note_content,
+            'added_by': self.added_by,
+            'added_by_id': self.added_by_id,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
+    
+    def __repr__(self):
+        return f'<FinanceAdminNote {self.id} - Request {self.request_id} by {self.added_by}>'

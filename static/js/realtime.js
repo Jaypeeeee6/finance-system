@@ -129,13 +129,19 @@ function handleRequestUpdate(data) {
     // Show update notification
     showUpdateNotification(data);
     
-    // Update dashboard table dynamically
-    updateDashboardTable();
-    
-    // Force a small delay to ensure the server has processed the update
-    setTimeout(() => {
+    // Only update dashboard if we're not on a request page
+    const currentPath = window.location.pathname;
+    if (!currentPath.includes('/request/')) {
+        // Update dashboard table dynamically
         updateDashboardTable();
-    }, 1000);
+        
+        // Force a small delay to ensure the server has processed the update
+        setTimeout(() => {
+            updateDashboardTable();
+        }, 1000);
+    } else {
+        console.log('🔔 DEBUG: Skipping dashboard update - on request page');
+    }
 }
 
 /**
@@ -388,7 +394,7 @@ function updateDashboardTable() {
     // Get current page URL to determine which dashboard to update
     const currentPath = window.location.pathname;
     
-    // Only update if we're on a dashboard page
+    // Only update if we're on a dashboard page, NOT on individual request pages
     if (!currentPath.includes('/finance') && 
         !currentPath.includes('/admin') && 
         !currentPath.includes('/it') && 
@@ -396,6 +402,11 @@ function updateDashboardTable() {
         !currentPath.includes('/operation') && 
         !currentPath.includes('/project') &&
         !currentPath.includes('/department')) {
+        return;
+    }
+    
+    // Don't update if we're on an individual request page (like /request/123)
+    if (currentPath.includes('/request/')) {
         return;
     }
     
