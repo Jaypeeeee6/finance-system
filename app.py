@@ -1710,7 +1710,7 @@ def it_dashboard():
     if department_filter and department_filter != 'all':
         request_types_query = request_types_query.filter(RequestType.department == department_filter)
     
-    request_types = request_types_query.order_by(RequestType.department, RequestType.name).all()
+    request_types = request_types_query.order_by(RequestType.id).all()
     
     # Get all departments for the filter dropdown
     all_departments = db.session.query(RequestType.department).distinct().order_by(RequestType.department).all()
@@ -1765,7 +1765,7 @@ def manage_request_types():
         query = query.filter(RequestType.name.contains(search_query))
     
     # Get paginated results
-    request_types_pagination = query.order_by(RequestType.department, RequestType.name).paginate(
+    request_types_pagination = query.order_by(RequestType.id).paginate(
         page=page, per_page=per_page, error_out=False
     )
     
@@ -2521,37 +2521,37 @@ def new_request():
         available_request_types = RequestType.query.filter(
             RequestType.name == 'Personal Expenses',
             RequestType.is_active == True
-        ).all()
+        ).order_by(RequestType.id).all()
     elif user_role in ['Finance Admin', 'Finance Staff']:
         # Finance users can see Finance department request types
         available_request_types = RequestType.query.filter(
             RequestType.department == 'Finance',
             RequestType.is_active == True
-        ).all()
+        ).order_by(RequestType.id).all()
     elif user_role == 'Operation Manager':
         # Operation Manager can see Operation and Project request types
         available_request_types = RequestType.query.filter(
             RequestType.department.in_(['Operation', 'Project']),
             RequestType.is_active == True
-        ).all()
+        ).order_by(RequestType.id).all()
     elif user_role == 'Project Staff':
         # Project Staff can see Project request types
         available_request_types = RequestType.query.filter(
             RequestType.department == 'Project',
             RequestType.is_active == True
-        ).all()
+        ).order_by(RequestType.id).all()
     elif user_role == 'Department Manager':
         # Department Managers can see their department's request types
         available_request_types = RequestType.query.filter(
             RequestType.department == user_department,
             RequestType.is_active == True
-        ).all()
+        ).order_by(RequestType.id).all()
     else:
         # Other staff roles can see their department's request types
         available_request_types = RequestType.query.filter(
             RequestType.department == user_department,
             RequestType.is_active == True
-        ).all()
+        ).order_by(RequestType.id).all()
     
     # Pass today's date and available request types to template for display
     today = datetime.utcnow().date().strftime('%Y-%m-%d')
