@@ -41,7 +41,7 @@ This document describes who can view what, who can approve/reject, and how a pay
 
 - **Operation Manager**
   - **View**: All departments, all roles, all statuses
-  - **Approve/Reject**: Operation department and Project Department
+  - **Approve/Reject**: Operation department and Project
 
 ### Finance Roles
 - **Finance Admin** (users: Mahmood Al-Mandhari, Abdalaziz Al-Brashdi)
@@ -73,10 +73,10 @@ This document describes who can view what, who can approve/reject, and how a pay
   - **View**: All departments, all roles; amounts are censored except for IT department requests
   - **Approve/Reject**: None
 
-### Project Department Management Structure
-- **Project Department** is managed by the **Operation Manager**
-  - **Manager Assignment**: All Project Department users (Project Staff) are automatically assigned the Operation Manager as their manager
-  - **Approval Authority**: Operation Manager approves all Project Department payment requests
+### Project Management Structure
+- **Project** is managed by the **Operation Manager**
+  - **Manager Assignment**: All Project users (Project Staff) are automatically assigned the Operation Manager as their manager
+  - **Approval Authority**: Operation Manager approves all Project payment requests
   - **View**: Project Staff can view their own requests only
   - **Approve/Reject**: Project Staff cannot approve/reject requests (Operation Manager handles all approvals)
   - **Edit**: Payment date for their own recurring payment request installments only
@@ -106,7 +106,7 @@ Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Qual
 - **Department Managers**: Assigned to General Manager
 - **General Manager**: Assigned to Abdalaziz Al-Brashdi (Finance Admin)
 - **Operation Department**: Assigned to Operation Manager
-- **Project Department**: Assigned to Operation Manager (same as Operation Department)
+- **Project**: Assigned to Operation Manager (same as Operation Department)
 - **Finance Department**: Assigned to Abdalaziz Al-Brashdi (Finance Admin)
 - **Office Department**: Assigned to General Manager
 - **Other Departments**: Assigned to their respective Department Manager (if exists)
@@ -236,7 +236,6 @@ When creating a new payment request, users can only select from request types th
 ### **Logistic Department**
 - ROP Expenses
 - Truck Maintenance
-- Rent Expenses (Jawad)
 
 ### **HR Department**
 - Salary Expenses
@@ -246,7 +245,7 @@ When creating a new payment request, users can only select from request types th
 
 ### **Quality Control Department**
 - Pest Control Expenses
-- Courses Expenses
+- Course Expenses
 - Refund/Reimbursement
 
 ### **Procurement Department**
@@ -259,10 +258,10 @@ When creating a new payment request, users can only select from request types th
 ### **Customer Service Department**
 - Refund/Reimbursement
 
-### **Project Department**
+### **Project**
 - New Branch Expenses
 - Project Expenses
-- 
+- Rent Expenses
 
 ---
 

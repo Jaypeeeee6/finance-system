@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Add Request Type{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-plus"></i> Add Request Type</h1>
+        <p>Add a new payment request type for a department</p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('add_request_type') }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="name">Request Type Name *</label>
+                        <input type="text" name="name" id="name" class="form-control" required 
+                               placeholder="e.g., Personal Expenses, Utilities Expenses">
+                        <small class="form-text text-muted">Enter a descriptive name for this request type</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="department">Department *</label>
+                        <select name="department" id="department" class="form-control" required>
+                            <option value="">-- Select Department --</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept }}">{{ dept }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Select which department this request type belongs to</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" name="is_active" id="is_active" class="form-check-input" checked>
+                        <label for="is_active" class="form-check-label">
+                            Active
+                        </label>
+                    </div>
+                    <small class="form-text text-muted">Active request types will be available for selection when creating new payment requests</small>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Add Request Type
+                    </button>
+                    <a href="{{ url_for('manage_request_types') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Help Section -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-info-circle"></i> Request Type Guidelines</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Naming Conventions:</h5>
+                    <ul>
+                        <li>Use clear, descriptive names</li>
+                        <li>Keep names concise but informative</li>
+                        <li>Use appropriate capitalization (e.g., "Personal Expenses", "AC Installation")</li>
+                        <li>Avoid abbreviations when possible</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h5>Department Assignment:</h5>
+                    <ul>
+                        <li>Each request type belongs to one department</li>
+                        <li>Users from that department will see this type</li>
+                        <li>General Manager role can see all types</li>
+                        <li>Choose the most appropriate department</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-lightbulb"></i>
+                <strong>Tip:</strong> You can always edit or deactivate request types later if needed. 
+                However, you cannot delete request types that are being used by existing payment requests.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add some basic validation
+    const form = document.querySelector('form');
+    const nameInput = document.getElementById('name');
+    const departmentSelect = document.getElementById('department');
+    
+    form.addEventListener('submit', function(e) {
+        const name = nameInput.value.trim();
+        const department = departmentSelect.value;
+        
+        if (!name || !department) {
+            e.preventDefault();
+            alert('Please fill in all required fields.');
+            return;
+        }
+        
+        // Basic name validation
+        if (name.length < 3) {
+            e.preventDefault();
+            alert('Request type name must be at least 3 characters long.');
+            nameInput.focus();
+            return;
+        }
+        
+        if (name.length > 100) {
+            e.preventDefault();
+            alert('Request type name must be less than 100 characters long.');
+            nameInput.focus();
+            return;
+        }
+    });
+    
+    // Allow free-form text input without auto-formatting
+});
+</script>
+{% endblock %}

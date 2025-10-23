@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Request Types{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-tags"></i> Manage Request Types</h1>
+        <p>Manage payment request types for all departments</p>
+    </div>
+
+    <div class="dashboard-actions">
+        <a href="{{ url_for('add_request_type') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add Request Type
+        </a>
+        <a href="{{ url_for('it_dashboard') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to IT Dashboard
+        </a>
+    </div>
+
+    <!-- Bulk Actions -->
+    <div id="bulkActions" class="bulk-actions" style="display: none;">
+        <div class="bulk-actions-content">
+            <div class="bulk-actions-info">
+                <span id="selectedCount">0</span> request type(s) selected
+            </div>
+            <div class="bulk-actions-buttons">
+                <button type="button" class="btn btn-sm btn-outline" onclick="selectAll()">
+                    <i class="fas fa-check-square"></i> Select All
+                </button>
+                <button type="button" class="btn btn-sm btn-outline" onclick="selectNone()">
+                    <i class="fas fa-square"></i> Select None
+                </button>
+                <button type="button" class="btn btn-sm btn-danger" onclick="bulkDelete()" id="bulkDeleteBtn" disabled>
+                    <i class="fas fa-trash"></i> Delete Selected
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="header-top">
+                <div class="filter-controls">
+                    <select id="departmentFilter" onchange="filterTable()" class="form-select">
+                        <option value="">All Departments</option>
+                        {% for dept in departments %}
+                        <option value="{{ dept }}" {% if department_filter == dept %}selected{% endif %}>{{ dept }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" id="searchInput" placeholder="Search by name..." class="form-control" value="{{ search_query }}">
+                    <button type="button" class="btn btn-outline" onclick="filterTable()">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                <h2><i class="fas fa-tags"></i> Request Types</h2>
+            </div>
+            <div class="card-header-actions">
+                {% if department_filter or search_query %}
+                <div class="filter-indicator">
+                    <span class="badge" style="background: #f57c00; color: white;">
+                        <i class="fas fa-filter"></i> 
+                        {% set filters = [] %}
+                        {% if department_filter %}{{ filters.append(department_filter) or '' }}{% endif %}
+                        {% if search_query %}{{ filters.append('Search: ' + search_query) or '' }}{% endif %}
+                        {{ filters|join(' | ') }}
+                    </span>
+                    <a href="{{ url_for('manage_request_types') }}" class="btn btn-sm btn-outline">
+                        <i class="fas fa-times"></i> Clear All
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card-body">
+            {% if request_types %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>
+                                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()">
+                                </th>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Department</th>
+                                <th>Status</th>
+                                <th>Created By</th>
+                                <th>Created Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for request_type in request_types %}
+                            <tr>
+                                <td>
+                                    <input type="checkbox" class="row-checkbox" value="{{ request_type.id }}" onchange="updateBulkActions()">
+                                </td>
+                                <td>{{ request_type.id }}</td>
+                                <td><strong>{{ request_type.name }}</strong></td>
+                                <td><span class="badge badge-info">{{ request_type.department }}</span></td>
+                                <td>
+                                    {% if request_type.is_active %}
+                                        <span class="badge badge-success">Active</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ request_type.created_by.name if request_type.created_by else 'System' }}</td>
+                                <td>{{ request_type.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{{ url_for('edit_request_type', request_type_id=request_type.id) }}" class="btn btn-sm btn-info" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form method="POST" action="{{ url_for('toggle_request_type', request_type_id=request_type.id) }}" style="display: inline;">
+                                            <button type="submit" class="btn btn-sm {% if request_type.is_active %}btn-warning{% else %}btn-success{% endif %}" 
+                                                    title="{% if request_type.is_active %}Deactivate{% else %}Activate{% endif %}"
+                                                    onclick="return confirm('Are you sure you want to {% if request_type.is_active %}deactivate{% else %}activate{% endif %} this request type?')">
+                                                <i class="fas fa-{% if request_type.is_active %}pause{% else %}play{% endif %}"></i>
+                                            </button>
+                                        </form>
+                                        <form method="POST" action="{{ url_for('delete_request_type', request_type_id=request_type.id) }}" style="display: inline;" 
+                                              onsubmit="return confirm('Are you sure you want to delete this request type? This action cannot be undone.')">
+                                            <button type="submit" class="btn btn-sm btn-danger" title="Delete">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-tags"></i>
+                    <p>No request types found.</p>
+                    <a href="{{ url_for('add_request_type') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add First Request Type
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Pagination Controls -->
+    {% if pagination and pagination.pages > 1 %}
+    <div class="pagination-container">
+        <div class="pagination-left">
+            <div class="pagination-info">
+                Showing {{ pagination.per_page * (pagination.page - 1) + 1 }} to 
+                {{ pagination.per_page * (pagination.page - 1) + pagination.items|length }} 
+                of {{ pagination.total }} request types
+            </div>
+            <div class="items-per-page">
+                <label for="per_page">Show:</label>
+                <select id="per_page" onchange="changeItemsPerPage(this.value)">
+                    <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10</option>
+                    <option value="20" {% if pagination.per_page == 20 %}selected{% endif %}>20</option>
+                    <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if pagination.per_page == 100 %}selected{% endif %}>100</option>
+                </select>
+                <span>per page</span>
+            </div>
+        </div>
+        <div class="pagination">
+            {% if pagination.has_prev %}
+                <a href="{{ url_for('manage_request_types', page=pagination.prev_num, per_page=pagination.per_page, department=department_filter, search=search_query) }}" class="btn btn-sm btn-secondary">
+                    <i class="fas fa-chevron-left"></i> Previous
+                </a>
+            {% endif %}
+            
+            {% for page_num in pagination.iter_pages() %}
+                {% if page_num %}
+                    {% if page_num != pagination.page %}
+                        <a href="{{ url_for('manage_request_types', page=page_num, per_page=pagination.per_page, department=department_filter, search=search_query) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
+                    {% else %}
+                        <span class="btn btn-sm btn-primary">{{ page_num }}</span>
+                    {% endif %}
+                {% else %}
+                    <span class="pagination-ellipsis">...</span>
+                {% endif %}
+            {% endfor %}
+            
+            {% if pagination.has_next %}
+                <a href="{{ url_for('manage_request_types', page=pagination.next_num, per_page=pagination.per_page, department=department_filter, search=search_query) }}" class="btn btn-sm btn-secondary">
+                    Next <i class="fas fa-chevron-right"></i>
+                </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Bulk Actions Styling */
+.bulk-actions {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.bulk-actions-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.bulk-actions-info {
+    font-weight: 600;
+    color: #495057;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bulk-actions-info span {
+    background: #007bff;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.bulk-actions-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.bulk-actions-buttons .btn {
+    white-space: nowrap;
+}
+
+/* Checkbox styling */
+input[type="checkbox"] {
+    transform: scale(1.2);
+    cursor: pointer;
+}
+
+#selectAllCheckbox {
+    margin: 0;
+}
+
+.row-checkbox {
+    margin: 0;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .bulk-actions-content {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .bulk-actions-buttons {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterTable() {
+    const departmentFilter = document.getElementById('departmentFilter').value;
+    const searchInput = document.getElementById('searchInput').value;
+    
+    // Build URL with filters
+    const url = new URL(window.location);
+    url.searchParams.set('department', departmentFilter);
+    url.searchParams.set('search', searchInput);
+    url.searchParams.set('page', '1'); // Reset to page 1 when filtering
+    
+    window.location.href = url.toString();
+}
+
+function changeItemsPerPage(perPage) {
+    const url = new URL(window.location);
+    url.searchParams.set('per_page', perPage);
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}
+
+// Bulk selection functions
+function updateBulkActions() {
+    const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+    const bulkActions = document.getElementById('bulkActions');
+    const selectedCount = document.getElementById('selectedCount');
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    
+    const selectedCountValue = checkboxes.length;
+    selectedCount.textContent = selectedCountValue;
+    
+    if (selectedCountValue > 0) {
+        bulkActions.style.display = 'block';
+        bulkDeleteBtn.disabled = false;
+    } else {
+        bulkActions.style.display = 'none';
+        bulkDeleteBtn.disabled = true;
+    }
+    
+    // Update select all checkbox state
+    const totalCheckboxes = document.querySelectorAll('.row-checkbox');
+    if (selectedCountValue === 0) {
+        selectAllCheckbox.indeterminate = false;
+        selectAllCheckbox.checked = false;
+    } else if (selectedCountValue === totalCheckboxes.length) {
+        selectAllCheckbox.indeterminate = false;
+        selectAllCheckbox.checked = true;
+    } else {
+        selectAllCheckbox.indeterminate = true;
+    }
+}
+
+function toggleSelectAll() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+    
+    rowCheckboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+    
+    updateBulkActions();
+}
+
+function selectAll() {
+    const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    
+    rowCheckboxes.forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    
+    selectAllCheckbox.checked = true;
+    selectAllCheckbox.indeterminate = false;
+    updateBulkActions();
+}
+
+function selectNone() {
+    const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    
+    rowCheckboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    selectAllCheckbox.checked = false;
+    selectAllCheckbox.indeterminate = false;
+    updateBulkActions();
+}
+
+function bulkDelete() {
+    const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (selectedIds.length === 0) {
+        alert('Please select at least one request type to delete.');
+        return;
+    }
+    
+    const confirmMessage = `Are you sure you want to delete ${selectedIds.length} request type(s)? This action cannot be undone.`;
+    
+    if (confirm(confirmMessage)) {
+        // Create a form to submit the bulk delete request
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("bulk_delete_request_types") }}';
+        
+        // Add CSRF token
+        const csrfToken = document.querySelector('meta[name="csrf-token"]');
+        if (csrfToken) {
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrf_token';
+            csrfInput.value = csrfToken.getAttribute('content');
+            form.appendChild(csrfInput);
+        }
+        
+        // Add selected IDs
+        selectedIds.forEach(id => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'request_type_ids';
+            input.value = id;
+            form.appendChild(input);
+        });
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// Initialize search functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                filterTable();
+            }
+        });
+    }
+    
+    // Initialize bulk actions
+    updateBulkActions();
+});
+</script>
+{% endblock %}

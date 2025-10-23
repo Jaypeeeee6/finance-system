@@ -6,7 +6,7 @@ from functools import wraps
 import os
 from datetime import datetime, date, timedelta
 import re
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory
+from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType
 from config import Config
 
 # Initialize Flask app
@@ -1160,7 +1160,7 @@ def dashboard():
         
         if current_user.department == 'IT':
             return redirect(url_for('it_dashboard'))
-        elif current_user.department in ['Project Department', 'Project', 'project', 'PROJECT']:
+        elif current_user.department in ['Project', 'project', 'PROJECT']:
             print("DEBUG: Redirecting to project dashboard")
             return redirect(url_for('project_dashboard'))
         else:
@@ -1621,6 +1621,10 @@ def it_dashboard():
     urgent_filter = request.args.get('urgent', None)
     tab = request.args.get('tab', 'pending')  # New tab parameter
     
+    # If department filter is provided, default to request-types tab
+    if department_filter and not request.args.get('tab'):
+        tab = 'request-types'
+    
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
@@ -1698,11 +1702,27 @@ def it_dashboard():
     
     users = User.query.all()
     logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(50).all()
+    
+    # Get request types for the Request Types Management section with department filter
+    request_types_query = RequestType.query
+    
+    # Apply department filter if specified
+    if department_filter and department_filter != 'all':
+        request_types_query = request_types_query.filter(RequestType.department == department_filter)
+    
+    request_types = request_types_query.order_by(RequestType.department, RequestType.name).all()
+    
+    # Get all departments for the filter dropdown
+    all_departments = db.session.query(RequestType.department).distinct().order_by(RequestType.department).all()
+    departments = [dept[0] for dept in all_departments]
+    
     return render_template('it_dashboard.html', 
                          requests=requests_pagination.items, 
                          pagination=requests_pagination,
                          users=users, 
                          logs=logs, 
+                         request_types=request_types,
+                         departments=departments,
                          user=current_user,
                          notifications=notifications,
                          unread_count=unread_count,
@@ -1714,13 +1734,298 @@ def it_dashboard():
                          active_tab=tab)
 
 
+# ==================== REQUEST TYPES MANAGEMENT ROUTES ====================
+
+@app.route('/it/request-types')
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def manage_request_types():
+    """Manage request types for all departments - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    department_filter = request.args.get('department', '')
+    search_query = request.args.get('search', '')
+    
+    # Validate per_page to prevent abuse
+    if per_page not in [10, 20, 50, 100]:
+        per_page = 20
+    
+    # Build query
+    query = RequestType.query
+    
+    if department_filter:
+        query = query.filter(RequestType.department == department_filter)
+    
+    if search_query:
+        query = query.filter(RequestType.name.contains(search_query))
+    
+    # Get paginated results
+    request_types_pagination = query.order_by(RequestType.department, RequestType.name).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    # Get all departments for filter dropdown
+    departments = db.session.query(RequestType.department).distinct().all()
+    departments = [dept[0] for dept in departments]
+    
+    return render_template('manage_request_types.html',
+                         request_types=request_types_pagination.items,
+                         pagination=request_types_pagination,
+                         departments=departments,
+                         department_filter=department_filter,
+                         search_query=search_query,
+                         user=current_user)
+
+
+@app.route('/it/request-types/add', methods=['GET', 'POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def add_request_type():
+    """Add new request type - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        department = request.form.get('department', '').strip()
+        is_active = request.form.get('is_active') == 'on'
+        
+        if not name or not department:
+            flash('Name and department are required.', 'danger')
+            return redirect(url_for('add_request_type'))
+        
+        # Check if request type already exists for this department
+        existing = RequestType.query.filter_by(name=name, department=department).first()
+        if existing:
+            flash(f'Request type "{name}" already exists for {department} department.', 'danger')
+            return redirect(url_for('add_request_type'))
+        
+        try:
+            request_type = RequestType(
+                name=name,
+                department=department,
+                is_active=is_active,
+                created_by_user_id=current_user.user_id
+            )
+            
+            db.session.add(request_type)
+            db.session.commit()
+            
+            # Log the action
+            log_action(f'Added request type: {name} for {department} department')
+            
+            flash(f'Request type "{name}" added successfully for {department} department.', 'success')
+            return redirect(url_for('manage_request_types'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding request type: {str(e)}', 'danger')
+            return redirect(url_for('add_request_type'))
+    
+    # Get all departments for dropdown
+    departments = ['General Manager', 'Finance', 'Operation', 'PR', 'Maintenance', 'Marketing', 
+                   'Logistic', 'HR', 'Quality Control', 'Procurement', 'IT', 'Customer Service', 
+                   'Project']
+    
+    return render_template('add_request_type.html', departments=departments, user=current_user)
+
+
+@app.route('/it/request-types/edit/<int:request_type_id>', methods=['GET', 'POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def edit_request_type(request_type_id):
+    """Edit request type - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    request_type = RequestType.query.get_or_404(request_type_id)
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        department = request.form.get('department', '').strip()
+        is_active = request.form.get('is_active') == 'on'
+        
+        if not name or not department:
+            flash('Name and department are required.', 'danger')
+            return redirect(url_for('edit_request_type', request_type_id=request_type_id))
+        
+        # Check if request type already exists for this department (excluding current one)
+        existing = RequestType.query.filter(
+            RequestType.name == name,
+            RequestType.department == department,
+            RequestType.id != request_type_id
+        ).first()
+        
+        if existing:
+            flash(f'Request type "{name}" already exists for {department} department.', 'danger')
+            return redirect(url_for('edit_request_type', request_type_id=request_type_id))
+        
+        try:
+            old_name = request_type.name
+            old_department = request_type.department
+            
+            request_type.name = name
+            request_type.department = department
+            request_type.is_active = is_active
+            request_type.updated_at = datetime.utcnow()
+            
+            db.session.commit()
+            
+            # Log the action
+            log_action(f'Updated request type: {old_name} ({old_department}) to {name} ({department})')
+            
+            flash(f'Request type updated successfully.', 'success')
+            return redirect(url_for('manage_request_types'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating request type: {str(e)}', 'danger')
+            return redirect(url_for('edit_request_type', request_type_id=request_type_id))
+    
+    # Get all departments for dropdown
+    departments = ['General Manager', 'Finance', 'Operation', 'PR', 'Maintenance', 'Marketing', 
+                   'Logistic', 'HR', 'Quality Control', 'Procurement', 'IT', 'Customer Service', 
+                   'Project']
+    
+    return render_template('edit_request_type.html', 
+                         request_type=request_type, 
+                         departments=departments, 
+                         user=current_user)
+
+
+@app.route('/it/request-types/delete/<int:request_type_id>', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def delete_request_type(request_type_id):
+    """Delete request type - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    request_type = RequestType.query.get_or_404(request_type_id)
+    
+    try:
+        # Check if any payment requests are using this request type
+        existing_requests = PaymentRequest.query.filter_by(request_type=request_type.name).first()
+        if existing_requests:
+            flash(f'Cannot delete request type "{request_type.name}" because it is being used by existing payment requests.', 'danger')
+            return redirect(url_for('it_dashboard', tab='request-types'))
+        
+        # Log the action before deletion
+        log_action(f'Deleted request type: {request_type.name} ({request_type.department})')
+        
+        db.session.delete(request_type)
+        db.session.commit()
+        
+        flash(f'Request type "{request_type.name}" deleted successfully.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting request type: {str(e)}', 'danger')
+    
+    # Redirect back to IT dashboard with request-types tab active
+    return redirect(url_for('it_dashboard', tab='request-types'))
+
+
+@app.route('/it/request-types/bulk-delete', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def bulk_delete_request_types():
+    """Bulk delete request types - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    request_type_ids = request.form.getlist('request_type_ids')
+    
+    if not request_type_ids:
+        flash('No request types selected for deletion.', 'warning')
+        return redirect(url_for('it_dashboard', tab='request-types'))
+    
+    deleted_count = 0
+    failed_deletions = []
+    
+    try:
+        for request_type_id in request_type_ids:
+            request_type = RequestType.query.get(request_type_id)
+            if not request_type:
+                failed_deletions.append(f"Request type with ID {request_type_id} not found")
+                continue
+            
+            # Check if any payment requests are using this request type
+            existing_requests = PaymentRequest.query.filter_by(request_type=request_type.name).first()
+            if existing_requests:
+                failed_deletions.append(f'"{request_type.name}" (used by existing payment requests)')
+                continue
+            
+            # Log the action before deletion
+            log_action(f'Bulk deleted request type: {request_type.name} ({request_type.department})')
+            
+            db.session.delete(request_type)
+            deleted_count += 1
+        
+        if deleted_count > 0:
+            db.session.commit()
+            flash(f'Successfully deleted {deleted_count} request type(s).', 'success')
+        
+        if failed_deletions:
+            flash(f'Could not delete: {", ".join(failed_deletions)}', 'warning')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error during bulk deletion: {str(e)}', 'danger')
+    
+    return redirect(url_for('it_dashboard', tab='request-types'))
+
+
+@app.route('/it/request-types/toggle/<int:request_type_id>', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def toggle_request_type(request_type_id):
+    """Toggle request type active status - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    request_type = RequestType.query.get_or_404(request_type_id)
+    
+    try:
+        request_type.is_active = not request_type.is_active
+        request_type.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        status = 'activated' if request_type.is_active else 'deactivated'
+        log_action(f'{status.title()} request type: {request_type.name} ({request_type.department})')
+        
+        flash(f'Request type "{request_type.name}" {status} successfully.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating request type: {str(e)}', 'danger')
+    
+    return redirect(url_for('manage_request_types'))
+
+
 @app.route('/project/dashboard')
 @login_required
 @role_required('Project Staff', 'Department Manager')
 def project_dashboard():
     """Dashboard for project users - can request payments and view due dates"""
     # Ensure only Project department users can access this dashboard
-    if current_user.role == 'Department Manager' and current_user.department != 'Project Department':
+    if current_user.role == 'Department Manager' and current_user.department != 'Project':
         flash('You do not have permission to access this page.', 'danger')
         return redirect(url_for('department_dashboard'))
     
@@ -1742,9 +2047,9 @@ def project_dashboard():
     if current_user.role == 'Project Staff':
         # Project Staff see only their own requests
         query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
-    elif current_user.role == 'Department Manager' and current_user.department == 'Project Department':
-        # Project Department Manager sees all requests from Project department
-        query = PaymentRequest.query.filter(PaymentRequest.department == 'Project Department')
+    elif current_user.role == 'Department Manager' and current_user.department == 'Project':
+        # Project Manager sees all requests from Project department
+        query = PaymentRequest.query.filter(PaymentRequest.department == 'Project')
     else:
         # Fallback - should not happen due to role_required decorator
         query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
@@ -1792,11 +2097,11 @@ def project_dashboard():
         completed_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
         rejected_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
         recurring_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
-    elif current_user.role == 'Department Manager' and current_user.department == 'Project Department':
-        # Project Department Manager sees all requests from Project department
-        completed_query = PaymentRequest.query.filter(PaymentRequest.department == 'Project Department')
-        rejected_query = PaymentRequest.query.filter(PaymentRequest.department == 'Project Department')
-        recurring_query = PaymentRequest.query.filter(PaymentRequest.department == 'Project Department')
+    elif current_user.role == 'Department Manager' and current_user.department == 'Project':
+        # Project Manager sees all requests from Project department
+        completed_query = PaymentRequest.query.filter(PaymentRequest.department == 'Project')
+        rejected_query = PaymentRequest.query.filter(PaymentRequest.department == 'Project')
+        recurring_query = PaymentRequest.query.filter(PaymentRequest.department == 'Project')
     else:
         # Fallback - should not happen due to role_required decorator
         completed_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
@@ -2203,10 +2508,76 @@ def new_request():
         flash('Payment request submitted successfully!', 'success')
         return redirect(url_for('dashboard'))
     
-    # Pass today's date to template for display
+    # Get available request types for the user's department and role
+    available_request_types = []
+    
+    # Get user's department and role
+    user_department = current_user.department
+    user_role = current_user.role
+    
+    # Query request types based on user's department and role
+    if user_role == 'GM':
+        # General Manager can only see Personal Expenses request type
+        available_request_types = RequestType.query.filter(
+            RequestType.name == 'Personal Expenses',
+            RequestType.is_active == True
+        ).all()
+    elif user_role in ['Finance Admin', 'Finance Staff']:
+        # Finance users can see Finance department request types
+        available_request_types = RequestType.query.filter(
+            RequestType.department == 'Finance',
+            RequestType.is_active == True
+        ).all()
+    elif user_role == 'Operation Manager':
+        # Operation Manager can see Operation and Project request types
+        available_request_types = RequestType.query.filter(
+            RequestType.department.in_(['Operation', 'Project']),
+            RequestType.is_active == True
+        ).all()
+    elif user_role == 'Project Staff':
+        # Project Staff can see Project request types
+        available_request_types = RequestType.query.filter(
+            RequestType.department == 'Project',
+            RequestType.is_active == True
+        ).all()
+    elif user_role == 'Department Manager':
+        # Department Managers can see their department's request types
+        available_request_types = RequestType.query.filter(
+            RequestType.department == user_department,
+            RequestType.is_active == True
+        ).all()
+    else:
+        # Other staff roles can see their department's request types
+        available_request_types = RequestType.query.filter(
+            RequestType.department == user_department,
+            RequestType.is_active == True
+        ).all()
+    
+    # Pass today's date and available request types to template for display
     today = datetime.utcnow().date().strftime('%Y-%m-%d')
-    return render_template('new_request.html', user=current_user, today=today)
+    return render_template('new_request.html', user=current_user, today=today, available_request_types=available_request_types)
 
+
+@app.route('/populate-request-types')
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def populate_request_types_route():
+    """Populate request types in the database"""
+    try:
+        from populate_request_types import populate_request_types, verify_population
+        
+        # Populate request types
+        populate_request_types()
+        
+        # Verify population
+        verify_population()
+        
+        flash('Request types populated successfully!', 'success')
+        return redirect(url_for('it_dashboard'))
+        
+    except Exception as e:
+        flash(f'Error populating request types: {str(e)}', 'error')
+        return redirect(url_for('it_dashboard'))
 
 @app.route('/test-timezone')
 def test_timezone():
@@ -2470,8 +2841,8 @@ def view_request(request_id):
         dept_manager = User.query.filter_by(role='Department Manager', department=req.department).first()
         if dept_manager:
             manager_name = dept_manager.name
-        elif req.department in ['Operation', 'Project Department']:
-            # For Operation and Project Department, try Operation Manager as fallback
+        elif req.department in ['Operation', 'Project']:
+            # For Operation and Project, try Operation Manager as fallback
             operation_manager = User.query.filter_by(role='Operation Manager').first()
             if operation_manager:
                 manager_name = operation_manager.name
@@ -3365,9 +3736,9 @@ def manager_approve_request(request_id):
     elif (current_user.name == 'Abdalaziz Al-Brashdi' and req.user.role == 'Operation Manager'):
         is_authorized = True
         print("DEBUG: Authorized via Abdalaziz role for Operation Manager")
-    # Special case: Operation Manager can approve Operation department and Project Department requests
+    # Special case: Operation Manager can approve Operation department and Project requests
     elif (current_user.role == 'Operation Manager' and 
-          (req.user.department == 'Operation' or req.user.department == 'Project Department') and 
+          (req.user.department == 'Operation' or req.user.department == 'Project') and 
           req.user.role != 'Operation Manager'):  # Operation Manager can't approve their own requests
         is_authorized = True
         print("DEBUG: Authorized via Operation Manager role")
@@ -4033,8 +4404,8 @@ def reports():
     
     # Role-based department filtering
     if current_user.role == 'Operation Manager':
-        # Operation Manager can only see Maintenance, Operation, Project Department, Procurement, and Logistic
-        query = query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project Department', 'Procurement', 'Logistic']))
+        # Operation Manager can only see Maintenance, Operation, Project, Procurement, and Logistic
+        query = query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project', 'Procurement', 'Logistic']))
     
     if department_filter:
         query = query.filter_by(department=department_filter)
@@ -4054,7 +4425,7 @@ def reports():
     # Get unique departments for filter
     if current_user.role == 'Operation Manager':
         # Operation Manager can only see specific departments
-        departments = ['Maintenance', 'Operation', 'Project Department', 'Procurement', 'Logistic']
+        departments = ['Maintenance', 'Operation', 'Project', 'Procurement', 'Logistic']
     else:
         # Other roles can see all departments
         departments = db.session.query(PaymentRequest.department).distinct().all()
@@ -4106,8 +4477,8 @@ def export_reports_pdf():
     
     # Role-based department filtering
     if current_user.role == 'Operation Manager':
-        # Operation Manager can only see Maintenance, Operation, Project Department, Procurement, and Logistic
-        query = query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project Department', 'Procurement', 'Logistic']))
+        # Operation Manager can only see Maintenance, Operation, Project, Procurement, and Logistic
+        query = query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project', 'Procurement', 'Logistic']))
     
     if department_filter:
         query = query.filter_by(department=department_filter)
@@ -4290,14 +4661,14 @@ def new_user():
                 if dept_manager:
                     final_manager_id = dept_manager.user_id
                 else:
-                    # Special rules: Office → GM, Operation → Operation Manager, Project Department → Operation Manager, Finance → specific named manager
+                    # Special rules: Office → GM, Operation → Operation Manager, Project → Operation Manager, Finance → specific named manager
                     if department == 'Office':
                         gm_user = User.query.filter_by(role='GM').first()
                         final_manager_id = gm_user.user_id if gm_user else None
                     elif department == 'Operation':
                         op_manager = User.query.filter_by(role='Operation Manager').first()
                         final_manager_id = op_manager.user_id if op_manager else None
-                    elif department == 'Project Department':
+                    elif department == 'Project':
                         op_manager = User.query.filter_by(role='Operation Manager').first()
                         final_manager_id = op_manager.user_id if op_manager else None
                     elif department == 'Finance':
@@ -4373,14 +4744,14 @@ def edit_user(user_id):
                 if dept_manager:
                     final_manager_id = dept_manager.user_id
                 else:
-                    # Special rules: Office → GM, Operation → Operation Manager, Project Department → Operation Manager, Finance → specific named manager
+                    # Special rules: Office → GM, Operation → Operation Manager, Project → Operation Manager, Finance → specific named manager
                     if new_department == 'Office':
                         gm_user = User.query.filter_by(role='GM').first()
                         final_manager_id = gm_user.user_id if gm_user else None
                     elif new_department == 'Operation':
                         op_manager = User.query.filter_by(role='Operation Manager').first()
                         final_manager_id = op_manager.user_id if op_manager else None
-                    elif new_department == 'Project Department':
+                    elif new_department == 'Project':
                         op_manager = User.query.filter_by(role='Operation Manager').first()
                         final_manager_id = op_manager.user_id if op_manager else None
                     elif new_department == 'Finance':

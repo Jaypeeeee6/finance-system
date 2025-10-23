@@ -58,7 +58,7 @@
                             <option value="Marketing" {% if user_to_edit.department == 'Marketing' %}selected{% endif %}>Marketing</option>
                             <option value="Operation" {% if user_to_edit.department == 'Operation' %}selected{% endif %}>Operation</option>
                             <option value="Quality Control" {% if user_to_edit.department == 'Quality Control' %}selected{% endif %}>Quality Control</option>
-                            <option value="Project Department" {% if user_to_edit.department == 'Project Department' %}selected{% endif %}>Project Department</option>
+                            <option value="Project" {% if user_to_edit.department == 'Project' %}selected{% endif %}>Project</option>
                             <option value="Research and Development" {% if user_to_edit.department == 'Research and Development' %}selected{% endif %}>Research and Development</option>
                             <option value="Office" {% if user_to_edit.department == 'Office' %}selected{% endif %}>Office</option>
                             <option value="Maintenance" {% if user_to_edit.department == 'Maintenance' %}selected{% endif %}>Maintenance</option>
@@ -185,7 +185,7 @@ function updateManagerDisplay() {
         managerUser = users.find(u => u.role === 'GM');
     } else if (department === 'Operation') {
         managerUser = users.find(u => u.role === 'Operation Manager');
-    } else if (department === 'Project Department') {
+    } else if (department === 'Project') {
         managerUser = users.find(u => u.role === 'Operation Manager');
     } else if (department === 'Finance') {
         managerUser = users.find(u => u.department === 'Finance' && u.name === 'Abdalaziz Al-Brashdi');

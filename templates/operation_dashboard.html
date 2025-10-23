@@ -50,7 +50,7 @@
                         <option value="">All Departments</option>
                         <option value="Maintenance" {% if department_filter == 'Maintenance' %}selected{% endif %}>Maintenance</option>
                         <option value="Operation" {% if department_filter == 'Operation' %}selected{% endif %}>Operation</option>
-                        <option value="Project Department" {% if department_filter == 'Project Department' %}selected{% endif %}>Project Department</option>
+                        <option value="Project" {% if department_filter == 'Project' %}selected{% endif %}>Project</option>
                     </select>
                     <select id="urgentFilter" onchange="filterTable()" class="form-select">
                         <option value="">All Requests</option>

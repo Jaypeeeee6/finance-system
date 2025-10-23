@@ -1,7 +1,7 @@
 // ==================== FLASH MESSAGE AUTO-DISMISS ====================
 document.addEventListener('DOMContentLoaded', function() {
-    // Auto-dismiss flash messages after 5 seconds
-    const alerts = document.querySelectorAll('.alert');
+    // Auto-dismiss flash messages after 5 seconds (excluding persistent alerts)
+    const alerts = document.querySelectorAll('.alert:not(.alert-persistent)');
     alerts.forEach(alert => {
         setTimeout(() => {
             alert.style.animation = 'slideOut 0.3s ease';

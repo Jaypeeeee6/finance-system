@@ -276,3 +276,33 @@ class InstallmentEditHistory(db.Model):
     def __repr__(self):
         return f'<InstallmentEditHistory {self.id} - Schedule {self.schedule_id} - Edited by {self.edited_by.name if self.edited_by else "Unknown"}>'
 
+
+class RequestType(db.Model):
+    """Request types available for each department"""
+    __tablename__ = 'request_types'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)  # e.g., "Personal Expenses", "Utilities Expenses"
+    department = db.Column(db.String(100), nullable=False)  # Department this type belongs to
+    is_active = db.Column(db.Boolean, default=True)  # Whether this type is currently available
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    
+    # Relationship to User who created this type
+    created_by = db.relationship('User', backref='created_request_types')
+    
+    def to_dict(self):
+        """Convert request type to dictionary"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'department': self.department,
+            'is_active': self.is_active,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'created_by': self.created_by.name if self.created_by else 'System'
+        }
+    
+    def __repr__(self):
+        return f'<RequestType {self.id} - {self.name} ({self.department})>'
