@@ -3348,6 +3348,7 @@ def approve_request(request_id):
             if req.recurring == 'Recurring':
                 # Recurring payment - set status to Recurring
                 req.status = 'Recurring'
+                req.approval_date = today  # Set approval_date when status becomes Recurring
                 
                 # End finance approval timing when recurring payment is approved
                 if req.finance_approval_start_time and not req.finance_approval_end_time:
@@ -3513,6 +3514,7 @@ def approve_request(request_id):
         if req.recurring == 'Recurring':
             # For recurring payments, set status to Recurring and handle payment schedule
             req.status = 'Recurring'
+            req.approval_date = current_time.date()  # Set approval_date when status becomes Recurring
             
             # End finance approval timing when recurring payment is approved
             if req.finance_approval_start_time and not req.finance_approval_end_time:
@@ -5010,11 +5012,8 @@ def export_reports_excel():
 
         # Add data rows
         for row_idx, r in enumerate(result_requests, 8):
-            # For Approved column: show completion_date for One-Time (Completed status) or approval_date for Recurring
-            if r.recurring == 'Recurring' and r.status == 'Recurring':
-                approved_date = r.approval_date.strftime('%Y-%m-%d') if getattr(r, 'approval_date', None) else ''
-            else:
-                approved_date = r.completion_date.strftime('%Y-%m-%d') if getattr(r, 'completion_date', None) else ''
+            # For Approved column: show approval_date (matching reports page)
+            approved_date = r.approval_date.strftime('%Y-%m-%d') if getattr(r, 'approval_date', None) else ''
             
             # For Person/Company column, show person_company field only
             company_display = r.person_company
@@ -5147,10 +5146,10 @@ def export_reports_pdf():
         c = canvas.Canvas(buffer, pagesize=landscape(A4))
         width, height = landscape(A4)
 
-        # Margins
-        left = 15 * mm
-        right = width - 15 * mm
-        top = height - 15 * mm
+        # Margins (reduced for more space)
+        left = 8 * mm
+        right = width - 8 * mm
+        top = height - 8 * mm
         y = top
 
         # Header
@@ -5228,9 +5227,9 @@ def export_reports_pdf():
         # Table header
         c.setFont('Helvetica-Bold', 9)
         headers = ['ID', 'Type', 'Requestor', 'Dept', 'Branch', 'Person/Company', 'Submitted', 'Payment', 'Approved', 'Amount', 'Approver']
-        # Column positions optimized for landscape A4 (297mm width) - added Person/Company column
-        col_x = [left, left+15*mm, left+45*mm, left+75*mm, left+100*mm, left+125*mm, left+150*mm, left+170*mm, left+195*mm, left+225*mm, left+255*mm]
-        col_widths = [10*mm, 25*mm, 25*mm, 20*mm, 20*mm, 20*mm, 15*mm, 20*mm, 25*mm, 25*mm, 20*mm]  # Added Person/Company column
+        # Column positions optimized for landscape A4 with reduced margins - more space available
+        col_x = [left, left+12*mm, left+42*mm, left+72*mm, left+97*mm, left+122*mm, left+147*mm, left+167*mm, left+192*mm, left+222*mm, left+252*mm]
+        col_widths = [12*mm, 30*mm, 30*mm, 25*mm, 25*mm, 25*mm, 20*mm, 25*mm, 30*mm, 30*mm, 25*mm]  # Increased column widths
         for hx, text in zip(col_x, headers):
             c.drawString(hx, y, text)
         y -= 10
@@ -5241,7 +5240,7 @@ def export_reports_pdf():
         c.setFont('Helvetica', 9)
         row_height = 10
         for r in result_requests:
-            if y < 20 * mm:
+            if y < 15 * mm:  # Reduced from 20mm to fit more rows per page
                 c.showPage()
                 y = top
                 c.setFont('Helvetica-Bold', 9)
@@ -5272,11 +5271,8 @@ def export_reports_pdf():
                 str(r.approver or '')
             ]
             
-            # For Approved column: show completion_date for One-Time (Completed status) or approval_date for Recurring
-            if r.recurring == 'Recurring' and r.status == 'Recurring':
-                approved_date = r.approval_date.strftime('%Y-%m-%d') if getattr(r, 'approval_date', None) else ''
-            else:
-                approved_date = r.completion_date.strftime('%Y-%m-%d') if getattr(r, 'completion_date', None) else ''
+            # For Approved column: show approval_date (matching reports page)
+            approved_date = r.approval_date.strftime('%Y-%m-%d') if getattr(r, 'approval_date', None) else ''
             row_data[7] = approved_date
             
             # Calculate height for each column
@@ -5292,7 +5288,7 @@ def export_reports_pdf():
                     for j, line in enumerate(lines):
                         c.drawString(col_x[i], y - (j * 10), line)
             
-            y -= max_height + 5  # Add some spacing between rows
+            y -= max_height + 3  # Reduced spacing between rows for more content
 
         c.showPage()
         c.save()
