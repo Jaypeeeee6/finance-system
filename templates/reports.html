@@ -3,6 +3,18 @@
 {% block title %}Reports{% endblock %}
 
 {% block content %}
+<style>
+    .data-table th:nth-child(5),
+    .data-table td:nth-child(5) {
+        width: 150px;
+        min-width: 150px;
+    }
+    
+    .data-table th:nth-child(6),
+    .data-table td:nth-child(6) {
+        text-align: left;
+    }
+</style>
 <div class="dashboard-container">
     <div class="dashboard-header">
         <h1><i class="fas fa-chart-bar"></i> Payment Reports</h1>
@@ -30,10 +42,9 @@
                         <label for="request_type">Request Type</label>
                         <select name="request_type" id="request_type">
                             <option value="">All Types</option>
-                            <option value="Item" {% if request.args.get('request_type') == 'Item' %}selected{% endif %}>Item</option>
-                            <option value="Person" {% if request.args.get('request_type') == 'Person' %}selected{% endif %}>Person</option>
-                            <option value="Supplier/Rental" {% if request.args.get('request_type') == 'Supplier/Rental' %}selected{% endif %}>Supplier/Rental</option>
-                            <option value="Company" {% if request.args.get('request_type') == 'Company' %}selected{% endif %}>Company</option>
+                            {% for request_type in request_types %}
+                            <option value="{{ request_type }}" {% if request.args.get('request_type') == request_type %}selected{% endif %}>{{ request_type }}</option>
+                            {% endfor %}
                         </select>
                     </div>
 
@@ -139,6 +150,9 @@
             <h2><i class="fas fa-table"></i> Report Results</h2>
             {% if requests and requests|length > 0 %}
             <div class="header-actions">
+                <a class="btn btn-success" id="export-excel-btn" href="{{ url_for('export_reports_excel', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to','')) }}" onclick="showExportLoading()">
+                    <i class="fas fa-file-excel"></i> <span id="export-excel-text">Export Excel</span>
+                </a>
                 <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to','')) }}" onclick="showExportLoading()">
                     <i class="fas fa-file-pdf"></i> <span id="export-text">Export PDF</span>
                 </a>
@@ -156,7 +170,7 @@
                                 <th>Requestor</th>
                                 <th>Department</th>
                                 <th>Branch Name</th>
-                                <th>Company Name</th>
+                                <th>Person/Company</th>
                                 <th>Submission Date</th>
                                 <th>Approval Date</th>
                                 <th>Amount</th>
@@ -180,8 +194,8 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if req.company_name %}
-                                        <span class="badge badge-secondary">{{ req.company_name }}</span>
+                                    {% if req.person_company %}
+                                        {{ req.person_company }}
                                     {% else %}
                                         <span style="color: #999;">-</span>
                                     {% endif %}
@@ -202,24 +216,24 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if req.status == 'Completed' %}
-                                        <span class="badge" style="background: #28a745; color: white; font-weight: 600;">✅ {{ req.status }}</span>
-                                    {% elif req.status == 'Pending Manager Approval' %}
-                                        <span class="badge" style="background: #ffc107; color: #212529; font-weight: 600;">⏳ {{ req.status }}</span>
-                                    {% elif req.status == 'Pending Finance Approval' %}
-                                        <span class="badge" style="background: #007bff; color: white; font-weight: 600;">⏳ {{ req.status }}</span>
-                                    {% elif req.status == 'Rejected by Manager' %}
-                                        <span class="badge" style="background: #dc3545; color: white; font-weight: 600;">❌ {{ req.status }}</span>
-                                    {% elif req.status == 'Rejected by Finance' %}
-                                        <span class="badge" style="background: #dc3545; color: white; font-weight: 600;">❌ {{ req.status }}</span>
-                                    {% elif req.status == 'Proof Pending' %}
-                                        <span class="badge" style="background: #17a2b8; color: white;">📤 {{ req.status }}</span>
-                                    {% elif req.status == 'Proof Sent' %}
-                                        <span class="badge" style="background: #28a745; color: white;">📥 {{ req.status }}</span>
+                                    {% if req.status == 'Approved' %}
+                                        <span class="badge badge-success">✓ {{ req.status }}</span>
+                                    {% elif req.status == 'Completed' %}
+                                        <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
+                                    {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
+                                        <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
+                                    {% elif req.status == 'Payment Pending' %}
+                                        <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
+                                    {% elif req.status in ['Proof Pending', 'Proof Sent'] %}
+                                        <span class="badge" style="background: #2196F3; color: white;">📄 {{ req.status }}</span>
+                                    {% elif req.status == 'Paid' %}
+                                        <span class="badge" style="background: #6f42c1; color: white;">💰 {{ req.status }}</span>
                                     {% elif req.status == 'Recurring' %}
-                                        <span class="badge" style="background: #6f42c1; color: white;">🔄 {{ req.status }}</span>
+                                        <span class="badge" style="background: #ffc107; color: #212529;">↻ {{ req.status }}</span>
+                                    {% elif req.status in ['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected'] or 'Rejected' in req.status %}
+                                        <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
                                     {% else %}
-                                        <span class="badge badge-secondary">❓ {{ req.status }}</span>
+                                        <span class="badge badge-warning">⏳ {{ req.status }}</span>
                                     {% endif %}
                                 </td>
                                 <td>{{ req.approver or 'N/A' }}</td>
@@ -309,6 +323,30 @@ document.addEventListener('keydown', function(e) {
 // Reset button state when the page loads (in case of refresh)
 document.addEventListener('DOMContentLoaded', function() {
     resetExportButton();
+});
+
+// Update request types when department changes
+document.getElementById('department').addEventListener('change', function() {
+    const department = this.value;
+    const requestTypeSelect = document.getElementById('request_type');
+    
+    // Clear existing options except "All Types"
+    requestTypeSelect.innerHTML = '<option value="">All Types</option>';
+    
+    // Fetch request types for selected department
+    fetch(`/api/request-types?department=${encodeURIComponent(department)}`)
+        .then(response => response.json())
+        .then(data => {
+            data.request_types.forEach(requestType => {
+                const option = document.createElement('option');
+                option.value = requestType;
+                option.textContent = requestType;
+                requestTypeSelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('Error fetching request types:', error);
+        });
 });
 </script>
 {% endblock %}

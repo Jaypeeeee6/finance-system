@@ -2714,7 +2714,7 @@ def new_request():
             requestor_name=requestor_name,
             branch_name=branch_name,
             item_name=item_name if request_type == 'Item' else None,
-            person_company=person_company if request_type in ['Person', 'Company'] else None,
+            person_company=person_company if person_company else None,
             company_name=company_name if request_type == 'Supplier/Rental' else None,
             department=current_user.department,
             date=date,
@@ -4805,7 +4805,7 @@ def reports():
         flash('You do not have permission to access this page.', 'danger')
         return redirect(url_for('dashboard'))
     
-    # Get filter parameters (no status filter - only show Completed requests)
+    # Get filter parameters (no status filter - show Completed and Recurring requests)
     department_filter = request.args.get('department', '')
     request_type_filter = request.args.get('request_type', '')
     company_filter = request.args.get('company', '')
@@ -4813,8 +4813,8 @@ def reports():
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
     
-    # Build query - only show Completed requests
-    query = PaymentRequest.query.filter_by(status='Completed')
+    # Build query - show Completed and Recurring requests
+    query = PaymentRequest.query.filter(PaymentRequest.status.in_(['Completed', 'Recurring']))
     
     # Role-based department filtering
     if current_user.role == 'Operation Manager':
@@ -4826,8 +4826,8 @@ def reports():
     if request_type_filter:
         query = query.filter_by(request_type=request_type_filter)
     if company_filter:
-        # Only filter by company name for completed requests with company_name
-        query = query.filter(PaymentRequest.company_name.ilike(f'%{company_filter}%'))
+        # Filter by person_company field only (company_name is no longer used)
+        query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
     if branch_filter:
         # Filter by branch name
         query = query.filter(PaymentRequest.branch_name == branch_filter)
@@ -4848,26 +4848,234 @@ def reports():
         departments = db.session.query(PaymentRequest.department).distinct().all()
         departments = [d[0] for d in departments]
     
-    # Get unique companies for filter (only for completed requests with company_name)
-    companies = db.session.query(PaymentRequest.company_name).filter(
-        PaymentRequest.status == 'Completed',
-        PaymentRequest.company_name.isnot(None),
-        PaymentRequest.company_name != ''
+    # Get unique companies for filter (only person_company field since company_name is no longer used)
+    companies = db.session.query(PaymentRequest.person_company).filter(
+        PaymentRequest.status.in_(['Completed', 'Recurring']),
+        PaymentRequest.person_company.isnot(None),
+        PaymentRequest.person_company != ''
     ).distinct().all()
     companies = [c[0] for c in companies if c[0]]
+    companies.sort()  # Sort alphabetically
     
     # Get unique branches for filter
     branches = Branch.query.filter_by(is_active=True).order_by(Branch.name).all()
+    
+    # Get request types based on selected department
+    if department_filter:
+        # If department is selected, show only request types for that department
+        request_types = db.session.query(RequestType.name).filter(
+            RequestType.department == department_filter,
+            RequestType.is_active == True
+        ).order_by(RequestType.name).all()
+        request_types = [rt[0] for rt in request_types]
+    else:
+        # If no department selected, show all unique request types (remove duplicates)
+        request_types = db.session.query(RequestType.name).filter(
+            RequestType.is_active == True
+        ).distinct().order_by(RequestType.name).all()
+        request_types = [rt[0] for rt in request_types]
     
     return render_template('reports.html', 
                          requests=requests, 
                          departments=departments,
                          companies=companies,
                          branches=branches,
+                         request_types=request_types,
                          company_filter=company_filter,
                          branch_filter=branch_filter,
                          user=current_user)
 
+
+
+@app.route('/api/request-types')
+@login_required
+def api_request_types():
+    """API endpoint to get request types by department"""
+    department = request.args.get('department', '')
+    
+    if department:
+        # Get request types for specific department
+        request_types = db.session.query(RequestType.name).filter(
+            RequestType.department == department,
+            RequestType.is_active == True
+        ).order_by(RequestType.name).all()
+        request_types = [rt[0] for rt in request_types]
+    else:
+        # Get all unique request types (remove duplicates)
+        request_types = db.session.query(RequestType.name).filter(
+            RequestType.is_active == True
+        ).distinct().order_by(RequestType.name).all()
+        request_types = [rt[0] for rt in request_types]
+    
+    return jsonify({
+        'request_types': request_types
+    })
+
+
+@app.route('/reports/export/excel')
+@login_required
+@role_required('Finance Admin', 'Finance Staff', 'GM', 'IT Staff', 'Operation Manager')
+def export_reports_excel():
+    """Export filtered reports to an Excel file with frozen columns"""
+    # Lazy imports to avoid hard dependency during app startup
+    import io
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        flash('Excel export requires openpyxl. Install with: pip install openpyxl', 'warning')
+        return redirect(url_for('reports', **request.args))
+    except Exception as e:
+        flash(f'Error importing Excel library: {str(e)}', 'error')
+        return redirect(url_for('reports', **request.args))
+
+    # Reuse the same filters as the reports() view (no status filter - show Completed and Recurring requests)
+    department_filter = request.args.get('department', '')
+    request_type_filter = request.args.get('request_type', '')
+    company_filter = request.args.get('company', '')
+    branch_filter = request.args.get('branch', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+
+    query = PaymentRequest.query.filter(PaymentRequest.status.in_(['Completed', 'Recurring']))
+    
+    # Role-based department filtering
+    if current_user.role == 'Operation Manager':
+        # Operation Manager can only see Maintenance, Operation, Project, Procurement, and Logistic
+        query = query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project', 'Procurement', 'Logistic']))
+    
+    if department_filter:
+        query = query.filter_by(department=department_filter)
+    if request_type_filter:
+        query = query.filter_by(request_type=request_type_filter)
+    if company_filter:
+        # Filter by person_company field only (company_name is no longer used)
+        query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
+    if branch_filter:
+        query = query.filter_by(branch_name=branch_filter)
+    if date_from:
+        query = query.filter(PaymentRequest.date >= datetime.strptime(date_from, '%Y-%m-%d').date())
+    if date_to:
+        query = query.filter(PaymentRequest.date <= datetime.strptime(date_to, '%Y-%m-%d').date())
+
+    result_requests = query.order_by(PaymentRequest.date.desc()).all()
+
+    # Helper function to convert to float
+    def to_float(value):
+        try:
+            return float(value)
+        except Exception:
+            return 0.0
+
+    # All requests are completed, so sum all amounts
+    total_amount = sum(to_float(r.amount) for r in result_requests)
+
+    try:
+        # Create Excel workbook
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Payment Reports"
+
+        # Add report header information
+        ws['A1'] = 'Payment Reports'
+        ws['A1'].font = Font(size=16, bold=True)
+        
+        generation_date = datetime.now().strftime('%Y-%m-%d %H:%M')
+        ws['A2'] = f"Report Generated: {generation_date}"
+        
+        filters_line = f"Dept: {department_filter or 'All'} | Type: {request_type_filter or 'All'} | Branch: {branch_filter or 'All'}"
+        ws['A3'] = filters_line
+        
+        # Date scope
+        if date_from and date_to:
+            ws['A4'] = f"Date Range: {date_from} to {date_to}"
+        elif date_from:
+            ws['A4'] = f"Date From: {date_from} (no end date)"
+        elif date_to:
+            ws['A4'] = f"Date To: {date_to} (no start date)"
+        else:
+            ws['A4'] = "Date Range: All dates (no filter applied)"
+        
+        ws['A5'] = f"Total Amount: OMR {total_amount:.3f}"
+        ws['A5'].font = Font(size=12, bold=True)
+
+        # Add headers starting from row 7
+        headers = ['ID', 'Type', 'Requestor', 'Dept', 'Branch', 'Person/Company', 'Submitted', 'Payment', 'Approved', 'Amount', 'Approver']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=7, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center")
+
+        # Add data rows
+        for row_idx, r in enumerate(result_requests, 8):
+            # For Approved column: show completion_date for One-Time (Completed status) or approval_date for Recurring
+            if r.recurring == 'Recurring' and r.status == 'Recurring':
+                approved_date = r.approval_date.strftime('%Y-%m-%d') if getattr(r, 'approval_date', None) else ''
+            else:
+                approved_date = r.completion_date.strftime('%Y-%m-%d') if getattr(r, 'completion_date', None) else ''
+            
+            # For Person/Company column, show person_company field only
+            company_display = r.person_company
+            
+            row_data = [
+                f"#{r.request_id}",
+                str(r.request_type or ''),
+                str(r.requestor_name or ''),
+                str(r.department or ''),
+                str(r.branch_name or ''),
+                str(company_display or ''),
+                r.date.strftime('%Y-%m-%d') if getattr(r, 'date', None) else '',
+                str(r.recurring or 'One-Time'),
+                approved_date,
+                f"OMR {to_float(r.amount):.3f}",
+                str(r.approver or '')
+            ]
+            
+            for col, data in enumerate(row_data, 1):
+                ws.cell(row=row_idx, column=col, value=data)
+
+        # Auto-adjust column widths
+        for column in ws.columns:
+            max_length = 0
+            column_letter = get_column_letter(column[0].column)
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            
+            # Special handling for specific columns
+            if column_letter == 'A':  # ID column - make it narrower
+                adjusted_width = min(max_length + 2, 12)  # Cap ID column at 12 characters
+            elif column_letter == 'D':  # Department column - make it wider
+                adjusted_width = min(max_length + 2, 25)  # Cap Department column at 25 characters
+            else:
+                adjusted_width = min(max_length + 2, 50)  # Cap other columns at 50 characters
+            
+            ws.column_dimensions[column_letter].width = adjusted_width
+
+        # Freeze panes - freeze only columns A, B, C, D (ID, Type, Requestor, Dept)
+        # This allows full vertical scrolling but keeps the first 4 columns frozen
+        ws.freeze_panes = 'E1'  # Freeze only to the left of column E, no row freeze
+
+        # Save to BytesIO
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        from flask import make_response
+        response = make_response(buffer.getvalue())
+        response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        response.headers['Content-Disposition'] = 'attachment; filename=reports.xlsx'
+        response.headers['Content-Length'] = str(len(buffer.getvalue()))
+        return response
+        
+    except Exception as e:
+        flash(f'Error generating Excel: {str(e)}', 'error')
+        return redirect(url_for('reports', **request.args))
 
 
 @app.route('/reports/export/pdf')
@@ -4881,6 +5089,7 @@ def export_reports_pdf():
         from reportlab.lib.pagesizes import A4
         from reportlab.pdfgen import canvas
         from reportlab.lib.units import mm
+        from reportlab.lib.utils import simpleSplit
     except ImportError:
         flash('PDF export requires reportlab. Install with: pip install reportlab', 'warning')
         return redirect(url_for('reports', **request.args))
@@ -4888,7 +5097,7 @@ def export_reports_pdf():
         flash(f'Error importing PDF library: {str(e)}', 'error')
         return redirect(url_for('reports', **request.args))
 
-    # Reuse the same filters as the reports() view (no status filter - only show Completed requests)
+    # Reuse the same filters as the reports() view (no status filter - show Completed and Recurring requests)
     department_filter = request.args.get('department', '')
     request_type_filter = request.args.get('request_type', '')
     company_filter = request.args.get('company', '')
@@ -4896,7 +5105,7 @@ def export_reports_pdf():
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
 
-    query = PaymentRequest.query.filter_by(status='Completed')
+    query = PaymentRequest.query.filter(PaymentRequest.status.in_(['Completed', 'Recurring']))
     
     # Role-based department filtering
     if current_user.role == 'Operation Manager':
@@ -4908,8 +5117,8 @@ def export_reports_pdf():
     if request_type_filter:
         query = query.filter_by(request_type=request_type_filter)
     if company_filter:
-        # Only filter by company name for completed requests with company_name
-        query = query.filter(PaymentRequest.company_name.ilike(f'%{company_filter}%'))
+        # Filter by person_company field only (company_name is no longer used)
+        query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
     if branch_filter:
         # Filter by branch name
         query = query.filter(PaymentRequest.branch_name == branch_filter)
@@ -4976,11 +5185,52 @@ def export_reports_pdf():
         c.drawString(left, y, f"Total Amount: OMR {total_amount:.3f}")
         y -= 18
 
+        # Helper function to wrap text manually
+        def wrap_text(text, max_width, font_name='Helvetica', font_size=9):
+            """Wrap text to fit within specified width"""
+            if not text:
+                return ['']
+            
+            # More conservative character width estimate for better wrapping
+            char_width = font_size * 0.5  # More conservative character width
+            max_chars = int(max_width / char_width)
+            
+            words = str(text).split()
+            lines = []
+            current_line = []
+            
+            for word in words:
+                # Check if adding this word would exceed the line length
+                test_line = ' '.join(current_line + [word])
+                if len(test_line) <= max_chars:
+                    current_line.append(word)
+                else:
+                    if current_line:
+                        lines.append(' '.join(current_line))
+                        current_line = [word]
+                    else:
+                        # Single word is too long, force break it
+                        if len(word) > max_chars:
+                            # Break long words
+                            while len(word) > max_chars:
+                                lines.append(word[:max_chars])
+                                word = word[max_chars:]
+                            if word:
+                                current_line = [word]
+                        else:
+                            lines.append(word)
+            
+            if current_line:
+                lines.append(' '.join(current_line))
+            
+            return lines if lines else ['']
+        
         # Table header
         c.setFont('Helvetica-Bold', 9)
-        headers = ['ID', 'Type', 'Requestor', 'Dept', 'Branch', 'Submitted', 'Approved', 'Amount', 'Approver']
-        # Column positions optimized for landscape A4 (297mm width) - added Branch column
-        col_x = [left, left+15*mm, left+35*mm, left+65*mm, left+90*mm, left+115*mm, left+140*mm, left+170*mm, left+200*mm]
+        headers = ['ID', 'Type', 'Requestor', 'Dept', 'Branch', 'Person/Company', 'Submitted', 'Payment', 'Approved', 'Amount', 'Approver']
+        # Column positions optimized for landscape A4 (297mm width) - added Person/Company column
+        col_x = [left, left+15*mm, left+45*mm, left+75*mm, left+100*mm, left+125*mm, left+150*mm, left+170*mm, left+195*mm, left+225*mm, left+255*mm]
+        col_widths = [10*mm, 25*mm, 25*mm, 20*mm, 20*mm, 20*mm, 15*mm, 20*mm, 25*mm, 25*mm, 20*mm]  # Added Person/Company column
         for hx, text in zip(col_x, headers):
             c.drawString(hx, y, text)
         y -= 10
@@ -5002,16 +5252,47 @@ def export_reports_pdf():
                 y -= 8
                 c.setFont('Helvetica', 9)
 
-            c.drawString(col_x[0], y, f"#{r.request_id}")
-            c.drawString(col_x[1], y, str(r.request_type or ''))
-            c.drawString(col_x[2], y, (r.requestor_name or '')[:20])
-            c.drawString(col_x[3], y, (r.department or '')[:15])
-            c.drawString(col_x[4], y, (r.branch_name or '')[:15])
-            c.drawString(col_x[5], y, r.date.strftime('%Y-%m-%d') if getattr(r, 'date', None) else '')
-            c.drawString(col_x[6], y, r.approval_date.strftime('%Y-%m-%d') if getattr(r, 'approval_date', None) else '')
-            c.drawRightString(col_x[7]+25*mm, y, f"OMR {to_float(r.amount):.3f}")
-            c.drawString(col_x[8], y, (r.approver or '')[:20])
-            y -= row_height
+            # Calculate the maximum height needed for this row across all columns
+            max_height = 0
+            
+            # For Person/Company column, show person_company field only
+            company_display = r.person_company
+            
+            row_data = [
+                f"#{r.request_id}",
+                str(r.request_type or ''),
+                str(r.requestor_name or ''),
+                str(r.department or ''),
+                str(r.branch_name or ''),
+                str(company_display or ''),
+                r.date.strftime('%Y-%m-%d') if getattr(r, 'date', None) else '',
+                str(r.recurring or 'One-Time'),
+                '',  # Will be filled below
+                f"OMR {to_float(r.amount):.3f}",
+                str(r.approver or '')
+            ]
+            
+            # For Approved column: show completion_date for One-Time (Completed status) or approval_date for Recurring
+            if r.recurring == 'Recurring' and r.status == 'Recurring':
+                approved_date = r.approval_date.strftime('%Y-%m-%d') if getattr(r, 'approval_date', None) else ''
+            else:
+                approved_date = r.completion_date.strftime('%Y-%m-%d') if getattr(r, 'completion_date', None) else ''
+            row_data[7] = approved_date
+            
+            # Calculate height for each column
+            for i, (data, width) in enumerate(zip(row_data, col_widths)):
+                if data:
+                    lines = wrap_text(str(data), width, 'Helvetica', 9)
+                    max_height = max(max_height, len(lines) * 10)
+            
+            # Draw each column with wrapping
+            for i, (data, width) in enumerate(zip(row_data, col_widths)):
+                if data:
+                    lines = wrap_text(str(data), width, 'Helvetica', 9)
+                    for j, line in enumerate(lines):
+                        c.drawString(col_x[i], y - (j * 10), line)
+            
+            y -= max_height + 5  # Add some spacing between rows
 
         c.showPage()
         c.save()

@@ -282,6 +282,19 @@ document.querySelectorAll('[data-print]').forEach(button => {
     button.addEventListener('click', printReport);
 });
 
+// ==================== EXPORT LOADING ====================
+function showExportLoading() {
+    // Show loading state for export buttons
+    const exportButtons = document.querySelectorAll('#export-pdf-btn, #export-excel-btn');
+    exportButtons.forEach(button => {
+        const textSpan = button.querySelector('span');
+        if (textSpan) {
+            textSpan.textContent = 'Exporting...';
+            button.disabled = true;
+        }
+    });
+}
+
 // ==================== EXPORT TO CSV ====================
 function exportTableToCSV(table, filename = 'report.csv') {
     const rows = table.querySelectorAll('tr');
