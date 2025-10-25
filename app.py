@@ -6,6 +6,8 @@ from functools import wraps
 import os
 from datetime import datetime, date, timedelta
 import re
+import threading
+import time
 from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType, Branch, FinanceAdminNote
 from config import Config
 
@@ -254,7 +256,7 @@ def log_action(action):
 
 def create_notification(user_id, title, message, notification_type, request_id=None):
     """Helper function to create notifications"""
-    print(f"🔔 DEBUG: Creating notification for user_id: {user_id}")
+    print(f"DEBUG: Creating notification for user_id: {user_id}")
     print(f"   - title: {title}")
     print(f"   - message: {message}")
     print(f"   - notification_type: {notification_type}")
@@ -270,7 +272,7 @@ def create_notification(user_id, title, message, notification_type, request_id=N
     db.session.add(notification)
     db.session.commit()
     
-    print(f"🔔 DEBUG: Notification created successfully with ID: {notification.notification_id}")
+    print(f"DEBUG: Notification created successfully with ID: {notification.notification_id}")
     return notification
 
 def notify_users_by_role(request, notification_type, title, message, request_id=None):
@@ -287,7 +289,7 @@ def notify_users_by_role(request, notification_type, title, message, request_id=
     requestor_role = request.user.role
     requestor_department = request.department
     
-    print(f"🔔 DEBUG: notify_users_by_role called")
+    print(f"DEBUG: notify_users_by_role called")
     print(f"   - notification_type: {notification_type}")
     print(f"   - requestor_role: {requestor_role}")
     print(f"   - requestor_department: {requestor_department}")
@@ -301,7 +303,7 @@ def notify_users_by_role(request, notification_type, title, message, request_id=
     
     # Handle new_submission notifications
     elif notification_type == 'new_submission':
-        print(f"🔔 DEBUG: Processing new_submission for role: {requestor_role}")
+        print(f"DEBUG: Processing new_submission for role: {requestor_role}")
         
         # General Manager - only from Department Manager submissions
         if requestor_role == 'Department Manager':
@@ -323,14 +325,14 @@ def notify_users_by_role(request, notification_type, title, message, request_id=
         
         # Department Managers (Non-IT) - only from their own department staff
         elif (requestor_role.endswith(' Staff') or requestor_role == 'Project Staff' or requestor_role in ['Finance Staff', 'HR Staff', 'Operation Staff', 'IT Staff']):
-            print(f"🔔 DEBUG: Notifying Department Managers for {requestor_role} from {requestor_department}")
+            print(f"DEBUG: Notifying Department Managers for {requestor_role} from {requestor_department}")
             dept_managers = User.query.filter_by(role='Department Manager', department=requestor_department).all()
-            print(f"🔔 DEBUG: Found {len(dept_managers)} Department Managers for department {requestor_department}")
+            print(f"DEBUG: Found {len(dept_managers)} Department Managers for department {requestor_department}")
             for user in dept_managers:
-                print(f"🔔 DEBUG: Notifying Department Manager {user.username} ({user.role}) from {user.department}")
+                print(f"DEBUG: Notifying Department Manager {user.username} ({user.role}) from {user.department}")
                 create_notification(user.user_id, title, message, notification_type, request_id)
         else:
-            print(f"🔔 DEBUG: No notification rule matched for role: {requestor_role}")
+            print(f"DEBUG: No notification rule matched for role: {requestor_role}")
     
     # Requestor - for updates on their own requests
     elif notification_type in ['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed']:
@@ -338,7 +340,7 @@ def notify_users_by_role(request, notification_type, title, message, request_id=
         
         # For proof_uploaded, also notify Finance Admin
         if notification_type == 'proof_uploaded':
-            print(f"🔔 DEBUG: Also notifying Finance Admin about proof upload")
+            print(f"DEBUG: Also notifying Finance Admin about proof upload")
             finance_users = User.query.filter(User.role.in_(['Finance Staff', 'Finance Admin'])).all()
             for user in finance_users:
                 create_notification(
@@ -348,11 +350,11 @@ def notify_users_by_role(request, notification_type, title, message, request_id=
                     notification_type=notification_type,
                     request_id=request_id
                 )
-                print(f"🔔 DEBUG: Notified Finance user {user.username} about proof upload")
+                print(f"DEBUG: Notified Finance user {user.username} about proof upload")
         
         # For request_approved, also notify Finance Admin if they didn't approve it
         elif notification_type == 'request_approved':
-            print(f"🔔 DEBUG: Also notifying Finance Admin about request approval")
+            print(f"DEBUG: Also notifying Finance Admin about request approval")
             finance_users = User.query.filter(User.role.in_(['Finance Staff', 'Finance Admin'])).all()
             for user in finance_users:
                 create_notification(
@@ -362,7 +364,7 @@ def notify_users_by_role(request, notification_type, title, message, request_id=
                     notification_type=notification_type,
                     request_id=request_id
                 )
-                print(f"🔔 DEBUG: Notified Finance user {user.username} about request approval")
+                print(f"DEBUG: Notified Finance user {user.username} about request approval")
     
     # Emit real-time notification to all users after creating database notifications
     try:
@@ -379,7 +381,7 @@ def notify_users_by_role(request, notification_type, title, message, request_id=
             'type': notification_type
         }, room='all_users')
         
-        print(f"🔔 DEBUG: WebSocket events emitted for {notification_type}")
+        print(f"DEBUG: WebSocket events emitted for {notification_type}")
     except Exception as e:
         print(f"Error emitting WebSocket notification: {e}")
 
@@ -520,6 +522,115 @@ def check_recurring_payments_due():
                     
                     # Log the action
                     log_action(f"Recurring payment due notification created for request #{request.request_id}")
+
+
+def check_finance_approval_timing_alerts():
+    """Check for finance approval timing alerts and send notifications"""
+    try:
+        current_time = datetime.utcnow()
+        
+        # Get all requests that are pending finance approval and have started timing
+        pending_requests = PaymentRequest.query.filter(
+            PaymentRequest.status == 'Pending Finance Approval',
+            PaymentRequest.finance_approval_start_time.isnot(None),
+            PaymentRequest.finance_approval_end_time.is_(None)  # Not yet completed
+        ).all()
+        
+        for request in pending_requests:
+            # Calculate time elapsed since finance approval started
+            time_elapsed = current_time - request.finance_approval_start_time
+            
+            # Determine alert thresholds based on urgency
+            if request.is_urgent:
+                # Urgent requests: 2 hours
+                alert_threshold = timedelta(hours=2)
+                recurring_threshold = timedelta(hours=2)
+            else:
+                # Non-urgent requests: 24 hours
+                alert_threshold = timedelta(hours=24)
+                recurring_threshold = timedelta(hours=24)
+            
+            # Check if we should send an alert
+            should_send_alert = False
+            alert_type = None
+            
+            if time_elapsed >= alert_threshold:
+                # Check if this is the first alert or a recurring alert
+                # Look for existing timing alerts for this request
+                existing_alerts = Notification.query.filter(
+                    Notification.request_id == request.request_id,
+                    Notification.notification_type.in_(['finance_approval_timing_alert', 'finance_approval_timing_recurring'])
+                ).order_by(Notification.created_at.desc()).all()
+                
+                if not existing_alerts:
+                    # First alert
+                    should_send_alert = True
+                    alert_type = 'finance_approval_timing_alert'
+                else:
+                    # Check if enough time has passed for a recurring alert
+                    last_alert = existing_alerts[0]
+                    time_since_last_alert = current_time - last_alert.created_at
+                    
+                    if time_since_last_alert >= recurring_threshold:
+                        should_send_alert = True
+                        alert_type = 'finance_approval_timing_recurring'
+            
+            if should_send_alert:
+                # Format time elapsed for display
+                hours = int(time_elapsed.total_seconds() // 3600)
+                minutes = int((time_elapsed.total_seconds() % 3600) // 60)
+                
+                if hours > 0:
+                    time_display = f"{hours} hour{'s' if hours != 1 else ''} and {minutes} minute{'s' if minutes != 1 else ''}"
+                else:
+                    time_display = f"{minutes} minute{'s' if minutes != 1 else ''}"
+                
+                # Create alert message
+                urgency_text = "URGENT" if request.is_urgent else "NON-URGENT"
+                threshold_text = "2 hours" if request.is_urgent else "24 hours"
+                
+                if alert_type == 'finance_approval_timing_alert':
+                    title = f"Finance Approval Overdue - {urgency_text} Request"
+                    message = f"Payment request #{request.request_id} has been pending finance approval for {time_display} (limit: {threshold_text}). Please take action immediately."
+                else:  # finance_approval_timing_recurring
+                    title = f"Finance Approval Still Overdue - {urgency_text} Request"
+                    message = f"Payment request #{request.request_id} is still pending finance approval after {time_display} (limit: {threshold_text}). This is a recurring alert - please take action immediately."
+                
+                # Send notification to all Finance Admin users
+                finance_admin_users = User.query.filter_by(role='Finance Admin').all()
+                for user in finance_admin_users:
+                    create_notification(
+                        user_id=user.user_id,
+                        title=title,
+                        message=message,
+                        notification_type=alert_type,
+                        request_id=request.request_id
+                    )
+                
+                # Log the action
+                log_action(f"Finance approval timing alert sent for request #{request.request_id} - {time_display} elapsed")
+                
+                print(f"Sent {alert_type} for request #{request.request_id} - {time_display} elapsed")
+        
+        print(f"Checked {len(pending_requests)} pending finance approval requests for timing alerts")
+        
+    except Exception as e:
+        print(f"Error checking finance approval timing alerts: {e}")
+
+
+def background_scheduler():
+    """Background scheduler that runs timing checks every hour"""
+    while True:
+        try:
+            with app.app_context():
+                check_finance_approval_timing_alerts()
+                check_recurring_payments_due()
+        except Exception as e:
+            print(f"Error in background scheduler: {e}")
+        
+        # Sleep for 1 hour (3600 seconds)
+        time.sleep(3600)
+
 
 def is_payment_due_today(request, today):
     """Check if a recurring payment is due today based on its configuration"""
@@ -750,7 +861,7 @@ def get_notifications_for_user(user):
                 db.and_(
                     Notification.user_id == user.user_id,
                     db.or_(
-                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                         Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                     )
                 )
@@ -761,7 +872,7 @@ def get_notifications_for_user(user):
                 db.and_(
                     Notification.user_id == user.user_id,
                     db.or_(
-                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                         Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                     )
                 )
@@ -770,7 +881,7 @@ def get_notifications_for_user(user):
             return Notification.query.filter(
                 db.and_(
                     Notification.user_id == user.user_id,
-                    Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
+                    Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
                 )
             ).order_by(Notification.created_at.desc()).limit(5).all()
     
@@ -827,13 +938,13 @@ def get_notifications_for_user(user):
     
     elif user.role == 'Department Manager':
         # Other Department Managers: New submissions from their own department staff only + recurring payment due for their department + updates on their own requests
-        print(f"🔔 DEBUG: Getting notifications for Department Manager {user.username} from {user.department}")
+        print(f"DEBUG: Getting notifications for Department Manager {user.username} from {user.department}")
         
         # Get all notifications for this user first
         all_user_notifications = Notification.query.filter_by(user_id=user.user_id).all()
-        print(f"🔔 DEBUG: Total notifications for user {user.username}: {len(all_user_notifications)}")
+        print(f"DEBUG: Total notifications for user {user.username}: {len(all_user_notifications)}")
         for notif in all_user_notifications:
-            print(f"🔔 DEBUG: Notification {notif.notification_id}: {notif.notification_type} - {notif.title}")
+            print(f"DEBUG: Notification {notif.notification_id}: {notif.notification_type} - {notif.title}")
         
         notifications = Notification.query.filter(
             db.and_(
@@ -845,7 +956,7 @@ def get_notifications_for_user(user):
                 )
             )
         ).order_by(Notification.created_at.desc()).limit(5).all()
-        print(f"🔔 DEBUG: Found {len(notifications)} filtered notifications for Department Manager")
+        print(f"DEBUG: Found {len(notifications)} filtered notifications for Department Manager")
         return notifications
     
     else:
@@ -882,7 +993,7 @@ def get_unread_count_for_user(user):
                     Notification.user_id == user.user_id,
                     Notification.is_read == False,
                     db.or_(
-                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                         Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                     )
                 )
@@ -894,7 +1005,7 @@ def get_unread_count_for_user(user):
                     Notification.user_id == user.user_id,
                     Notification.is_read == False,
                     db.or_(
-                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                         Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                     )
                 )
@@ -905,7 +1016,7 @@ def get_unread_count_for_user(user):
                     Notification.user_id == user.user_id,
                     Notification.is_read == False,
                     db.or_(
-                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                         Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
                     )
                 )
@@ -1065,7 +1176,7 @@ def emit_request_update_to_all_rooms(event_name, data):
         socketio.emit(event_name, data, room='it_staff')
         socketio.emit(event_name, data, room='project_staff')
         
-        print(f"🔔 DEBUG: Emitted {event_name} to all relevant rooms")
+        print(f"DEBUG: Emitted {event_name} to all relevant rooms")
     except Exception as e:
         print(f"Error emitting {event_name} to all rooms: {e}")
 
@@ -1366,6 +1477,9 @@ def admin_dashboard():
         ))
     elif tab == 'recurring':
         query = query.filter(PaymentRequest.status == 'Recurring')
+    elif tab == 'my_requests':
+        # For 'my_requests' tab, show only the current user's requests
+        query = query.filter(PaymentRequest.user_id == current_user.user_id)
     elif tab == 'pending':
         # For 'pending' tab (now "All Requests"), show all requests that the user can see
         # No additional filtering needed - show all requests based on the base query
@@ -1399,8 +1513,15 @@ def admin_dashboard():
     notifications = get_notifications_for_user(current_user)
     unread_count = get_unread_count_for_user(current_user)
     
+    # Get user's own requests for the My Requests tab
+    my_requests_query = PaymentRequest.query.filter(PaymentRequest.user_id == current_user.user_id)
+    my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
     return render_template('admin_dashboard.html', 
                          requests=requests_pagination.items, 
+                         my_requests=my_requests_pagination.items,
                          pagination=requests_pagination,
                          user=current_user, 
                          notifications=notifications, 
@@ -1486,6 +1607,9 @@ def finance_dashboard():
         ))
     elif tab == 'recurring':
         query = query.filter(PaymentRequest.status == 'Recurring')
+    elif tab == 'my_requests':
+        # For 'my_requests' tab, show only the current user's requests
+        query = query.filter(PaymentRequest.user_id == current_user.user_id)
     elif tab == 'pending':
         # For 'pending' tab (now "All Requests"), show all requests that the user can see
         # No additional filtering needed - show all requests based on the base query
@@ -1499,8 +1623,15 @@ def finance_dashboard():
     notifications = get_notifications_for_user(current_user)
     unread_count = get_unread_count_for_user(current_user)
     
+    # Get user's own requests for the My Requests tab
+    my_requests_query = PaymentRequest.query.filter(PaymentRequest.user_id == current_user.user_id)
+    my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
     return render_template('finance_dashboard.html', 
                          requests=requests_pagination.items, 
+                         my_requests=my_requests_pagination.items,
                          pagination=requests_pagination,
                          user=current_user, 
                          notifications=notifications, 
@@ -2879,7 +3010,7 @@ def new_request():
                 'date': new_req.date.strftime('%Y-%m-%d')
             }, room='department_managers')
             
-            print(f"🔔 DEBUG: Emitted new_request event to all_users, finance_admin, department_staff, and department_managers rooms")
+            print(f"DEBUG: Emitted new_request event to all_users, finance_admin, department_staff, and department_managers rooms")
         except Exception as e:
             print(f"Error emitting real-time notification: {e}")
             # Don't fail the request creation if real-time notification fails
@@ -3044,7 +3175,21 @@ def get_payment_schedule_api(request_id):
         schedule = get_payment_schedule(request_id)
         return jsonify({'success': True, 'schedule': schedule})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/admin/check-timing-alerts')
+@login_required
+@role_required('Finance Admin')
+def check_timing_alerts():
+    """Manual endpoint to check and send timing alerts (for testing and manual triggers)"""
+    try:
+        check_finance_approval_timing_alerts()
+        flash('Timing alerts check completed successfully.', 'success')
+        return redirect(url_for('admin_dashboard'))
+    except Exception as e:
+        flash(f'Error checking timing alerts: {str(e)}', 'error')
+        return redirect(url_for('admin_dashboard')), 500
 
 
 @app.route('/favicon.ico')
@@ -6387,5 +6532,17 @@ def mark_installment_late():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        # Check for timing alerts on startup
+        try:
+            check_finance_approval_timing_alerts()
+            print("Timing alerts check completed on startup")
+        except Exception as e:
+            print(f"Error checking timing alerts on startup: {e}")
+        
+        # Start background scheduler in a separate thread
+        scheduler_thread = threading.Thread(target=background_scheduler, daemon=True)
+        scheduler_thread.start()
+        print("Background scheduler started")
+    
     socketio.run(app, debug=True, host='0.0.0.0', port=5005)
 

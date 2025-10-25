@@ -109,6 +109,13 @@
                                     {% endif %}
                                 </td>
                                 <td><span class="badge badge-info">{{ req.request_type }}</span></td>
+                                <td>
+                                    {% if req.recurring == 'Recurring' %}
+                                        <span class="badge" style="background: #ffc107; color: #212529;">↻ Recurring</span>
+                                    {% else %}
+                                        <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ req.requestor_name }}</td>
                                 <td><span class="badge badge-secondary">{{ req.department }}</span></td>
                                 <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
@@ -170,6 +177,7 @@
                                 <tr>
                                     <th>ID</th>
                                     <th>Type</th>
+                                    <th>Payment Type</th>
                                     <th>Requestor</th>
                                     <th>Department</th>
                                     <th>Submission Date</th>
@@ -224,6 +232,7 @@
                                 <tr>
                                     <th>ID</th>
                                     <th>Type</th>
+                                    <th>Payment Type</th>
                                     <th>Requestor</th>
                                     <th>Department</th>
                                     <th>Submission Date</th>
