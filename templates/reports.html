@@ -176,11 +176,27 @@
                                 <th>Amount</th>
                                 <th>Status</th>
                                 <th>Approver</th>
+                                <th>Manager Duration</th>
+                                <th>Finance Duration</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for req in requests %}
+                            {% set manager_duration = '' %}
+                            {% set finance_duration = '' %}
+                            {% if req.manager_approval_duration_minutes %}
+                                {% set hours = req.manager_approval_duration_minutes // 3600 %}
+                                {% set minutes = (req.manager_approval_duration_minutes % 3600) // 60 %}
+                                {% set seconds = req.manager_approval_duration_minutes % 60 %}
+                                {% set manager_duration = hours ~ ':' ~ '%02d'|format(minutes) ~ ':' ~ '%02d'|format(seconds) %}
+                            {% endif %}
+                            {% if req.finance_approval_duration_minutes %}
+                                {% set hours = req.finance_approval_duration_minutes // 3600 %}
+                                {% set minutes = (req.finance_approval_duration_minutes % 3600) // 60 %}
+                                {% set seconds = req.finance_approval_duration_minutes % 60 %}
+                                {% set finance_duration = hours ~ ':' ~ '%02d'|format(minutes) ~ ':' ~ '%02d'|format(seconds) %}
+                            {% endif %}
                             <tr>
                                 <td>#{{ req.request_id }}</td>
                                 <td><span class="badge badge-info">{{ req.request_type }}</span></td>
@@ -237,6 +253,20 @@
                                     {% endif %}
                                 </td>
                                 <td>{{ req.approver or 'N/A' }}</td>
+                                <td>
+                                    {% if manager_duration %}
+                                        <span style="font-family: monospace; background: #f8f9fa; padding: 2px 6px; border-radius: 3px; font-size: 0.9em;">{{ manager_duration }}</span>
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if finance_duration %}
+                                        <span style="font-family: monospace; background: #f8f9fa; padding: 2px 6px; border-radius: 3px; font-size: 0.9em;">{{ finance_duration }}</span>
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
                                         <i class="fas fa-eye"></i> View

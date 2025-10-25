@@ -5003,12 +5003,24 @@ def export_reports_excel():
         ws['A5'].font = Font(size=12, bold=True)
 
         # Add headers starting from row 7
-        headers = ['ID', 'Type', 'Requestor', 'Dept', 'Branch', 'Person/Company', 'Submitted', 'Payment', 'Approved', 'Amount', 'Approver']
+        headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver', 'Manager Duration', 'Finance Duration']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=7, column=col, value=header)
             cell.font = Font(bold=True)
             cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
             cell.alignment = Alignment(horizontal="center")
+
+        # Helper function to format duration
+        def format_duration(seconds):
+            """Format duration in seconds to readable format (H:MM:SS)"""
+            if not seconds:
+                return ''
+            
+            hours = seconds // 3600
+            minutes = (seconds % 3600) // 60
+            secs = seconds % 60
+            
+            return f"{hours}:{minutes:02d}:{secs:02d}"
 
         # Add data rows
         for row_idx, r in enumerate(result_requests, 8):
@@ -5018,18 +5030,24 @@ def export_reports_excel():
             # For Person/Company column, show person_company field only
             company_display = r.person_company
             
+            # Format duration columns
+            manager_duration = format_duration(r.manager_approval_duration_minutes)
+            finance_duration = format_duration(r.finance_approval_duration_minutes)
+            
             row_data = [
                 f"#{r.request_id}",
                 str(r.request_type or ''),
                 str(r.requestor_name or ''),
                 str(r.department or ''),
+                str(r.recurring or 'One-Time'),
+                f"OMR {to_float(r.amount):.3f}",
                 str(r.branch_name or ''),
                 str(company_display or ''),
                 r.date.strftime('%Y-%m-%d') if getattr(r, 'date', None) else '',
-                str(r.recurring or 'One-Time'),
                 approved_date,
-                f"OMR {to_float(r.amount):.3f}",
-                str(r.approver or '')
+                str(r.approver or ''),
+                manager_duration,
+                finance_duration
             ]
             
             for col, data in enumerate(row_data, 1):
@@ -5051,14 +5069,14 @@ def export_reports_excel():
                 adjusted_width = min(max_length + 2, 12)  # Cap ID column at 12 characters
             elif column_letter == 'D':  # Department column - make it wider
                 adjusted_width = min(max_length + 2, 25)  # Cap Department column at 25 characters
+            elif column_letter in ['L', 'M']:  # Duration columns - make them narrower
+                adjusted_width = min(max_length + 2, 15)  # Cap duration columns at 15 characters
             else:
                 adjusted_width = min(max_length + 2, 50)  # Cap other columns at 50 characters
             
             ws.column_dimensions[column_letter].width = adjusted_width
 
-        # Freeze panes - freeze only columns A, B, C, D (ID, Type, Requestor, Dept)
-        # This allows full vertical scrolling but keeps the first 4 columns frozen
-        ws.freeze_panes = 'E1'  # Freeze only to the left of column E, no row freeze
+        # No frozen panes - all columns can be scrolled freely
 
         # Save to BytesIO
         buffer = io.BytesIO()
@@ -5226,10 +5244,10 @@ def export_reports_pdf():
         
         # Table header
         c.setFont('Helvetica-Bold', 9)
-        headers = ['ID', 'Type', 'Requestor', 'Dept', 'Branch', 'Person/Company', 'Submitted', 'Payment', 'Approved', 'Amount', 'Approver']
-        # Column positions optimized for landscape A4 with reduced margins - more space available
+        headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver']
+        # Column positions optimized for landscape A4 with reduced margins - reordered columns
         col_x = [left, left+12*mm, left+42*mm, left+72*mm, left+97*mm, left+122*mm, left+147*mm, left+167*mm, left+192*mm, left+222*mm, left+252*mm]
-        col_widths = [12*mm, 30*mm, 30*mm, 25*mm, 25*mm, 25*mm, 20*mm, 25*mm, 30*mm, 30*mm, 25*mm]  # Increased column widths
+        col_widths = [12*mm, 30*mm, 30*mm, 25*mm, 20*mm, 25*mm, 25*mm, 25*mm, 20*mm, 30*mm, 25*mm]  # Reordered column widths
         for hx, text in zip(col_x, headers):
             c.drawString(hx, y, text)
         y -= 10
@@ -5262,18 +5280,18 @@ def export_reports_pdf():
                 str(r.request_type or ''),
                 str(r.requestor_name or ''),
                 str(r.department or ''),
+                str(r.recurring or 'One-Time'),
+                f"OMR {to_float(r.amount):.3f}",
                 str(r.branch_name or ''),
                 str(company_display or ''),
                 r.date.strftime('%Y-%m-%d') if getattr(r, 'date', None) else '',
-                str(r.recurring or 'One-Time'),
                 '',  # Will be filled below
-                f"OMR {to_float(r.amount):.3f}",
                 str(r.approver or '')
             ]
             
             # For Approved column: show approval_date (matching reports page)
             approved_date = r.approval_date.strftime('%Y-%m-%d') if getattr(r, 'approval_date', None) else ''
-            row_data[7] = approved_date
+            row_data[9] = approved_date  # Approved column is now at index 9
             
             # Calculate height for each column
             for i, (data, width) in enumerate(zip(row_data, col_widths)):
