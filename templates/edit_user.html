@@ -17,7 +17,7 @@
         </div>
         <div class="card-body">
             <div class="alert alert-info" style="margin-bottom: 1.5rem;">
-                <strong>Note:</strong> Email address cannot be changed. Leave password field empty to keep current password.
+                <strong>Note:</strong> Email address cannot be changed. Leave password and PIN fields empty to keep current values.
             </div>
 
             <form method="POST" action="{{ url_for('edit_user', user_id=user_to_edit.user_id) }}">
@@ -40,6 +40,12 @@
                         <label for="password">New Password (Optional)</label>
                         <input type="password" name="password" id="password" minlength="6">
                         <small>Leave empty to keep current password. Minimum 6 characters if changing.</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="pin">New 4-Digit PIN (Optional)</label>
+                        <input type="password" name="pin" id="pin" maxlength="4" pattern="\d{4}" placeholder="e.g., 1234" inputmode="numeric" autocomplete="off">
+                        <small>Leave empty to keep current PIN. Must be exactly 4 digits if changing.</small>
                     </div>
                 </div>
 
@@ -207,6 +213,25 @@ roleSelect.addEventListener('change', updateManagerDisplay);
 
 // Initialize on load in case defaults are pre-selected
 updateManagerDisplay();
+
+// PIN field validation
+document.getElementById('pin').addEventListener('input', function(e) {
+    // Remove any non-numeric characters
+    this.value = this.value.replace(/[^0-9]/g, '');
+    
+    // Limit to 4 digits
+    if (this.value.length > 4) {
+        this.value = this.value.slice(0, 4);
+    }
+});
+
+// Prevent paste of non-numeric content in PIN field
+document.getElementById('pin').addEventListener('paste', function(e) {
+    e.preventDefault();
+    const paste = (e.clipboardData || window.clipboardData).getData('text');
+    const numericOnly = paste.replace(/[^0-9]/g, '').slice(0, 4);
+    this.value = numericOnly;
+});
 </script>
 {% endblock %}
 

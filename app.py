@@ -1311,18 +1311,129 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
+        pin = request.form.get('pin')
         
         user = User.query.filter_by(username=username).first()
         
+        # Check if account is locked
+        if user and user.is_account_locked():
+            flash('Your account has been locked due to too many failed login attempts. Please contact IT Staff to unlock your account.', 'danger')
+            log_action(f"Login attempt for locked account: {username}")
+            return render_template('login.html')
+        
+        # Verify password and PIN
         if user and user.check_password(password):
-            login_user(user, remember=True)
-            log_action(f"User {username} logged in")
-            flash(f'Welcome back, {user.name}!', 'success')
-            return redirect(url_for('dashboard'))
+            # Check if user has a PIN set
+            if not user.has_pin():
+                flash('Your account does not have a PIN set. Please contact IT Staff to set up your PIN.', 'danger')
+                log_action(f"Login attempt for user without PIN: {username}")
+                return render_template('login.html')
+            
+            # Verify PIN
+            if user.check_pin(pin):
+                # Reset failed login attempts on successful login
+                user.reset_failed_login()
+                login_user(user, remember=True)
+                log_action(f"User {username} logged in successfully with PIN")
+                flash(f'Welcome back, {user.name}!', 'success')
+                return redirect(url_for('dashboard'))
+            else:
+                # Invalid PIN
+                user.increment_failed_login()
+                remaining_attempts = 5 - user.failed_login_attempts
+                
+                if user.is_account_locked():
+                    flash(f'Too many failed login attempts. Your account has been locked. Please contact IT Staff to unlock your account.', 'danger')
+                    log_action(f"Account locked due to failed PIN attempts: {username}")
+                elif remaining_attempts > 0:
+                    flash(f'Invalid PIN. You have {remaining_attempts} attempt(s) remaining before your account is locked.', 'danger')
+                    log_action(f"Failed PIN attempt for user: {username} ({remaining_attempts} attempts remaining)")
         else:
-            flash('Invalid email address or password', 'danger')
+            # Invalid password
+            if user:
+                user.increment_failed_login()
+                remaining_attempts = 5 - user.failed_login_attempts
+                
+                if user.is_account_locked():
+                    flash(f'Too many failed login attempts. Your account has been locked. Please contact IT Staff to unlock your account.', 'danger')
+                    log_action(f"Account locked due to failed login attempts: {username}")
+                elif remaining_attempts > 0:
+                    flash(f'Invalid email address or password. You have {remaining_attempts} attempt(s) remaining before your account is locked.', 'danger')
+                    log_action(f"Failed login attempt for user: {username} ({remaining_attempts} attempts remaining)")
+            else:
+                flash('Invalid email address or password', 'danger')
+                log_action(f"Failed login attempt for non-existent user: {username}")
     
     return render_template('login.html')
+
+
+@app.route('/validate_credentials', methods=['POST'])
+def validate_credentials():
+    """Validate email and password before showing PIN modal"""
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return jsonify({
+                'success': False,
+                'message': 'Email and password are required.'
+            })
+        
+        user = User.query.filter_by(username=username).first()
+        
+        # Check if account is locked
+        if user and user.is_account_locked():
+            return jsonify({
+                'success': False,
+                'message': 'Your account has been locked due to too many failed login attempts. Please contact IT Staff to unlock your account.'
+            })
+        
+        # Verify password only (not PIN yet)
+        if user and user.check_password(password):
+            # Check if user has a PIN set
+            if not user.has_pin():
+                return jsonify({
+                    'success': False,
+                    'message': 'Your account does not have a PIN set. Please contact IT Staff to set up your PIN.'
+                })
+            
+            # Credentials are valid, user can proceed to PIN entry
+            return jsonify({
+                'success': True,
+                'message': 'Credentials validated. Please enter your PIN.'
+            })
+        else:
+            # Invalid credentials - increment failed attempts
+            if user:
+                user.increment_failed_login()
+                remaining_attempts = 5 - user.failed_login_attempts
+                
+                if user.is_account_locked():
+                    log_action(f"Account locked due to failed login attempts: {username}")
+                    return jsonify({
+                        'success': False,
+                        'message': 'Too many failed login attempts. Your account has been locked. Please contact IT Staff to unlock your account.'
+                    })
+                elif remaining_attempts > 0:
+                    log_action(f"Failed login attempt for user: {username} ({remaining_attempts} attempts remaining)")
+                    return jsonify({
+                        'success': False,
+                        'message': f'Invalid email address or password. You have {remaining_attempts} attempt(s) remaining before your account is locked.'
+                    })
+            else:
+                log_action(f"Failed login attempt for non-existent user: {username}")
+                return jsonify({
+                    'success': False,
+                    'message': 'Invalid email address or password.'
+                })
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': 'An error occurred. Please try again.'
+        })
 
 
 @app.route('/logout')
@@ -5629,9 +5740,15 @@ def new_user():
         name = request.form.get('name')
         username = request.form.get('username')  # This is now the email
         password = request.form.get('password')
+        pin = request.form.get('pin')  # 4-digit PIN
         department = request.form.get('department')
         role = request.form.get('role')
         manager_id = request.form.get('manager_id')
+        
+        # Validate PIN
+        if not pin or len(pin) != 4 or not pin.isdigit():
+            flash('PIN must be exactly 4 digits (0000-9999).', 'danger')
+            return redirect(url_for('new_user'))
         
         # Check if username (email) already exists
         existing_user = User.query.filter_by(username=username).first()
@@ -5686,6 +5803,7 @@ def new_user():
             email=username  # Store email in both username and email fields
         )
         new_user.set_password(password)
+        new_user.set_pin(pin)  # Set 4-digit PIN
         
         db.session.add(new_user)
         db.session.commit()
@@ -5722,9 +5840,15 @@ def edit_user(user_id):
     if request.method == 'POST':
         new_name = request.form.get('name')
         new_password = request.form.get('password')
+        new_pin = request.form.get('pin')  # 4-digit PIN
         new_department = request.form.get('department')
         new_role = request.form.get('role')
         new_manager_id = request.form.get('manager_id')
+        
+        # Validate PIN if provided
+        if new_pin and (len(new_pin) != 4 or not new_pin.isdigit()):
+            flash('PIN must be exactly 4 digits (0000-9999).', 'danger')
+            return redirect(url_for('edit_user', user_id=user_id))
         
         # Department restriction removed - multiple accounts per department allowed
         
@@ -5771,6 +5895,10 @@ def edit_user(user_id):
         if new_password:
             user_to_edit.set_password(new_password)
         
+        # Only update PIN if provided
+        if new_pin:
+            user_to_edit.set_pin(new_pin)
+        
         db.session.commit()
         
         log_action(f"Updated user: {user_to_edit.username} ({new_role}) - Department: {new_department}")
@@ -5790,6 +5918,76 @@ def edit_user(user_id):
     # Get all users for manager selection (excluding the user being edited)
     all_users = User.query.filter(User.user_id != user_id).all()
     return render_template('edit_user.html', user=current_user, user_to_edit=user_to_edit, all_users=all_users)
+
+
+@app.route('/users/<int:user_id>/unlock', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def unlock_user(user_id):
+    """Unlock a locked user account - IT ONLY"""
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    user_to_unlock = User.query.get_or_404(user_id)
+    
+    if not user_to_unlock.is_account_locked():
+        flash(f'Account {user_to_unlock.username} is not locked.', 'info')
+        return redirect(url_for('manage_users'))
+    
+    user_to_unlock.unlock_account()
+    log_action(f"IT Staff {current_user.username} unlocked account: {user_to_unlock.username}")
+    
+    # Create notification for the user
+    create_notification(
+        user_id=user_to_unlock.user_id,
+        title="Account Unlocked",
+        message=f"Your account has been unlocked by IT Staff. You can now log in again.",
+        notification_type='account_unlocked',
+        request_id=None
+    )
+    
+    flash(f'Account {user_to_unlock.username} has been unlocked successfully!', 'success')
+    return redirect(url_for('manage_users'))
+
+
+@app.route('/users/<int:user_id>/reset_password', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def reset_user_password(user_id):
+    """Reset user password and unlock account - IT ONLY"""
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    user_to_reset = User.query.get_or_404(user_id)
+    new_password = request.form.get('new_password')
+    
+    if not new_password or len(new_password) < 6:
+        flash('Password must be at least 6 characters long.', 'danger')
+        return redirect(url_for('manage_users'))
+    
+    # Reset password
+    user_to_reset.set_password(new_password)
+    
+    # Unlock account if locked
+    if user_to_reset.is_account_locked():
+        user_to_reset.unlock_account()
+    
+    db.session.commit()
+    log_action(f"IT Staff {current_user.username} reset password for: {user_to_reset.username}")
+    
+    # Create notification for the user
+    create_notification(
+        user_id=user_to_reset.user_id,
+        title="Password Reset",
+        message=f"Your password has been reset by IT Staff. Please log in with your new password and change it immediately.",
+        notification_type='password_reset',
+        request_id=None
+    )
+    
+    flash(f'Password for {user_to_reset.username} has been reset successfully! The account has been unlocked.', 'success')
+    return redirect(url_for('manage_users'))
 
 
 @app.route('/users/<int:user_id>/delete', methods=['POST'])
