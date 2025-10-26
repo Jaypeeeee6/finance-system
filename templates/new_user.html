@@ -162,11 +162,10 @@ function updateManagerDisplay() {
         return;
     }
 
-    if (role === 'Department Manager' || (role === 'GM' && department === 'Office') || (role === 'Operation Manager' && department === 'Operation') || (role === 'Finance Admin' && department === 'Finance' && document.getElementById('name').value.trim() === 'Abdalaziz Al-Brashdi')) {
+    // Special cases for managers who don't need a manager assignment
+    if ((role === 'GM' && department === 'Office') || (role === 'Operation Manager' && department === 'Operation') || (role === 'Finance Admin' && department === 'Finance' && document.getElementById('name').value.trim() === 'Abdalaziz Al-Brashdi')) {
         managerIdInput.value = '';
-        if (role === 'Department Manager') {
-            setDisplay('General Manager will be your assigned manager', '#d4edda', '#c3e6cb', 'As a Department Manager, the General Manager will approve your requests', '#28a745');
-        } else if (role === 'GM') {
+        if (role === 'GM') {
             setDisplay('Abdalaziz Al-Brashdi will be your assigned manager', '#d4edda', '#c3e6cb', 'As a General Manager, Abdalaziz will approve your requests', '#28a745');
         } else {
             setDisplay('You will be the assigned manager for this department', '#d4edda', '#c3e6cb', 'As a Manager, you will manage this department', '#28a745');
@@ -184,6 +183,22 @@ function updateManagerDisplay() {
         managerUser = users.find(u => u.role === 'Operation Manager');
     } else if (department === 'Project') {
         managerUser = users.find(u => u.role === 'Operation Manager');
+    } else if (department === 'Maintenance') {
+        // Maintenance Department Manager reports to Operation Manager
+        // Maintenance Staff report to Maintenance Department Manager
+        if (role === 'Department Manager') {
+            managerUser = users.find(u => u.role === 'Operation Manager');
+        } else {
+            managerUser = users.find(u => u.department === 'Maintenance' && u.role === 'Department Manager');
+        }
+    } else if (department === 'Logistic') {
+        // Logistic Department Manager reports to Operation Manager
+        // Logistic Staff report to Logistic Department Manager
+        if (role === 'Department Manager') {
+            managerUser = users.find(u => u.role === 'Operation Manager');
+        } else {
+            managerUser = users.find(u => u.department === 'Logistic' && u.role === 'Department Manager');
+        }
     } else if (department === 'Finance') {
         managerUser = users.find(u => u.department === 'Finance' && u.name === 'Abdalaziz Al-Brashdi');
     } else {
