@@ -27,7 +27,7 @@
                 {% endif %}
             {% endwith %}
 
-            <form method="POST" action="{{ url_for('login') }}" class="login-form">
+            <form method="POST" action="{{ url_for('login') }}" class="login-form" id="loginForm">
                 <div class="form-group">
                     <label for="username">
                         <i class="fas fa-envelope"></i> Email Address
@@ -42,7 +42,13 @@
                     <input type="password" id="password" name="password" required>
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-block">
+                <!-- Hidden PIN field that will be populated by modal -->
+                <input type="hidden" id="pin" name="pin">
+                
+                <!-- Hidden field to track if we need PIN validation -->
+                <input type="hidden" id="validate_credentials" name="validate_credentials" value="true">
+
+                <button type="button" class="btn btn-primary btn-block" id="loginButton">
                     <i class="fas fa-sign-in-alt"></i> Login
                 </button>
             </form>
@@ -52,6 +58,402 @@
             </div>
         </div>
     </div>
+
+    <!-- PIN Modal -->
+    <div id="pinModal" class="pin-modal">
+        <div class="pin-modal-content">
+            <div class="pin-modal-header">
+                <h3><i class="fas fa-shield-alt"></i> Enter Your 4-Digit PIN</h3>
+                <p>Please enter your security PIN to continue</p>
+            </div>
+            <div class="pin-modal-body">
+                <div class="pin-boxes">
+                    <input type="password" class="pin-box" id="pin1" maxlength="1" inputmode="numeric" autocomplete="off">
+                    <input type="password" class="pin-box" id="pin2" maxlength="1" inputmode="numeric" autocomplete="off">
+                    <input type="password" class="pin-box" id="pin3" maxlength="1" inputmode="numeric" autocomplete="off">
+                    <input type="password" class="pin-box" id="pin4" maxlength="1" inputmode="numeric" autocomplete="off">
+                </div>
+                <p class="pin-hint">Enter the 4-digit PIN provided by IT</p>
+            </div>
+            <div class="pin-modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closePinModal()">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-primary" id="submitPinButton">
+                    <i class="fas fa-check"></i> Submit
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* PIN Modal Styles */
+        .pin-modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+        }
+
+        .pin-modal-content {
+            background-color: #ffffff;
+            margin: 10% auto;
+            padding: 0;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 450px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .pin-modal-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px 15px 0 0;
+            text-align: center;
+        }
+
+        .pin-modal-header h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .pin-modal-header p {
+            margin: 0;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .pin-modal-body {
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .pin-boxes {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .pin-box {
+            width: 60px;
+            height: 70px;
+            font-size: 2rem;
+            text-align: center;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            background-color: #ffffff;
+            color: #000000;
+        }
+
+        .pin-box:focus {
+            outline: none;
+            border-color: #000000;
+            background-color: #ffffff;
+            box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+            transform: scale(1.05);
+        }
+
+        .pin-box.filled {
+            border-color: #000000;
+            background-color: #f8f9fa;
+        }
+
+        .pin-hint {
+            color: #666;
+            font-size: 0.85rem;
+            margin: 0;
+        }
+
+        .pin-modal-footer {
+            padding: 20px 30px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            border-radius: 0 0 15px 15px;
+            background-color: #f8f9fa;
+        }
+
+        .pin-modal-footer .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .pin-modal-footer .btn-secondary {
+            background-color: #ffffff;
+            border: 2px solid #000000;
+            color: #000000;
+        }
+
+        .pin-modal-footer .btn-secondary:hover {
+            background-color: #f8f9fa;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .pin-modal-footer .btn-primary {
+            background: #000000;
+            border: 2px solid #000000;
+            color: #ffffff;
+        }
+
+        .pin-modal-footer .btn-primary:hover {
+            background: #333333;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Shake animation for wrong PIN */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        .pin-boxes.shake {
+            animation: shake 0.5s ease-in-out;
+        }
+    </style>
+
+    <script>
+        const loginButton = document.getElementById('loginButton');
+        const loginForm = document.getElementById('loginForm');
+        const pinModal = document.getElementById('pinModal');
+        const pinBoxes = document.querySelectorAll('.pin-box');
+        const submitPinButton = document.getElementById('submitPinButton');
+        const hiddenPinField = document.getElementById('pin');
+
+        // Show PIN modal when login button is clicked
+        loginButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Validate email and password first
+            const email = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                alert('Please enter your email and password first.');
+                return;
+            }
+            
+            // Validate credentials with server first
+            validateCredentials(email, password);
+        });
+
+        // Show PIN modal when Enter key is pressed in email or password fields
+        document.getElementById('username').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const email = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                
+                if (!email) {
+                    alert('Please enter your email address.');
+                    return;
+                }
+                
+                if (!password) {
+                    document.getElementById('password').focus();
+                    return;
+                }
+                
+                // Validate credentials with server first
+                validateCredentials(email, password);
+            }
+        });
+
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const email = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                
+                if (!email || !password) {
+                    alert('Please enter your email and password first.');
+                    return;
+                }
+                
+                // Validate credentials with server first
+                validateCredentials(email, password);
+            }
+        });
+
+        // Function to validate credentials with server before showing PIN modal
+        async function validateCredentials(email, password) {
+            // Show loading state
+            loginButton.disabled = true;
+            loginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
+            
+            try {
+                const response = await fetch('{{ url_for("validate_credentials") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: email,
+                        password: password
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Reset button
+                loginButton.disabled = false;
+                loginButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+                
+                if (data.success) {
+                    // Credentials are correct, show PIN modal
+                    openPinModal();
+                } else {
+                    // Show error message
+                    alert(data.message || 'Invalid email or password.');
+                }
+            } catch (error) {
+                // Reset button
+                loginButton.disabled = false;
+                loginButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+                alert('An error occurred. Please try again.');
+            }
+        }
+
+        function openPinModal() {
+            pinModal.style.display = 'block';
+            // Clear all PIN boxes
+            pinBoxes.forEach(box => {
+                box.value = '';
+                box.classList.remove('filled');
+            });
+            // Focus on first box
+            pinBoxes[0].focus();
+        }
+
+        function closePinModal() {
+            pinModal.style.display = 'none';
+            // Clear PIN boxes
+            pinBoxes.forEach(box => {
+                box.value = '';
+                box.classList.remove('filled');
+            });
+        }
+
+        // PIN box auto-focus and validation
+        pinBoxes.forEach((box, index) => {
+            box.addEventListener('input', function(e) {
+                // Only allow numbers
+                this.value = this.value.replace(/[^0-9]/g, '');
+                
+                if (this.value.length === 1) {
+                    this.classList.add('filled');
+                    // Move to next box
+                    if (index < pinBoxes.length - 1) {
+                        pinBoxes[index + 1].focus();
+                    } else {
+                        // All boxes filled, focus submit button
+                        submitPinButton.focus();
+                    }
+                } else {
+                    this.classList.remove('filled');
+                }
+            });
+
+            // Handle backspace
+            box.addEventListener('keydown', function(e) {
+                if (e.key === 'Backspace' && this.value === '' && index > 0) {
+                    pinBoxes[index - 1].focus();
+                    pinBoxes[index - 1].value = '';
+                    pinBoxes[index - 1].classList.remove('filled');
+                }
+                
+                // Submit on Enter key if all boxes filled
+                if (e.key === 'Enter') {
+                    const pin = Array.from(pinBoxes).map(box => box.value).join('');
+                    if (pin.length === 4) {
+                        submitPin();
+                    }
+                }
+            });
+
+            // Prevent paste
+            box.addEventListener('paste', function(e) {
+                e.preventDefault();
+                const paste = (e.clipboardData || window.clipboardData).getData('text');
+                const digits = paste.replace(/[^0-9]/g, '').split('');
+                
+                // Fill boxes with pasted digits
+                digits.forEach((digit, i) => {
+                    if (index + i < pinBoxes.length) {
+                        pinBoxes[index + i].value = digit;
+                        pinBoxes[index + i].classList.add('filled');
+                    }
+                });
+                
+                // Focus appropriate box
+                const nextIndex = Math.min(index + digits.length, pinBoxes.length - 1);
+                pinBoxes[nextIndex].focus();
+            });
+        });
+
+        // Submit PIN button
+        submitPinButton.addEventListener('click', submitPin);
+
+        function submitPin() {
+            const pin = Array.from(pinBoxes).map(box => box.value).join('');
+            
+            if (pin.length !== 4) {
+                alert('Please enter all 4 digits of your PIN.');
+                pinBoxes[0].focus();
+                return;
+            }
+            
+            // Set hidden PIN field value
+            hiddenPinField.value = pin;
+            
+            // Close modal
+            closePinModal();
+            
+            // Submit the form
+            loginForm.submit();
+        }
+
+        // Close modal when clicking outside
+        window.addEventListener('click', function(e) {
+            if (e.target === pinModal) {
+                closePinModal();
+            }
+        });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && pinModal.style.display === 'block') {
+                closePinModal();
+            }
+        });
+    </script>
 </body>
 </html>
 

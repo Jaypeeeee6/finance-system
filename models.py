@@ -13,12 +13,19 @@ class User(UserMixin, db.Model):
     user_id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
+    pin = db.Column(db.String(255), nullable=True)  # 4-digit PIN (hashed)
     name = db.Column(db.String(100), nullable=False)  # User's full name
     department = db.Column(db.String(100), nullable=False)
     role = db.Column(db.String(50), nullable=False)  # Admin, Finance, GM, IT, Department-specific Staff roles, Project
     manager_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)  # Manager reference
     email = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Account lockout fields
+    failed_login_attempts = db.Column(db.Integer, default=0)
+    account_locked = db.Column(db.Boolean, default=False)
+    locked_at = db.Column(db.DateTime, nullable=True)
+    last_failed_login = db.Column(db.DateTime, nullable=True)
     
     def get_id(self):
         return str(self.user_id)
@@ -30,6 +37,52 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         """Verify password"""
         return check_password_hash(self.password, password)
+    
+    def set_pin(self, pin):
+        """Hash and set 4-digit PIN"""
+        if pin and len(str(pin)) == 4 and str(pin).isdigit():
+            self.pin = generate_password_hash(str(pin))
+            return True
+        return False
+    
+    def check_pin(self, pin):
+        """Verify 4-digit PIN"""
+        if not self.pin:
+            return False  # No PIN set
+        return check_password_hash(self.pin, str(pin))
+    
+    def has_pin(self):
+        """Check if user has a PIN set"""
+        return self.pin is not None and self.pin != ''
+    
+    def is_account_locked(self):
+        """Check if account is locked"""
+        return self.account_locked
+    
+    def increment_failed_login(self):
+        """Increment failed login attempts and lock account if necessary"""
+        self.failed_login_attempts = (self.failed_login_attempts or 0) + 1
+        self.last_failed_login = datetime.utcnow()
+        
+        if self.failed_login_attempts >= 5:
+            self.account_locked = True
+            self.locked_at = datetime.utcnow()
+        
+        db.session.commit()
+    
+    def reset_failed_login(self):
+        """Reset failed login attempts after successful login"""
+        self.failed_login_attempts = 0
+        self.last_failed_login = None
+        db.session.commit()
+    
+    def unlock_account(self):
+        """Unlock account (used by IT Staff)"""
+        self.account_locked = False
+        self.failed_login_attempts = 0
+        self.locked_at = None
+        self.last_failed_login = None
+        db.session.commit()
     
     # Relationships
     manager = db.relationship('User', remote_side=[user_id], backref='subordinates')
