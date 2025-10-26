@@ -1,3 +1,173 @@
+/* ==================== SEARCH BAR STYLES ==================== */
+.search-bar-container {
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 1rem 1.5rem;
+    margin: 0;
+}
+
+.search-form {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+    justify-content: center;
+}
+
+.search-input-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 500px;
+    flex: 1;
+    max-width: 600px;
+}
+
+.search-input-container .form-control {
+    padding: 0.75rem 3rem 0.75rem 3rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: var(--transition);
+    background: white;
+    color: var(--dark-color);
+    width: 100%;
+    min-width: 500px;
+}
+
+.search-input-container .form-control::placeholder {
+    color: #6c757d;
+}
+
+.search-input-container .form-control:focus {
+    outline: none;
+    border-color: var(--dark-color);
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+    background: white;
+}
+
+.search-icon {
+    position: absolute;
+    left: 1rem;
+    color: #6c757d;
+    font-size: 0.9rem;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.clear-search-btn {
+    position: absolute;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 3px;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.clear-search-btn:hover {
+    background: var(--light-color);
+    color: var(--dark-color);
+}
+
+.search-results-info {
+    background: rgba(0, 123, 255, 0.1);
+    border: 1px solid rgba(0, 123, 255, 0.3);
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    margin-top: 0.5rem;
+    color: #004085;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.search-results-info span {
+    font-weight: 600;
+    color: #007bff;
+}
+
+/* Responsive search bar */
+@media (max-width: 768px) {
+    .search-input-container {
+        min-width: 250px;
+        max-width: 100%;
+    }
+    
+    .search-input-container .form-control {
+        min-width: 250px;
+    }
+    
+    .search-form {
+        justify-content: center;
+    }
+    
+    .search-bar-container {
+        padding: 1rem;
+    }
+}
+
+/* ==================== PASSWORD INPUT WITH TOGGLE ==================== */
+.password-input-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-container input[type="password"],
+.password-input-container input[type="text"] {
+    width: 100%;
+    padding: 0.75rem 3rem 0.75rem 0.75rem;
+    border: 2px solid var(--border-color);
+    border-radius: 5px;
+    font-size: 1rem;
+    transition: var(--transition);
+}
+
+.password-toggle-btn {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--secondary-color);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 3px;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+}
+
+.password-toggle-btn:hover {
+    background: var(--light-color);
+    color: var(--dark-color);
+}
+
+.password-toggle-btn:focus {
+    outline: none;
+    background: var(--light-color);
+    color: var(--dark-color);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+.password-toggle-btn i {
+    font-size: 1rem;
+}
+
 /* ==================== GLOBAL STYLES ==================== */
 /* Updated: 2024-12-19 - Fixed card header left upper corner */
 :root {

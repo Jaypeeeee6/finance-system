@@ -15,6 +15,24 @@
         <div class="card-header">
             <h2><i class="fas fa-list"></i> All Users</h2>
         </div>
+        
+        <!-- Search Bar positioned below the black header -->
+        <div class="search-bar-container">
+            <div class="search-form">
+                <div class="search-input-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="form-control" id="userSearch" placeholder="Search users by name, department, role, or email...">
+                    <button type="button" class="clear-search-btn" id="clearSearch" style="display: none;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="search-results-info" id="searchResultsInfo" style="display: none;">
+                <i class="fas fa-info-circle"></i>
+                <span id="searchResultsText"></span>
+            </div>
+        </div>
+        
         <div class="card-body">
             {% if users %}
                 <div class="table-responsive">
@@ -102,6 +120,72 @@ function getSelectedUserIds() {
     const checkedCheckboxes = document.querySelectorAll('.user-checkbox:checked');
     return Array.from(checkedCheckboxes).map(checkbox => checkbox.value);
 }
+
+// Search functionality
+const searchInput = document.getElementById('userSearch');
+const clearSearchBtn = document.getElementById('clearSearch');
+const searchResultsInfo = document.getElementById('searchResultsInfo');
+const searchResultsText = document.getElementById('searchResultsText');
+const tableRows = document.querySelectorAll('.data-table tbody tr');
+
+// Store original table state
+const originalTableRows = Array.from(tableRows);
+
+function filterUsers() {
+    const searchTerm = searchInput.value.toLowerCase().trim();
+    let visibleCount = 0;
+    
+    if (searchTerm === '') {
+        // Show all rows
+        tableRows.forEach(row => {
+            row.style.display = '';
+            visibleCount++;
+        });
+        clearSearchBtn.style.display = 'none';
+        searchResultsInfo.style.display = 'none';
+    } else {
+        // Filter rows based on search term
+        tableRows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            let isVisible = false;
+            
+            // Check each cell for the search term (skip checkbox and actions columns)
+            for (let i = 1; i < cells.length - 1; i++) {
+                const cellText = cells[i].textContent.toLowerCase();
+                if (cellText.includes(searchTerm)) {
+                    isVisible = true;
+                    break;
+                }
+            }
+            
+            if (isVisible) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        
+        clearSearchBtn.style.display = 'flex';
+        searchResultsInfo.style.display = 'flex';
+        searchResultsText.textContent = `Showing ${visibleCount} of ${originalTableRows.length} users`;
+    }
+    
+    // Update select all checkbox state
+    updateSelectAllState();
+}
+
+// Event listeners
+searchInput.addEventListener('input', filterUsers);
+
+clearSearchBtn.addEventListener('click', function() {
+    searchInput.value = '';
+    filterUsers();
+    searchInput.focus();
+});
+
+// Initialize search state
+filterUsers();
 </script>
 {% endblock %}
 

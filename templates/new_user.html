@@ -38,7 +38,12 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="password">Password *</label>
-                        <input type="password" name="password" id="password" required minlength="6">
+                        <div class="password-input-container">
+                            <input type="password" name="password" id="password" required minlength="6">
+                            <button type="button" class="password-toggle-btn" id="password-toggle" aria-label="Toggle password visibility">
+                                <i class="fas fa-eye" id="password-toggle-icon"></i>
+                            </button>
+                        </div>
                         <small>Minimum 6 characters</small>
                     </div>
                 </div>
@@ -199,6 +204,25 @@ roleSelect.addEventListener('change', updateManagerDisplay);
 
 // Initialize on load in case defaults are pre-selected
 updateManagerDisplay();
+
+// Password visibility toggle functionality
+const passwordInput = document.getElementById('password');
+const passwordToggleBtn = document.getElementById('password-toggle');
+const passwordToggleIcon = document.getElementById('password-toggle-icon');
+
+passwordToggleBtn.addEventListener('click', function() {
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        passwordToggleIcon.classList.remove('fa-eye');
+        passwordToggleIcon.classList.add('fa-eye-slash');
+        passwordToggleBtn.setAttribute('aria-label', 'Hide password');
+    } else {
+        passwordInput.type = 'password';
+        passwordToggleIcon.classList.remove('fa-eye-slash');
+        passwordToggleIcon.classList.add('fa-eye');
+        passwordToggleBtn.setAttribute('aria-label', 'Show password');
+    }
+});
 </script>
 {% endblock %}
 
