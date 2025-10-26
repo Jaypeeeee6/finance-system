@@ -5481,12 +5481,12 @@ def export_reports_pdf():
 
         # Helper function to wrap text manually
         def wrap_text(text, max_width, font_name='Helvetica', font_size=9):
-            """Wrap text to fit within specified width"""
+            """Wrap text to fit within specified width with more aggressive wrapping"""
             if not text:
                 return ['']
             
             # More conservative character width estimate for better wrapping
-            char_width = font_size * 0.5  # More conservative character width
+            char_width = font_size * 0.45  # Even more conservative character width
             max_chars = int(max_width / char_width)
             
             words = str(text).split()
@@ -5505,7 +5505,7 @@ def export_reports_pdf():
                     else:
                         # Single word is too long, force break it
                         if len(word) > max_chars:
-                            # Break long words
+                            # Break long words more aggressively
                             while len(word) > max_chars:
                                 lines.append(word[:max_chars])
                                 word = word[max_chars:]
@@ -5522,9 +5522,13 @@ def export_reports_pdf():
         # Table header
         c.setFont('Helvetica-Bold', 9)
         headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver']
-        # Column positions optimized for landscape A4 with reduced margins - reordered columns
-        col_x = [left, left+12*mm, left+42*mm, left+72*mm, left+97*mm, left+122*mm, left+147*mm, left+167*mm, left+192*mm, left+222*mm, left+252*mm]
-        col_widths = [12*mm, 30*mm, 30*mm, 25*mm, 20*mm, 25*mm, 25*mm, 25*mm, 20*mm, 30*mm, 25*mm]  # Reordered column widths
+        # Column widths optimized for landscape A4 with proper spacing
+        # [ID, Type, Requestor, Department, Payment, Amount, Branch, Company, Submitted, Approved, Approver]
+        col_widths = [14*mm, 32*mm, 24*mm, 20*mm, 18*mm, 18*mm, 28*mm, 28*mm, 16*mm, 16*mm, 30*mm]  # Increased Approver column width slightly
+        # Calculate column positions based on widths to prevent overlapping
+        col_x = [left]
+        for i in range(1, len(col_widths)):
+            col_x.append(col_x[i-1] + col_widths[i-1] + 3*mm)  # Add 3mm spacing between columns to prevent overlap
         for hx, text in zip(col_x, headers):
             c.drawString(hx, y, text)
         y -= 10
