@@ -13,8 +13,11 @@
         <a href="{{ url_for('new_request') }}" class="btn btn-primary">
             <i class="fas fa-plus-circle"></i> New Payment Request
         </a>
-        <a href="{{ url_for('check_timing_alerts') }}" class="btn btn-warning" onclick="return confirm('This will check for overdue finance approval requests and send alerts. Continue?')">
-            <i class="fas fa-clock"></i> Check Timing Alerts
+        <a href="{{ url_for('overdue_requests') }}" class="btn btn-warning" style="position: relative;">
+            <i class="fas fa-exclamation-triangle"></i> Overdue Requests
+            {% if overdue_count > 0 %}
+                <span class="notification-badge" style="top: -0.5rem; right: -0.5rem; padding: 0; width: 1.4rem; height: 1.4rem; line-height: 1.4rem; text-align: center; min-width: 1.4rem;">{{ overdue_count }}</span>
+            {% endif %}
         </a>
     </div>
 
@@ -611,6 +614,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (tabSearchBtn) {
         tabSearchBtn.addEventListener('click', filterTable);
     }
+    
+    // Update overdue count
+    updateOverdueCount();
 });
 
 function initializeTabs() {
@@ -793,6 +799,43 @@ document.addEventListener('visibilitychange', function() {
 window.addEventListener('beforeunload', function() {
     stopLiveUpdates();
 });
+
+function updateOverdueCount() {
+    fetch('/api/overdue-requests/count')
+        .then(response => response.json())
+        .then(data => {
+            // Update overdue badge in dashboard button
+            const overdueButton = document.querySelector('a[href*="overdue_requests"]');
+            if (overdueButton) {
+                let badge = overdueButton.querySelector('.notification-badge');
+                if (!badge && data.count > 0) {
+                    badge = document.createElement('span');
+                    badge.className = 'notification-badge';
+                    badge.style.top = '-0.5rem';
+                    badge.style.right = '-0.5rem';
+                    badge.style.padding = '0';
+                    badge.style.width = '1.4rem';
+                    badge.style.height = '1.4rem';
+                    badge.style.lineHeight = '1.4rem';
+                    badge.style.textAlign = 'center';
+                    badge.style.minWidth = '1.4rem';
+                    overdueButton.appendChild(badge);
+                }
+                
+                if (badge) {
+                    if (data.count > 0) {
+                        badge.textContent = data.count;
+                        badge.style.display = 'flex';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error updating overdue count:', error);
+        });
+}
 </script>
 {% endblock %}
 

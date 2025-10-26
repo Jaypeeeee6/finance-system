@@ -524,6 +524,95 @@ def check_recurring_payments_due():
                     log_action(f"Recurring payment due notification created for request #{request.request_id}")
 
 
+def get_overdue_requests_count():
+    """Get count of overdue finance approval requests"""
+    try:
+        current_time = datetime.utcnow()
+        
+        # Get all requests that are pending finance approval and have started timing
+        pending_requests = PaymentRequest.query.filter(
+            PaymentRequest.status == 'Pending Finance Approval',
+            PaymentRequest.finance_approval_start_time.isnot(None),
+            PaymentRequest.finance_approval_end_time.is_(None)  # Not yet completed
+        ).all()
+        
+        overdue_count = 0
+        for request in pending_requests:
+            # Calculate time elapsed since finance approval started
+            time_elapsed = current_time - request.finance_approval_start_time
+            
+            # Determine alert thresholds based on urgency
+            if request.is_urgent:
+                # Urgent requests: 2 hours
+                alert_threshold = timedelta(hours=2)
+            else:
+                # Non-urgent requests: 24 hours
+                alert_threshold = timedelta(hours=24)
+            
+            # Check if this request is overdue
+            if time_elapsed >= alert_threshold:
+                overdue_count += 1
+        
+        return overdue_count
+        
+    except Exception as e:
+        print(f"Error getting overdue requests count: {e}")
+        return 0
+
+
+def get_overdue_requests():
+    """Get all overdue finance approval requests"""
+    try:
+        current_time = datetime.utcnow()
+        
+        # Get all requests that are pending finance approval and have started timing
+        pending_requests = PaymentRequest.query.filter(
+            PaymentRequest.status == 'Pending Finance Approval',
+            PaymentRequest.finance_approval_start_time.isnot(None),
+            PaymentRequest.finance_approval_end_time.is_(None)  # Not yet completed
+        ).all()
+        
+        overdue_requests = []
+        for request in pending_requests:
+            # Calculate time elapsed since finance approval started
+            time_elapsed = current_time - request.finance_approval_start_time
+            
+            # Determine alert thresholds based on urgency
+            if request.is_urgent:
+                # Urgent requests: 2 hours
+                alert_threshold = timedelta(hours=2)
+            else:
+                # Non-urgent requests: 24 hours
+                alert_threshold = timedelta(hours=24)
+            
+            # Check if this request is overdue
+            if time_elapsed >= alert_threshold:
+                # Format time elapsed for display
+                hours = int(time_elapsed.total_seconds() // 3600)
+                minutes = int((time_elapsed.total_seconds() % 3600) // 60)
+                
+                if hours > 0:
+                    time_display = f"{hours} hour{'s' if hours != 1 else ''} and {minutes} minute{'s' if minutes != 1 else ''}"
+                else:
+                    time_display = f"{minutes} minute{'s' if minutes != 1 else ''}"
+                
+                overdue_requests.append({
+                    'request': request,
+                    'time_elapsed': time_elapsed,
+                    'time_display': time_display,
+                    'threshold': alert_threshold
+                })
+        
+        # Sort by time elapsed (most overdue first)
+        overdue_requests.sort(key=lambda x: x['time_elapsed'], reverse=True)
+        
+        return overdue_requests
+        
+    except Exception as e:
+        print(f"Error getting overdue requests: {e}")
+        return []
+
+
 def check_finance_approval_timing_alerts():
     """Check for finance approval timing alerts and send notifications"""
     try:
@@ -1513,6 +1602,9 @@ def admin_dashboard():
     notifications = get_notifications_for_user(current_user)
     unread_count = get_unread_count_for_user(current_user)
     
+    # Get overdue requests count
+    overdue_count = get_overdue_requests_count()
+    
     # Get user's own requests for the My Requests tab
     my_requests_query = PaymentRequest.query.filter(PaymentRequest.user_id == current_user.user_id)
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
@@ -1526,6 +1618,7 @@ def admin_dashboard():
                          user=current_user, 
                          notifications=notifications, 
                          unread_count=unread_count,
+                         overdue_count=overdue_count,
                          status_filter=status_filter,
                          department_filter=department_filter,
                          search_query=search_query,
@@ -1623,6 +1716,9 @@ def finance_dashboard():
     notifications = get_notifications_for_user(current_user)
     unread_count = get_unread_count_for_user(current_user)
     
+    # Get overdue requests count
+    overdue_count = get_overdue_requests_count()
+    
     # Get user's own requests for the My Requests tab
     my_requests_query = PaymentRequest.query.filter(PaymentRequest.user_id == current_user.user_id)
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
@@ -1636,6 +1732,7 @@ def finance_dashboard():
                          user=current_user, 
                          notifications=notifications, 
                          unread_count=unread_count,
+                         overdue_count=overdue_count,
                          department_filter=department_filter,
                          search_query=search_query,
                          urgent_filter=urgent_filter,
@@ -3190,6 +3287,41 @@ def check_timing_alerts():
     except Exception as e:
         flash(f'Error checking timing alerts: {str(e)}', 'error')
         return redirect(url_for('admin_dashboard')), 500
+
+
+@app.route('/admin/overdue-requests')
+@login_required
+@role_required('Finance Admin', 'Finance Staff')
+def overdue_requests():
+    """Display all overdue finance approval requests"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        # Validate per_page to prevent abuse
+        if per_page not in [10, 20, 50, 100]:
+            per_page = 10
+        
+        overdue_requests_list = get_overdue_requests()
+        overdue_count = len(overdue_requests_list)
+        
+        # Calculate pagination
+        total_pages = (overdue_count + per_page - 1) // per_page  # Ceiling division
+        start_index = (page - 1) * per_page
+        end_index = start_index + per_page
+        
+        # Get paginated results
+        paginated_overdue_requests = overdue_requests_list[start_index:end_index]
+        
+        return render_template('overdue_requests.html', 
+                             overdue_requests=paginated_overdue_requests,
+                             overdue_count=overdue_count,
+                             page=page,
+                             per_page=per_page,
+                             total_pages=total_pages)
+    except Exception as e:
+        flash(f'Error loading overdue requests: {str(e)}', 'error')
+        return redirect(url_for('admin_dashboard'))
 
 
 @app.route('/favicon.ico')
@@ -5832,6 +5964,15 @@ def delete_all_notifications():
 def unread_notifications_count():
     """Get count of unread notifications based on RBAC"""
     count = get_unread_count_for_user(current_user)
+    return jsonify({'count': count})
+
+
+@app.route('/api/overdue-requests/count')
+@login_required
+@role_required('Finance Admin', 'Finance Staff')
+def overdue_requests_count():
+    """API endpoint to get overdue requests count"""
+    count = get_overdue_requests_count()
     return jsonify({'count': count})
 
 
