@@ -67,26 +67,31 @@
                 <p>A PIN has been sent to your email. Please check your inbox and enter the PIN below.</p>
             </div>
             <div class="pin-modal-body">
-                <div class="pin-boxes">
-                    <input type="password" class="pin-box" id="pin1" maxlength="1" inputmode="numeric" autocomplete="off">
-                    <input type="password" class="pin-box" id="pin2" maxlength="1" inputmode="numeric" autocomplete="off">
-                    <input type="password" class="pin-box" id="pin3" maxlength="1" inputmode="numeric" autocomplete="off">
-                    <input type="password" class="pin-box" id="pin4" maxlength="1" inputmode="numeric" autocomplete="off">
-                </div>
-                <p class="pin-hint">Enter the 4-digit PIN sent to your email</p>
-                
-                <!-- Countdown Timer -->
-                <div class="pin-timer">
-                    <div class="timer-circle">
-                        <svg class="timer-svg" viewBox="0 0 100 100">
-                            <circle class="timer-bg" cx="50" cy="50" r="45"></circle>
-                            <circle class="timer-progress" cx="50" cy="50" r="45" id="timerCircle"></circle>
-                        </svg>
-                        <div class="timer-text">
-                            <span id="timerMinutes">2</span>:<span id="timerSeconds">00</span>
+                <div class="pin-content-wrapper">
+                    <!-- Left side: PIN input -->
+                    <div class="pin-input-section">
+                        <div class="pin-boxes">
+                            <input type="password" class="pin-box" id="pin1" maxlength="1" inputmode="numeric" autocomplete="off">
+                            <input type="password" class="pin-box" id="pin2" maxlength="1" inputmode="numeric" autocomplete="off">
+                            <input type="password" class="pin-box" id="pin3" maxlength="1" inputmode="numeric" autocomplete="off">
+                            <input type="password" class="pin-box" id="pin4" maxlength="1" inputmode="numeric" autocomplete="off">
                         </div>
+                        <p class="pin-hint">Enter the 4-digit PIN sent to your email</p>
                     </div>
-                    <p class="timer-label">PIN expires in</p>
+                    
+                    <!-- Right side: Timer -->
+                    <div class="pin-timer">
+                        <div class="timer-circle">
+                            <svg class="timer-svg" viewBox="0 0 100 100">
+                                <circle class="timer-bg" cx="50" cy="50" r="45"></circle>
+                                <circle class="timer-progress" cx="50" cy="50" r="45" id="timerCircle"></circle>
+                            </svg>
+                            <div class="timer-text">
+                                <span id="timerMinutes">2</span>:<span id="timerSeconds">00</span>
+                            </div>
+                        </div>
+                        <p class="timer-label">PIN expires in</p>
+                    </div>
                 </div>
             </div>
             <div class="pin-modal-footer">
@@ -120,7 +125,7 @@
             padding: 0;
             border-radius: 15px;
             width: 90%;
-            max-width: 450px;
+            max-width: 600px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
             animation: slideDown 0.3s ease-out;
         }
@@ -157,8 +162,26 @@
         }
 
         .pin-modal-body {
-            padding: 40px 30px;
+            padding: 30px;
             text-align: center;
+        }
+
+        /* Landscape layout */
+        .pin-content-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 40px;
+            justify-content: space-between;
+        }
+
+        .pin-input-section {
+            flex: 1;
+            text-align: center;
+        }
+
+        .pin-timer {
+            flex: 0 0 auto;
+            margin: 0;
         }
 
         .pin-boxes {
@@ -260,9 +283,9 @@
 
         .timer-circle {
             position: relative;
-            width: 120px;
-            height: 120px;
-            margin: 0 auto 15px;
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 10px;
         }
 
         .timer-svg {
@@ -300,7 +323,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 1.8rem;
+            font-size: 1.5rem;
             font-weight: bold;
             color: #2c3e50;
             font-family: 'Courier New', monospace;
