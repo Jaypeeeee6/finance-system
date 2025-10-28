@@ -2,6 +2,7 @@ Flask==2.3.3
 Flask-Login==0.6.3
 Flask-SQLAlchemy==3.0.5
 Flask-SocketIO==5.3.6
+Flask-Mail==0.9.1
 Werkzeug==2.3.7
 eventlet==0.33.3
 python-socketio==5.8.0

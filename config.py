@@ -27,4 +27,21 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     
+    # Email configuration (Flask-Mail)
+    # IMPORTANT: For Gmail, you MUST use an App Password (not your regular password)
+    # Steps: Google Account → Security → 2-Step Verification → App passwords
+    # Create an App Password and use it below
+    
+    MAIL_SERVER = os.environ.get('MAIL_SERVER') or 'smtp.gmail.com'
+    MAIL_PORT = int(os.environ.get('MAIL_PORT') or 587)
+    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
+    
+    # Email credentials configured
+    MAIL_USERNAME = os.environ.get('MAIL_USERNAME') or 'noreply.financepin@gmail.com'
+    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD') or 'bjgkbjxtzfbzwoqp'  # App Password (spaces removed)
+    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER') or 'noreply.financepin@gmail.com'
+    
+    # PIN configuration
+    PIN_EXPIRY_MINUTES = 2  # PIN expires after 2 minutes
+    
 

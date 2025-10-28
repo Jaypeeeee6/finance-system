@@ -64,7 +64,7 @@
         <div class="pin-modal-content">
             <div class="pin-modal-header">
                 <h3><i class="fas fa-shield-alt"></i> Enter Your 4-Digit PIN</h3>
-                <p>Please enter your security PIN to continue</p>
+                <p>A PIN has been sent to your email. Please check your inbox and enter the PIN below.</p>
             </div>
             <div class="pin-modal-body">
                 <div class="pin-boxes">
@@ -73,7 +73,21 @@
                     <input type="password" class="pin-box" id="pin3" maxlength="1" inputmode="numeric" autocomplete="off">
                     <input type="password" class="pin-box" id="pin4" maxlength="1" inputmode="numeric" autocomplete="off">
                 </div>
-                <p class="pin-hint">Enter the 4-digit PIN provided by IT</p>
+                <p class="pin-hint">Enter the 4-digit PIN sent to your email</p>
+                
+                <!-- Countdown Timer -->
+                <div class="pin-timer">
+                    <div class="timer-circle">
+                        <svg class="timer-svg" viewBox="0 0 100 100">
+                            <circle class="timer-bg" cx="50" cy="50" r="45"></circle>
+                            <circle class="timer-progress" cx="50" cy="50" r="45" id="timerCircle"></circle>
+                        </svg>
+                        <div class="timer-text">
+                            <span id="timerMinutes">2</span>:<span id="timerSeconds">00</span>
+                        </div>
+                    </div>
+                    <p class="timer-label">PIN expires in</p>
+                </div>
             </div>
             <div class="pin-modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closePinModal()">
@@ -237,6 +251,78 @@
         .pin-boxes.shake {
             animation: shake 0.5s ease-in-out;
         }
+
+        /* Timer Styles */
+        .pin-timer {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        .timer-circle {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 15px;
+        }
+
+        .timer-svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .timer-bg {
+            fill: none;
+            stroke: #e0e0e0;
+            stroke-width: 8;
+        }
+
+        .timer-progress {
+            fill: none;
+            stroke: #2c3e50;
+            stroke-width: 8;
+            stroke-linecap: round;
+            stroke-dasharray: 283; /* 2 * PI * 45 */
+            stroke-dashoffset: 0;
+            transition: stroke-dashoffset 1s linear;
+        }
+
+        .timer-progress.warning {
+            stroke: #ffc107;
+        }
+
+        .timer-progress.danger {
+            stroke: #dc3545;
+        }
+
+        .timer-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #2c3e50;
+            font-family: 'Courier New', monospace;
+        }
+
+        .timer-label {
+            margin: 0;
+            color: #666;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        /* Timer animations */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .timer-circle.pulse {
+            animation: pulse 1s infinite;
+        }
     </style>
 
     <script>
@@ -246,6 +332,10 @@
         const pinBoxes = document.querySelectorAll('.pin-box');
         const submitPinButton = document.getElementById('submitPinButton');
         const hiddenPinField = document.getElementById('pin');
+        
+        // Timer variables
+        let timerInterval = null;
+        let timeLeft = 120; // 2 minutes in seconds
 
         // Show PIN modal when login button is clicked
         loginButton.addEventListener('click', function(e) {
@@ -327,8 +417,23 @@
                 loginButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
                 
                 if (data.success) {
-                    // Credentials are correct, show PIN modal
-                    openPinModal();
+                    // Check if IT system account bypass
+                    if (data.bypass_pin) {
+                        // IT system account - submit form directly to login route
+                        console.log('IT account bypass - submitting form directly');
+                        hiddenPinField.value = ''; // Clear PIN field
+                        loginForm.submit();
+                    } else {
+                        // Regular user - show PIN modal
+                        openPinModal();
+                        // Show success message about PIN being sent
+                        if (data.message) {
+                            const pinHint = document.querySelector('.pin-hint');
+                            pinHint.innerHTML = data.message;
+                            pinHint.style.color = '#28a745';
+                            pinHint.style.fontWeight = 'bold';
+                        }
+                    }
                 } else {
                     // Show error message
                     alert(data.message || 'Invalid email or password.');
@@ -348,17 +453,125 @@
                 box.value = '';
                 box.classList.remove('filled');
             });
+            // Reset pin hint styling (in case it was modified)
+            const pinHint = document.querySelector('.pin-hint');
+            if (!pinHint.innerHTML.includes('sent to your email')) {
+                pinHint.innerHTML = 'Enter the 4-digit PIN sent to your email';
+                pinHint.style.color = '#666';
+                pinHint.style.fontWeight = 'normal';
+            }
+            // Start the countdown timer
+            startTimer();
             // Focus on first box
             pinBoxes[0].focus();
         }
-
-        function closePinModal() {
-            pinModal.style.display = 'none';
+        
+        function startTimer() {
+            timeLeft = 120; // Reset to 2 minutes
+            updateTimerDisplay();
+            
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    timerExpired();
+                }
+            }, 1000);
+        }
+        
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            
+            document.getElementById('timerMinutes').textContent = minutes;
+            document.getElementById('timerSeconds').textContent = seconds.toString().padStart(2, '0');
+            
+            // Update progress circle
+            const progressCircle = document.getElementById('timerCircle');
+            const circumference = 283; // 2 * PI * 45
+            const progress = (timeLeft / 120) * circumference; // Use 120 seconds for 2 minutes
+            progressCircle.style.strokeDashoffset = circumference - progress;
+            
+            // Change color based on time remaining
+            const timerCircle = document.querySelector('.timer-circle');
+            if (timeLeft <= 15) {
+                progressCircle.classList.add('danger');
+                progressCircle.classList.remove('warning');
+                timerCircle.classList.add('pulse');
+            } else if (timeLeft <= 60) {
+                progressCircle.classList.add('warning');
+                progressCircle.classList.remove('danger');
+                timerCircle.classList.remove('pulse');
+            } else {
+                progressCircle.classList.remove('warning', 'danger');
+                timerCircle.classList.remove('pulse');
+            }
+        }
+        
+        function timerExpired() {
             // Clear PIN boxes
             pinBoxes.forEach(box => {
                 box.value = '';
                 box.classList.remove('filled');
             });
+            
+            // Show expired message
+            const pinHint = document.querySelector('.pin-hint');
+            pinHint.innerHTML = '⏰ PIN has expired. Please request a new one by logging in again.';
+            pinHint.style.color = '#dc3545';
+            pinHint.style.fontWeight = 'bold';
+            
+            // Disable PIN input
+            pinBoxes.forEach(box => {
+                box.disabled = true;
+                box.style.opacity = '0.5';
+            });
+            
+            // Disable submit button
+            submitPinButton.disabled = true;
+            submitPinButton.style.opacity = '0.5';
+            
+            // Update timer display
+            document.getElementById('timerMinutes').textContent = '0';
+            document.getElementById('timerSeconds').textContent = '00';
+            
+            // Show alert
+            setTimeout(() => {
+                alert('PIN has expired. Please close this modal and try logging in again to get a new PIN.');
+            }, 500);
+        }
+        
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function closePinModal() {
+            pinModal.style.display = 'none';
+            // Stop the timer
+            stopTimer();
+            // Clear PIN boxes
+            pinBoxes.forEach(box => {
+                box.value = '';
+                box.classList.remove('filled');
+                box.disabled = false;
+                box.style.opacity = '1';
+            });
+            // Reset submit button
+            submitPinButton.disabled = false;
+            submitPinButton.style.opacity = '1';
+            // Reset timer display
+            document.getElementById('timerMinutes').textContent = '2';
+            document.getElementById('timerSeconds').textContent = '00';
+            // Reset progress circle
+            const progressCircle = document.getElementById('timerCircle');
+            progressCircle.style.strokeDashoffset = '0';
+            progressCircle.classList.remove('warning', 'danger');
+            document.querySelector('.timer-circle').classList.remove('pulse');
         }
 
         // PIN box auto-focus and validation
@@ -425,19 +638,96 @@
             const pin = Array.from(pinBoxes).map(box => box.value).join('');
             
             if (pin.length !== 4) {
-                alert('Please enter all 4 digits of your PIN.');
+                showPinError('Please enter all 4 digits of your PIN.');
                 pinBoxes[0].focus();
                 return;
             }
             
-            // Set hidden PIN field value
-            hiddenPinField.value = pin;
+            // Check if timer has expired
+            if (timeLeft <= 0) {
+                showPinError('PIN has expired. Please request a new one.');
+                return;
+            }
             
-            // Close modal
-            closePinModal();
+            // Show loading state
+            submitPinButton.disabled = true;
+            submitPinButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
             
-            // Submit the form
-            loginForm.submit();
+            // Get username from form
+            const username = document.getElementById('username').value;
+            
+            // Verify PIN via AJAX
+            fetch('{{ url_for("verify_pin") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: username,
+                    pin: pin
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Reset button
+                submitPinButton.disabled = false;
+                submitPinButton.innerHTML = '<i class="fas fa-check"></i> Submit';
+                
+                if (data.success) {
+                    // PIN is correct - redirect to dashboard
+                    stopTimer();
+                    window.location.href = data.redirect_url;
+                } else {
+                    // PIN is wrong or other error
+                    if (data.account_locked || data.session_expired || data.pin_expired) {
+                        // Close modal and show error on login page
+                        closePinModal();
+                        alert(data.message);
+                    } else {
+                        // Show error in modal and let user try again
+                        showPinError(data.message);
+                    }
+                }
+            })
+            .catch(error => {
+                // Reset button
+                submitPinButton.disabled = false;
+                submitPinButton.innerHTML = '<i class="fas fa-check"></i> Submit';
+                showPinError('An error occurred. Please try again.');
+            });
+        }
+        
+        function showPinError(message) {
+            // Clear PIN boxes
+            pinBoxes.forEach(box => {
+                box.value = '';
+                box.classList.remove('filled');
+            });
+            
+            // Show error message
+            const pinHint = document.querySelector('.pin-hint');
+            pinHint.innerHTML = `❌ ${message}`;
+            pinHint.style.color = '#dc3545';
+            pinHint.style.fontWeight = 'bold';
+            
+            // Add shake animation
+            const pinBoxesContainer = document.querySelector('.pin-boxes');
+            pinBoxesContainer.classList.add('shake');
+            setTimeout(() => {
+                pinBoxesContainer.classList.remove('shake');
+            }, 500);
+            
+            // Focus on first box
+            pinBoxes[0].focus();
+            
+            // Reset error message after 3 seconds
+            setTimeout(() => {
+                if (pinHint.innerHTML.includes('❌')) {
+                    pinHint.innerHTML = 'Enter the 4-digit PIN sent to your email';
+                    pinHint.style.color = '#666';
+                    pinHint.style.fontWeight = 'normal';
+                }
+            }, 3000);
         }
 
         // Close modal when clicking outside

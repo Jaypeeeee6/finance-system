@@ -1,6 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_socketio import SocketIO, emit, join_room
+from flask_mail import Mail, Message
 from werkzeug.utils import secure_filename
 from functools import wraps
 import os
@@ -8,6 +9,8 @@ from datetime import datetime, date, timedelta
 import re
 import threading
 import time
+import random
+from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType, Branch, FinanceAdminNote
 from config import Config
 
@@ -187,6 +190,9 @@ app.jinja_env.globals.update(format_recurring_schedule=format_recurring_schedule
 # Initialize database
 db.init_app(app)
 
+# Initialize Flask-Mail
+mail = Mail(app)
+
 # Initialize SocketIO for real-time updates
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
@@ -252,6 +258,131 @@ def log_action(action):
         )
         db.session.add(log)
         db.session.commit()
+
+
+def send_pin_email(user_email, user_name, pin):
+    """Send PIN to user's email"""
+    try:
+        msg = Message(
+            subject='Your Login PIN - Payment Request System',
+            sender=app.config['MAIL_DEFAULT_SENDER'],
+            recipients=[user_email]
+        )
+        
+        msg.html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                }}
+                .container {{
+                    max-width: 600px;
+                    margin: 0 auto;
+                    padding: 20px;
+                    background-color: #f9f9f9;
+                }}
+                .header {{
+                    background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
+                    color: white;
+                    padding: 30px;
+                    text-align: center;
+                    border-radius: 10px 10px 0 0;
+                }}
+                .content {{
+                    background-color: white;
+                    padding: 30px;
+                    border-radius: 0 0 10px 10px;
+                }}
+                .pin-box {{
+                    background-color: #f0f0f0;
+                    border: 2px solid #2c3e50;
+                    border-radius: 10px;
+                    padding: 20px;
+                    text-align: center;
+                    margin: 20px 0;
+                }}
+                .pin {{
+                    font-size: 36px;
+                    font-weight: bold;
+                    color: #2c3e50;
+                    letter-spacing: 10px;
+                }}
+                .warning {{
+                    background-color: #fff3cd;
+                    border-left: 4px solid #ffc107;
+                    padding: 15px;
+                    margin: 20px 0;
+                }}
+                .footer {{
+                    text-align: center;
+                    color: #666;
+                    margin-top: 20px;
+                    font-size: 12px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🔐 Login PIN</h1>
+                    <p>Payment Request Management System</p>
+                </div>
+                <div class="content">
+                    <p>Hello <strong>{user_name}</strong>,</p>
+                    <p>Your login PIN has been generated. Please use this PIN to complete your login:</p>
+                    
+                    <div class="pin-box">
+                        <div class="pin">{pin}</div>
+                    </div>
+                    
+                    <div class="warning">
+                        <strong>⚠️ Important:</strong>
+                        <ul>
+                            <li>This PIN is valid for <strong>2 minutes</strong></li>
+                            <li>Do not share this PIN with anyone</li>
+                            <li>If you didn't request this PIN, please contact IT immediately</li>
+                        </ul>
+                    </div>
+                    
+                    <p>If you're having trouble logging in, please contact the IT department for assistance.</p>
+                </div>
+                <div class="footer">
+                    <p>This is an automated message. Please do not reply to this email.</p>
+                    <p>&copy; 2024 Payment Request Management System</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        msg.body = f"""
+        Hello {user_name},
+
+        Your login PIN has been generated. Please use this PIN to complete your login:
+
+        PIN: {pin}
+
+        IMPORTANT:
+        - This PIN is valid for 2 minutes
+        - Do not share this PIN with anyone
+        - If you didn't request this PIN, please contact IT immediately
+
+        If you're having trouble logging in, please contact the IT department for assistance.
+
+        This is an automated message. Please do not reply to this email.
+        
+        © 2024 Payment Request Management System
+        """
+        
+        mail.send(msg)
+        return True, "PIN sent successfully"
+    except Exception as e:
+        app.logger.error(f"Failed to send PIN email: {str(e)}")
+        return False, f"Failed to send email: {str(e)}"
 
 
 def create_notification(user_id, title, message, notification_type, request_id=None):
@@ -1285,6 +1416,109 @@ def index():
     return redirect(url_for('login'))
 
 
+@app.route('/verify_pin', methods=['POST'])
+def verify_pin():
+    """Verify PIN via AJAX - returns JSON response"""
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        pin = data.get('pin')
+        
+        if not username or not pin:
+            return jsonify({
+                'success': False,
+                'message': 'Username and PIN are required.'
+            })
+        
+        user = User.query.filter_by(username=username).first()
+        
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': 'User not found.'
+            })
+        
+        # Check if account is locked
+        if user.is_account_locked():
+            return jsonify({
+                'success': False,
+                'message': 'Your account has been locked due to too many failed login attempts. Please contact IT Staff to unlock your account.',
+                'account_locked': True
+            })
+        
+        # Check if PIN exists in session
+        stored_pin = session.get('temp_login_pin')
+        stored_username = session.get('temp_pin_username')
+        pin_expires = session.get('temp_pin_expires')
+        
+        if not stored_pin or stored_username != username:
+            return jsonify({
+                'success': False,
+                'message': 'No PIN generated or session expired. Please try logging in again.',
+                'session_expired': True
+            })
+        
+        # Check if PIN is expired
+        if datetime.utcnow().timestamp() > pin_expires:
+            # Clear expired session data
+            session.pop('temp_login_pin', None)
+            session.pop('temp_pin_username', None)
+            session.pop('temp_pin_expires', None)
+            return jsonify({
+                'success': False,
+                'message': 'PIN has expired. Please request a new one by logging in again.',
+                'pin_expired': True
+            })
+        
+        # Verify PIN
+        if check_password_hash(stored_pin, pin):
+            # Clear session PIN data
+            session.pop('temp_login_pin', None)
+            session.pop('temp_pin_username', None)
+            session.pop('temp_pin_expires', None)
+            
+            # Reset failed login attempts on successful login
+            user.reset_failed_login()
+            login_user(user, remember=True)
+            log_action(f"User {username} logged in successfully with email PIN")
+            
+            return jsonify({
+                'success': True,
+                'message': f'Welcome back, {user.name}!',
+                'redirect_url': url_for('dashboard')
+            })
+        else:
+            # Invalid PIN - increment failed attempts
+            user.increment_failed_login()
+            remaining_attempts = 5 - user.failed_login_attempts
+            
+            if user.is_account_locked():
+                # Clear session data
+                session.pop('temp_login_pin', None)
+                session.pop('temp_pin_username', None)
+                session.pop('temp_pin_expires', None)
+                log_action(f"Account locked due to failed PIN attempts: {username}")
+                return jsonify({
+                    'success': False,
+                    'message': 'Too many failed login attempts. Your account has been locked. Please contact IT Staff to unlock your account.',
+                    'account_locked': True
+                })
+            else:
+                log_action(f"Failed PIN attempt for user: {username} ({remaining_attempts} attempts remaining)")
+                return jsonify({
+                    'success': False,
+                    'message': f'Wrong PIN. You have {remaining_attempts} attempt(s) remaining before your account is locked.',
+                    'remaining_attempts': remaining_attempts
+                })
+    
+    except Exception as e:
+        app.logger.error(f"PIN verification error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'An error occurred. Please try again.'
+        })
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Login page"""
@@ -1313,7 +1547,13 @@ def login():
         password = request.form.get('password')
         pin = request.form.get('pin')
         
+        # Debug logging
+        app.logger.info(f"Login attempt: username={username}, pin_provided={bool(pin)}")
+        
         user = User.query.filter_by(username=username).first()
+        
+        # Debug user found
+        app.logger.info(f"User found: {user is not None}, user_id: {user.user_id if user else 'None'}")
         
         # Check if account is locked
         if user and user.is_account_locked():
@@ -1321,33 +1561,68 @@ def login():
             log_action(f"Login attempt for locked account: {username}")
             return render_template('login.html')
         
-        # Verify password and PIN
+        # Verify password and temporary PIN
         if user and user.check_password(password):
-            # Check if user has a PIN set
-            if not user.has_pin():
-                flash('Your account does not have a PIN set. Please contact IT Staff to set up your PIN.', 'danger')
-                log_action(f"Login attempt for user without PIN: {username}")
-                return render_template('login.html')
-            
-            # Verify PIN
-            if user.check_pin(pin):
+            # Special case: IT system account bypasses PIN requirement
+            if username == 'it@system.local':
+                app.logger.info(f"IT system account bypass triggered for {username}")
                 # Reset failed login attempts on successful login
                 user.reset_failed_login()
                 login_user(user, remember=True)
-                log_action(f"User {username} logged in successfully with PIN")
+                app.logger.info(f"IT user logged in successfully, redirecting to dashboard")
+                log_action(f"IT system account {username} logged in successfully (PIN bypassed)")
+                flash(f'Welcome back, {user.name}!', 'success')
+                return redirect(url_for('dashboard'))
+            
+            # Check if PIN exists in session
+            stored_pin = session.get('temp_login_pin')
+            stored_username = session.get('temp_pin_username')
+            pin_expires = session.get('temp_pin_expires')
+            
+            if not stored_pin or stored_username != username:
+                flash('No PIN generated or session expired. Please try logging in again.', 'danger')
+                return render_template('login.html')
+            
+            # Check if PIN is expired
+            if datetime.utcnow().timestamp() > pin_expires:
+                # Clear expired session data
+                session.pop('temp_login_pin', None)
+                session.pop('temp_pin_username', None)
+                session.pop('temp_pin_expires', None)
+                flash('PIN has expired. Please request a new one by logging in again.', 'danger')
+                return render_template('login.html')
+            
+            # Verify PIN
+            if check_password_hash(stored_pin, pin):
+                # Clear session PIN data
+                session.pop('temp_login_pin', None)
+                session.pop('temp_pin_username', None)
+                session.pop('temp_pin_expires', None)
+                
+                # Reset failed login attempts on successful login
+                user.reset_failed_login()
+                login_user(user, remember=True)
+                log_action(f"User {username} logged in successfully with email PIN")
                 flash(f'Welcome back, {user.name}!', 'success')
                 return redirect(url_for('dashboard'))
             else:
-                # Invalid PIN
+                # Invalid PIN - increment failed attempts but stay in modal
                 user.increment_failed_login()
                 remaining_attempts = 5 - user.failed_login_attempts
                 
                 if user.is_account_locked():
+                    # Clear session data and redirect to login with error
+                    session.pop('temp_login_pin', None)
+                    session.pop('temp_pin_username', None)
+                    session.pop('temp_pin_expires', None)
                     flash(f'Too many failed login attempts. Your account has been locked. Please contact IT Staff to unlock your account.', 'danger')
                     log_action(f"Account locked due to failed PIN attempts: {username}")
-                elif remaining_attempts > 0:
+                    return render_template('login.html')
+                else:
+                    # Return error message that will be handled by JavaScript
                     flash(f'Invalid PIN. You have {remaining_attempts} attempt(s) remaining before your account is locked.', 'danger')
                     log_action(f"Failed PIN attempt for user: {username} ({remaining_attempts} attempts remaining)")
+                    return render_template('login.html')
         else:
             # Invalid password
             if user:
@@ -1392,18 +1667,47 @@ def validate_credentials():
         
         # Verify password only (not PIN yet)
         if user and user.check_password(password):
-            # Check if user has a PIN set
-            if not user.has_pin():
+            # Special case: IT system account bypasses PIN requirement
+            if username == 'it@system.local':
                 return jsonify({
-                    'success': False,
-                    'message': 'Your account does not have a PIN set. Please contact IT Staff to set up your PIN.'
+                    'success': True,
+                    'message': 'IT system account - PIN bypassed. Redirecting to dashboard.',
+                    'bypass_pin': True
                 })
             
-            # Credentials are valid, user can proceed to PIN entry
-            return jsonify({
-                'success': True,
-                'message': 'Credentials validated. Please enter your PIN.'
-            })
+            # Check if user has email
+            if not user.email:
+                return jsonify({
+                    'success': False,
+                    'message': 'Your account does not have an email address set. Please contact IT Staff.'
+                })
+            
+            # Generate a random 4-digit PIN
+            pin = str(random.randint(1000, 9999))
+            
+            # Store PIN in session (not database)
+            session['temp_login_pin'] = generate_password_hash(pin)
+            session['temp_pin_username'] = username
+            session['temp_pin_expires'] = (datetime.utcnow() + timedelta(minutes=app.config.get('PIN_EXPIRY_MINUTES', 5))).timestamp()
+            
+            # Send PIN via email
+            success, message = send_pin_email(user.email, user.name, pin)
+            
+            if success:
+                log_action(f"Login PIN sent to {username}")
+                return jsonify({
+                    'success': True,
+                    'message': f'A 4-digit PIN has been sent to your email ({user.email}). Please check your email and enter the PIN to continue.'
+                })
+            else:
+                # Clear session data if email fails
+                session.pop('temp_login_pin', None)
+                session.pop('temp_pin_username', None)
+                session.pop('temp_pin_expires', None)
+                return jsonify({
+                    'success': False,
+                    'message': f'Failed to send PIN to your email. Please try again or contact IT Staff. Error: {message}'
+                })
         else:
             # Invalid credentials - increment failed attempts
             if user:

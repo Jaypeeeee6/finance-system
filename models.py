@@ -84,6 +84,36 @@ class User(UserMixin, db.Model):
         self.last_failed_login = None
         db.session.commit()
     
+    def set_temp_login_pin(self, pin, expiry_minutes=5):
+        """Set temporary login PIN with expiry"""
+        from datetime import timedelta
+        self.temp_login_pin = generate_password_hash(str(pin))
+        self.temp_pin_created_at = datetime.utcnow()
+        self.temp_pin_expires_at = datetime.utcnow() + timedelta(minutes=expiry_minutes)
+        db.session.commit()
+    
+    def check_temp_login_pin(self, pin):
+        """Verify temporary login PIN and check if it's expired"""
+        if not self.temp_login_pin:
+            return False, "No PIN generated. Please request a new one."
+        
+        # Check if PIN is expired
+        if self.temp_pin_expires_at and datetime.utcnow() > self.temp_pin_expires_at:
+            return False, "PIN has expired. Please request a new one."
+        
+        # Check if PIN matches
+        if check_password_hash(self.temp_login_pin, str(pin)):
+            return True, "PIN verified successfully."
+        
+        return False, "Invalid PIN."
+    
+    def clear_temp_login_pin(self):
+        """Clear temporary login PIN after successful login"""
+        self.temp_login_pin = None
+        self.temp_pin_created_at = None
+        self.temp_pin_expires_at = None
+        db.session.commit()
+    
     # Relationships
     manager = db.relationship('User', remote_side=[user_id], backref='subordinates')
     
