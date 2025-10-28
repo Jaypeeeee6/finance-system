@@ -1563,14 +1563,14 @@ def login():
         
         # Verify password and temporary PIN
         if user and user.check_password(password):
-            # Special case: IT system account bypasses PIN requirement
-            if username == 'it@system.local':
-                app.logger.info(f"IT system account bypass triggered for {username}")
+            # Special case: IT system account and test admin bypass PIN requirement
+            if username in ['it@system.local', 'testadmin@maagroup.om']:
+                app.logger.info(f"System account bypass triggered for {username}")
                 # Reset failed login attempts on successful login
                 user.reset_failed_login()
                 login_user(user, remember=True)
-                app.logger.info(f"IT user logged in successfully, redirecting to dashboard")
-                log_action(f"IT system account {username} logged in successfully (PIN bypassed)")
+                app.logger.info(f"System user logged in successfully, redirecting to dashboard")
+                log_action(f"System account {username} logged in successfully (PIN bypassed)")
                 flash(f'Welcome back, {user.name}!', 'success')
                 return redirect(url_for('dashboard'))
             
@@ -1667,11 +1667,11 @@ def validate_credentials():
         
         # Verify password only (not PIN yet)
         if user and user.check_password(password):
-            # Special case: IT system account bypasses PIN requirement
-            if username == 'it@system.local':
+            # Special case: IT system account and test admin bypass PIN requirement
+            if username in ['it@system.local', 'testadmin@maagroup.om']:
                 return jsonify({
                     'success': True,
-                    'message': 'IT system account - PIN bypassed. Redirecting to dashboard.',
+                    'message': 'System account - PIN bypassed. Redirecting to dashboard.',
                     'bypass_pin': True
                 })
             
@@ -6048,15 +6048,9 @@ def new_user():
         name = request.form.get('name')
         username = request.form.get('username')  # This is now the email
         password = request.form.get('password')
-        pin = request.form.get('pin')  # 4-digit PIN
         department = request.form.get('department')
         role = request.form.get('role')
         manager_id = request.form.get('manager_id')
-        
-        # Validate PIN
-        if not pin or len(pin) != 4 or not pin.isdigit():
-            flash('PIN must be exactly 4 digits (0000-9999).', 'danger')
-            return redirect(url_for('new_user'))
         
         # Check if username (email) already exists
         existing_user = User.query.filter_by(username=username).first()
@@ -6111,7 +6105,6 @@ def new_user():
             email=username  # Store email in both username and email fields
         )
         new_user.set_password(password)
-        new_user.set_pin(pin)  # Set 4-digit PIN
         
         db.session.add(new_user)
         db.session.commit()

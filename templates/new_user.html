@@ -35,23 +35,15 @@
                     </div>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="password">Password *</label>
-                        <div class="password-input-container">
-                            <input type="password" name="password" id="password" required minlength="6">
-                            <button type="button" class="password-toggle-btn" id="password-toggle" aria-label="Toggle password visibility">
-                                <i class="fas fa-eye" id="password-toggle-icon"></i>
-                            </button>
-                        </div>
-                        <small>Minimum 6 characters</small>
+                <div class="form-group">
+                    <label for="password">Password *</label>
+                    <div class="password-input-container">
+                        <input type="password" name="password" id="password" required minlength="6">
+                        <button type="button" class="password-toggle-btn" id="password-toggle" aria-label="Toggle password visibility">
+                            <i class="fas fa-eye" id="password-toggle-icon"></i>
+                        </button>
                     </div>
-                    
-                    <div class="form-group">
-                        <label for="pin">4-Digit PIN *</label>
-                        <input type="password" name="pin" id="pin" required maxlength="4" pattern="\d{4}" placeholder="e.g., 1234" inputmode="numeric" autocomplete="off">
-                        <small>Must be exactly 4 digits (0000-9999)</small>
-                    </div>
+                    <small>Minimum 6 characters</small>
                 </div>
 
                 <div class="form-row">
@@ -245,24 +237,6 @@ passwordToggleBtn.addEventListener('click', function() {
     }
 });
 
-// PIN field validation
-document.getElementById('pin').addEventListener('input', function(e) {
-    // Remove any non-numeric characters
-    this.value = this.value.replace(/[^0-9]/g, '');
-    
-    // Limit to 4 digits
-    if (this.value.length > 4) {
-        this.value = this.value.slice(0, 4);
-    }
-});
-
-// Prevent paste of non-numeric content in PIN field
-document.getElementById('pin').addEventListener('paste', function(e) {
-    e.preventDefault();
-    const paste = (e.clipboardData || window.clipboardData).getData('text');
-    const numericOnly = paste.replace(/[^0-9]/g, '').slice(0, 4);
-    this.value = numericOnly;
-});
 </script>
 {% endblock %}
 
