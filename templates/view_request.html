@@ -691,7 +691,14 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                 
                                 <p style="margin-bottom: 0.5rem; color: #666;">
                                     <strong>Assigned Manager:</strong> 
-                                    {% if user.role == 'GM' and user.user_id == request.user_id %}
+                                    {% if temporary_manager_name %}
+                                        <span style="color: #ff9800; font-weight: 600;">{{ temporary_manager_name }}</span>
+                                        <span style="font-style: italic; color: #666;">(Temporary Assignment)</span>
+                                        <span style="margin-left: 10px; color: #999;">|</span>
+                                        <span style="margin-left: 10px;">Original: 
+                                            <strong>{{ manager_name if manager_name else ('Department Manager for ' + request.department) }}</strong>
+                                        </span>
+                                    {% elif user.role == 'GM' and user.user_id == request.user_id %}
                                         Abdalaziz Al-Brashdi (Finance Admin)
                                     {% elif user.role == 'Finance Staff' and user.user_id == request.user_id %}
                                         Abdalaziz Al-Brashdi (Finance Admin)
@@ -759,8 +766,8 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     </div>
                 </div>
 
-                <!-- Manager approval form (only visible to managers of the same department, but not Department Managers viewing their own requests) -->
-                {% if (user.role == 'Department Manager' and user.department == request.department and user.user_id != request.user_id) or (user.role == 'Operation Manager' and request.department in ['Operation', 'Project']) or (user.role == 'Finance Admin' and request.department == 'Finance') or (user.role == 'GM' and request.user.role == 'Department Manager') or (user.name == 'Abdalaziz Al-Brashdi' and request.user.role in ['GM', 'Finance Staff', 'Operation Manager']) %}
+                <!-- Manager approval form (visible to authorized managers, including temporary manager) -->
+                {% if (request.temporary_manager_id and user.user_id == request.temporary_manager_id) or (not request.temporary_manager_id and ((user.role == 'Department Manager' and user.department == request.department and user.user_id != request.user_id) or (user.role == 'Operation Manager' and request.department in ['Operation', 'Project']) or (user.role == 'Finance Admin' and request.department == 'Finance') or (user.role == 'GM' and request.user.role == 'Department Manager') or (user.name == 'Abdalaziz Al-Brashdi' and request.user.role in ['GM', 'Finance Staff', 'Operation Manager']))) %}
                     <div class="card your-approval-required">
                         <div class="card-header">
                             <h4><i class="fas fa-check-circle"></i> Your Approval Required</h4>
@@ -800,6 +807,39 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                 <div class="step-actions">
                                     <button type="submit" class="btn btn-success">
                                         <i class="fas fa-check"></i> Submit Decision
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                {% endif %}
+                
+                <!-- IT Department manager reassignment section -->
+                {% if user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status == 'Pending Manager Approval' %}
+                    <div class="card" style="margin-top: 1.5rem; border-left: 4px solid #17a2b8;">
+                        <div class="card-header" style="background: #e7f3f5; border-bottom: 1px solid #b8daff;">
+                            <h4><i class="fas fa-user-cog"></i> Manager Reassignment (IT Only)</h4>
+                            <p style="margin: 0; font-size: 0.9rem; color: #6c757d;">Reassign a temporary manager for this specific request when the originally assigned manager is unavailable.</p>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('reassign_manager', request_id=request.request_id) }}">
+                                <div class="form-group">
+                                    <label for="temporary_manager_id">Select Temporary Manager *</label>
+                                    <select name="temporary_manager_id" id="temporary_manager_id" required>
+                                        <option value="">-- Select a Manager --</option>
+                                        {% for manager in available_managers %}
+                                            <option value="{{ manager.user_id }}" {% if request.temporary_manager_id == manager.user_id %}selected{% endif %}>
+                                                {{ manager.name }} ({{ manager.role }} - {{ manager.department }})
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    <small style="color: #6c757d; margin-top: 0.5rem; display: block;">
+                                        <i class="fas fa-info-circle"></i> This only affects this specific request, not future or past requests.
+                                    </small>
+                                </div>
+                                <div class="form-group">
+                                    <button type="submit" class="btn btn-info">
+                                        <i class="fas fa-save"></i> Assign Temporary Manager
                                     </button>
                                 </div>
                             </form>

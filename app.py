@@ -1106,14 +1106,15 @@ def get_notifications_for_user(user):
             ).order_by(Notification.created_at.desc()).limit(5).all()
     
     elif user.role == 'GM':
-        # GM: New submissions from Department Manager only + updates on their own requests + system-wide
+        # GM: New submissions from Department Manager only + updates on their own requests + system-wide + temporary manager assignments
         return Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
                     db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('Department Manager')),
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
-                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
+                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                    Notification.notification_type == 'temporary_manager_assignment'
                 )
             )
         ).order_by(Notification.created_at.desc()).limit(5).all()
@@ -1126,20 +1127,22 @@ def get_notifications_for_user(user):
                 db.or_(
                     db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('Operation Staff')),
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
-                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
+                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                    Notification.notification_type == 'temporary_manager_assignment'
                 )
             )
         ).order_by(Notification.created_at.desc()).limit(5).all()
     
     elif user.role == 'Department Manager' and user.department == 'IT':
-        # IT Department Manager: New submissions from IT Staff only + updates on their own requests + system-wide + user management
+        # IT Department Manager: New submissions from IT Staff only + updates on their own requests + system-wide + user management + temporary manager assignments
         return Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
                     db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('IT Staff')),
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted']),
-                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
+                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                    Notification.notification_type == 'temporary_manager_assignment'
                 )
             )
         ).order_by(Notification.created_at.desc()).limit(5).all()
@@ -1157,7 +1160,7 @@ def get_notifications_for_user(user):
         ).order_by(Notification.created_at.desc()).limit(5).all()
     
     elif user.role == 'Department Manager':
-        # Other Department Managers: New submissions from their own department staff only + recurring payment due for their department + updates on their own requests
+        # Other Department Managers: New submissions from their own department staff only + recurring payment due for their department + updates on their own requests + temporary manager assignments
         print(f"DEBUG: Getting notifications for Department Manager {user.username} from {user.department}")
         
         # Get all notifications for this user first
@@ -1172,7 +1175,8 @@ def get_notifications_for_user(user):
                 db.or_(
                     Notification.notification_type == 'new_submission',
                     Notification.notification_type == 'recurring_due',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
+                    Notification.notification_type == 'temporary_manager_assignment'
                 )
             )
         ).order_by(Notification.created_at.desc()).limit(5).all()
@@ -1251,7 +1255,8 @@ def get_unread_count_for_user(user):
                 db.or_(
                     db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('Department Manager')),
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
-                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
+                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                    Notification.notification_type == 'temporary_manager_assignment'
                 )
             )
         ).count()
@@ -1265,13 +1270,14 @@ def get_unread_count_for_user(user):
                 db.or_(
                     db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('Operation Staff')),
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
-                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
+                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                    Notification.notification_type == 'temporary_manager_assignment'
                 )
             )
         ).count()
     
     elif user.role == 'Department Manager' and user.department == 'IT':
-        # IT Department Manager: New submissions from IT Staff only + updates on their own requests + system-wide + user management
+        # IT Department Manager: New submissions from IT Staff only + updates on their own requests + system-wide + user management + temporary manager assignments
         return Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
@@ -1279,7 +1285,8 @@ def get_unread_count_for_user(user):
                 db.or_(
                     db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('IT Staff')),
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted']),
-                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
+                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                    Notification.notification_type == 'temporary_manager_assignment'
                 )
             )
         ).count()
@@ -1306,7 +1313,8 @@ def get_unread_count_for_user(user):
                 db.or_(
                     Notification.notification_type == 'new_submission',  # Simplified - same as get_notifications_for_user
                     Notification.notification_type == 'recurring_due',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
+                    Notification.notification_type == 'temporary_manager_assignment'
                 )
             )
         ).count()
@@ -1826,8 +1834,12 @@ def department_dashboard():
             base_query = PaymentRequest.query
         else:
             # Department Manager can see ALL their department's requests
+            # plus any request where they are the temporary manager
             base_query = PaymentRequest.query.filter(
-                PaymentRequest.department == current_user.department
+                db.or_(
+                    PaymentRequest.department == current_user.department,
+                    PaymentRequest.temporary_manager_id == current_user.user_id
+                )
             )
     else:
         # For regular users, show their own requests
@@ -1964,12 +1976,25 @@ def admin_dashboard():
                             User.role == 'Operation Manager'
                         )
                     )
+                ),
+                # Also include requests where the current user is temporarily assigned as manager
+                db.and_(
+                    PaymentRequest.status == 'Pending Manager Approval',
+                    PaymentRequest.temporary_manager_id == current_user.user_id
                 )
             )
         )
     else:
-        # Other Finance Admins only see finance-related statuses
-        query = PaymentRequest.query.filter(PaymentRequest.status.in_(finance_statuses))
+        # Other Finance Admins only see finance-related statuses plus temporary assignments awaiting manager approval
+        query = PaymentRequest.query.filter(
+            db.or_(
+                PaymentRequest.status.in_(finance_statuses),
+                db.and_(
+                    PaymentRequest.status == 'Pending Manager Approval',
+                    PaymentRequest.temporary_manager_id == current_user.user_id
+                )
+            )
+        )
     
     # Apply tab-based filtering
     if tab == 'completed':
@@ -3780,6 +3805,9 @@ def view_request(request_id):
             # IT Department Managers can view all requests
             if current_user.department == 'IT':
                 pass  # Allow access to all requests
+            # Temporary manager may view regardless of department
+            elif getattr(req, 'temporary_manager_id', None) == current_user.user_id:
+                pass
             elif req.department != current_user.department:
                 flash('You do not have permission to view this request.', 'danger')
                 return redirect(url_for('dashboard'))
@@ -3867,6 +3895,14 @@ def view_request(request_id):
     
     # Determine the manager's name for display
     manager_name = None
+    temporary_manager_name = None
+    
+    # Check if there's a temporary manager assigned (IT Department feature)
+    if req.temporary_manager_id:
+        temp_manager = User.query.get(req.temporary_manager_id)
+        if temp_manager:
+            temporary_manager_name = temp_manager.name
+    
     # Determine manager name for all statuses (pending and completed)
     if req.user.manager_id:
         # Get the manager's name from the manager_id
@@ -3941,7 +3977,14 @@ def view_request(request_id):
     if req.finance_approval_duration_minutes is not None:
         db.session.commit()
     
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes)
+    # Get list of managers for IT dropdown (only if user is IT Staff or IT Department Manager)
+    available_managers = []
+    if current_user.department == 'IT' and current_user.role in ['IT Staff', 'Department Manager']:
+        available_managers = User.query.filter(
+            User.role.in_(['Department Manager', 'GM', 'Operation Manager', 'Finance Admin'])
+        ).order_by(User.department, User.name).all()
+    
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes)
 
 
 @app.route('/request/<int:request_id>/approve', methods=['POST'])
@@ -4819,44 +4862,58 @@ def manager_approve_request(request_id):
     # Check if current user is authorized to approve this request
     is_authorized = False
     
-    # Check if current user is the manager of the request submitter
-    if req.user.manager_id and req.user.manager_id == current_user.user_id:
-        is_authorized = True
-        print("DEBUG: Authorized via manager_id relationship")
-    # Special case: General Manager can approve Department Manager requests
-    elif (current_user.role == 'GM' and req.user.role == 'Department Manager'):
-        is_authorized = True
-        print("DEBUG: Authorized via GM role for Department Manager")
-    # Special case: Abdalaziz can approve General Manager requests
-    elif (current_user.name == 'Abdalaziz Al-Brashdi' and req.user.role == 'GM'):
-        is_authorized = True
-        print("DEBUG: Authorized via Abdalaziz role for General Manager")
-    # Special case: Abdalaziz can approve Finance Staff requests
-    elif (current_user.name == 'Abdalaziz Al-Brashdi' and req.user.role == 'Finance Staff'):
-        is_authorized = True
-        print("DEBUG: Authorized via Abdalaziz role for Finance Staff")
-    # Special case: Abdalaziz can approve Operation Manager requests
-    elif (current_user.name == 'Abdalaziz Al-Brashdi' and req.user.role == 'Operation Manager'):
-        is_authorized = True
-        print("DEBUG: Authorized via Abdalaziz role for Operation Manager")
-    # Special case: Operation Manager can approve Operation department and Project requests
-    elif (current_user.role == 'Operation Manager' and 
-          (req.user.department == 'Operation' or req.user.department == 'Project') and 
-          req.user.role != 'Operation Manager'):  # Operation Manager can't approve their own requests
-        is_authorized = True
-        print("DEBUG: Authorized via Operation Manager role")
-    # Special case: Finance Admin can approve Finance department requests
-    elif (current_user.role == 'Finance Admin' and 
-          req.user.department == 'Finance' and 
-          req.user.role != 'Finance Admin'):  # Finance Admin can't approve their own requests
-        is_authorized = True
-        print("DEBUG: Authorized via Finance Admin role")
-    # Special case: Department Manager can approve same department requests
-    elif (current_user.role == 'Department Manager' and 
-          req.user.department == current_user.department and 
-          req.user.role != 'Department Manager'):  # Department Manager can't approve their own requests
-        is_authorized = True
-        print("DEBUG: Authorized via Department Manager role")
+    # First, enforce temporary manager exclusivity (IT Department feature)
+    if req.temporary_manager_id:
+        if req.temporary_manager_id == current_user.user_id:
+            is_authorized = True
+            print("DEBUG: Authorized via temporary manager assignment")
+        else:
+            # When a temporary manager is assigned, only they can approve this request
+            print("DEBUG: Approval blocked - temporary manager is assigned and current user is not the assignee")
+            is_authorized = False
+    else:
+        # No temporary manager assigned, use standard authorization checks
+        # Check if current user is the manager of the request submitter
+        if req.user.manager_id and req.user.manager_id == current_user.user_id:
+            is_authorized = True
+            print("DEBUG: Authorized via manager_id relationship")
+    
+    # If not yet authorized and no temporary manager restriction applied, check special cases
+    if not is_authorized and not req.temporary_manager_id:
+        # Special case: General Manager can approve Department Manager requests
+        if (current_user.role == 'GM' and req.user.role == 'Department Manager'):
+            is_authorized = True
+            print("DEBUG: Authorized via GM role for Department Manager")
+        # Special case: Abdalaziz can approve General Manager requests
+        elif (current_user.name == 'Abdalaziz Al-Brashdi' and req.user.role == 'GM'):
+            is_authorized = True
+            print("DEBUG: Authorized via Abdalaziz role for General Manager")
+        # Special case: Abdalaziz can approve Finance Staff requests
+        elif (current_user.name == 'Abdalaziz Al-Brashdi' and req.user.role == 'Finance Staff'):
+            is_authorized = True
+            print("DEBUG: Authorized via Abdalaziz role for Finance Staff")
+        # Special case: Abdalaziz can approve Operation Manager requests
+        elif (current_user.name == 'Abdalaziz Al-Brashdi' and req.user.role == 'Operation Manager'):
+            is_authorized = True
+            print("DEBUG: Authorized via Abdalaziz role for Operation Manager")
+        # Special case: Operation Manager can approve Operation department and Project requests
+        elif (current_user.role == 'Operation Manager' and 
+              (req.user.department == 'Operation' or req.user.department == 'Project') and 
+              req.user.role != 'Operation Manager'):  # Operation Manager can't approve their own requests
+            is_authorized = True
+            print("DEBUG: Authorized via Operation Manager role")
+        # Special case: Finance Admin can approve Finance department requests
+        elif (current_user.role == 'Finance Admin' and 
+              req.user.department == 'Finance' and 
+              req.user.role != 'Finance Admin'):  # Finance Admin can't approve their own requests
+            is_authorized = True
+            print("DEBUG: Authorized via Finance Admin role")
+        # Special case: Department Manager can approve same department requests
+        elif (current_user.role == 'Department Manager' and 
+              req.user.department == current_user.department and 
+              req.user.role != 'Department Manager'):  # Department Manager can't approve their own requests
+            is_authorized = True
+            print("DEBUG: Authorized via Department Manager role")
     
     print(f"DEBUG: Authorization result: {is_authorized}")
     
@@ -5041,6 +5098,99 @@ def manager_reject_request(request_id):
     
     flash(f'Payment request #{request_id} has been rejected by manager.', 'success')
     return redirect(url_for('dashboard'))
+
+
+@app.route('/request/<int:request_id>/reassign_manager', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def reassign_manager(request_id):
+    """IT Department can reassign a temporary manager for a specific request"""
+    # Only allow IT Department Staff to perform this action
+    if current_user.department != 'IT':
+        flash('You do not have permission to reassign managers. Only IT Department can perform this action.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    req = PaymentRequest.query.get_or_404(request_id)
+    
+    # Only allow reassignment for pending manager approval requests
+    if req.status != 'Pending Manager Approval':
+        flash('You can only reassign managers for requests with "Pending Manager Approval" status.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Get the new manager ID from form
+    new_manager_id = request.form.get('temporary_manager_id')
+    
+    if not new_manager_id:
+        flash('Please select a manager.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Validate that the manager exists and is a valid manager
+    new_manager = User.query.get(new_manager_id)
+    if not new_manager:
+        flash('Selected manager does not exist.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Only allow reassignment to managers and department managers
+    if new_manager.role not in ['Department Manager', 'GM', 'Operation Manager', 'Finance Admin']:
+        flash('Selected user is not a manager. Please select a valid manager.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Don't allow reassigning to the same manager
+    if req.temporary_manager_id == int(new_manager_id):
+        flash('Selected manager is already assigned as the temporary manager for this request.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Get the old temporary manager (if any) for notification
+    old_temp_manager = req.temporary_manager
+    old_original_manager = None
+    if req.user.manager_id:
+        old_original_manager = User.query.get(req.user.manager_id)
+    
+    # Set the temporary manager
+    req.temporary_manager_id = int(new_manager_id)
+    req.updated_at = datetime.utcnow()
+    
+    db.session.commit()
+    
+    log_action(f"Reassigned temporary manager for request #{request_id} to {new_manager.name} (IT Staff only action)")
+    
+    # Notify the new temporary manager
+    create_notification(
+        user_id=new_manager_id,
+        title="Temporary Manager Assignment",
+        message=f"You have been temporarily assigned to review payment request #{request_id} from {req.department} department. The originally assigned manager is not available.",
+        notification_type="temporary_manager_assignment",
+        request_id=request_id
+    )
+    
+    # Notify the requestor about the manager change
+    create_notification(
+        user_id=req.user_id,
+        title="Manager Reassigned for Your Request",
+        message=f"The manager for your payment request #{request_id} has been temporarily reassigned to {new_manager.name}. This only affects this specific request.",
+        notification_type="manager_reassigned",
+        request_id=request_id
+    )
+    
+    # Notify the old temporary manager (if any) that they're no longer assigned
+    if old_temp_manager and old_temp_manager.user_id != int(new_manager_id):
+        create_notification(
+            user_id=old_temp_manager.user_id,
+            title="Temporary Manager Assignment Removed",
+            message=f"You are no longer the temporary manager for payment request #{request_id}.",
+            notification_type="temporary_manager_unassigned",
+            request_id=request_id
+        )
+    
+    # Emit real-time update
+    socketio.emit('request_updated', {
+        'request_id': request_id,
+        'temporary_manager_id': new_manager_id,
+        'temporary_manager_name': new_manager.name
+    })
+    
+    flash(f'Temporary manager has been reassigned to {new_manager.name} for request #{request_id}.', 'success')
+    return redirect(url_for('view_request', request_id=request_id))
 
 
 @app.route('/request/<int:request_id>/delete', methods=['POST'])

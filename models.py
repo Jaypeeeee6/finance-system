@@ -177,8 +177,14 @@ class PaymentRequest(db.Model):
     # Additional field for tracking who created the request
     user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'))
     
+    # Temporary manager assignment (used when IT staff reassigns manager for specific request)
+    temporary_manager_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    
     # Relationship to User
-    user = db.relationship('User', backref='payment_requests')
+    user = db.relationship('User', backref='payment_requests', foreign_keys=[user_id])
+    
+    # Relationship to temporary manager (if assigned)
+    temporary_manager = db.relationship('User', foreign_keys=[temporary_manager_id], backref='temporarily_assigned_requests')
     
     def to_dict(self):
         """Convert request to dictionary"""
