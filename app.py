@@ -6290,16 +6290,18 @@ def edit_user(user_id):
     
     if request.method == 'POST':
         new_name = request.form.get('name')
+        new_username = request.form.get('username')  # This is the email
         new_password = request.form.get('password')
-        new_pin = request.form.get('pin')  # 4-digit PIN
         new_department = request.form.get('department')
         new_role = request.form.get('role')
         new_manager_id = request.form.get('manager_id')
         
-        # Validate PIN if provided
-        if new_pin and (len(new_pin) != 4 or not new_pin.isdigit()):
-            flash('PIN must be exactly 4 digits (0000-9999).', 'danger')
-            return redirect(url_for('edit_user', user_id=user_id))
+        # Check if email (username) is being changed and if it already exists
+        if new_username != user_to_edit.username:
+            existing_user = User.query.filter_by(username=new_username).first()
+            if existing_user:
+                flash('Email address already exists. Please choose a different email.', 'danger')
+                return redirect(url_for('edit_user', user_id=user_id))
         
         # Department restriction removed - multiple accounts per department allowed
         
@@ -6337,18 +6339,15 @@ def edit_user(user_id):
         
         # Update user information
         user_to_edit.name = new_name
+        user_to_edit.username = new_username  # Update email/username
+        user_to_edit.email = new_username     # Update email field as well
         user_to_edit.department = new_department
         user_to_edit.role = new_role
         user_to_edit.manager_id = final_manager_id
-        # Email is stored in username field, so no need to update email separately
         
         # Only update password if provided
         if new_password:
             user_to_edit.set_password(new_password)
-        
-        # Only update PIN if provided
-        if new_pin:
-            user_to_edit.set_pin(new_pin)
         
         db.session.commit()
         
