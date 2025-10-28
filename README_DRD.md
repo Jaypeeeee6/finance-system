@@ -80,7 +80,6 @@ To define the structure, storage, and relationships of data used in the Payment 
 ## 📦 Storage
 - Database: PostgreSQL / MySQL
 - File uploads: Local `/uploads/receipts` or AWS S3
-- Backup: Weekly automated database dump
 
 ---
 
