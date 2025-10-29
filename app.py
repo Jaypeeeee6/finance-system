@@ -1070,139 +1070,213 @@ def check_recurring_payment_completion(request_id):
         return False
 
 
-def get_notifications_for_user(user):
-    """Get appropriate notifications for a user based on their role per RBAC"""
-    
+def get_notifications_for_user(user, limit=5, page=None, per_page=None):
+    """Get notifications for a user based on RBAC.
+    - If limit is provided, return limited results (for dropdowns)
+    - If page and per_page are provided, return paginated results
+    - Otherwise return all results
+    """
+
+    query = None
+
     if user.role == 'Project Staff':
         # Project Staff: Updates on their own requests + recurring payment due on their own requests only
-        return Notification.query.filter(
+        query = Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
                     Notification.notification_type == 'recurring_due',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                    Notification.notification_type.in_([
+                        'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
+                        'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
+                        'installment_paid'
+                    ])
                 )
             )
-        ).order_by(Notification.created_at.desc()).limit(5).all()
-    
+        ).order_by(Notification.created_at.desc())
+
     elif user.role in ['Finance Staff', 'Finance Admin']:
         # Finance roles: New submissions when requests reach Pending Finance Approval + proof uploaded + recurring payment due + system-wide
         # Finance Staff additionally get updates on their own requests
         if user.role == 'Finance Staff':
-            return Notification.query.filter(
+            query = Notification.query.filter(
                 db.and_(
                     Notification.user_id == user.user_id,
                     db.or_(
-                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                        Notification.notification_type.in_([
+                            'ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited',
+                            'finance_approval_timing_alert', 'finance_approval_timing_recurring',
+                            'system_maintenance', 'system_update', 'security_alert', 'system_error',
+                            'admin_announcement'
+                        ]),
+                        Notification.notification_type.in_([
+                            'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
+                            'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
+                            'installment_paid'
+                        ])
                     )
                 )
-            ).order_by(Notification.created_at.desc()).limit(5).all()
+            ).order_by(Notification.created_at.desc())
         elif user.name == 'Abdalaziz Al-Brashdi':
             # Abdalaziz gets finance notifications + updates on Finance Staff, GM, and Operation Manager requests
-            return Notification.query.filter(
+            query = Notification.query.filter(
                 db.and_(
                     Notification.user_id == user.user_id,
                     db.or_(
-                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                        Notification.notification_type.in_([
+                            'ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited',
+                            'finance_approval_timing_alert', 'finance_approval_timing_recurring',
+                            'system_maintenance', 'system_update', 'security_alert', 'system_error',
+                            'admin_announcement'
+                        ]),
+                        Notification.notification_type.in_([
+                            'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
+                            'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
+                            'installment_paid'
+                        ])
                     )
                 )
-            ).order_by(Notification.created_at.desc()).limit(5).all()
+            ).order_by(Notification.created_at.desc())
         else:  # Other Finance Admin
-            return Notification.query.filter(
+            query = Notification.query.filter(
                 db.and_(
                     Notification.user_id == user.user_id,
-                    Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
+                    Notification.notification_type.in_([
+                        'ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited',
+                        'finance_approval_timing_alert', 'finance_approval_timing_recurring',
+                        'system_maintenance', 'system_update', 'security_alert', 'system_error',
+                        'admin_announcement'
+                    ])
                 )
-            ).order_by(Notification.created_at.desc()).limit(5).all()
-    
+            ).order_by(Notification.created_at.desc())
+
     elif user.role == 'GM':
         # GM: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide + temporary manager assignments
-        return Notification.query.filter(
+        query = Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
                     Notification.notification_type == 'new_submission',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
-                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                    Notification.notification_type.in_([
+                        'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
+                        'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
+                        'installment_paid'
+                    ]),
+                    Notification.notification_type.in_([
+                        'system_maintenance', 'system_update', 'security_alert', 'system_error',
+                        'admin_announcement'
+                    ]),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
             )
-        ).order_by(Notification.created_at.desc()).limit(5).all()
-    
+        ).order_by(Notification.created_at.desc())
+
     elif user.role == 'Operation Manager':
         # Operation Manager: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide
-        return Notification.query.filter(
+        query = Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
                     Notification.notification_type == 'new_submission',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
-                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                    Notification.notification_type.in_([
+                        'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
+                        'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
+                        'installment_paid'
+                    ]),
+                    Notification.notification_type.in_([
+                        'system_maintenance', 'system_update', 'security_alert', 'system_error',
+                        'admin_announcement'
+                    ]),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
             )
-        ).order_by(Notification.created_at.desc()).limit(5).all()
-    
+        ).order_by(Notification.created_at.desc())
+
     elif user.role == 'Department Manager' and user.department == 'IT':
         # IT Department Manager: New submissions from IT Staff only + updates on their own requests + system-wide + user management + temporary manager assignments
-        return Notification.query.filter(
+        query = Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
                     db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('IT Staff')),
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted']),
-                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                    Notification.notification_type.in_([
+                        'request_rejected', 'request_approved', 'proof_uploaded', 'status_changed',
+                        'proof_required', 'recurring_approved', 'request_completed', 'installment_paid',
+                        'user_created', 'user_updated', 'user_deleted'
+                    ]),
+                    Notification.notification_type.in_([
+                        'system_maintenance', 'system_update', 'security_alert', 'system_error',
+                        'admin_announcement'
+                    ]),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
             )
-        ).order_by(Notification.created_at.desc()).limit(5).all()
-    
+        ).order_by(Notification.created_at.desc())
+
     elif user.role == 'IT Staff':
         # IT Staff: Updates on their own requests + system-wide + user management
-        return Notification.query.filter(
+        query = Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted']),
-                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
+                    Notification.notification_type.in_([
+                        'request_rejected', 'request_approved', 'proof_uploaded', 'status_changed',
+                        'proof_required', 'recurring_approved', 'request_completed', 'installment_paid',
+                        'user_created', 'user_updated', 'user_deleted'
+                    ]),
+                    Notification.notification_type.in_([
+                        'system_maintenance', 'system_update', 'security_alert', 'system_error',
+                        'admin_announcement'
+                    ])
                 )
             )
-        ).order_by(Notification.created_at.desc()).limit(5).all()
-    
+        ).order_by(Notification.created_at.desc())
+
     elif user.role == 'Department Manager':
         # Other Department Managers: New submissions from their own department staff only + recurring payment due for their department + updates on their own requests + temporary manager assignments
         print(f"DEBUG: Getting notifications for Department Manager {user.username} from {user.department}")
-        
+
         # Get all notifications for this user first
         all_user_notifications = Notification.query.filter_by(user_id=user.user_id).all()
         print(f"DEBUG: Total notifications for user {user.username}: {len(all_user_notifications)}")
         for notif in all_user_notifications:
             print(f"DEBUG: Notification {notif.notification_id}: {notif.notification_type} - {notif.title}")
-        
-        notifications = Notification.query.filter(
+
+        query = Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
                     Notification.notification_type == 'new_submission',
                     Notification.notification_type == 'recurring_due',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
+                    Notification.notification_type.in_([
+                        'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
+                        'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
+                        'installment_paid'
+                    ]),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
             )
-        ).order_by(Notification.created_at.desc()).limit(5).all()
-        print(f"DEBUG: Found {len(notifications)} filtered notifications for Department Manager")
-        return notifications
-    
+        ).order_by(Notification.created_at.desc())
+
     else:
         # Department Staff: Updates on their own requests only + recurring payment due for their own requests
-        return Notification.query.filter(
+        query = Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
-                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                Notification.notification_type.in_([
+                    'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
+                    'status_changed', 'recurring_due', 'proof_required', 'recurring_approved',
+                    'request_completed', 'installment_paid'
+                ])
             )
-        ).order_by(Notification.created_at.desc()).limit(5).all()
+        ).order_by(Notification.created_at.desc())
+
+    # Handle pagination, limit, or return all
+    if page is not None and per_page is not None:
+        return query.paginate(page=page, per_page=per_page, error_out=False)
+    elif limit:
+        return query.limit(limit).all()
+    return query.all()
 
 def get_unread_count_for_user(user):
     """Get unread notification count for a user based on their role per RBAC"""
@@ -7082,9 +7156,16 @@ def debug_requests():
 @login_required
 @role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def notifications():
-    """View all notifications based on RBAC permissions"""
-    notifications = get_notifications_for_user(current_user)
-    return render_template('notifications.html', notifications=notifications, user=current_user)
+    """View all notifications based on RBAC permissions with pagination"""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 25, type=int)
+    
+    # Validate per_page to prevent abuse
+    if per_page not in [10, 25, 50, 100]:
+        per_page = 25
+    
+    pagination = get_notifications_for_user(current_user, page=page, per_page=per_page)
+    return render_template('notifications.html', pagination=pagination, notifications=pagination.items, user=current_user)
 
 
 @app.route('/notifications/mark_read/<int:notification_id>')
