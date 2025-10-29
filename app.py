@@ -6262,11 +6262,6 @@ def reports():
     # Build query - show Completed and Recurring requests
     query = PaymentRequest.query.filter(PaymentRequest.status.in_(['Completed', 'Recurring']))
     
-    # Role-based department filtering
-    if current_user.role == 'Operation Manager':
-        # Operation Manager can only see Maintenance, Operation, Project, Procurement, and Logistic
-        query = query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project', 'Procurement', 'Logistic']))
-    
     if department_filter:
         query = query.filter_by(department=department_filter)
     if request_type_filter:
@@ -6286,13 +6281,8 @@ def reports():
     requests = query.order_by(PaymentRequest.approval_date.desc()).all()
     
     # Get unique departments for filter
-    if current_user.role == 'Operation Manager':
-        # Operation Manager can only see specific departments
-        departments = ['Maintenance', 'Operation', 'Project', 'Procurement', 'Logistic']
-    else:
-        # Other roles can see all departments
-        departments = db.session.query(PaymentRequest.department).distinct().all()
-        departments = [d[0] for d in departments]
+    departments = db.session.query(PaymentRequest.department).distinct().all()
+    departments = [d[0] for d in departments]
     
     # Get unique companies for filter (only person_company field since company_name is no longer used)
     companies = db.session.query(PaymentRequest.person_company).filter(
@@ -6385,11 +6375,6 @@ def export_reports_excel():
     date_to = request.args.get('date_to', '')
 
     query = PaymentRequest.query.filter(PaymentRequest.status.in_(['Completed', 'Recurring']))
-    
-    # Role-based department filtering
-    if current_user.role == 'Operation Manager':
-        # Operation Manager can only see Maintenance, Operation, Project, Procurement, and Logistic
-        query = query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project', 'Procurement', 'Logistic']))
     
     if department_filter:
         query = query.filter_by(department=department_filter)
@@ -6568,11 +6553,6 @@ def export_reports_pdf():
 
     query = PaymentRequest.query.filter(PaymentRequest.status.in_(['Completed', 'Recurring']))
     
-    # Role-based department filtering
-    if current_user.role == 'Operation Manager':
-        # Operation Manager can only see Maintenance, Operation, Project, Procurement, and Logistic
-        query = query.filter(PaymentRequest.department.in_(['Maintenance', 'Operation', 'Project', 'Procurement', 'Logistic']))
-    
     if department_filter:
         query = query.filter_by(department=department_filter)
     if request_type_filter:
@@ -6723,6 +6703,20 @@ def export_reports_pdf():
             # For Person/Company column, show person_company field only
             company_display = r.person_company
             
+            # Build Submitted (date + manager approval START time if available)
+            submitted_date = r.date.strftime('%Y-%m-%d') if getattr(r, 'date', None) else ''
+            manager_start_time_str = ''
+            if getattr(r, 'manager_approval_start_time', None):
+                local_start = utc_to_local(r.manager_approval_start_time)
+                manager_start_time_str = f" {local_start.strftime('%H:%M:%S')}"
+
+            # Build Approved (date + finance approval END time if available)
+            approved_date = r.approval_date.strftime('%Y-%m-%d') if getattr(r, 'approval_date', None) else ''
+            finance_end_time_str = ''
+            if getattr(r, 'finance_approval_end_time', None):
+                local_end = utc_to_local(r.finance_approval_end_time)
+                finance_end_time_str = f" {local_end.strftime('%H:%M:%S')}"
+
             row_data = [
                 f"#{r.request_id}",
                 str(r.request_type or ''),
@@ -6732,14 +6726,10 @@ def export_reports_pdf():
                 f"OMR {to_float(r.amount):.3f}",
                 str(r.branch_name or ''),
                 str(company_display or ''),
-                r.date.strftime('%Y-%m-%d') if getattr(r, 'date', None) else '',
-                '',  # Will be filled below
+                f"{submitted_date}{manager_start_time_str}",
+                f"{approved_date}{finance_end_time_str}",
                 str(r.approver or '')
             ]
-            
-            # For Approved column: show approval_date (matching reports page)
-            approved_date = r.approval_date.strftime('%Y-%m-%d') if getattr(r, 'approval_date', None) else ''
-            row_data[9] = approved_date  # Approved column is now at index 9
             
             # Calculate height for each column
             for i, (data, width) in enumerate(zip(row_data, col_widths)):
