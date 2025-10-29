@@ -6251,17 +6251,20 @@ def reports():
         flash('You do not have permission to access this page.', 'danger')
         return redirect(url_for('dashboard'))
     
-    # Get filter parameters (no status filter - show Completed and Recurring requests)
+    # Get filter parameters
     department_filter = request.args.get('department', '')
     request_type_filter = request.args.get('request_type', '')
     company_filter = request.args.get('company', '')
     branch_filter = request.args.get('branch', '')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
+    status_filter = request.args.get('status', '')
     
     # Build query - show Completed and Recurring requests
     query = PaymentRequest.query.filter(PaymentRequest.status.in_(['Completed', 'Recurring']))
     
+    if status_filter:
+        query = query.filter_by(status=status_filter)
     if department_filter:
         query = query.filter_by(department=department_filter)
     if request_type_filter:
@@ -6285,11 +6288,14 @@ def reports():
     departments = [d[0] for d in departments]
     
     # Get unique companies for filter (only person_company field since company_name is no longer used)
-    companies = db.session.query(PaymentRequest.person_company).filter(
+    companies_query = db.session.query(PaymentRequest.person_company).filter(
         PaymentRequest.status.in_(['Completed', 'Recurring']),
         PaymentRequest.person_company.isnot(None),
         PaymentRequest.person_company != ''
-    ).distinct().all()
+    )
+    if status_filter:
+        companies_query = companies_query.filter(PaymentRequest.status == status_filter)
+    companies = companies_query.distinct().all()
     companies = [c[0] for c in companies if c[0]]
     companies.sort()  # Sort alphabetically
     
@@ -6319,6 +6325,7 @@ def reports():
                          request_types=request_types,
                          company_filter=company_filter,
                          branch_filter=branch_filter,
+                         status_filter=status_filter,
                          user=current_user)
 
 
@@ -6366,16 +6373,19 @@ def export_reports_excel():
         flash(f'Error importing Excel library: {str(e)}', 'error')
         return redirect(url_for('reports', **request.args))
 
-    # Reuse the same filters as the reports() view (no status filter - show Completed and Recurring requests)
+    # Reuse the same filters as the reports() view
     department_filter = request.args.get('department', '')
     request_type_filter = request.args.get('request_type', '')
     company_filter = request.args.get('company', '')
     branch_filter = request.args.get('branch', '')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
+    status_filter = request.args.get('status', '')
 
     query = PaymentRequest.query.filter(PaymentRequest.status.in_(['Completed', 'Recurring']))
     
+    if status_filter:
+        query = query.filter_by(status=status_filter)
     if department_filter:
         query = query.filter_by(department=department_filter)
     if request_type_filter:
@@ -6543,16 +6553,19 @@ def export_reports_pdf():
         flash(f'Error importing PDF library: {str(e)}', 'error')
         return redirect(url_for('reports', **request.args))
 
-    # Reuse the same filters as the reports() view (no status filter - show Completed and Recurring requests)
+    # Reuse the same filters as the reports() view
     department_filter = request.args.get('department', '')
     request_type_filter = request.args.get('request_type', '')
     company_filter = request.args.get('company', '')
     branch_filter = request.args.get('branch', '')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
+    status_filter = request.args.get('status', '')
 
     query = PaymentRequest.query.filter(PaymentRequest.status.in_(['Completed', 'Recurring']))
     
+    if status_filter:
+        query = query.filter_by(status=status_filter)
     if department_filter:
         query = query.filter_by(department=department_filter)
     if request_type_filter:
