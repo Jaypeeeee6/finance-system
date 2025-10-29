@@ -1977,6 +1977,8 @@ def admin_dashboard():
                         )
                     )
                 ),
+                # Always include current user's own requests regardless of status
+                PaymentRequest.user_id == current_user.user_id,
                 # Also include requests where the current user is temporarily assigned as manager
                 db.and_(
                     PaymentRequest.status == 'Pending Manager Approval',
@@ -1989,6 +1991,8 @@ def admin_dashboard():
         query = PaymentRequest.query.filter(
             db.or_(
                 PaymentRequest.status.in_(finance_statuses),
+                # Always include current user's own requests regardless of status
+                PaymentRequest.user_id == current_user.user_id,
                 db.and_(
                     PaymentRequest.status == 'Pending Manager Approval',
                     PaymentRequest.temporary_manager_id == current_user.user_id
@@ -3820,22 +3824,23 @@ def view_request(request_id):
         if getattr(req, 'temporary_manager_id', None) == current_user.user_id:
             pass
         else:
-            # Finance users can only view requests in finance-related statuses
-            finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
-            
-            # For Abdalaziz, also allow viewing Pending Manager Approval and Rejected by Manager requests from Finance Staff, GM, and Operation Manager
-            if current_user.name == 'Abdalaziz Al-Brashdi' and req.status in ['Pending Manager Approval', 'Rejected by Manager']:
-                if req.user.role in ['Finance Staff', 'GM', 'Operation Manager']:
-                    pass  # Allow access
-                else:
+            # Always allow finance users to view their own requests regardless of status
+            if req.user_id == current_user.user_id:
+                pass
+            else:
+                # Finance users can only view requests in finance-related statuses
+                finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
+                
+                # For Abdalaziz, also allow viewing Pending Manager Approval and Rejected by Manager requests from Finance Staff, GM, and Operation Manager
+                if current_user.name == 'Abdalaziz Al-Brashdi' and req.status in ['Pending Manager Approval', 'Rejected by Manager']:
+                    if req.user.role in ['Finance Staff', 'GM', 'Operation Manager']:
+                        pass  # Allow access
+                    else:
+                        flash('You do not have permission to view this request.', 'danger')
+                        return redirect(url_for('dashboard'))
+                elif req.status not in finance_statuses:
                     flash('You do not have permission to view this request.', 'danger')
                     return redirect(url_for('dashboard'))
-            # For Finance Staff, allow viewing their own requests with Pending Manager Approval and Rejected by Manager
-            elif current_user.role == 'Finance Staff' and req.status in ['Pending Manager Approval', 'Rejected by Manager'] and req.user_id == current_user.user_id:
-                pass  # Allow access to own requests
-            elif req.status not in finance_statuses:
-                flash('You do not have permission to view this request.', 'danger')
-                return redirect(url_for('dashboard'))
     
     # Mark notifications related to this request as read for Finance and Admin users
     if current_user.role in ['Finance Staff', 'Finance Admin']:
@@ -4867,6 +4872,11 @@ def manager_approve_request(request_id):
     """Manager approves a payment request"""
     req = PaymentRequest.query.get_or_404(request_id)
     
+    # Never allow users to approve their own requests at the manager stage
+    if req.user_id == current_user.user_id:
+        flash('You cannot approve your own request at the manager stage.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+
     # Debug information
     print(f"DEBUG: Current user: {current_user.name} (ID: {current_user.user_id}, Role: {current_user.role}, Department: {current_user.department})")
     print(f"DEBUG: Request submitter: {req.user.name} (ID: {req.user.user_id}, Role: {req.user.role}, Department: {req.user.department})")
@@ -4887,10 +4897,15 @@ def manager_approve_request(request_id):
             is_authorized = False
     else:
         # No temporary manager assigned, use standard authorization checks
-        # Check if current user is the manager of the request submitter
-        if req.user.manager_id and req.user.manager_id == current_user.user_id:
+        # New global rule: GM and Operation Manager can approve ANY request at manager stage
+        if current_user.role in ['GM', 'Operation Manager']:
             is_authorized = True
-            print("DEBUG: Authorized via manager_id relationship")
+            print("DEBUG: Authorized via global GM/Operation Manager rule")
+        else:
+        # Check if current user is the manager of the request submitter
+            if req.user.manager_id and req.user.manager_id == current_user.user_id:
+                is_authorized = True
+                print("DEBUG: Authorized via manager_id relationship")
     
     # If not yet authorized and no temporary manager restriction applied, check special cases
     if not is_authorized and not req.temporary_manager_id:
@@ -5096,6 +5111,11 @@ def manager_reject_request(request_id):
     """Manager rejects a payment request"""
     req = PaymentRequest.query.get_or_404(request_id)
     
+    # Never allow users to reject their own requests at the manager stage
+    if req.user_id == current_user.user_id:
+        flash('You cannot reject your own request at the manager stage.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+
     # Check if current user is authorized to reject this request
     is_authorized = False
     
@@ -5106,8 +5126,11 @@ def manager_reject_request(request_id):
         else:
             is_authorized = False
     else:
+        # New global rule: GM and Operation Manager can reject ANY request at manager stage
+        if current_user.role in ['GM', 'Operation Manager']:
+            is_authorized = True
         # Check if current user is the manager of the request submitter
-        if req.user.manager_id and req.user.manager_id == current_user.user_id:
+        elif req.user.manager_id and req.user.manager_id == current_user.user_id:
             is_authorized = True
         # Special case: Operation Manager can reject Operation department requests
         elif (current_user.role == 'Operation Manager' and 

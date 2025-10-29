@@ -37,11 +37,13 @@ This document describes who can view what, who can approve/reject, and how a pay
 ### Global/Executive Roles
 - **General Manager**
   - **View**: All departments, all roles, all statuses
-  - **Approve/Reject**: All departments (acts as assigned manager for department managers only)
+  - **Approve/Reject (Manager Stage)**: All requests regardless of department and role
+  - Note: If a temporary manager is assigned, only the temporary manager can approve/reject.
 
 - **Operation Manager**
   - **View**: All departments, all roles, all statuses
-  - **Approve/Reject**: Operation department and Project
+  - **Approve/Reject (Manager Stage)**: All requests regardless of department and role
+  - Note: If a temporary manager is assigned, only the temporary manager can approve/reject.
 
 ### Finance Roles
 - **Finance Admin** (users: Mahmood Al-Mandhari, Abdalaziz Al-Brashdi)
@@ -103,13 +105,27 @@ Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Qual
 - Only the appropriate approver for a given stage can transition the status forward or reject at that stage.
 
 ### Manager Assignment Rules
-- **Department Managers**: Assigned to General Manager
+- **Department Managers**: Assigned to General Manager and Operation Manager
 - **General Manager**: Assigned to Abdalaziz Al-Brashdi (Finance Admin)
 - **Operation Department**: Assigned to Operation Manager
 - **Project**: Assigned to Operation Manager (same as Operation Department)
 - **Finance Department**: Assigned to Abdalaziz Al-Brashdi (Finance Admin)
 - **Office Department**: Assigned to General Manager
 - **Other Departments**: Assigned to their respective Department Manager (if exists)
+
+#### Temporary Manager (IT feature)
+- IT can assign a `temporary_manager_id` to a specific request while status is `Pending Manager Approval`.
+- When a temporary manager is assigned:
+  - They have exclusive authority to Approve/Reject that request as manager.
+  - They can view the request regardless of their role/department (Finance Admin included).
+  - Original/special-case managers cannot approve/reject during the temporary assignment.
+  - All approvals/rejections are attributed to the temporary manager in the UI.
+
+#### Multiple Managers for Department Managers (GM + Operation Manager)
+- Requests created by users with role `Department Manager` can be approved by either:
+  - General Manager (GM), or
+  - Operation Manager
+- The system records the actual approver (GM or Operation Manager) and displays that person’s name.
 
 ---
 
