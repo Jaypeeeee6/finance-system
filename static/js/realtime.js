@@ -188,62 +188,19 @@ function updateConnectionStatus(connected) {
 
 /**
  * Show notification for new requests
+ * NOTE: Visual pop-ups removed - only sound notification kept
  */
 function showNewRequestNotification(count, data) {
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = 'realtime-notification';
-    notification.innerHTML = `
-        <i class="fas fa-bell"></i>
-        <div>
-            <strong>New Payment Request!</strong>
-            ${data ? `<div style="font-size: 0.85rem; margin-top: 0.3rem;">${data.requestor_name} - OMR ${data.amount.toFixed(3)}</div>` : ''}
-        </div>
-    `;
-    
-    // Add to page
-    document.body.appendChild(notification);
-    
-    // Animate in
-    setTimeout(() => {
-        notification.classList.add('show');
-    }, 100);
-    
-    // Remove after 5 seconds
-    setTimeout(() => {
-        notification.classList.remove('show');
-        setTimeout(() => {
-            notification.remove();
-        }, 300);
-    }, 5000);
-    
-    // Play notification sound
+    // Play notification sound only (no visual pop-up)
     playNotificationSound();
 }
 
 /**
  * Show notification for request updates
+ * NOTE: Visual pop-ups removed - only sound notification kept
  */
 function showUpdateNotification(data) {
-    const notification = document.createElement('div');
-    notification.className = 'realtime-notification';
-    notification.innerHTML = `
-        <i class="fas fa-sync-alt"></i>
-        <div>
-            <strong>Request Updated!</strong>
-            <div style="font-size: 0.85rem; margin-top: 0.3rem;">Request #${data.request_id} - ${data.status}</div>
-        </div>
-    `;
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => notification.classList.add('show'), 100);
-    
-    setTimeout(() => {
-        notification.classList.remove('show');
-        setTimeout(() => notification.remove(), 300);
-    }, 5000);
-    
+    // Play notification sound only (no visual pop-up)
     playNotificationSound();
 }
 
@@ -563,40 +520,9 @@ function showTableUpdateIndicator() {
         }, 1000);
     }
     
-    // Show a brief notification
-    const notification = document.createElement('div');
-    notification.className = 'realtime-notification show';
-    notification.innerHTML = `
-        <i class="fas fa-sync-alt"></i>
-        <div>
-            <strong>Dashboard Updated</strong>
-            <div style="font-size: 0.85rem; margin-top: 0.3rem;">New data loaded automatically</div>
-        </div>
-    `;
-    
-    document.body.appendChild(notification);
-    
-    // Auto remove after 2 seconds
-    setTimeout(() => {
-        notification.remove();
-    }, 2000);
+    // Visual notification removed - table update happens silently
 }
 
-/**
- * Enhanced notification handling
- */
-function handleNewNotification(data) {
-    // Show notification popup
-    showNotificationPopup(data);
-    
-    // Update notification count
-    updateNotificationCount();
-    
-    // Update dashboard if on dashboard page
-    if (document.querySelector('.data-table')) {
-        updateDashboardTable();
-    }
-}
 
 /**
  * Cleanup on page unload

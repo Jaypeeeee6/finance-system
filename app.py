@@ -1034,6 +1034,22 @@ def check_recurring_payment_completion(request_id):
                     request_id=request_id
                 )
                 
+                # Notify Auditing Staff and Auditing Department Manager
+                auditing_users = User.query.filter(
+                    db.and_(
+                        User.department == 'Auditing',
+                        User.role.in_(['Auditing Staff', 'Department Manager'])
+                    )
+                ).all()
+                for auditing_user in auditing_users:
+                    create_notification(
+                        user_id=auditing_user.user_id,
+                        title="Recurring Payment Completed",
+                        message=f'All installments for recurring payment request #{request_id} from {req.department} department have been paid. Request marked as completed.',
+                        notification_type="recurring_completed",
+                        request_id=request_id
+                    )
+                
                 # Log the action
                 log_action(f"Recurring payment request #{request_id} automatically marked as completed - all installments paid")
                 
@@ -1817,6 +1833,9 @@ def department_dashboard():
     search_query = request.args.get('search', None)
     status_filter = request.args.get('status', None)
     tab = request.args.get('tab', 'all')
+    # Enforce visibility: only Auditing department users can access 'my_requests' tab
+    if tab == 'my_requests' and (not current_user.department or current_user.department != 'Auditing'):
+        tab = 'all'
     urgent_filter = request.args.get('urgent', None)
     
     # Validate per_page to prevent abuse
@@ -1829,8 +1848,25 @@ def department_dashboard():
         if current_user.role == 'Operation Manager':
             # Operation Manager can see ALL departments
             base_query = PaymentRequest.query
+        elif current_user.department == 'Auditing':
+            # Auditing Department Manager can see:
+            # 1. All their own requests (regardless of status or department)
+            # 2. All requests from Auditing department (as department manager)
+            # 3. Completed and Recurring requests from OTHER departments (view-only)
+            # 4. Any request where they are the temporary manager
+            base_query = PaymentRequest.query.filter(
+                db.or_(
+                    PaymentRequest.user_id == current_user.user_id,
+                    PaymentRequest.department == 'Auditing',
+                    PaymentRequest.temporary_manager_id == current_user.user_id,
+                    db.and_(
+                        PaymentRequest.department != 'Auditing',
+                        PaymentRequest.status.in_(['Completed', 'Recurring'])
+                    )
+                )
+            )
         else:
-            # Department Manager can see ALL their department's requests
+            # Other Department Managers can see ALL their department's requests
             # plus any request where they are the temporary manager
             base_query = PaymentRequest.query.filter(
                 db.or_(
@@ -1838,6 +1874,19 @@ def department_dashboard():
                     PaymentRequest.temporary_manager_id == current_user.user_id
                 )
             )
+    elif current_user.department == 'Auditing' and current_user.role == 'Auditing Staff':
+        # Auditing Staff can see:
+        # 1. All their own requests (regardless of status or department)
+        # 2. Completed and Recurring requests from OTHER departments (view-only)
+        base_query = PaymentRequest.query.filter(
+            db.or_(
+                PaymentRequest.user_id == current_user.user_id,
+                db.and_(
+                    PaymentRequest.department != 'Auditing',
+                    PaymentRequest.status.in_(['Completed', 'Recurring'])
+                )
+            )
+        )
     else:
         # For regular users, show their own requests
         base_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
@@ -1872,6 +1921,9 @@ def department_dashboard():
         query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     elif tab == 'recurring':
         query = base_query.filter(PaymentRequest.status == 'Recurring')
+    elif tab == 'my_requests':
+        # For 'my_requests' tab, show only the current user's requests
+        query = base_query.filter(PaymentRequest.user_id == current_user.user_id)
     elif tab == 'all':
         # 'all' tab - show ALL requests, but apply status filter if provided
         query = base_query
@@ -1883,9 +1935,77 @@ def department_dashboard():
             query = query.filter(PaymentRequest.status == status_filter)
     
     # Get separate queries for each tab content
-    completed_query = base_query.filter(PaymentRequest.status == 'Completed')
-    rejected_query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
-    recurring_query = base_query.filter(PaymentRequest.status == 'Recurring')
+    # For Auditing department users (Staff and Department Manager), include their own requests + other department's Completed/Recurring
+    if current_user.department == 'Auditing' and (current_user.role == 'Auditing Staff' or current_user.role == 'Department Manager'):
+        if current_user.role == 'Department Manager':
+            # Auditing Department Manager can see:
+            # 1. All their own requests
+            # 2. All Auditing department requests (as manager)
+            # 3. Completed/Recurring from other departments
+            completed_query = PaymentRequest.query.filter(
+                db.or_(
+                    PaymentRequest.user_id == current_user.user_id,
+                    PaymentRequest.department == 'Auditing',
+                    db.and_(
+                        PaymentRequest.department != 'Auditing',
+                        PaymentRequest.status == 'Completed'
+                    )
+                )
+            )
+            recurring_query = PaymentRequest.query.filter(
+                db.or_(
+                    PaymentRequest.user_id == current_user.user_id,
+                    PaymentRequest.department == 'Auditing',
+                    db.and_(
+                        PaymentRequest.department != 'Auditing',
+                        PaymentRequest.status == 'Recurring'
+                    )
+                )
+            )
+            # Rejected query - their own rejected + Auditing department rejected
+            rejected_query = PaymentRequest.query.filter(
+                db.or_(
+                    db.and_(
+                        PaymentRequest.user_id == current_user.user_id,
+                        PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected'])
+                    ),
+                    db.and_(
+                        PaymentRequest.department == 'Auditing',
+                        PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected'])
+                    )
+                )
+            )
+        else:
+            # Auditing Staff
+            completed_query = PaymentRequest.query.filter(
+                db.or_(
+                    PaymentRequest.user_id == current_user.user_id,
+                    db.and_(
+                        PaymentRequest.department != 'Auditing',
+                        PaymentRequest.status == 'Completed'
+                    )
+                )
+            )
+            recurring_query = PaymentRequest.query.filter(
+                db.or_(
+                    PaymentRequest.user_id == current_user.user_id,
+                    db.and_(
+                        PaymentRequest.department != 'Auditing',
+                        PaymentRequest.status == 'Recurring'
+                    )
+                )
+            )
+            # Rejected query - only their own rejected requests (not other departments' rejected)
+            rejected_query = PaymentRequest.query.filter(
+                db.and_(
+                    PaymentRequest.user_id == current_user.user_id,
+                    PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected'])
+                )
+            )
+    else:
+        completed_query = base_query.filter(PaymentRequest.status == 'Completed')
+        rejected_query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
+        recurring_query = base_query.filter(PaymentRequest.status == 'Recurring')
     
     # Apply urgent filter to separate queries
     if urgent_filter == 'urgent':
@@ -1942,6 +2062,12 @@ def department_dashboard():
     notifications = get_notifications_for_user(current_user)
     unread_count = get_unread_count_for_user(current_user)
     
+    # Get user's own requests for the My Requests tab
+    my_requests_query = PaymentRequest.query.filter(PaymentRequest.user_id == current_user.user_id)
+    my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
     return render_template('department_dashboard.html', 
                          requests=requests_pagination.items, 
                          pagination=requests_pagination,
@@ -1954,6 +2080,7 @@ def department_dashboard():
                          rejected_requests=rejected_requests,
                          recurring_requests=recurring_requests,
                          urgent_filter=urgent_filter,
+                         my_requests=my_requests_pagination.items,
                          active_tab=tab)
 
 
@@ -2255,6 +2382,9 @@ def gm_dashboard():
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     elif tab == 'recurring':
         query = query.filter(PaymentRequest.status == 'Recurring')
+    elif tab == 'my_requests':
+        # For 'my_requests' tab, show only the current user's requests
+        query = query.filter(PaymentRequest.user_id == current_user.user_id)
     elif tab == 'all':
         # 'all' tab (All Requests) shows all requests
         # Apply status filter if provided (excludes Completed, Rejected, Recurring from dropdown)
@@ -2303,6 +2433,12 @@ def gm_dashboard():
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
     recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
     
+    # Get user's own requests for the My Requests tab
+    my_requests_query = PaymentRequest.query.filter(PaymentRequest.user_id == current_user.user_id)
+    my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
     return render_template('gm_dashboard.html', 
                          requests=requests_pagination.items, 
                          pagination=requests_pagination,
@@ -2317,6 +2453,7 @@ def gm_dashboard():
                          completed_requests=completed_requests,
                          rejected_requests=rejected_requests,
                          recurring_requests=recurring_requests,
+                         my_requests=my_requests_pagination.items,
                          active_tab=tab)
 
 
@@ -2422,6 +2559,12 @@ def it_dashboard():
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
     recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
     
+    # Get user's own requests for the My Requests tab
+    my_requests_query = PaymentRequest.query.filter(PaymentRequest.user_id == current_user.user_id)
+    my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
     users = User.query.all()
     logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(50).all()
     
@@ -2449,6 +2592,7 @@ def it_dashboard():
     
     return render_template('it_dashboard.html', 
                          requests=requests_pagination.items, 
+                         my_requests=my_requests_pagination.items,
                          pagination=requests_pagination,
                          users=users, 
                          logs=logs, 
@@ -3163,6 +3307,9 @@ def operation_dashboard():
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     elif tab == 'recurring':
         query = query.filter(PaymentRequest.status == 'Recurring')
+    elif tab == 'my_requests':
+        # For 'my_requests' tab, show only the current user's requests
+        query = query.filter(PaymentRequest.user_id == current_user.user_id)
     elif tab == 'all':
         # 'all' tab - apply status filter if provided (only on all tab)
         if status_filter:
@@ -3200,6 +3347,12 @@ def operation_dashboard():
     completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
     
+    # Get user's own requests for the My Requests tab
+    my_requests_query = PaymentRequest.query.filter(PaymentRequest.user_id == current_user.user_id)
+    my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
     return render_template('operation_dashboard.html', 
                          requests=requests_pagination.items, 
                          pagination=requests_pagination,
@@ -3212,6 +3365,7 @@ def operation_dashboard():
                          urgent_filter=urgent_filter,
                          completed_requests=completed_requests,
                          rejected_requests=rejected_requests,
+                         my_requests=my_requests_pagination.items,
                          active_tab=tab)
 
 
@@ -3854,8 +4008,29 @@ def view_request(request_id):
     # Check permissions
     # Allow Operation Manager, IT users, and IT Department Managers to view all requests (same as GM visibility)
     if current_user.role not in ['Finance Admin', 'Finance Staff', 'GM', 'IT Staff', 'Project Staff', 'Operation Manager']:
-        # Department Managers can view requests from their department
-        if current_user.role == 'Department Manager':
+        # Auditing Department users (Staff and Department Manager) can view their own requests OR Completed/Recurring requests from other departments
+        if current_user.department == 'Auditing' and (current_user.role == 'Auditing Staff' or current_user.role == 'Department Manager'):
+            # Allow if:
+            # 1. It's their own request, OR
+            # 2. (For Department Manager) It's from Auditing department, OR
+            # 3. It's Completed/Recurring from another department, OR
+            # 4. They are temporary manager
+            if req.user_id != current_user.user_id:
+                # Not their own request
+                if current_user.role == 'Department Manager':
+                    # Department Manager can also view their department's requests
+                    if req.department == 'Auditing' or getattr(req, 'temporary_manager_id', None) == current_user.user_id:
+                        pass  # Allow access
+                    elif req.status not in ['Completed', 'Recurring']:
+                        flash('You do not have permission to view this request.', 'danger')
+                        return redirect(url_for('dashboard'))
+                else:
+                    # Auditing Staff - check if it's Completed/Recurring from another department
+                    if req.department == 'Auditing' or req.status not in ['Completed', 'Recurring']:
+                        flash('You do not have permission to view this request.', 'danger')
+                        return redirect(url_for('dashboard'))
+        # Other Department Managers can view requests from their department
+        elif current_user.role == 'Department Manager':
             # IT Department Managers can view all requests
             if current_user.department == 'IT':
                 pass  # Allow access to all requests
@@ -4145,6 +4320,17 @@ def approve_request(request_id):
         proof_required = request.form.get('proof_required') == 'on'
         today = datetime.utcnow().date()
         
+        # Require reference number for Finance Admin approval
+        reference_number = request.form.get('reference_number', '').strip()
+        if not reference_number:
+            flash('Reference number is required for Finance Admin approval.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        # Validate reference number is alphanumeric
+        if not re.match(r'^[A-Za-z0-9]+$', reference_number):
+            flash('Reference number must contain only letters and numbers.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
         # Require receipt upload for Finance Admin approval
         if 'receipt_files' not in request.files:
             flash('Receipt upload is required for Finance Admin approval.', 'error')
@@ -4192,6 +4378,9 @@ def approve_request(request_id):
         import json
         finance_receipt_path = json.dumps(uploaded_files)
         req.finance_admin_receipt_path = finance_receipt_path
+        
+        # Save reference number
+        req.reference_number = reference_number
         
         req.approver = approver
         req.proof_required = proof_required
@@ -4279,6 +4468,22 @@ def approve_request(request_id):
                     request_id=request_id
                 )
                 
+                # Notify Auditing Staff and Auditing Department Manager
+                auditing_users = User.query.filter(
+                    db.and_(
+                        User.department == 'Auditing',
+                        User.role.in_(['Auditing Staff', 'Department Manager'])
+                    )
+                ).all()
+                for auditing_user in auditing_users:
+                    create_notification(
+                        user_id=auditing_user.user_id,
+                        title="Recurring Payment Approved",
+                        message=f"Recurring payment request #{request_id} from {req.department} department has been approved by Finance. Payment schedule will be managed.",
+                        notification_type="recurring_approved",
+                        request_id=request_id
+                    )
+                
                 # Check if all installments are now paid and mark as completed if so
                 check_recurring_payment_completion(request_id)
                 
@@ -4313,6 +4518,22 @@ def approve_request(request_id):
                     request_id=request_id
                 )
                 
+                # Notify Auditing Staff and Auditing Department Manager
+                auditing_users = User.query.filter(
+                    db.and_(
+                        User.department == 'Auditing',
+                        User.role.in_(['Auditing Staff', 'Department Manager'])
+                    )
+                ).all()
+                for auditing_user in auditing_users:
+                    create_notification(
+                        user_id=auditing_user.user_id,
+                        title="Request Completed",
+                        message=f"Payment request #{request_id} from {req.department} department has been completed.",
+                        notification_type="request_completed",
+                        request_id=request_id
+                    )
+                
                 # Emit real-time update
                 socketio.emit('request_updated', {
                     'request_id': request_id,
@@ -4331,6 +4552,17 @@ def approve_request(request_id):
         receipt_files = request.files.getlist('receipt_files')
         if not receipt_files or not any(f.filename for f in receipt_files):
             flash('Receipt upload is required to mark as paid.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        # Require reference number when marking as paid
+        reference_number = request.form.get('reference_number', '').strip()
+        if not reference_number:
+            flash('Reference number is required when marking as paid.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        # Validate reference number is alphanumeric
+        if not re.match(r'^[A-Za-z0-9]+$', reference_number):
+            flash('Reference number must contain only letters and numbers.', 'error')
             return redirect(url_for('view_request', request_id=request_id))
         
         # Handle multiple receipt uploads
@@ -4370,6 +4602,9 @@ def approve_request(request_id):
         import json
         finance_receipt_path = json.dumps(uploaded_files)
         req.finance_admin_receipt_path = finance_receipt_path
+        
+        # Save reference number
+        req.reference_number = reference_number
         
         req.status = 'Completed'
         req.approval_date = datetime.utcnow().date()  # Set approval_date when status becomes Completed
@@ -4483,6 +4718,22 @@ def approve_request(request_id):
                 notification_type="proof_approved",
                 request_id=request_id
             )
+            
+            # Notify Auditing Staff and Auditing Department Manager
+            auditing_users = User.query.filter(
+                db.and_(
+                    User.department == 'Auditing',
+                    User.role.in_(['Auditing Staff', 'Department Manager'])
+                )
+            ).all()
+            for auditing_user in auditing_users:
+                create_notification(
+                    user_id=auditing_user.user_id,
+                    title="Request Completed",
+                    message=f"Payment request #{request_id} from {req.department} department has been completed (proof approved).",
+                    notification_type="request_completed",
+                    request_id=request_id
+                )
             
             # Emit real-time update
             socketio.emit('request_updated', {
@@ -4759,6 +5010,22 @@ def close_request(request_id):
         notification_type="request_completed",
         request_id=request_id
     )
+    
+    # Notify Auditing Staff and Auditing Department Manager
+    auditing_users = User.query.filter(
+        db.and_(
+            User.department == 'Auditing',
+            User.role.in_(['Auditing Staff', 'Department Manager'])
+        )
+    ).all()
+    for auditing_user in auditing_users:
+        create_notification(
+            user_id=auditing_user.user_id,
+            title="Request Completed",
+            message=f"Payment request #{request_id} from {req.department} department has been completed and closed.",
+            notification_type="request_completed",
+            request_id=request_id
+        )
     
     # Emit real-time update
     socketio.emit('request_updated', {

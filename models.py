@@ -168,6 +168,7 @@ class PaymentRequest(db.Model):
     finance_rejection_date = db.Column(db.Date)  # Date when finance rejected
     completion_date = db.Column(db.Date)  # Date when request was completed
     additional_files = db.Column(db.Text)  # JSON string containing additional file paths uploaded by Finance Admin
+    reference_number = db.Column(db.String(100))  # Reference number provided by Finance Admin when approving (alphanumeric)
     
     # Timing fields for approval process
     manager_approval_start_time = db.Column(db.DateTime)  # When manager approval process starts

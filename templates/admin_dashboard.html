@@ -569,12 +569,27 @@
                  data-help-text="Required for approval (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
             </div>
             
+            <!-- Receipt Reference Number Field (moved after upload) -->
+            <div class="form-group">
+                <label for="admin_reference_number">Receipt Reference Number <span style="color: red;">*</span></label>
+                <input type="text" name="reference_number" id="admin_reference_number" class="form-control" 
+                       placeholder="Enter receipt reference number (letters and numbers)" 
+                       pattern="[A-Za-z0-9]+" 
+                       title="Receipt reference number must contain only letters and numbers"
+                       required>
+                <small class="form-text text-muted">
+                    Required field. Enter the receipt reference number (alphanumeric only).
+                </small>
+            </div>
+            
             <div class="form-group checkbox-group">
                 <label>
                     <input type="checkbox" name="proof_of_payment" id="proof_of_payment">
                     <span>Proof of Payment Received</span>
                 </label>
             </div>
+            
+            <input type="hidden" name="approval_status" value="approve">
             
             <div class="form-actions">
                 <button type="submit" class="btn btn-success">

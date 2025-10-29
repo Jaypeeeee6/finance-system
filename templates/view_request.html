@@ -1385,6 +1385,13 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         </div>
                         {% endif %}
                         
+                        {% if request.reference_number %}
+                        <div class="form-group">
+                            <label><i class="fas fa-hashtag"></i> Receipt Reference Number</label>
+                            <input type="text" value="{{ request.reference_number }}" readonly style="background: #f5f5f5; font-weight: bold; font-size: 1.1rem;">
+                        </div>
+                        {% endif %}
+                        
                         {% if request.proof_required %}
                         <div class="form-group">
                             <label>Proof Required</label>
@@ -1553,6 +1560,19 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                      data-required="true"
                                      data-label="Upload Receipt"
                                      data-help-text="Required for Finance Admin approval (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
+                                </div>
+                                
+                                <!-- Receipt Reference Number Field (moved after upload) -->
+                                <div class="form-group">
+                                    <label for="reference_number">Receipt Reference Number <span style="color: red;">*</span></label>
+                                    <input type="text" name="reference_number" id="reference_number" class="form-control" 
+                                           placeholder="Enter receipt reference number (letters and numbers)" 
+                                           pattern="[A-Za-z0-9]+" 
+                                           title="Receipt reference number must contain only letters and numbers"
+                                           required>
+                                    <small class="form-text text-muted">
+                                        Required field. Enter the receipt reference number (alphanumeric only).
+                                    </small>
                                 </div>
                                 
                                 <div class="form-group checkbox-group">
