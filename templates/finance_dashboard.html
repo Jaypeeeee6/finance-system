@@ -26,7 +26,7 @@
 
     <!-- Tab Navigation -->
     <div class="tab-navigation">
-        <button class="tab-button {% if active_tab == 'pending' %}active{% endif %}" onclick="switchTab('pending')" id="tab-pending">
+        <button class="tab-button {% if active_tab == 'all' %}active{% endif %}" onclick="switchTab('all')" id="tab-all">
             <i class="fas fa-list"></i> All Requests
         </button>
         <button class="tab-button {% if active_tab == 'my_requests' %}active{% endif %}" onclick="switchTab('my_requests')" id="tab-my_requests">
@@ -70,13 +70,22 @@
                         <option value="Office" {% if department_filter == 'Office' %}selected{% endif %}>Office</option>
                         <option value="Maintenance" {% if department_filter == 'Maintenance' %}selected{% endif %}>Maintenance</option>
                     </select>
+                    {% if active_tab == 'all' %}
+                    <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
+                        <option value="">All Statuses</option>
+                        <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
+                        <option value="Pending Finance Approval" {% if status_filter == 'Pending Finance Approval' %}selected{% endif %}>Pending Finance Approval</option>
+                        <option value="Proof Pending" {% if status_filter == 'Proof Pending' %}selected{% endif %}>Proof Pending</option>
+                        <option value="Proof Sent" {% if status_filter == 'Proof Sent' %}selected{% endif %}>Proof Sent</option>
+                        <option value="Proof Rejected" {% if status_filter == 'Proof Rejected' %}selected{% endif %}>Proof Rejected</option>
+                    </select>
+                    {% endif %}
                     <select id="urgentFilter" onchange="filterTable()" class="form-select">
                         <option value="">All Requests</option>
                         <option value="urgent" {% if urgent_filter == 'urgent' %}selected{% endif %}>🔴 Urgent Only</option>
                         <option value="not_urgent" {% if urgent_filter == 'not_urgent' %}selected{% endif %}>⚪ Not Urgent</option>
                     </select>
                 </div>
-                <h2><i class="fas fa-list"></i> Payment Requests</h2>
             </div>
             <div class="card-header-actions">
                 {% if status_filter or department_filter or search_query %}
@@ -99,7 +108,7 @@
         <div class="card-body">
             <h4 class="card-title mb-4">Payment Requests</h4>
             <!-- All Requests Tab -->
-            <div id="tab-content-pending" class="tab-content {% if active_tab == 'pending' %}active{% endif %}">
+            <div id="tab-content-all" class="tab-content {% if active_tab == 'all' %}active{% endif %}">
                 {% if requests %}
                     <div class="table-responsive">
                         <table class="data-table">
@@ -592,6 +601,20 @@ function changeItemsPerPage(perPage) {
     window.location.href = url.toString();
 }
 
+function applyStatusFilter() {
+    const statusFilter = document.getElementById('statusFilter');
+    const statusValue = statusFilter.value;
+    
+    const url = new URL(window.location);
+    if (statusValue) {
+        url.searchParams.set('status', statusValue);
+    } else {
+        url.searchParams.delete('status');
+    }
+    url.searchParams.set('page', '1'); // Reset to page 1 when filtering
+    window.location.href = url.toString();
+}
+
 function filterByUrgent(urgent) {
     // Redirect to dashboard with urgent filter
     const url = new URL(window.location);
@@ -681,7 +704,7 @@ function startLiveUpdates() {
         if (document.visibilityState === 'visible') {
             // Preserve current tab and search parameters
             const currentUrl = new URL(window.location);
-            const currentTab = currentUrl.searchParams.get('tab') || 'pending';
+            const currentTab = currentUrl.searchParams.get('tab') || 'all';
             const currentPage = currentUrl.searchParams.get('page') || '1';
             const currentSearch = currentUrl.searchParams.get('search') || '';
             const currentDepartment = currentUrl.searchParams.get('department') || '';

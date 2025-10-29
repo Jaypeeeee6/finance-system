@@ -16,7 +16,7 @@
     </div>
 
     <div class="dashboard-tabs">
-        <button class="tab-btn {% if active_tab == 'pending' or active_tab == 'completed' or active_tab == 'rejected' or active_tab == 'recurring' %}active{% endif %}" onclick="showTab('requests')">
+        <button class="tab-btn {% if active_tab == 'all' or active_tab == 'completed' or active_tab == 'rejected' or active_tab == 'recurring' %}active{% endif %}" onclick="showTab('requests')">
             <i class="fas fa-file-invoice"></i> Requests
         </button>
         <button class="tab-btn {% if active_tab == 'users' %}active{% endif %}" onclick="showTab('users')">
@@ -36,10 +36,10 @@
     <!-- Tab Content Container -->
     <div class="tab-content-container">
         <!-- Requests Tab -->
-        <div id="requests-tab" class="tab-content {% if active_tab == 'pending' or active_tab == 'completed' or active_tab == 'rejected' or active_tab == 'recurring' %}active{% endif %}">
+        <div id="requests-tab" class="tab-content {% if active_tab == 'all' or active_tab == 'completed' or active_tab == 'rejected' or active_tab == 'recurring' %}active{% endif %}">
         <!-- Tab Navigation -->
         <div class="tab-navigation">
-            <button class="tab-button {% if active_tab == 'pending' %}active{% endif %}" onclick="switchTab('pending')" id="tab-pending">
+            <button class="tab-button {% if active_tab == 'all' %}active{% endif %}" onclick="switchTab('all')" id="tab-all">
                 <i class="fas fa-list"></i> All Requests
             </button>
             <button class="tab-button {% if active_tab == 'completed' %}active{% endif %}" onclick="switchTab('completed')" id="tab-completed">
@@ -79,13 +79,22 @@
                             <option value="Office" {% if department_filter == 'Office' %}selected{% endif %}>Office</option>
                             <option value="Maintenance" {% if department_filter == 'Maintenance' %}selected{% endif %}>Maintenance</option>
                         </select>
+                        {% if active_tab == 'all' %}
+                        <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
+                            <option value="">All Statuses</option>
+                            <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
+                            <option value="Pending Finance Approval" {% if status_filter == 'Pending Finance Approval' %}selected{% endif %}>Pending Finance Approval</option>
+                            <option value="Proof Pending" {% if status_filter == 'Proof Pending' %}selected{% endif %}>Proof Pending</option>
+                            <option value="Proof Sent" {% if status_filter == 'Proof Sent' %}selected{% endif %}>Proof Sent</option>
+                            <option value="Proof Rejected" {% if status_filter == 'Proof Rejected' %}selected{% endif %}>Proof Rejected</option>
+                        </select>
+                        {% endif %}
                         <select id="urgentFilter" onchange="filterTable()" class="form-select">
                             <option value="">All Requests</option>
                             <option value="urgent" {% if urgent_filter == 'urgent' %}selected{% endif %}>🔴 Urgent Only</option>
                             <option value="not_urgent" {% if urgent_filter == 'not_urgent' %}selected{% endif %}>⚪ Not Urgent</option>
                         </select>
                     </div>
-                    <h2><i class="fas fa-tasks"></i> Payment Requests</h2>
                 </div>
                 <div class="card-header-actions">
                     {% if status_filter or department_filter or urgent_filter or search_query %}
@@ -109,7 +118,7 @@
             <div class="card-body">
                 <h4 class="card-title mb-4">Payment Requests</h4>
             <!-- All Requests Tab -->
-            <div id="tab-content-pending" class="tab-content {% if active_tab == 'pending' %}active{% endif %}">
+            <div id="tab-content-all" class="tab-content {% if active_tab == 'all' %}active{% endif %}">
                 <!-- Bulk Actions -->
                 <div id="bulkActions" class="bulk-actions" style="display: none; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px;">
                     <div style="display: flex; align-items: center; gap: 15px;">
@@ -1008,14 +1017,30 @@
 
 {% block extra_js %}
 <script>
+function applyStatusFilter() {
+    const statusFilter = document.getElementById('statusFilter');
+    const statusValue = statusFilter.value;
+    
+    const url = new URL(window.location);
+    if (statusValue) {
+        url.searchParams.set('status', statusValue);
+    } else {
+        url.searchParams.delete('status');
+    }
+    url.searchParams.set('page', '1'); // Reset to page 1 when filtering
+    window.location.href = url.toString();
+}
+
 function filterTable() {
     const searchInput = document.getElementById('tabSearchInput');
     const departmentFilter = document.getElementById('departmentFilter');
     const urgentFilter = document.getElementById('urgentFilter');
+    const statusFilter = document.getElementById('statusFilter');
     
     const searchFilter = searchInput.value.toLowerCase();
     const departmentValue = departmentFilter.value;
     const urgentValue = urgentFilter.value;
+    const statusValue = statusFilter ? statusFilter.value : '';
     
     // Target only the requests table in the requests tab
     const requestsTab = document.getElementById('requests-tab');

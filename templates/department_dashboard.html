@@ -20,7 +20,7 @@
 
     <!-- Tab Navigation -->
     <div class="tab-navigation">
-        <button class="tab-button {% if active_tab == 'pending' %}active{% endif %}" onclick="switchTab('pending')" id="tab-pending">
+        <button class="tab-button {% if active_tab == 'all' %}active{% endif %}" onclick="switchTab('all')" id="tab-all">
             <i class="fas fa-list"></i> All Requests
         </button>
         <button class="tab-button {% if active_tab == 'completed' %}active{% endif %}" onclick="switchTab('completed')" id="tab-completed">
@@ -44,13 +44,22 @@
         <div class="card-header">
             <div class="header-top">
                 <div class="filter-controls">
+                    {% if active_tab == 'all' %}
+                    <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
+                        <option value="">All Statuses</option>
+                        <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
+                        <option value="Pending Finance Approval" {% if status_filter == 'Pending Finance Approval' %}selected{% endif %}>Pending Finance Approval</option>
+                        <option value="Proof Pending" {% if status_filter == 'Proof Pending' %}selected{% endif %}>Proof Pending</option>
+                        <option value="Proof Sent" {% if status_filter == 'Proof Sent' %}selected{% endif %}>Proof Sent</option>
+                        <option value="Proof Rejected" {% if status_filter == 'Proof Rejected' %}selected{% endif %}>Proof Rejected</option>
+                    </select>
+                    {% endif %}
                     <select id="urgentFilter" onchange="filterTable()" class="form-select">
                         <option value="">All Requests</option>
                         <option value="urgent" {% if urgent_filter == 'urgent' %}selected{% endif %}>🔴 Urgent Only</option>
                         <option value="not_urgent" {% if urgent_filter == 'not_urgent' %}selected{% endif %}>⚪ Not Urgent</option>
                     </select>
                 </div>
-                <h2><i class="fas fa-tasks"></i> Payment Requests</h2>
             </div>
             <div class="card-header-actions">
                 {% if search_query or urgent_filter %}
@@ -72,7 +81,7 @@
         <div class="card-body">
             <h4 class="card-title mb-4">Payment Requests</h4>
             <!-- All Requests Tab -->
-            <div id="tab-content-pending" class="tab-content {% if active_tab == 'pending' %}active{% endif %}">
+            <div id="tab-content-all" class="tab-content {% if active_tab == 'all' %}active{% endif %}">
                 {% if requests %}
                 <div class="table-responsive">
                     <table class="data-table">
@@ -424,12 +433,28 @@ function changeItemsPerPage(perPage) {
 }
 
 
+function applyStatusFilter() {
+    const statusFilter = document.getElementById('statusFilter');
+    const statusValue = statusFilter.value;
+    
+    const url = new URL(window.location);
+    if (statusValue) {
+        url.searchParams.set('status', statusValue);
+    } else {
+        url.searchParams.delete('status');
+    }
+    url.searchParams.set('page', '1'); // Reset to page 1 when filtering
+    window.location.href = url.toString();
+}
+
 function filterTable() {
     const searchInput = document.getElementById('tabSearchInput');
     const urgentFilter = document.getElementById('urgentFilter');
+    const statusFilter = document.getElementById('statusFilter');
     
     const searchFilter = searchInput.value.toLowerCase();
     const urgentValue = urgentFilter.value;
+    const statusValue = statusFilter ? statusFilter.value : '';
     
     const table = document.querySelector('.data-table');
     const rows = table.getElementsByTagName('tr');
@@ -476,34 +501,15 @@ function clearSearch() {
 }
 
 function switchTab(tabName) {
-    // Hide all tab contents
-    const tabContents = document.querySelectorAll('.tab-content');
-    tabContents.forEach(content => {
-        content.classList.remove('active');
-    });
-    
-    // Remove active class from all tab buttons
-    const tabButtons = document.querySelectorAll('.tab-button');
-    tabButtons.forEach(button => {
-        button.classList.remove('active');
-    });
-    
-    // Show selected tab content
-    const selectedContent = document.getElementById('tab-content-' + tabName);
-    if (selectedContent) {
-        selectedContent.classList.add('active');
-    }
-    
-    // Add active class to selected tab button
-    const selectedButton = document.getElementById('tab-' + tabName);
-    if (selectedButton) {
-        selectedButton.classList.add('active');
-    }
-    
-    // Update URL with tab parameter
+    // Redirect to the same page with the tab parameter so server sets active_tab
     const url = new URL(window.location);
     url.searchParams.set('tab', tabName);
-    window.history.pushState({}, '', url);
+    // Clear status filter when switching tabs (status filter is only for All Requests)
+    if (tabName !== 'all') {
+        url.searchParams.delete('status');
+    }
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
 }
 
 // Initialize tab search functionality when page loads

@@ -326,8 +326,8 @@ document.addEventListener('DOMContentLoaded', function() {
 function handleNewNotification(data) {
     console.log('🔔 DEBUG: handleNewNotification called with:', data);
     
-    // Show notification popup
-    showNotificationPopup(data);
+    // Play notification sound for notification bell
+    playNotificationSound();
     
     // Update notification count
     updateNotificationCount();
@@ -347,27 +347,57 @@ function handleNewNotification(data) {
 }
 
 /**
- * Show notification popup
+ * Play notification sound when new notification arrives
+ * Uses Web Audio API to generate a simple bell notification sound
  */
-function showNotificationPopup(data) {
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = 'realtime-notification show';
-    notification.innerHTML = `
-        <i class="fas fa-bell"></i>
-        <div>
-            <strong>${data.title}</strong>
-            <p>${data.message}</p>
-        </div>
-    `;
-    
-    // Add to page
-    document.body.appendChild(notification);
-    
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-        notification.remove();
-    }, 5000);
+function playNotificationSound() {
+    try {
+        // Check if user wants sounds (could be extended with user preference)
+        // For now, always play sound
+        
+        // Use Web Audio API to generate a pleasant notification sound
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Create a simple two-tone bell sound
+        const oscillator1 = audioContext.createOscillator();
+        const oscillator2 = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        // Connect oscillators to gain node
+        oscillator1.connect(gainNode);
+        oscillator2.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        // Configure first tone (higher frequency)
+        oscillator1.type = 'sine';
+        oscillator1.frequency.value = 800; // 800 Hz
+        
+        // Configure second tone (lower frequency)
+        oscillator2.type = 'sine';
+        oscillator2.frequency.value = 600; // 600 Hz
+        
+        // Configure gain envelope (fade out)
+        const now = audioContext.currentTime;
+        gainNode.gain.setValueAtTime(0.3, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+        
+        // Play the sound
+        oscillator1.start(now);
+        oscillator2.start(now);
+        oscillator1.stop(now + 0.3);
+        oscillator2.stop(now + 0.3);
+    } catch (error) {
+        console.log('Error playing notification sound:', error);
+        // Fallback: try simple beep
+        try {
+            const audio = new Audio();
+            audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPRgjMGHm7A7+OZUxEKUaTi8LhnIAUxgc/y1IM1Bh9uve/jmFMRClGj4O+4ZSAGMYHP8tSCNQYebsDv45lTEQpRo+PwuGcgBjGBz/LUgzUGH27A7+OZUxEKUaPg77hlIAYxgc/y1II1Bh5uwO/jmVM';
+            audio.volume = 0.3;
+            audio.play().catch(err => console.log('Fallback audio play failed:', err));
+        } catch (fallbackError) {
+            console.log('All audio methods failed:', fallbackError);
+        }
+    }
 }
 
 /**

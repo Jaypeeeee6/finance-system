@@ -436,34 +436,30 @@ def notify_users_by_role(request, notification_type, title, message, request_id=
     elif notification_type == 'new_submission':
         print(f"DEBUG: Processing new_submission for role: {requestor_role}")
         
-        # General Manager - only from Department Manager submissions
-        if requestor_role == 'Department Manager':
-            gm_users = User.query.filter_by(role='GM').all()
-            for user in gm_users:
-                create_notification(user.user_id, title, message, notification_type, request_id)
+        # General Manager - receives notifications from ALL requests (regardless of role/department)
+        gm_users = User.query.filter_by(role='GM').all()
+        for user in gm_users:
+            create_notification(user.user_id, title, message, notification_type, request_id)
         
-        # Operation Manager - only from Operation Staff submissions
-        elif requestor_role == 'Operation Staff':
-            op_manager_users = User.query.filter_by(role='Operation Manager').all()
-            for user in op_manager_users:
-                create_notification(user.user_id, title, message, notification_type, request_id)
+        # Operation Manager - receives notifications from ALL requests (regardless of role/department)
+        op_manager_users = User.query.filter_by(role='Operation Manager').all()
+        for user in op_manager_users:
+            create_notification(user.user_id, title, message, notification_type, request_id)
         
         # IT Department Manager - only from IT Staff submissions
-        elif requestor_role == 'IT Staff':
+        if requestor_role == 'IT Staff':
             it_manager_users = User.query.filter_by(role='Department Manager', department='IT').all()
             for user in it_manager_users:
                 create_notification(user.user_id, title, message, notification_type, request_id)
         
         # Department Managers (Non-IT) - only from their own department staff
-        elif (requestor_role.endswith(' Staff') or requestor_role == 'Project Staff' or requestor_role in ['Finance Staff', 'HR Staff', 'Operation Staff', 'IT Staff']):
+        if (requestor_role.endswith(' Staff') or requestor_role == 'Project Staff' or requestor_role in ['Finance Staff', 'HR Staff', 'Operation Staff', 'IT Staff']):
             print(f"DEBUG: Notifying Department Managers for {requestor_role} from {requestor_department}")
             dept_managers = User.query.filter_by(role='Department Manager', department=requestor_department).all()
             print(f"DEBUG: Found {len(dept_managers)} Department Managers for department {requestor_department}")
             for user in dept_managers:
                 print(f"DEBUG: Notifying Department Manager {user.username} ({user.role}) from {user.department}")
                 create_notification(user.user_id, title, message, notification_type, request_id)
-        else:
-            print(f"DEBUG: No notification rule matched for role: {requestor_role}")
     
     # Requestor - for updates on their own requests
     elif notification_type in ['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed']:
@@ -1106,12 +1102,12 @@ def get_notifications_for_user(user):
             ).order_by(Notification.created_at.desc()).limit(5).all()
     
     elif user.role == 'GM':
-        # GM: New submissions from Department Manager only + updates on their own requests + system-wide + temporary manager assignments
+        # GM: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide + temporary manager assignments
         return Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
-                    db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('Department Manager')),
+                    Notification.notification_type == 'new_submission',
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
@@ -1120,12 +1116,12 @@ def get_notifications_for_user(user):
         ).order_by(Notification.created_at.desc()).limit(5).all()
     
     elif user.role == 'Operation Manager':
-        # Operation Manager: New submissions from Operation Staff only + updates on their own requests + system-wide
+        # Operation Manager: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide
         return Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
-                    db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('Operation Staff')),
+                    Notification.notification_type == 'new_submission',
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
@@ -1247,13 +1243,13 @@ def get_unread_count_for_user(user):
             ).count()
     
     elif user.role == 'GM':
-        # GM: New submissions from Department Manager only + updates on their own requests + system-wide
+        # GM: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide
         return Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
                 db.or_(
-                    db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('Department Manager')),
+                    Notification.notification_type == 'new_submission',
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
@@ -1262,13 +1258,13 @@ def get_unread_count_for_user(user):
         ).count()
     
     elif user.role == 'Operation Manager':
-        # Operation Manager: New submissions from Operation Staff only + updates on their own requests + system-wide
+        # Operation Manager: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide
         return Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
                 db.or_(
-                    db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('Operation Staff')),
+                    Notification.notification_type == 'new_submission',
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
@@ -1819,7 +1815,8 @@ def department_dashboard():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     search_query = request.args.get('search', None)
-    tab = request.args.get('tab', 'pending')
+    status_filter = request.args.get('status', None)
+    tab = request.args.get('tab', 'all')
     urgent_filter = request.args.get('urgent', None)
     
     # Validate per_page to prevent abuse
@@ -1845,32 +1842,22 @@ def department_dashboard():
         # For regular users, show their own requests
         base_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
     
-    # Apply tab-based filtering
-    if tab == 'completed':
-        query = base_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
-    elif tab == 'rejected':
-        query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
-    elif tab == 'recurring':
-        query = base_query.filter(PaymentRequest.status == 'Recurring')
-    else:  # pending tab (default) - show ALL requests (no filtering)
-        query = base_query
-    
-    # Apply urgent filter if provided
+    # Apply urgent filter if provided (before tab filtering)
     if urgent_filter == 'urgent':
-        query = query.filter(PaymentRequest.urgent == True)
+        base_query = base_query.filter(PaymentRequest.is_urgent == True)
     elif urgent_filter == 'not_urgent':
-        query = query.filter(PaymentRequest.urgent == False)
+        base_query = base_query.filter(PaymentRequest.is_urgent == False)
     
-    # Apply search filter if provided
+    # Apply search filter if provided (before tab filtering)
     if search_query:
         try:
             # Try to convert to integer for exact match
             search_id = int(search_query)
-            query = query.filter(PaymentRequest.request_id == search_id)
+            base_query = base_query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
             # If not a number, search by requestor name or other text fields
             search_term = f'%{search_query}%'
-            query = query.filter(
+            base_query = base_query.filter(
                 db.or_(
                     PaymentRequest.requestor_name.ilike(search_term),
                     PaymentRequest.purpose.ilike(search_term),
@@ -1878,20 +1865,37 @@ def department_dashboard():
                 )
             )
     
+    # Apply tab-based filtering
+    if tab == 'completed':
+        query = base_query.filter(PaymentRequest.status == 'Completed')
+    elif tab == 'rejected':
+        query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
+    elif tab == 'recurring':
+        query = base_query.filter(PaymentRequest.status == 'Recurring')
+    elif tab == 'all':
+        # 'all' tab - show ALL requests, but apply status filter if provided
+        query = base_query
+        if status_filter:
+            query = query.filter(PaymentRequest.status == status_filter)
+    else:  # default - show ALL requests
+        query = base_query
+        if status_filter:
+            query = query.filter(PaymentRequest.status == status_filter)
+    
     # Get separate queries for each tab content
-    completed_query = base_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
+    completed_query = base_query.filter(PaymentRequest.status == 'Completed')
     rejected_query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     recurring_query = base_query.filter(PaymentRequest.status == 'Recurring')
     
     # Apply urgent filter to separate queries
     if urgent_filter == 'urgent':
-        completed_query = completed_query.filter(PaymentRequest.urgent == True)
-        rejected_query = rejected_query.filter(PaymentRequest.urgent == True)
-        recurring_query = recurring_query.filter(PaymentRequest.urgent == True)
+        completed_query = completed_query.filter(PaymentRequest.is_urgent == True)
+        rejected_query = rejected_query.filter(PaymentRequest.is_urgent == True)
+        recurring_query = recurring_query.filter(PaymentRequest.is_urgent == True)
     elif urgent_filter == 'not_urgent':
-        completed_query = completed_query.filter(PaymentRequest.urgent == False)
-        rejected_query = rejected_query.filter(PaymentRequest.urgent == False)
-        recurring_query = recurring_query.filter(PaymentRequest.urgent == False)
+        completed_query = completed_query.filter(PaymentRequest.is_urgent == False)
+        rejected_query = rejected_query.filter(PaymentRequest.is_urgent == False)
+        recurring_query = recurring_query.filter(PaymentRequest.is_urgent == False)
     
     # Apply search filter to separate queries
     if search_query:
@@ -1944,6 +1948,7 @@ def department_dashboard():
                          user=current_user,
                          notifications=notifications,
                          unread_count=unread_count,
+                         status_filter=status_filter,
                          search_query=search_query,
                          completed_requests=completed_requests,
                          rejected_requests=rejected_requests,
@@ -1966,61 +1971,72 @@ def admin_dashboard():
     department_filter = request.args.get('department', None)
     search_query = request.args.get('search', None)
     urgent_filter = request.args.get('urgent', None)
-    tab = request.args.get('tab', 'pending')  # New tab parameter
+    tab = request.args.get('tab', 'all')  # 'all' tab shows all requests
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
     
     # Build query with optional status, department, and search filters
-    # For "All Requests" tab (pending), show ALL requests regardless of status
-    # For other tabs, apply appropriate filtering
-    if tab == 'pending':
-        # "All Requests" tab - show ALL requests without status filtering
-        query = PaymentRequest.query
-    else:
-        # For other tabs, apply the normal finance status filtering
-        # Finance Admin can see finance-related statuses + Pending Manager Approval from Finance Staff, GM, and Operation Manager
-        finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
+    # Apply finance status filtering for all tabs (including "All Requests" tab)
+    # Finance Admin can see finance-related statuses + Pending Manager Approval from Finance department only (or their own requests)
+    finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
 
-        # For Abdalaziz, also include Pending Manager Approval requests from Finance Staff, GM, and Operation Manager
-        if current_user.name == 'Abdalaziz Al-Brashdi':
-            # Include finance statuses + Pending Manager Approval from specific roles
-            query = PaymentRequest.query.filter(
-                db.or_(
-                    PaymentRequest.status.in_(finance_statuses),
-                    db.and_(
-                        PaymentRequest.status == 'Pending Manager Approval',
-                        PaymentRequest.user.has(
-                            db.or_(
-                                User.role == 'Finance Staff',
-                                User.role == 'GM',
-                                User.role == 'Operation Manager'
-                            )
-                        )
-                    ),
-                    # Always include current user's own requests regardless of status
-                    PaymentRequest.user_id == current_user.user_id,
-                    # Also include requests where the current user is temporarily assigned as manager
-                    db.and_(
-                        PaymentRequest.status == 'Pending Manager Approval',
-                        PaymentRequest.temporary_manager_id == current_user.user_id
-                    )
+    # For Abdalaziz, also include Pending Manager Approval requests from Finance department OR his own requests
+    if current_user.name == 'Abdalaziz Al-Brashdi':
+        # Include finance statuses + Pending Manager Approval from Finance department OR his own requests
+        query = PaymentRequest.query.filter(
+            db.or_(
+                PaymentRequest.status.in_(finance_statuses),
+                # Pending Manager Approval from Finance department only
+                db.and_(
+                    PaymentRequest.status == 'Pending Manager Approval',
+                    PaymentRequest.department == 'Finance'
+                ),
+                # Always include current user's own requests regardless of status
+                PaymentRequest.user_id == current_user.user_id,
+                # Also include requests where the current user is temporarily assigned as manager
+                db.and_(
+                    PaymentRequest.status == 'Pending Manager Approval',
+                    PaymentRequest.temporary_manager_id == current_user.user_id
                 )
             )
-        else:
-            # Other Finance Admins only see finance-related statuses plus temporary assignments awaiting manager approval
-            query = PaymentRequest.query.filter(
-                db.or_(
-                    PaymentRequest.status.in_(finance_statuses),
-                    # Always include current user's own requests regardless of status
-                    PaymentRequest.user_id == current_user.user_id,
-                    db.and_(
-                        PaymentRequest.status == 'Pending Manager Approval',
-                        PaymentRequest.temporary_manager_id == current_user.user_id
-                    )
+        )
+    else:
+        # Other Finance Admins only see finance-related statuses plus temporary assignments awaiting manager approval
+        query = PaymentRequest.query.filter(
+            db.or_(
+                PaymentRequest.status.in_(finance_statuses),
+                # Always include current user's own requests regardless of status
+                PaymentRequest.user_id == current_user.user_id,
+                db.and_(
+                    PaymentRequest.status == 'Pending Manager Approval',
+                    PaymentRequest.temporary_manager_id == current_user.user_id
                 )
             )
+        )
+    
+    # Apply department filter (before tab filtering)
+    if department_filter:
+        query = query.filter(PaymentRequest.department == department_filter)
+    
+    # Apply search filter (before tab filtering)
+    if search_query:
+        # Search by request ID only
+        try:
+            # Try to convert to integer for exact match
+            search_id = int(search_query)
+            query = query.filter(PaymentRequest.request_id == search_id)
+        except ValueError:
+            # If not a number, no results (only search by request ID)
+            query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
+    
+    # Apply urgent filter (before tab filtering)
+    if urgent_filter:
+        if urgent_filter == 'urgent':
+            query = query.filter(PaymentRequest.is_urgent == True)
+        elif urgent_filter == 'not_urgent':
+            query = query.filter(PaymentRequest.is_urgent == False)
     
     # Apply tab-based filtering
     if tab == 'completed':
@@ -2035,27 +2051,10 @@ def admin_dashboard():
     elif tab == 'my_requests':
         # For 'my_requests' tab, show only the current user's requests
         query = query.filter(PaymentRequest.user_id == current_user.user_id)
-    
-    # Only apply status_filter for non-pending tabs (All Requests tab shows all statuses)
-    if status_filter and tab != 'pending':
-        query = query.filter(PaymentRequest.status == status_filter)
-    if department_filter:
-        query = query.filter(PaymentRequest.department == department_filter)
-    if search_query:
-        # Search by request ID only
-        try:
-            # Try to convert to integer for exact match
-            search_id = int(search_query)
-            query = query.filter(PaymentRequest.request_id == search_id)
-        except ValueError:
-            # If not a number, no results (only search by request ID)
-            query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
-    
-    if urgent_filter:
-        if urgent_filter == 'urgent':
-            query = query.filter(PaymentRequest.is_urgent == True)
-        elif urgent_filter == 'not_urgent':
-            query = query.filter(PaymentRequest.is_urgent == False)
+    elif tab == 'all':
+        # 'all' tab - apply status filter if provided (only on all tab)
+        if status_filter:
+            query = query.filter(PaymentRequest.status == status_filter)
     
     # Get paginated requests
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
@@ -2100,50 +2099,51 @@ def finance_dashboard():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     department_filter = request.args.get('department', None)
+    status_filter = request.args.get('status', None)
     search_query = request.args.get('search', None)
     urgent_filter = request.args.get('urgent', None)
-    tab = request.args.get('tab', 'pending')  # New tab parameter
+    tab = request.args.get('tab', 'all')  # 'all' tab shows all requests
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
     
     # Build query with optional department and search filters
-    # For "All Requests" tab (pending), show ALL requests regardless of status
-    # For other tabs, apply appropriate filtering
-    if tab == 'pending':
-        # "All Requests" tab - show ALL requests without status filtering
-        query = PaymentRequest.query
-    else:
-        # For other tabs, apply the normal finance status filtering
-        # Finance Staff can see finance-related statuses + their own requests with Pending Manager Approval + their own requests with Rejected by Manager
-        # Abdalaziz can see finance-related statuses + Pending Manager Approval + Rejected by Manager for Finance Staff, GM, and Operation Manager
-        finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
-        
-        # Base query for finance-related statuses
-        query = PaymentRequest.query.filter(PaymentRequest.status.in_(finance_statuses))
-        
-        # Add Finance Staff's own requests with Pending Manager Approval and Rejected by Manager
-        if current_user.role == 'Finance Staff':
-            own_pending_requests = PaymentRequest.query.filter(
-                db.and_(
-                    PaymentRequest.user_id == current_user.user_id,
-                    PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager'])
+    # Apply finance status filtering for all tabs (including "All Requests" tab)
+    # Finance Staff can see finance-related statuses + their own requests with Pending Manager Approval + their own requests with Rejected by Manager
+    # Abdalaziz can see finance-related statuses + Pending Manager Approval + Rejected by Manager for Finance department only (or his own requests)
+    finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
+    
+    # Base query for finance-related statuses
+    query = PaymentRequest.query.filter(PaymentRequest.status.in_(finance_statuses))
+    
+    # Add Finance Staff's own requests with Pending Manager Approval and Rejected by Manager
+    if current_user.role == 'Finance Staff':
+        own_pending_requests = PaymentRequest.query.filter(
+            db.and_(
+                PaymentRequest.user_id == current_user.user_id,
+                PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager'])
+            )
+        )
+        query = query.union(own_pending_requests)
+    
+    # Add Abdalaziz's special permissions: Finance department requests OR his own requests
+    elif current_user.name == 'Abdalaziz Al-Brashdi':
+        abdalaziz_special_requests = PaymentRequest.query.filter(
+            db.and_(
+                PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager']),
+                db.or_(
+                    PaymentRequest.department == 'Finance',
+                    PaymentRequest.user_id == current_user.user_id
                 )
             )
-            query = query.union(own_pending_requests)
-        
-        # Add Abdalaziz's special permissions for Finance Staff, GM, and Operation Manager requests
-        elif current_user.name == 'Abdalaziz Al-Brashdi':
-            abdalaziz_special_requests = PaymentRequest.query.filter(
-                db.and_(
-                    PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager']),
-                    PaymentRequest.user.has(User.role.in_(['Finance Staff', 'GM', 'Operation Manager']))
-                )
-            )
-            query = query.union(abdalaziz_special_requests)
+        )
+        query = query.union(abdalaziz_special_requests)
+    # Apply department filter (before tab filtering)
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
+    
+    # Apply search filter (before tab filtering)
     if search_query:
         # Search by request ID only
         try:
@@ -2154,6 +2154,7 @@ def finance_dashboard():
             # If not a number, no results (only search by request ID)
             query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
     
+    # Apply urgent filter (before tab filtering)
     if urgent_filter:
         if urgent_filter == 'urgent':
             query = query.filter(PaymentRequest.is_urgent == True)
@@ -2173,10 +2174,11 @@ def finance_dashboard():
     elif tab == 'my_requests':
         # For 'my_requests' tab, show only the current user's requests
         query = query.filter(PaymentRequest.user_id == current_user.user_id)
-    elif tab == 'pending':
-        # For 'pending' tab (now "All Requests"), show all requests that the user can see
-        # No additional filtering needed - show all requests based on the base query
-        pass
+    elif tab == 'all':
+        # 'all' tab - apply status filter if provided (only on all tab)
+        if status_filter:
+            query = query.filter(PaymentRequest.status == status_filter)
+        # Otherwise show all requests that the user can see
     
     # Get paginated requests
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
@@ -2217,9 +2219,10 @@ def gm_dashboard():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     department_filter = request.args.get('department', None)
+    status_filter = request.args.get('status', None)
     search_query = request.args.get('search', None)
     urgent_filter = request.args.get('urgent', None)
-    tab = request.args.get('tab', 'pending')  # New tab parameter
+    tab = request.args.get('tab', 'all')  # 'all' tab shows all requests
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -2252,9 +2255,11 @@ def gm_dashboard():
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     elif tab == 'recurring':
         query = query.filter(PaymentRequest.status == 'Recurring')
-    elif tab == 'pending':
-        # 'pending' tab (All Requests) shows all requests (no additional filtering)
-        pass
+    elif tab == 'all':
+        # 'all' tab (All Requests) shows all requests
+        # Apply status filter if provided (excludes Completed, Rejected, Recurring from dropdown)
+        if status_filter:
+            query = query.filter(PaymentRequest.status == status_filter)
     # Default case also shows all requests
     
     # Get paginated requests
@@ -2290,7 +2295,7 @@ def gm_dashboard():
         rejected_query = rejected_query.filter(PaymentRequest.department == department_filter)
         recurring_query = recurring_query.filter(PaymentRequest.department == department_filter)
     
-    completed_query = completed_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
+    completed_query = completed_query.filter(PaymentRequest.status == 'Completed')
     rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     recurring_query = recurring_query.filter(PaymentRequest.status == 'Recurring')
     
@@ -2306,6 +2311,7 @@ def gm_dashboard():
                          notifications=notifications,
                          unread_count=unread_count,
                          department_filter=department_filter,
+                         status_filter=status_filter,
                          search_query=search_query,
                          urgent_filter=urgent_filter,
                          completed_requests=completed_requests,
@@ -2322,10 +2328,11 @@ def it_dashboard():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     department_filter = request.args.get('department', None)
+    status_filter = request.args.get('status', None)
     search_query = request.args.get('search', None)
     urgent_filter = request.args.get('urgent', None)
     location_filter = request.args.get('location', None)
-    tab = request.args.get('tab', 'pending')  # New tab parameter
+    tab = request.args.get('tab', 'all')  # 'all' tab shows all requests
     
     # If department filter is provided, default to request-types tab
     if department_filter and not request.args.get('tab'):
@@ -2372,9 +2379,11 @@ def it_dashboard():
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     elif tab == 'recurring':
         query = query.filter(PaymentRequest.status == 'Recurring')
-    elif tab == 'pending':
-        # 'pending' tab (All Requests) shows all requests (no additional filtering)
-        pass
+    elif tab == 'all':
+        # 'all' tab (All Requests) shows all requests
+        # Apply status filter if provided (excludes Completed, Rejected, Recurring from dropdown)
+        if status_filter:
+            query = query.filter(PaymentRequest.status == status_filter)
     # Default case also shows all requests
     
     # Get paginated requests
@@ -2405,7 +2414,7 @@ def it_dashboard():
         rejected_query = rejected_query.filter(PaymentRequest.department == department_filter)
         recurring_query = recurring_query.filter(PaymentRequest.department == department_filter)
     
-    completed_query = completed_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
+    completed_query = completed_query.filter(PaymentRequest.status == 'Completed')
     rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     recurring_query = recurring_query.filter(PaymentRequest.status == 'Recurring')
     
@@ -2450,6 +2459,7 @@ def it_dashboard():
                          notifications=notifications,
                          unread_count=unread_count,
                          department_filter=department_filter,
+                         status_filter=status_filter,
                          search_query=search_query,
                          location_filter=location_filter,
                          urgent_filter=urgent_filter,
@@ -3011,7 +3021,7 @@ def project_dashboard():
     status_filter = request.args.get('status', None)
     search_query = request.args.get('search', None)
     urgent_filter = request.args.get('urgent', None)
-    tab = request.args.get('tab', 'pending')  # New tab parameter
+    tab = request.args.get('tab', 'all')  # 'all' tab shows all requests
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -3027,8 +3037,8 @@ def project_dashboard():
     else:
         # Fallback - should not happen due to role_required decorator
         query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
-    # Only apply status_filter for non-pending tabs (All Requests tab shows all statuses)
-    if status_filter and tab != 'pending':
+    # Only apply status_filter for non-all tabs (All Requests tab shows all statuses)
+    if status_filter and tab != 'all':
         query = query.filter(PaymentRequest.status == status_filter)
     if search_query:
         # Search by request ID only
@@ -3052,8 +3062,8 @@ def project_dashboard():
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     elif tab == 'recurring':
         query = query.filter(PaymentRequest.recurring == 'Recurring')
-    elif tab == 'pending':
-        # 'pending' tab (All Requests) shows all requests (no additional filtering)
+    elif tab == 'all':
+        # 'all' tab (All Requests) shows all requests (no additional filtering)
         pass
     # Default case also shows all requests
     
@@ -3083,7 +3093,7 @@ def project_dashboard():
         rejected_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
         recurring_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
     
-    completed_query = completed_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
+    completed_query = completed_query.filter(PaymentRequest.status == 'Completed')
     rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     recurring_query = recurring_query.filter(PaymentRequest.recurring == 'Recurring')
     
@@ -3120,7 +3130,7 @@ def operation_dashboard():
     department_filter = request.args.get('department', None)
     search_query = request.args.get('search', None)
     urgent_filter = request.args.get('urgent', None)
-    tab = request.args.get('tab', 'pending')  # New tab parameter
+    tab = request.args.get('tab', 'all')  # 'all' tab shows all requests
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -3153,21 +3163,19 @@ def operation_dashboard():
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     elif tab == 'recurring':
         query = query.filter(PaymentRequest.status == 'Recurring')
-    elif tab == 'pending':
-        # 'pending' tab (All Requests) shows all requests regardless of status
-        # Do NOT apply status_filter - show ALL requests
-        # If no status filter, prioritize showing requests that need manager approval
-        query = query.order_by(
-            db.case(
-                (PaymentRequest.status == 'Pending Manager Approval', 1),
-                else_=2
-            ),
-            PaymentRequest.created_at.desc()
-        )
-    else:
-        # Default case - apply status filter if provided for non-pending tabs
+    elif tab == 'all':
+        # 'all' tab - apply status filter if provided (only on all tab)
         if status_filter:
             query = query.filter(PaymentRequest.status == status_filter)
+        # If no status filter, prioritize showing requests that need manager approval
+        else:
+            query = query.order_by(
+                db.case(
+                    (PaymentRequest.status == 'Pending Manager Approval', 1),
+                    else_=2
+                ),
+                PaymentRequest.created_at.desc()
+            )
     
     # Get paginated requests
     requests_pagination = query.paginate(
@@ -3186,7 +3194,7 @@ def operation_dashboard():
         completed_query = completed_query.filter(PaymentRequest.department == department_filter)
         rejected_query = rejected_query.filter(PaymentRequest.department == department_filter)
     
-    completed_query = completed_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
+    completed_query = completed_query.filter(PaymentRequest.status == 'Completed')
     rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     
     completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
@@ -3524,7 +3532,7 @@ def new_request():
         
         # Create notifications based on request status and RBAC rules
         try:
-            if new_req.status == 'Approved':
+            if new_req.status == 'Completed':
                 # Finance department requests are auto-approved - notify Finance Admin
                 notify_users_by_role(
                     request=new_req,
@@ -3873,9 +3881,9 @@ def view_request(request_id):
                 # Finance users can only view requests in finance-related statuses
                 finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
                 
-                # For Abdalaziz, also allow viewing Pending Manager Approval and Rejected by Manager requests from Finance Staff, GM, and Operation Manager
+                # For Abdalaziz, also allow viewing Pending Manager Approval and Rejected by Manager requests from Finance department OR his own requests
                 if current_user.name == 'Abdalaziz Al-Brashdi' and req.status in ['Pending Manager Approval', 'Rejected by Manager']:
-                    if req.user.role in ['Finance Staff', 'GM', 'Operation Manager']:
+                    if req.department == 'Finance' or req.user_id == current_user.user_id:
                         pass  # Allow access
                     else:
                         flash('You do not have permission to view this request.', 'danger')
@@ -3990,7 +3998,7 @@ def view_request(request_id):
     # Get all proof files for this request grouped by batch
     proof_files = []
     proof_batches = []
-    if req.status in ['Proof Sent', 'Proof Rejected', 'Payment Pending', 'Paid', 'Completed', 'Recurring']:
+    if req.status in ['Proof Sent', 'Proof Rejected', 'Completed', 'Recurring']:
         import os
         import glob
         upload_folder = app.config['UPLOAD_FOLDER']
@@ -4099,7 +4107,7 @@ def view_request(request_id):
             legacy_receipts = json.loads(req.receipt_path)
             if isinstance(legacy_receipts, list):
                 # Check status to determine if it's from requestor or finance admin
-                finance_statuses = ['Proof Pending', 'Proof Sent', 'Recurring', 'Completed', 'Paid']
+                finance_statuses = ['Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed']
                 if req.approver and req.status in finance_statuses:
                     finance_admin_receipts = legacy_receipts
                 else:
@@ -4107,7 +4115,7 @@ def view_request(request_id):
         except (json.JSONDecodeError, TypeError):
             # Handle legacy single file format
             if isinstance(req.receipt_path, str):
-                finance_statuses = ['Proof Pending', 'Proof Sent', 'Recurring', 'Completed', 'Paid']
+                finance_statuses = ['Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed']
                 if req.approver and req.status in finance_statuses:
                     finance_admin_receipts = [req.receipt_path]
                 else:
@@ -4124,7 +4132,7 @@ def approve_request(request_id):
     req = PaymentRequest.query.get_or_404(request_id)
     
     # Check if request is in correct status for Finance approval
-    if req.status not in ['Pending', 'Pending Finance Approval', 'Payment Pending', 'Proof Sent']:
+    if req.status not in ['Pending Manager Approval', 'Pending Finance Approval', 'Proof Sent']:
         flash('This request is not ready for Finance approval.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
@@ -4363,18 +4371,18 @@ def approve_request(request_id):
         finance_receipt_path = json.dumps(uploaded_files)
         req.finance_admin_receipt_path = finance_receipt_path
         
-        req.status = 'Paid'
-        req.approval_date = datetime.utcnow().date()  # Set approval_date when status becomes Paid
+        req.status = 'Completed'
+        req.approval_date = datetime.utcnow().date()  # Set approval_date when status becomes Completed
         req.updated_at = datetime.utcnow()
         
         db.session.commit()
         
-        log_action(f"Finance admin marked payment request #{request_id} as paid")
+        log_action(f"Finance admin marked payment request #{request_id} as completed")
         
         # Emit real-time update to all users
         emit_request_update_to_all_rooms('request_updated', {
             'request_id': request_id,
-            'status': 'Paid',
+            'status': 'Completed',
             'paid': True
         })
         
@@ -4455,12 +4463,13 @@ def approve_request(request_id):
             
             flash(f'Recurring payment request #{request_id} has been approved. Payment schedule is now active.', 'success')
         else:
-            # For non-recurring payments, set status to Payment Pending
+            # For non-recurring payments, set status to Completed when proof is approved
             # Don't end finance approval timing here - it should continue until completed
-            # The timer should continue running through Payment Pending status
+            # The timer should continue running until status is Completed
             
-            req.status = 'Payment Pending'
+            req.status = 'Completed'
             req.updated_at = current_time
+            req.completion_date = datetime.utcnow().date()
             
             db.session.commit()
             
@@ -4470,7 +4479,7 @@ def approve_request(request_id):
             create_notification(
                 user_id=req.user_id,
                 title="Proof Approved",
-                message=f"Your proof for payment request #{request_id} has been approved. Status updated to Payment Pending.",
+                message=f"Your proof for payment request #{request_id} has been approved. Status updated to Completed.",
                 notification_type="proof_approved",
                 request_id=request_id
             )
@@ -4478,7 +4487,7 @@ def approve_request(request_id):
             # Emit real-time update
             socketio.emit('request_updated', {
                 'request_id': request_id,
-                'status': 'Payment Pending',
+                'status': 'Completed',
                 'proof_approved': True
             })
             
@@ -4576,7 +4585,7 @@ def upload_additional_files(request_id):
     req = PaymentRequest.query.get_or_404(request_id)
     
     # Check if request is in correct status for additional file upload
-    if req.status not in ['Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid', 'Completed', 'Recurring']:
+    if req.status not in ['Proof Pending', 'Proof Sent', 'Proof Rejected', 'Completed', 'Recurring']:
         flash('This request is not in a state that allows file uploads.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
@@ -4678,14 +4687,15 @@ def mark_as_paid(request_id):
     """Mark a payment pending request as paid"""
     req = PaymentRequest.query.get_or_404(request_id)
     
-    # Check if request is in correct status
-    if req.status != 'Payment Pending':
-        flash('This request is not in Payment Pending status.', 'error')
+    # Check if request is in correct status (Proof Sent means proof has been submitted and can be marked as paid/completed)
+    if req.status not in ['Proof Sent', 'Proof Pending']:
+        flash('This request is not in a valid status for marking as paid.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
-    # Mark as paid
-    req.status = 'Approved'
-    req.approval_date = datetime.utcnow().date()  # Set approval_date when status becomes Approved
+    # Mark as completed
+    req.status = 'Completed'
+    req.approval_date = datetime.utcnow().date()  # Set approval_date when status becomes Completed
+    req.completion_date = datetime.utcnow().date()
     req.updated_at = datetime.utcnow()
     
     db.session.commit()
@@ -4720,7 +4730,7 @@ def close_request(request_id):
     req = PaymentRequest.query.get_or_404(request_id)
     
     # Check if request is in correct status
-    if req.status not in ['Payment Pending', 'Proof Pending', 'Proof Sent', 'Paid']:
+    if req.status not in ['Proof Pending', 'Proof Sent', 'Proof Rejected']:
         flash('This request cannot be closed in its current status.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
@@ -4970,9 +4980,10 @@ def final_approve_request(request_id):
         flash('This request is not ready for final approval.', 'error')
         return redirect(url_for('admin_dashboard'))
     
-    # Final approval
-    req.status = 'Approved'
-    req.approval_date = datetime.utcnow().date()  # Set approval_date when status becomes Approved
+    # Final approval - set to Completed
+    req.status = 'Completed'
+    req.approval_date = datetime.utcnow().date()  # Set approval_date when status becomes Completed
+    req.completion_date = datetime.utcnow().date()
     req.updated_at = datetime.utcnow()
     
     db.session.commit()
@@ -4982,7 +4993,7 @@ def final_approve_request(request_id):
     # Emit real-time update
     socketio.emit('request_updated', {
         'request_id': request_id,
-        'status': 'Approved',
+        'status': 'Completed',
         'final_approval': True
     })
     

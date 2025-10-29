@@ -3,11 +3,13 @@
 This document describes who can view what, who can approve/reject, and how a payment request moves through the workflow. Keep this as the single reference for permissions and process.
 
 ### Statuses Used in the System
-- **Pending Manager Approval**: Newly submitted; waiting for the requestor’s department manager.
+- **Pending Manager Approval**: Newly submitted; waiting for the requestor's department manager.
 - **Pending Finance Approval**: Approved by department manager; waiting for Finance.
 - **Rejected by Manager**: Rejected by the department manager during initial review.
+- **Rejected by Finance**: Rejected by Finance during review.
 - **Proof Pending**: Approved by Finance and awaiting payment proof upload.
 - **Proof Sent**: Proof uploaded/sent; pending any final checks or reconciliation.
+- **Proof Rejected**: Proof was rejected by Finance; requestor must resubmit proof.
 - **Recurring**: Recurring payment schedule item.
 - **Completed**: Fully processed and finalized.
 
@@ -22,7 +24,7 @@ This document describes who can view what, who can approve/reject, and how a pay
    - If rejected → status becomes **Rejected by Finance**.
 4. Proof is provided (e.g., receipt/transfer slip):
    - Status progresses to **Proof Sent**, then to **Completed** after verification.
-   - If the submitted proof is rejected by Finance → status returns to **Proof Pending**. The requestor must re-submit proof; upon re-submission it moves to **Proof Sent** again. This loop repeats until Finance accepts the proof and advances the request to **Completed**.
+   - If the submitted proof is rejected by Finance → status becomes **Proof Rejected**. The requestor must re-submit proof; upon re-submission it moves to **Proof Sent** again, or back to **Proof Pending** if Finance requires a new proof submission. This loop repeats until Finance accepts the proof and advances the request to **Completed**.
 5. Recurring requests cycle as **Recurring** according to schedule; when all installments are marked as paid, the request status becomes **Completed**.
 
 ### Who Can Change Status
