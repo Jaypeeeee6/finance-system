@@ -6,6 +6,26 @@
 // Socket.IO connection
 let socket = null;
 
+// Track original title and unread count for tab badge
+let originalTitle = document.title;
+let unreadTotal = 0;
+function updateTabTitle() {
+    document.title = unreadTotal > 0 ? `(${unreadTotal}) ${originalTitle}` : originalTitle;
+}
+
+// Fetch unread count from server and sync tab title
+function syncTabTitleFromServer() {
+    fetch('/api/notifications/unread_count')
+        .then(response => response.json())
+        .then(data => {
+            unreadTotal = typeof data.count === 'number' ? data.count : 0;
+            updateTabTitle();
+        })
+        .catch(() => {
+            // Silently ignore errors syncing the tab title
+        });
+}
+
 /**
  * Initialize real-time WebSocket connection
  */
@@ -64,6 +84,8 @@ function initRealTimeUpdates() {
         handleNewRequest(data);
         // Update notification count when new request is created
         updateNotificationCount();
+        // Also sync tab title badge
+        syncTabTitleFromServer();
     });
     
     // Listen for request updates (approval/pending)
@@ -72,12 +94,16 @@ function initRealTimeUpdates() {
         handleRequestUpdate(data);
         // Update notification count when request is updated
         updateNotificationCount();
+        // Also sync tab title badge
+        syncTabTitleFromServer();
     });
     
     // Listen for new notifications
     socket.on('new_notification', function(data) {
         console.log('New notification received:', data);
         handleNewNotification(data);
+        // Ensure tab title reflects newest count
+        syncTabTitleFromServer();
     });
     
     // Listen for notification updates (triggers badge update)
@@ -85,6 +111,8 @@ function initRealTimeUpdates() {
         console.log('🔔 DEBUG: Notification update received:', data);
         // Force update notification count
         updateNotificationCount();
+        // Also sync tab title badge
+        syncTabTitleFromServer();
         
         // Also refresh dropdown if it's open
         if (typeof notificationDropdownOpen !== 'undefined' && notificationDropdownOpen) {
@@ -284,6 +312,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (window.updateNotificationBadge) {
         window.updateNotificationBadge();
     }
+    // Always sync tab title count on load
+    syncTabTitleFromServer();
     
     console.log('%c Real-Time WebSocket Active for ALL ROLES ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
     console.log('Instant updates - No refresh needed!');
@@ -380,6 +410,10 @@ function updateNotificationCount() {
                         badge.style.display = 'none';
                     }
                 }
+
+                // Update tab title badge using the latest count
+                unreadTotal = typeof data.count === 'number' ? data.count : 0;
+                updateTabTitle();
             })
             .catch(error => {
                 console.error('Error updating notification count:', error);
@@ -540,6 +574,13 @@ function handleNewNotification(data) {
 window.addEventListener('beforeunload', function() {
     if (socket) {
         socket.disconnect();
+    }
+});
+
+// Refresh count when tab gains focus
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+        syncTabTitleFromServer();
     }
 });
 
