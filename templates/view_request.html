@@ -406,36 +406,24 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 </div>
                 {% endif %}
 
-       <!-- Receipt Files Section -->
+       <!-- Requestor Receipt Files Section -->
        <div class="form-group">
-           <label>Receipt/Proof of Payment</label>
-           {% if request.receipt_path %}
-               {% set receipt_files = request.receipt_path|from_json if request.receipt_path else [] %}
-               {% if receipt_files is string or (receipt_files is not iterable) %}
-                   <!-- Handle legacy single file format -->
-                   <div style="margin-bottom: 10px;">
-                       <a href="{{ url_for('uploaded_file', filename=request.receipt_path) }}" target="_blank" class="btn btn-info">
-                           <i class="fas fa-download"></i> View Receipt
-                       </a>
-                   </div>
-               {% elif receipt_files|length > 0 %}
-                   <!-- Handle multiple files -->
-                   {% for receipt_file in receipt_files %}
-                   <div style="margin-bottom: 10px; padding: 8px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">
-                       <a href="{{ url_for('uploaded_file', filename=receipt_file) }}" target="_blank" class="btn btn-info">
-                           <i class="fas fa-download"></i> View Receipt {{ loop.index }}
-                       </a>
-                       <small style="color: #666; margin-left: 10px;">{{ receipt_file.split('_', 1)[1] if '_' in receipt_file else receipt_file }}</small>
-                   </div>
-                   {% endfor %}
-               {% else %}
-                   <!-- No files -->
-                   <p style="color: #666; font-style: italic;">No receipt files uploaded</p>
-               {% endif %}
+           <label><i class="fas fa-upload"></i> Receipt/Proof of Payment (Uploaded by Requestor)</label>
+           {% if requestor_receipts and requestor_receipts|length > 0 %}
+               {% for receipt_file in requestor_receipts %}
+               <div style="margin-bottom: 10px; padding: 8px; background: #e7f3ff; border-radius: 4px; border: 1px solid #b3d9ff;">
+                   <a href="{{ url_for('uploaded_file', filename=receipt_file) }}" target="_blank" class="btn btn-info">
+                       <i class="fas fa-download"></i> View Requestor Receipt {{ loop.index }}
+                   </a>
+                   <small style="color: #666; margin-left: 10px;">{{ receipt_file.split('_', 1)[1] if '_' in receipt_file else receipt_file }}</small>
+               </div>
+               {% endfor %}
            {% else %}
-               <p style="color: #666; font-style: italic;">No receipt files uploaded</p>
+               <p style="color: #666; font-style: italic;">No receipt files uploaded by requestor</p>
            {% endif %}
        </div>
+
+       <!-- Finance Admin Receipt Files Section moved to Finance Admin Approval tab -->
 
 
                 <!-- Payment Installments Display for Recurring Payments -->
@@ -877,6 +865,8 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
         <!-- Step 3: Finance Admin Approval -->
         <div class="step-content" id="step-finance">
             <h3><i class="fas fa-dollar-sign"></i> Finance Admin Approval</h3>
+            
+            <!-- Finance Admin Receipts were moved to the bottom of the tab -->
             
             <!-- Finance Admin Notes Section (at top when status is Pending Finance Approval) -->
             {% if request.status == 'Pending Finance Approval' %}
@@ -1448,6 +1438,24 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                             {% endfor %}
                         </div>
                         {% endif %}
+
+                        <!-- Finance Admin Receipts (visible for statuses: Proof Pending, Proof Sent, Recurring, etc.) -->
+                        <div class="form-group" style="margin-top: 15px;">
+                            <label><i class="fas fa-check-circle"></i> Receipt/Proof of Payment (Uploaded by Finance Admin)</label>
+                            {% if finance_admin_receipts and finance_admin_receipts|length > 0 %}
+                                {% for receipt_file in finance_admin_receipts %}
+                                <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                    <a href="{{ url_for('uploaded_file', filename=receipt_file) }}" target="_blank" class="btn btn-warning">
+                                        <i class="fas fa-download"></i> View Finance Receipt {{ loop.index }}
+                                    </a>
+                                    <small style="color: #666; margin-left: 10px;">{{ receipt_file.split('_', 1)[1] if '_' in receipt_file else receipt_file }}</small>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p style="color: #666; font-style: italic;">No receipt files uploaded by finance admin</p>
+                            {% endif %}
+                        </div>
+
                     </div>
                 </div>
             {% else %}
@@ -1458,6 +1466,8 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                             <h4>Finance Admin Approval</h4>
                         </div>
                         <div class="card-body">
+                            
+
                             <!-- Status Display -->
                             <div class="status-display" style="margin-bottom: 1.5rem;">
                                 <div style="font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 0.5rem;">Status</div>
@@ -1562,6 +1572,23 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                     </button>
                                 </div>
                             </form>
+
+                            <!-- Existing Finance Admin Receipts (moved to bottom of Finance Admin Approval form) -->
+                            <div class="form-group" style="margin-top: 20px;">
+                                <label><i class="fas fa-check-circle"></i> Receipt/Proof of Payment (Uploaded by Finance Admin)</label>
+                                {% if finance_admin_receipts and finance_admin_receipts|length > 0 %}
+                                    {% for receipt_file in finance_admin_receipts %}
+                                    <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                        <a href="{{ url_for('uploaded_file', filename=receipt_file) }}" target="_blank" class="btn btn-warning">
+                                            <i class="fas fa-download"></i> View Finance Receipt {{ loop.index }}
+                                        </a>
+                                        <small style="color: #666; margin-left: 10px;">{{ receipt_file.split('_', 1)[1] if '_' in receipt_file else receipt_file }}</small>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <p style="color: #666; font-style: italic;">No receipt files uploaded by finance admin</p>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 {% else %}
@@ -1571,6 +1598,8 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                             <h4><i class="fas fa-dollar-sign"></i> Finance Admin Approval Required</h4>
                         </div>
                         <div class="card-body">
+                            
+
                             <div class="row">
                                 <div class="col-md-8">
                                     <p style="margin-bottom: 0.5rem; font-size: 1.1rem;">
@@ -1621,6 +1650,23 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                         <p style="margin: 0; font-weight: 600; color: #856404;">Pending Review</p>
                                     </div>
                                 </div>
+                            </div>
+
+                            <!-- Existing Finance Admin Receipts (moved to bottom for non-finance viewers) -->
+                            <div class="form-group" style="margin-top: 15px;">
+                                <label><i class="fas fa-check-circle"></i> Receipt/Proof of Payment (Uploaded by Finance Admin)</label>
+                                {% if finance_admin_receipts and finance_admin_receipts|length > 0 %}
+                                    {% for receipt_file in finance_admin_receipts %}
+                                    <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                        <a href="{{ url_for('uploaded_file', filename=receipt_file) }}" target="_blank" class="btn btn-warning">
+                                            <i class="fas fa-download"></i> View Finance Receipt {{ loop.index }}
+                                        </a>
+                                        <small style="color: #666; margin-left: 10px;">{{ receipt_file.split('_', 1)[1] if '_' in receipt_file else receipt_file }}</small>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <p style="color: #666; font-style: italic;">No receipt files uploaded by finance admin</p>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -3290,6 +3336,31 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initial update
     updateServerBasedTimers();
+
+    // Ensure Finance Admin multiple receipt files are all submitted
+    try {
+        const financeForm = document.querySelector('.finance-approval-form form');
+        const uploadContainer = document.getElementById('finance-receipt-upload-container');
+        if (financeForm && uploadContainer && uploadContainer.uploadComponent) {
+            financeForm.addEventListener('submit', function(e) {
+                // Build FormData with all files from the component
+                const formData = new FormData(financeForm);
+                uploadContainer.uploadComponent.prepareFormData(formData);
+                e.preventDefault();
+                fetch(financeForm.action, { method: 'POST', body: formData })
+                    .then(resp => {
+                        if (resp.redirected) {
+                            window.location.href = resp.url;
+                        } else if (resp.ok) {
+                            window.location.reload();
+                        } else {
+                            window.location.reload();
+                        }
+                    })
+                    .catch(() => window.location.reload());
+            });
+        }
+    } catch (_) { /* no-op */ }
 });
 
 // Function to save finance admin note

@@ -1850,6 +1850,8 @@ def department_dashboard():
         query = base_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     elif tab == 'rejected':
         query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
+    elif tab == 'recurring':
+        query = base_query.filter(PaymentRequest.status == 'Recurring')
     else:  # pending tab (default) - show ALL requests (no filtering)
         query = base_query
     
@@ -1879,14 +1881,17 @@ def department_dashboard():
     # Get separate queries for each tab content
     completed_query = base_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     rejected_query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
+    recurring_query = base_query.filter(PaymentRequest.status == 'Recurring')
     
     # Apply urgent filter to separate queries
     if urgent_filter == 'urgent':
         completed_query = completed_query.filter(PaymentRequest.urgent == True)
         rejected_query = rejected_query.filter(PaymentRequest.urgent == True)
+        recurring_query = recurring_query.filter(PaymentRequest.urgent == True)
     elif urgent_filter == 'not_urgent':
         completed_query = completed_query.filter(PaymentRequest.urgent == False)
         rejected_query = rejected_query.filter(PaymentRequest.urgent == False)
+        recurring_query = recurring_query.filter(PaymentRequest.urgent == False)
     
     # Apply search filter to separate queries
     if search_query:
@@ -1894,6 +1899,7 @@ def department_dashboard():
             search_id = int(search_query)
             completed_query = completed_query.filter(PaymentRequest.request_id == search_id)
             rejected_query = rejected_query.filter(PaymentRequest.request_id == search_id)
+            recurring_query = recurring_query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
             search_term = f'%{search_query}%'
             completed_query = completed_query.filter(
@@ -1910,10 +1916,18 @@ def department_dashboard():
                     PaymentRequest.account_name.ilike(search_term)
                 )
             )
+            recurring_query = recurring_query.filter(
+                db.or_(
+                    PaymentRequest.requestor_name.ilike(search_term),
+                    PaymentRequest.purpose.ilike(search_term),
+                    PaymentRequest.account_name.ilike(search_term)
+                )
+            )
     
     # Get data for each tab
     completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
+    recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
     
     # Paginate the main query
     requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
@@ -1933,6 +1947,7 @@ def department_dashboard():
                          search_query=search_query,
                          completed_requests=completed_requests,
                          rejected_requests=rejected_requests,
+                         recurring_requests=recurring_requests,
                          urgent_filter=urgent_filter,
                          active_tab=tab)
 
@@ -1958,47 +1973,54 @@ def admin_dashboard():
         per_page = 10
     
     # Build query with optional status, department, and search filters
-    # Finance Admin can see finance-related statuses + Pending Manager Approval from Finance Staff, GM, and Operation Manager
-    finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
-    
-    # For Abdalaziz, also include Pending Manager Approval requests from Finance Staff, GM, and Operation Manager
-    if current_user.name == 'Abdalaziz Al-Brashdi':
-        # Include finance statuses + Pending Manager Approval from specific roles
-        query = PaymentRequest.query.filter(
-            db.or_(
-                PaymentRequest.status.in_(finance_statuses),
-                db.and_(
-                    PaymentRequest.status == 'Pending Manager Approval',
-                    PaymentRequest.user.has(
-                        db.or_(
-                            User.role == 'Finance Staff',
-                            User.role == 'GM',
-                            User.role == 'Operation Manager'
-                        )
-                    )
-                ),
-                # Always include current user's own requests regardless of status
-                PaymentRequest.user_id == current_user.user_id,
-                # Also include requests where the current user is temporarily assigned as manager
-                db.and_(
-                    PaymentRequest.status == 'Pending Manager Approval',
-                    PaymentRequest.temporary_manager_id == current_user.user_id
-                )
-            )
-        )
+    # For "All Requests" tab (pending), show ALL requests regardless of status
+    # For other tabs, apply appropriate filtering
+    if tab == 'pending':
+        # "All Requests" tab - show ALL requests without status filtering
+        query = PaymentRequest.query
     else:
-        # Other Finance Admins only see finance-related statuses plus temporary assignments awaiting manager approval
-        query = PaymentRequest.query.filter(
-            db.or_(
-                PaymentRequest.status.in_(finance_statuses),
-                # Always include current user's own requests regardless of status
-                PaymentRequest.user_id == current_user.user_id,
-                db.and_(
-                    PaymentRequest.status == 'Pending Manager Approval',
-                    PaymentRequest.temporary_manager_id == current_user.user_id
+        # For other tabs, apply the normal finance status filtering
+        # Finance Admin can see finance-related statuses + Pending Manager Approval from Finance Staff, GM, and Operation Manager
+        finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
+
+        # For Abdalaziz, also include Pending Manager Approval requests from Finance Staff, GM, and Operation Manager
+        if current_user.name == 'Abdalaziz Al-Brashdi':
+            # Include finance statuses + Pending Manager Approval from specific roles
+            query = PaymentRequest.query.filter(
+                db.or_(
+                    PaymentRequest.status.in_(finance_statuses),
+                    db.and_(
+                        PaymentRequest.status == 'Pending Manager Approval',
+                        PaymentRequest.user.has(
+                            db.or_(
+                                User.role == 'Finance Staff',
+                                User.role == 'GM',
+                                User.role == 'Operation Manager'
+                            )
+                        )
+                    ),
+                    # Always include current user's own requests regardless of status
+                    PaymentRequest.user_id == current_user.user_id,
+                    # Also include requests where the current user is temporarily assigned as manager
+                    db.and_(
+                        PaymentRequest.status == 'Pending Manager Approval',
+                        PaymentRequest.temporary_manager_id == current_user.user_id
+                    )
                 )
             )
-        )
+        else:
+            # Other Finance Admins only see finance-related statuses plus temporary assignments awaiting manager approval
+            query = PaymentRequest.query.filter(
+                db.or_(
+                    PaymentRequest.status.in_(finance_statuses),
+                    # Always include current user's own requests regardless of status
+                    PaymentRequest.user_id == current_user.user_id,
+                    db.and_(
+                        PaymentRequest.status == 'Pending Manager Approval',
+                        PaymentRequest.temporary_manager_id == current_user.user_id
+                    )
+                )
+            )
     
     # Apply tab-based filtering
     if tab == 'completed':
@@ -2013,12 +2035,9 @@ def admin_dashboard():
     elif tab == 'my_requests':
         # For 'my_requests' tab, show only the current user's requests
         query = query.filter(PaymentRequest.user_id == current_user.user_id)
-    elif tab == 'pending':
-        # For 'pending' tab (now "All Requests"), show all requests that the user can see
-        # No additional filtering needed - show all requests based on the base query
-        pass
     
-    if status_filter:
+    # Only apply status_filter for non-pending tabs (All Requests tab shows all statuses)
+    if status_filter and tab != 'pending':
         query = query.filter(PaymentRequest.status == status_filter)
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
@@ -2090,32 +2109,39 @@ def finance_dashboard():
         per_page = 10
     
     # Build query with optional department and search filters
-    # Finance Staff can see finance-related statuses + their own requests with Pending Manager Approval + their own requests with Rejected by Manager
-    # Abdalaziz can see finance-related statuses + Pending Manager Approval + Rejected by Manager for Finance Staff, GM, and Operation Manager
-    finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
-    
-    # Base query for finance-related statuses
-    query = PaymentRequest.query.filter(PaymentRequest.status.in_(finance_statuses))
-    
-    # Add Finance Staff's own requests with Pending Manager Approval and Rejected by Manager
-    if current_user.role == 'Finance Staff':
-        own_pending_requests = PaymentRequest.query.filter(
-            db.and_(
-                PaymentRequest.user_id == current_user.user_id,
-                PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager'])
+    # For "All Requests" tab (pending), show ALL requests regardless of status
+    # For other tabs, apply appropriate filtering
+    if tab == 'pending':
+        # "All Requests" tab - show ALL requests without status filtering
+        query = PaymentRequest.query
+    else:
+        # For other tabs, apply the normal finance status filtering
+        # Finance Staff can see finance-related statuses + their own requests with Pending Manager Approval + their own requests with Rejected by Manager
+        # Abdalaziz can see finance-related statuses + Pending Manager Approval + Rejected by Manager for Finance Staff, GM, and Operation Manager
+        finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
+        
+        # Base query for finance-related statuses
+        query = PaymentRequest.query.filter(PaymentRequest.status.in_(finance_statuses))
+        
+        # Add Finance Staff's own requests with Pending Manager Approval and Rejected by Manager
+        if current_user.role == 'Finance Staff':
+            own_pending_requests = PaymentRequest.query.filter(
+                db.and_(
+                    PaymentRequest.user_id == current_user.user_id,
+                    PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager'])
+                )
             )
-        )
-        query = query.union(own_pending_requests)
-    
-    # Add Abdalaziz's special permissions for Finance Staff, GM, and Operation Manager requests
-    elif current_user.name == 'Abdalaziz Al-Brashdi':
-        abdalaziz_special_requests = PaymentRequest.query.filter(
-            db.and_(
-                PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager']),
-                PaymentRequest.user.has(User.role.in_(['Finance Staff', 'GM', 'Operation Manager']))
+            query = query.union(own_pending_requests)
+        
+        # Add Abdalaziz's special permissions for Finance Staff, GM, and Operation Manager requests
+        elif current_user.name == 'Abdalaziz Al-Brashdi':
+            abdalaziz_special_requests = PaymentRequest.query.filter(
+                db.and_(
+                    PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager']),
+                    PaymentRequest.user.has(User.role.in_(['Finance Staff', 'GM', 'Operation Manager']))
+                )
             )
-        )
-        query = query.union(abdalaziz_special_requests)
+            query = query.union(abdalaziz_special_requests)
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     if search_query:
@@ -2224,6 +2250,8 @@ def gm_dashboard():
         query = query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     elif tab == 'rejected':
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
+    elif tab == 'recurring':
+        query = query.filter(PaymentRequest.status == 'Recurring')
     elif tab == 'pending':
         # 'pending' tab (All Requests) shows all requests (no additional filtering)
         pass
@@ -2252,19 +2280,23 @@ def gm_dashboard():
     notifications = get_notifications_for_user(current_user)
     unread_count = get_unread_count_for_user(current_user)
     
-    # Get separate queries for completed and rejected requests for tab content
+    # Get separate queries for completed, rejected, and recurring requests for tab content
     completed_query = PaymentRequest.query
     rejected_query = PaymentRequest.query
+    recurring_query = PaymentRequest.query
     
     if department_filter:
         completed_query = completed_query.filter(PaymentRequest.department == department_filter)
         rejected_query = rejected_query.filter(PaymentRequest.department == department_filter)
+        recurring_query = recurring_query.filter(PaymentRequest.department == department_filter)
     
     completed_query = completed_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
+    recurring_query = recurring_query.filter(PaymentRequest.status == 'Recurring')
     
     completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
+    recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
     
     return render_template('gm_dashboard.html', 
                          requests=requests_pagination.items, 
@@ -2278,6 +2310,7 @@ def gm_dashboard():
                          urgent_filter=urgent_filter,
                          completed_requests=completed_requests,
                          rejected_requests=rejected_requests,
+                         recurring_requests=recurring_requests,
                          active_tab=tab)
 
 
@@ -2337,6 +2370,8 @@ def it_dashboard():
         query = query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     elif tab == 'rejected':
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
+    elif tab == 'recurring':
+        query = query.filter(PaymentRequest.status == 'Recurring')
     elif tab == 'pending':
         # 'pending' tab (All Requests) shows all requests (no additional filtering)
         pass
@@ -2351,9 +2386,10 @@ def it_dashboard():
     notifications = get_notifications_for_user(current_user)
     unread_count = get_unread_count_for_user(current_user)
     
-    # Get separate queries for completed and rejected requests for tab content
+    # Get separate queries for completed, rejected, and recurring requests for tab content
     completed_query = PaymentRequest.query
     rejected_query = PaymentRequest.query
+    recurring_query = PaymentRequest.query
     
     if current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT'):
         # IT users and IT Department Managers see all requests
@@ -2362,16 +2398,20 @@ def it_dashboard():
         # Other users should not see requests that are still pending manager approval
         completed_query = completed_query.filter(PaymentRequest.status != 'Pending Manager Approval')
         rejected_query = rejected_query.filter(PaymentRequest.status != 'Pending Manager Approval')
+        recurring_query = recurring_query.filter(PaymentRequest.status != 'Pending Manager Approval')
     
     if department_filter:
         completed_query = completed_query.filter(PaymentRequest.department == department_filter)
         rejected_query = rejected_query.filter(PaymentRequest.department == department_filter)
+        recurring_query = recurring_query.filter(PaymentRequest.department == department_filter)
     
     completed_query = completed_query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
+    recurring_query = recurring_query.filter(PaymentRequest.status == 'Recurring')
     
     completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
+    recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
     
     users = User.query.all()
     logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(50).all()
@@ -2415,6 +2455,7 @@ def it_dashboard():
                          urgent_filter=urgent_filter,
                          completed_requests=completed_requests,
                          rejected_requests=rejected_requests,
+                         recurring_requests=recurring_requests,
                          active_tab=tab)
 
 
@@ -2986,7 +3027,8 @@ def project_dashboard():
     else:
         # Fallback - should not happen due to role_required decorator
         query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
-    if status_filter:
+    # Only apply status_filter for non-pending tabs (All Requests tab shows all statuses)
+    if status_filter and tab != 'pending':
         query = query.filter(PaymentRequest.status == status_filter)
     if search_query:
         # Search by request ID only
@@ -3087,19 +3129,6 @@ def operation_dashboard():
     # Build query with optional status, department, and search filters - Operation Manager sees ALL departments
     query = PaymentRequest.query
     
-    # If no specific status filter, prioritize showing requests that need manager approval
-    if not status_filter:
-        # Show requests that need manager approval first, then others
-        query = query.order_by(
-            db.case(
-                (PaymentRequest.status == 'Pending Manager Approval', 1),
-                else_=2
-            ),
-            PaymentRequest.created_at.desc()
-        )
-    else:
-        query = query.filter(PaymentRequest.status == status_filter)
-    
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     if search_query:
@@ -3122,10 +3151,23 @@ def operation_dashboard():
         query = query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
     elif tab == 'rejected':
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
+    elif tab == 'recurring':
+        query = query.filter(PaymentRequest.status == 'Recurring')
     elif tab == 'pending':
-        # 'pending' tab (All Requests) shows all requests (no additional filtering)
-        pass
-    # Default case also shows all requests
+        # 'pending' tab (All Requests) shows all requests regardless of status
+        # Do NOT apply status_filter - show ALL requests
+        # If no status filter, prioritize showing requests that need manager approval
+        query = query.order_by(
+            db.case(
+                (PaymentRequest.status == 'Pending Manager Approval', 1),
+                else_=2
+            ),
+            PaymentRequest.created_at.desc()
+        )
+    else:
+        # Default case - apply status filter if provided for non-pending tabs
+        if status_filter:
+            query = query.filter(PaymentRequest.status == status_filter)
     
     # Get paginated requests
     requests_pagination = query.paginate(
@@ -3398,7 +3440,7 @@ def new_request():
             recurring=recurring,
             recurring_interval=recurring_interval if recurring == 'Recurring' else None,
             status=initial_status,
-            receipt_path=receipt_path,  # Add receipt path if file was uploaded
+            requestor_receipt_path=receipt_path,  # Store requestor receipts in separate column
             user_id=current_user.user_id,
             # Start timing immediately when request is submitted
             manager_approval_start_time=current_time
@@ -4003,7 +4045,75 @@ def view_request(request_id):
             User.role.in_(['Department Manager', 'GM', 'Operation Manager', 'Finance Admin'])
         ).order_by(User.department, User.name).all()
     
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name)
+    # Prepare receipt files for template (both requestor and finance admin receipts)
+    requestor_receipts = []
+    finance_admin_receipts = []
+    import json
+    
+    # Get requestor receipts
+    if req.requestor_receipt_path:
+        try:
+            requestor_receipts = json.loads(req.requestor_receipt_path)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            # Fallback: try Python literal (in case it's a repr list)
+            try:
+                import ast
+                parsed = ast.literal_eval(req.requestor_receipt_path)
+                if isinstance(parsed, list):
+                    requestor_receipts = parsed
+                elif isinstance(parsed, str) and parsed:
+                    requestor_receipts = [parsed]
+            except Exception:
+                # Final fallback: split on commas
+                if isinstance(req.requestor_receipt_path, str) and req.requestor_receipt_path:
+                    if ',' in req.requestor_receipt_path:
+                        requestor_receipts = [p.strip() for p in req.requestor_receipt_path.split(',') if p.strip()]
+                    else:
+                        requestor_receipts = [req.requestor_receipt_path]
+    
+    # Get finance admin receipts
+    if req.finance_admin_receipt_path:
+        try:
+            finance_admin_receipts = json.loads(req.finance_admin_receipt_path)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            # Fallback: try Python literal (in case it's a repr list)
+            try:
+                import ast
+                parsed = ast.literal_eval(req.finance_admin_receipt_path)
+                if isinstance(parsed, list):
+                    finance_admin_receipts = parsed
+                elif isinstance(parsed, str) and parsed:
+                    finance_admin_receipts = [parsed]
+            except Exception:
+                # Final fallback: split on commas
+                if isinstance(req.finance_admin_receipt_path, str) and req.finance_admin_receipt_path:
+                    if ',' in req.finance_admin_receipt_path:
+                        finance_admin_receipts = [p.strip() for p in req.finance_admin_receipt_path.split(',') if p.strip()]
+                    else:
+                        finance_admin_receipts = [req.finance_admin_receipt_path]
+    
+    # Backward compatibility: If new columns are empty but legacy receipt_path exists,
+    # try to determine which column it should be in based on request status
+    if not requestor_receipts and not finance_admin_receipts and req.receipt_path:
+        try:
+            legacy_receipts = json.loads(req.receipt_path)
+            if isinstance(legacy_receipts, list):
+                # Check status to determine if it's from requestor or finance admin
+                finance_statuses = ['Proof Pending', 'Proof Sent', 'Recurring', 'Completed', 'Paid']
+                if req.approver and req.status in finance_statuses:
+                    finance_admin_receipts = legacy_receipts
+                else:
+                    requestor_receipts = legacy_receipts
+        except (json.JSONDecodeError, TypeError):
+            # Handle legacy single file format
+            if isinstance(req.receipt_path, str):
+                finance_statuses = ['Proof Pending', 'Proof Sent', 'Recurring', 'Completed', 'Paid']
+                if req.approver and req.status in finance_statuses:
+                    finance_admin_receipts = [req.receipt_path]
+                else:
+                    requestor_receipts = [req.receipt_path]
+    
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts)
 
 
 @app.route('/request/<int:request_id>/approve', methods=['POST'])
@@ -4069,8 +4179,11 @@ def approve_request(request_id):
             flash('No valid receipt files were uploaded.', 'error')
             return redirect(url_for('view_request', request_id=request_id))
         
-        # Store the first file as primary receipt, others are additional
-        req.receipt_path = uploaded_files[0]
+        # Store all finance admin receipts as JSON string in finance_admin_receipt_path
+        # Never overwrite requestor receipts - they stay in requestor_receipt_path
+        import json
+        finance_receipt_path = json.dumps(uploaded_files)
+        req.finance_admin_receipt_path = finance_receipt_path
         
         req.approver = approver
         req.proof_required = proof_required
@@ -4119,8 +4232,12 @@ def approve_request(request_id):
                 if first_installment:
                     first_installment.is_paid = True
                     first_installment.paid_date = today
-                    # Copy the finance admin receipt to the first installment
-                    first_installment.receipt_path = req.receipt_path
+                    # Copy the finance admin receipt to the first installment (only if it doesn't already have one)
+                    if not first_installment.receipt_path and req.finance_admin_receipt_path:
+                        import json
+                        finance_receipts = json.loads(req.finance_admin_receipt_path)
+                        if finance_receipts:
+                            first_installment.receipt_path = finance_receipts[0]
                     
                     # Create a paid notification for the first installment
                     create_notification(
@@ -4240,8 +4357,11 @@ def approve_request(request_id):
             flash('No valid receipt files were uploaded.', 'error')
             return redirect(url_for('view_request', request_id=request_id))
         
-        # Store the first file as primary receipt, others are additional
-        req.receipt_path = uploaded_files[0]
+        # Store all finance admin receipts as JSON string in finance_admin_receipt_path
+        # Never overwrite requestor receipts - they stay in requestor_receipt_path
+        import json
+        finance_receipt_path = json.dumps(uploaded_files)
+        req.finance_admin_receipt_path = finance_receipt_path
         
         req.status = 'Paid'
         req.approval_date = datetime.utcnow().date()  # Set approval_date when status becomes Paid
@@ -4284,8 +4404,12 @@ def approve_request(request_id):
             if first_installment:
                 first_installment.is_paid = True
                 first_installment.paid_date = current_time.date()
-                # Copy the finance admin receipt to the first installment
-                first_installment.receipt_path = req.receipt_path
+                # Copy the finance admin receipt to the first installment (only if it doesn't already have one)
+                if not first_installment.receipt_path and req.finance_admin_receipt_path:
+                    import json
+                    finance_receipts = json.loads(req.finance_admin_receipt_path)
+                    if finance_receipts:
+                        first_installment.receipt_path = finance_receipts[0]
                 
                 # Create a paid notification for the first installment
                 create_notification(
@@ -5282,11 +5406,47 @@ def delete_request(request_id):
     """Delete a payment request (IT only)"""
     req = PaymentRequest.query.get_or_404(request_id)
     
-    # Delete associated receipt file if exists
+    # Delete associated receipt files if they exist (both requestor and finance admin receipts)
+    import json
+    if req.requestor_receipt_path:
+        try:
+            requestor_receipts = json.loads(req.requestor_receipt_path)
+            for receipt_file in requestor_receipts:
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], receipt_file)
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+        except (json.JSONDecodeError, TypeError):
+            # Handle legacy single file format
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.requestor_receipt_path)
+            if os.path.exists(filepath):
+                os.remove(filepath)
+    
+    if req.finance_admin_receipt_path:
+        try:
+            finance_receipts = json.loads(req.finance_admin_receipt_path)
+            for receipt_file in finance_receipts:
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], receipt_file)
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+        except (json.JSONDecodeError, TypeError):
+            # Handle legacy single file format
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.finance_admin_receipt_path)
+            if os.path.exists(filepath):
+                os.remove(filepath)
+    
+    # Also check legacy receipt_path for backwards compatibility
     if req.receipt_path:
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.receipt_path)
-        if os.path.exists(filepath):
-            os.remove(filepath)
+        try:
+            legacy_receipts = json.loads(req.receipt_path)
+            for receipt_file in legacy_receipts:
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], receipt_file)
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+        except (json.JSONDecodeError, TypeError):
+            # Handle legacy single file format
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.receipt_path)
+            if os.path.exists(filepath):
+                os.remove(filepath)
     
     # Delete related InstallmentEditHistory records first
     InstallmentEditHistory.query.filter_by(request_id=request_id).delete()
@@ -5481,7 +5641,11 @@ def upload_installment_receipt(request_id):
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         receipt_file.save(filepath)
         
-        # Store the file as primary receipt
+        # Store the file as receipt for this installment (only if it doesn't already have one)
+        if schedule_entry.receipt_path:
+            flash(f'This installment already has a receipt. Please delete the existing receipt first if you want to replace it.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
         schedule_entry.receipt_path = filename
         db.session.commit()
         
@@ -5559,7 +5723,11 @@ def upload_installment_invoice(request_id):
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         invoice_file.save(filepath)
         
-        # Store the file as invoice
+        # Store the file as invoice for this installment (only if it doesn't already have one)
+        if schedule_entry.invoice_path:
+            flash(f'This installment already has an invoice. Please delete the existing invoice first if you want to replace it.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
         schedule_entry.invoice_path = filename
         db.session.commit()
         
@@ -6544,11 +6712,44 @@ def delete_user(user_id):
     if payment_requests:
         # Delete all payment requests by this user
         for req in payment_requests:
-            # Delete associated files if they exist
+            # Delete associated receipt files if they exist (both requestor and finance admin receipts)
+            import json
+            if req.requestor_receipt_path:
+                try:
+                    requestor_receipts = json.loads(req.requestor_receipt_path)
+                    for receipt_file in requestor_receipts:
+                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], receipt_file)
+                        if os.path.exists(filepath):
+                            os.remove(filepath)
+                except (json.JSONDecodeError, TypeError):
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.requestor_receipt_path)
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+            
+            if req.finance_admin_receipt_path:
+                try:
+                    finance_receipts = json.loads(req.finance_admin_receipt_path)
+                    for receipt_file in finance_receipts:
+                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], receipt_file)
+                        if os.path.exists(filepath):
+                            os.remove(filepath)
+                except (json.JSONDecodeError, TypeError):
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.finance_admin_receipt_path)
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+            
+            # Also check legacy receipt_path for backwards compatibility
             if req.receipt_path:
-                receipt_file = os.path.join(app.config['UPLOAD_FOLDER'], req.receipt_path)
-                if os.path.exists(receipt_file):
-                    os.remove(receipt_file)
+                try:
+                    legacy_receipts = json.loads(req.receipt_path)
+                    for receipt_file in legacy_receipts:
+                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], receipt_file)
+                        if os.path.exists(filepath):
+                            os.remove(filepath)
+                except (json.JSONDecodeError, TypeError):
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.receipt_path)
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
             if req.proof_of_payment:
                 proof_file = os.path.join(app.config['UPLOAD_FOLDER'], req.proof_of_payment)
                 if os.path.exists(proof_file):
@@ -6987,7 +7188,7 @@ def api_admin_recurring_events():
                         'extendedProps': {
                             'requestId': req.request_id,
                             'requestType': req.request_type,
-                            'companyName': req.company_name,
+                            'companyName': req.person_company or req.company_name or 'N/A',
                             'department': req.department,
                             'purpose': req.purpose,
                             'baseAmount': f'OMR {req.amount:.3f}',
@@ -7032,7 +7233,7 @@ def api_admin_recurring_events():
                         'extendedProps': {
                             'requestId': req.request_id,
                             'requestType': req.request_type,
-                            'companyName': req.company_name,
+                            'companyName': req.person_company or req.company_name or 'N/A',
                             'department': req.department,
                             'purpose': req.purpose,
                             'baseAmount': None,

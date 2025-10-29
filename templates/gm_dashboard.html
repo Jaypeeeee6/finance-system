@@ -39,6 +39,9 @@
         <button class="tab-button {% if active_tab == 'rejected' %}active{% endif %}" onclick="switchTab('rejected')" id="tab-rejected">
             <i class="fas fa-times-circle"></i> Rejected
         </button>
+        <button class="tab-button {% if active_tab == 'recurring' %}active{% endif %}" onclick="switchTab('recurring')" id="tab-recurring">
+            <i class="fas fa-sync-alt"></i> Recurring
+        </button>
         <div class="tab-search">
             <input type="text" id="tabSearchInput" placeholder="Search..." class="tab-search-input">
             <button type="button" class="tab-search-btn">
@@ -317,6 +320,58 @@
                         <p>No rejected requests found.</p>
                     </div>
                 {% endif %}
+            </div>
+
+            <!-- Recurring Tab -->
+            <div id="tab-content-recurring" class="tab-content {% if active_tab == 'recurring' %}active{% endif %}">
+            {% if recurring_requests %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Type</th>
+                                <th>Payment Type</th>
+                                <th>Requestor</th>
+                                <th>Department</th>
+                                <th>Submission Date</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in recurring_requests %}
+                            <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
+                                <td>#{{ req.request_id }}</td>
+                                <td><span class="badge badge-info">{{ req.request_type }}</span></td>
+                                <td>
+                                    {% if req.recurring == 'Recurring' %}
+                                        <span class="badge" style="background: #ffc107; color: #212529;">↻ Recurring</span>
+                                    {% else %}
+                                        <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ req.requestor_name }}</td>
+                                <td>{{ req.department }}</td>
+                                <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
+                                <td>OMR {{ '%.3f'|format(req.amount|float) }}</td>
+                                <td>
+                                    <span class="badge" style="background: #ffc107; color: #212529;">↻ {{ req.status }}</span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p>No recurring requests found.</p>
+            {% endif %}
             </div>
             
             <!-- Pagination Controls -->

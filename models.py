@@ -146,7 +146,9 @@ class PaymentRequest(db.Model):
     recurring_interval = db.Column(db.String(50))  # Monthly, Quarterly, Annually
     status = db.Column(db.String(20), default='Pending')  # Pending, Send Proof, Received Proof, Approved
     reason_pending = db.Column(db.Text)
-    receipt_path = db.Column(db.Text)  # JSON string containing multiple file paths
+    receipt_path = db.Column(db.Text)  # DEPRECATED: Use requestor_receipt_path and finance_admin_receipt_path instead
+    requestor_receipt_path = db.Column(db.Text)  # JSON string containing multiple file paths uploaded by requestor when submitting
+    finance_admin_receipt_path = db.Column(db.Text)  # JSON string containing multiple file paths uploaded by finance admin when approving/completing
     approver = db.Column(db.String(50))  # Mahmoud, Abdulaziz
     proof_required = db.Column(db.Boolean, default=False)  # Whether proof is required
     proof_of_payment = db.Column(db.String(255))  # File path for proof uploaded by department
@@ -207,7 +209,9 @@ class PaymentRequest(db.Model):
             'recurring_interval': self.recurring_interval,
             'status': self.status,
             'reason_pending': self.reason_pending,
-            'receipt_path': self.receipt_path,
+            'receipt_path': self.receipt_path,  # Legacy field
+            'requestor_receipt_path': self.requestor_receipt_path,
+            'finance_admin_receipt_path': self.finance_admin_receipt_path,
             'approver': self.approver,
             'proof_of_payment': self.proof_of_payment,
             'finance_admin_note': self.finance_admin_note,
