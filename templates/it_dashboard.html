@@ -258,9 +258,17 @@
                                         <td>{{ req.request_type }}</td>
                                         <td>{{ req.requestor_name }}</td>
                                         <td>{{ req.department }}</td>
-                                        <td>{{ req.submission_date.strftime('%Y-%m-%d') if req.submission_date else 'N/A' }}</td>
-                                        <td>{{ req.completed_date.strftime('%Y-%m-%d') if req.completed_date else 'N/A' }}</td>
-                                        <td>${{ "%.2f"|format(req.amount) }}</td>
+                                        <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
+                                        <td>
+                                            {% if req.completion_date %}
+                                                {{ req.completion_date.strftime('%Y-%m-%d') }}
+                                            {% elif req.approval_date %}
+                                                {{ req.approval_date.strftime('%Y-%m-%d') }}
+                                            {% else %}
+                                                <span style="color: #999;">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>OMR {{ "%.3f"|format(req.amount) }}</td>
                                         <td>
                                             <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
                                         </td>
@@ -312,9 +320,17 @@
                                         <td>{{ req.request_type }}</td>
                                         <td>{{ req.requestor_name }}</td>
                                         <td>{{ req.department }}</td>
-                                        <td>{{ req.submission_date.strftime('%Y-%m-%d') if req.submission_date else 'N/A' }}</td>
-                                        <td>{{ req.rejected_date.strftime('%Y-%m-%d') if req.rejected_date else 'N/A' }}</td>
-                                        <td>${{ "%.2f"|format(req.amount) }}</td>
+                                        <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
+                                        <td>
+                                            {% if req.manager_rejection_date %}
+                                                {{ req.manager_rejection_date.strftime('%Y-%m-%d') }}
+                                            {% elif req.finance_rejection_date %}
+                                                {{ req.finance_rejection_date.strftime('%Y-%m-%d') }}
+                                            {% else %}
+                                                <span style="color: #999;">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>OMR {{ "%.3f"|format(req.amount) }}</td>
                                         <td>
                                             <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
                                         </td>

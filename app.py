@@ -3816,22 +3816,26 @@ def view_request(request_id):
             flash('You do not have permission to view this request.', 'danger')
             return redirect(url_for('dashboard'))
     elif current_user.role in ['Finance Admin', 'Finance Staff']:
-        # Finance users can only view requests in finance-related statuses
-        finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
-        
-        # For Abdalaziz, also allow viewing Pending Manager Approval and Rejected by Manager requests from Finance Staff, GM, and Operation Manager
-        if current_user.name == 'Abdalaziz Al-Brashdi' and req.status in ['Pending Manager Approval', 'Rejected by Manager']:
-            if req.user.role in ['Finance Staff', 'GM', 'Operation Manager']:
-                pass  # Allow access
-            else:
+        # If assigned as temporary manager, allow viewing regardless of finance status rules
+        if getattr(req, 'temporary_manager_id', None) == current_user.user_id:
+            pass
+        else:
+            # Finance users can only view requests in finance-related statuses
+            finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
+            
+            # For Abdalaziz, also allow viewing Pending Manager Approval and Rejected by Manager requests from Finance Staff, GM, and Operation Manager
+            if current_user.name == 'Abdalaziz Al-Brashdi' and req.status in ['Pending Manager Approval', 'Rejected by Manager']:
+                if req.user.role in ['Finance Staff', 'GM', 'Operation Manager']:
+                    pass  # Allow access
+                else:
+                    flash('You do not have permission to view this request.', 'danger')
+                    return redirect(url_for('dashboard'))
+            # For Finance Staff, allow viewing their own requests with Pending Manager Approval and Rejected by Manager
+            elif current_user.role == 'Finance Staff' and req.status in ['Pending Manager Approval', 'Rejected by Manager'] and req.user_id == current_user.user_id:
+                pass  # Allow access to own requests
+            elif req.status not in finance_statuses:
                 flash('You do not have permission to view this request.', 'danger')
                 return redirect(url_for('dashboard'))
-        # For Finance Staff, allow viewing their own requests with Pending Manager Approval and Rejected by Manager
-        elif current_user.role == 'Finance Staff' and req.status in ['Pending Manager Approval', 'Rejected by Manager'] and req.user_id == current_user.user_id:
-            pass  # Allow access to own requests
-        elif req.status not in finance_statuses:
-            flash('You do not have permission to view this request.', 'danger')
-            return redirect(url_for('dashboard'))
     
     # Mark notifications related to this request as read for Finance and Admin users
     if current_user.role in ['Finance Staff', 'Finance Admin']:
@@ -3924,7 +3928,17 @@ def view_request(request_id):
             operation_manager = User.query.filter_by(role='Operation Manager').first()
             if operation_manager:
                 manager_name = operation_manager.name
+        elif req.department == 'Office':
+            # For Office, fallback to the General Manager
+            gm_user_fallback = User.query.filter_by(role='GM').first()
+            if gm_user_fallback:
+                manager_name = gm_user_fallback.name
         
+    # Also resolve GM and Operation Manager names (used for Department Manager submissions)
+    gm_user = User.query.filter_by(role='GM').first()
+    gm_name = gm_user.name if gm_user else 'General Manager'
+    op_manager_user = User.query.filter_by(role='Operation Manager').first()
+    op_manager_name = op_manager_user.name if op_manager_user else 'Operation Manager'
     
     # Get all proof files for this request grouped by batch
     proof_files = []
@@ -3984,7 +3998,7 @@ def view_request(request_id):
             User.role.in_(['Department Manager', 'GM', 'Operation Manager', 'Finance Admin'])
         ).order_by(User.department, User.name).all()
     
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes)
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name)
 
 
 @app.route('/request/<int:request_id>/approve', methods=['POST'])
@@ -4884,6 +4898,10 @@ def manager_approve_request(request_id):
         if (current_user.role == 'GM' and req.user.role == 'Department Manager'):
             is_authorized = True
             print("DEBUG: Authorized via GM role for Department Manager")
+        # Special case: Operation Manager can also approve Department Manager requests (global)
+        elif (current_user.role == 'Operation Manager' and req.user.role == 'Department Manager'):
+            is_authorized = True
+            print("DEBUG: Authorized via Operation Manager role for Department Manager")
         # Special case: Abdalaziz can approve General Manager requests
         elif (current_user.name == 'Abdalaziz Al-Brashdi' and req.user.role == 'GM'):
             is_authorized = True
@@ -4950,6 +4968,9 @@ def manager_approve_request(request_id):
         
         req.status = 'Pending Finance Approval'
         req.manager_approval_date = current_time.date()
+        # Track who actually approved as manager (covers GM, Operation Manager, Department Manager, Finance Admin, and temporary manager)
+        req.manager_approver = current_user.name
+        req.manager_approver_user_id = current_user.user_id
         req.is_urgent = request.form.get('is_urgent') == 'on'
         req.manager_approval_reason = request.form.get('approval_reason', '').strip()
         req.updated_at = current_time
@@ -4976,12 +4997,27 @@ def manager_approve_request(request_id):
             request_id=request_id
         )
         
-        # Emit real-time update to Finance Admin
+        # Emit real-time update to Finance Admin and management dashboards
         socketio.emit('request_updated', {
             'request_id': request_id,
             'status': 'Pending Finance Approval',
             'manager_approved': True
         }, room='finance_admin')
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'Pending Finance Approval',
+            'manager_approved': True
+        }, room='gm')
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'Pending Finance Approval',
+            'manager_approved': True
+        }, room='operation_manager')
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'Pending Finance Approval',
+            'manager_approved': True
+        })
         
         flash(f'Payment request #{request_id} has been approved by manager. Sent to Finance for final approval.', 'success')
         
@@ -5010,6 +5046,9 @@ def manager_approve_request(request_id):
         req.status = 'Rejected by Manager'
         req.rejection_reason = rejection_reason
         req.manager_rejection_date = current_time.date()
+        # Track who actually rejected as manager (covers GM, Operation Manager, Department Manager, Finance Admin, and temporary manager)
+        req.manager_rejector = current_user.name
+        req.manager_rejector_user_id = current_user.user_id
         req.updated_at = current_time
         
         db.session.commit()
@@ -5025,12 +5064,22 @@ def manager_approve_request(request_id):
             request_id=request_id
         )
         
-        # Emit real-time update
+        # Emit real-time update to everyone (including GM and Operation Manager dashboards)
         socketio.emit('request_updated', {
             'request_id': request_id,
             'status': 'Rejected by Manager',
             'manager_rejected': True
         })
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'Rejected by Manager',
+            'manager_rejected': True
+        }, room='gm')
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'Rejected by Manager',
+            'manager_rejected': True
+        }, room='operation_manager')
         
         flash(f'Payment request #{request_id} has been rejected by manager.', 'success')
     
@@ -5050,19 +5099,26 @@ def manager_reject_request(request_id):
     # Check if current user is authorized to reject this request
     is_authorized = False
     
-    # Check if current user is the manager of the request submitter
-    if req.user.manager_id and req.user.manager_id == current_user.user_id:
-        is_authorized = True
-    # Special case: Operation Manager can reject Operation department requests
-    elif (current_user.role == 'Operation Manager' and 
-          req.user.department == 'Operation' and 
-          req.user.role != 'Operation Manager'):  # Operation Manager can't reject their own requests
-        is_authorized = True
-    # Special case: Finance Admin can reject Finance department requests
-    elif (current_user.role == 'Finance Admin' and 
-          req.user.department == 'Finance' and 
-          req.user.role != 'Finance Admin'):  # Finance Admin can't reject their own requests
-        is_authorized = True
+    # Temporary manager exclusivity: if a temporary manager is assigned, only they can reject
+    if req.temporary_manager_id:
+        if req.temporary_manager_id == current_user.user_id:
+            is_authorized = True
+        else:
+            is_authorized = False
+    else:
+        # Check if current user is the manager of the request submitter
+        if req.user.manager_id and req.user.manager_id == current_user.user_id:
+            is_authorized = True
+        # Special case: Operation Manager can reject Operation department requests
+        elif (current_user.role == 'Operation Manager' and 
+              req.user.department == 'Operation' and 
+              req.user.role != 'Operation Manager'):  # Operation Manager can't reject their own requests
+            is_authorized = True
+        # Special case: Finance Admin can reject Finance department requests
+        elif (current_user.role == 'Finance Admin' and 
+              req.user.department == 'Finance' and 
+              req.user.role != 'Finance Admin'):  # Finance Admin can't reject their own requests
+            is_authorized = True
     
     if not is_authorized:
         flash('You are not authorized to reject this request.', 'error')
@@ -5083,6 +5139,9 @@ def manager_reject_request(request_id):
     req.status = 'Rejected by Manager'
     req.rejection_reason = reason
     req.manager_rejection_date = datetime.utcnow().date()
+    # Track who actually rejected as manager
+    req.manager_rejector = current_user.name
+    req.manager_rejector_user_id = current_user.user_id
     req.updated_at = datetime.utcnow()
     
     db.session.commit()

@@ -225,8 +225,16 @@
                                     </td>
                                     <td>{{ req.requestor_name }}</td>
                                     <td>{{ req.department }}</td>
-                                    <td>{{ req.submission_date.strftime('%Y-%m-%d') if req.submission_date else req.date.strftime('%Y-%m-%d') }}</td>
-                                    <td>{{ req.completion_date.strftime('%Y-%m-%d') if req.completion_date else 'N/A' }}</td>
+                                    <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        {% if req.completion_date %}
+                                            {{ req.completion_date.strftime('%Y-%m-%d') }}
+                                        {% elif req.approval_date %}
+                                            {{ req.approval_date.strftime('%Y-%m-%d') }}
+                                        {% else %}
+                                            <span style="color: #999;">-</span>
+                                        {% endif %}
+                                    </td>
                                     <td>OMR {{ "%.3f"|format(req.amount) }}</td>
                                     <td>
                                         <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
@@ -287,7 +295,7 @@
                                     </td>
                                     <td>{{ req.requestor_name }}</td>
                                     <td>{{ req.department }}</td>
-                                    <td>{{ req.submission_date.strftime('%Y-%m-%d') if req.submission_date else req.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
                                     <td>{{ req.manager_rejection_date.strftime('%Y-%m-%d') if req.manager_rejection_date else req.finance_rejection_date.strftime('%Y-%m-%d') if req.finance_rejection_date else 'N/A' }}</td>
                                     <td>OMR {{ "%.3f"|format(req.amount) }}</td>
                                     <td>

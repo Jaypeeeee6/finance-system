@@ -153,7 +153,11 @@ class PaymentRequest(db.Model):
     approval_date = db.Column(db.Date)  # Date when request was approved
     payment_date = db.Column(db.Date)  # Date when payment is scheduled
     manager_approval_date = db.Column(db.Date)  # Date when manager approved
+    manager_approver = db.Column(db.String(100))  # Name of the user who actually approved as manager
+    manager_approver_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)  # ID of the user who actually approved as manager
     manager_rejection_date = db.Column(db.Date)  # Date when manager rejected
+    manager_rejector = db.Column(db.String(100))  # Name of the user who actually rejected as manager
+    manager_rejector_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)  # ID of the user who actually rejected as manager
     rejection_reason = db.Column(db.Text)  # Reason for manager rejection
     is_urgent = db.Column(db.Boolean, default=False)  # Whether request is marked as urgent
     manager_approval_reason = db.Column(db.Text)  # Manager's notes when approving

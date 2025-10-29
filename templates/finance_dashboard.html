@@ -323,6 +323,8 @@
                                     <td>
                                         {% if req.completion_date %}
                                             {{ req.completion_date.strftime('%Y-%m-%d') }}
+                                        {% elif req.approval_date %}
+                                            {{ req.approval_date.strftime('%Y-%m-%d') }}
                                         {% else %}
                                             <span style="color: #999;">-</span>
                                         {% endif %}

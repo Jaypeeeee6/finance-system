@@ -182,10 +182,12 @@ function updateManagerDisplay() {
     } else if (department === 'Project') {
         managerUser = users.find(u => u.role === 'Operation Manager');
     } else if (department === 'Maintenance') {
-        // Maintenance Department Manager reports to Operation Manager
+        // Maintenance Department Manager reports to GM and Operation Manager (dual)
         // Maintenance Staff report to Maintenance Department Manager
         if (role === 'Department Manager') {
-            managerUser = users.find(u => u.role === 'Operation Manager');
+            managerIdInput.value = '';
+            setDisplay('General Manager and Operation Manager', '#d4edda', '#c3e6cb', 'As a Department Manager, both the GM and Operation Manager can approve your requests', '#28a745');
+            return;
         } else {
             managerUser = users.find(u => u.department === 'Maintenance' && u.role === 'Department Manager');
         }
@@ -203,7 +205,11 @@ function updateManagerDisplay() {
         // Fallback: Department Manager of same department
         managerUser = users.find(u => u.department === department && u.role === 'Department Manager');
     }
-    if (managerUser) {
+    if (role === 'Department Manager') {
+        // Global rule: Department Managers have two managers (GM and Operation Manager)
+        managerIdInput.value = '';
+        setDisplay('General Manager and Operation Manager', '#d4edda', '#c3e6cb', 'As a Department Manager, both the GM and Operation Manager can approve your requests', '#28a745');
+    } else if (managerUser) {
         managerIdInput.value = managerUser.id;
         setDisplay(`${managerUser.name}`, '#d4edda', '#c3e6cb', `${managerUser.name} is the assigned manager for the ${department} department`, '#28a745');
     } else {

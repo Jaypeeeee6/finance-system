@@ -166,7 +166,7 @@ function updateManagerDisplay() {
     if (role === 'Department Manager' || (role === 'GM' && department === 'Office') || (role === 'Operation Manager' && department === 'Operation') || (role === 'Finance Admin' && department === 'Finance' && document.getElementById('name').value.trim() === 'Abdalaziz Al-Brashdi')) {
         managerIdInput.value = '';
         if (role === 'Department Manager') {
-            setDisplay('General Manager will be your assigned manager', '#d4edda', '#c3e6cb', 'As a Department Manager, the General Manager will approve your requests', '#28a745');
+            setDisplay('General Manager and Operation Manager', '#d4edda', '#c3e6cb', 'As a Department Manager, both the GM and Operation Manager can approve your requests', '#28a745');
         } else if (role === 'GM') {
             setDisplay('Abdalaziz Al-Brashdi will be your assigned manager', '#d4edda', '#c3e6cb', 'As a General Manager, Abdalaziz will approve your requests', '#28a745');
         } else {
@@ -191,7 +191,11 @@ function updateManagerDisplay() {
         // Fallback: Department Manager of same department
         managerUser = users.find(u => u.department === department && u.role === 'Department Manager');
     }
-    if (managerUser) {
+    if (role === 'Department Manager') {
+        // Global rule: Department Managers have two managers (GM and Operation Manager)
+        managerIdInput.value = '';
+        setDisplay('General Manager and Operation Manager', '#d4edda', '#c3e6cb', 'As a Department Manager, both the GM and Operation Manager can approve your requests', '#28a745');
+    } else if (managerUser) {
         managerIdInput.value = managerUser.id;
         setDisplay(`${managerUser.name}`, '#d4edda', '#c3e6cb', `${managerUser.name} is the assigned manager for the ${department} department`, '#28a745');
     } else {
