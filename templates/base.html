@@ -92,7 +92,7 @@
             <div class="maintenance-banner-content">
                 <i class="fas fa-tools"></i>
                 <span><strong>Maintenance Mode</strong> is ON. Non-IT users see a maintenance page.</span>
-                <form method="POST" action="{{ url_for('maintenance_disable') }}" style="margin-left:auto;">
+                <form method="POST" action="{{ url_for('maintenance_disable') }}" style="margin-left:auto;" onsubmit="return confirm('Disable maintenance mode and allow all users back in?');">
                     <button class="btn btn-sm btn-warning" type="submit"><i class="fas fa-power-off"></i> Disable</button>
                 </form>
             </div>
@@ -106,6 +106,7 @@
                 if(!toggleBtn) return;
                 toggleBtn.innerHTML = '<i class="fas fa-tools"></i> Enable Maintenance';
                 toggleBtn.onclick = async function(){
+                    if(!confirm('Enable maintenance mode? Non-IT users will be blocked until disabled.')) return;
                     const message = prompt('Optional message to display during maintenance:');
                     try{
                         await fetch('/maintenance/enable', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ message }) });
@@ -117,6 +118,7 @@
                 if(!toggleBtn) return;
                 toggleBtn.innerHTML = '<i class="fas fa-tools"></i> Disable Maintenance';
                 toggleBtn.onclick = async function(){
+                    if(!confirm('Disable maintenance mode and allow all users back in?')) return;
                     try{
                         await fetch('/maintenance/disable', { method:'POST' });
                         location.reload();
@@ -162,6 +164,30 @@
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     <script src="{{ url_for('static', filename='js/realtime.js') }}"></script>
     <script src="{{ url_for('static', filename='js/multiple-file-upload.js') }}"></script>
+    
+    <!-- Inactivity auto-logout (10 minutes) -->
+    {% if current_user.is_authenticated %}
+    <script>
+    (function(){
+        let idleTimer = null;
+        const IDLE_LIMIT_MS = 10 * 60 * 1000; // 10 minutes
+        const resetTimer = () => {
+            if (idleTimer) clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => {
+                // Redirect to server logout; server also enforces timeout
+                window.location.href = "{{ url_for('logout') }}";
+            }, IDLE_LIMIT_MS);
+        };
+        ['click','mousemove','keydown','scroll','touchstart','touchmove','focus'].forEach(evt => {
+            window.addEventListener(evt, resetTimer, { passive: true });
+        });
+        // Start timer on load
+        resetTimer();
+        // Also reset when tab becomes visible again
+        document.addEventListener('visibilitychange', function(){ if (!document.hidden) resetTimer(); });
+    })();
+    </script>
+    {% endif %}
     
     <!-- Notification Bell JavaScript -->
     <script>

@@ -261,6 +261,39 @@ def load_user(user_id):
     """Load user for Flask-Login"""
     return User.query.get(int(user_id))
 
+# --- Idle timeout enforcement ---
+@app.before_request
+def enforce_idle_timeout():
+    try:
+        # Skip static files, socket traffic, and login/logout routes
+        if request.path.startswith('/static') or request.path.startswith('/socket.io'):
+            return None
+        if request.endpoint in ['login', 'logout']:
+            return None
+        # Allow maintenance endpoints and health checks to pass through
+        if request.path.startswith('/maintenance') or request.path.startswith('/health'):
+            return None
+
+        if current_user.is_authenticated:
+            now_ts = datetime.utcnow().timestamp()
+            last_activity = session.get('last_activity', now_ts)
+            idle_seconds = now_ts - float(last_activity)
+            # 10 minutes = 600 seconds
+            if idle_seconds > 600:
+                # Invalidate session and force logout
+                try:
+                    logout_user()
+                except Exception:
+                    pass
+                session.clear()
+                flash('You were logged out due to inactivity.', 'warning')
+                return redirect(url_for('login'))
+            # Update last activity timestamp for active user
+            session['last_activity'] = now_ts
+    except Exception:
+        # Fail-open: do not block the request on any error here
+        return None
+
 # --- Maintenance gate ---
 @app.before_request
 def maintenance_gate():
@@ -1684,6 +1717,12 @@ def verify_pin():
             # Reset failed login attempts on successful login
             user.reset_failed_login()
             login_user(user, remember=True)
+            # Mark session as permanent and set activity timestamp
+            try:
+                session.permanent = True
+                session['last_activity'] = datetime.utcnow().timestamp()
+            except Exception:
+                pass
             log_action(f"User {username} logged in successfully with email PIN")
             
             return jsonify({
@@ -1773,6 +1812,12 @@ def login():
                 # Reset failed login attempts on successful login
                 user.reset_failed_login()
                 login_user(user, remember=True)
+                # Mark session as permanent and set activity timestamp
+                try:
+                    session.permanent = True
+                    session['last_activity'] = datetime.utcnow().timestamp()
+                except Exception:
+                    pass
                 app.logger.info(f"System user logged in successfully, redirecting to dashboard")
                 log_action(f"System account {username} logged in successfully (PIN bypassed)")
                 flash(f'Welcome back, {user.name}!', 'success')
@@ -1806,6 +1851,12 @@ def login():
                 # Reset failed login attempts on successful login
                 user.reset_failed_login()
                 login_user(user, remember=True)
+                # Mark session as permanent and set activity timestamp
+                try:
+                    session.permanent = True
+                    session['last_activity'] = datetime.utcnow().timestamp()
+                except Exception:
+                    pass
                 log_action(f"User {username} logged in successfully with email PIN")
                 flash(f'Welcome back, {user.name}!', 'success')
                 return redirect(url_for('dashboard'))
