@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Maintenance{% endblock %}
+
+{% block content %}
+<div class="dashboard-container" id="maintenance-page" style="text-align:center;">
+    <div class="card" style="max-width: 1000px; margin: 3rem auto;">
+        <div class="card-header" style="justify-content: center; text-align: center;">
+            <h2 style="margin: 0;"><i class="fas fa-tools"></i> System Maintenance</h2>
+        </div>
+        <div class="card-body" style="padding: 3rem; min-height: 280px; display: flex; align-items: center; justify-content: center; text-align: center;">
+            <p style="font-size:1.1rem;">{{ message or 'The system is undergoing maintenance. Please try again later.' }}</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+

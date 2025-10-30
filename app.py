@@ -13,10 +13,39 @@ import random
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType, Branch, FinanceAdminNote
 from config import Config
+import json
+
+# --- Maintenance mode storage (instance file) ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_INSTANCE_DIR = os.path.join(BASE_DIR, 'instance')
+MAINTENANCE_FILE_PATH = os.path.join(DEFAULT_INSTANCE_DIR, 'maintenance.json')
+
+def read_maintenance_state():
+    try:
+        with open(MAINTENANCE_FILE_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {"enabled": False, "message": "The system is undergoing maintenance. Please try again later."}
+
+def write_maintenance_state(enabled: bool, message: str = None):
+    state = read_maintenance_state()
+    state['enabled'] = bool(enabled)
+    if message is not None:
+        state['message'] = message
+    os.makedirs(os.path.dirname(MAINTENANCE_FILE_PATH), exist_ok=True)
+    with open(MAINTENANCE_FILE_PATH, 'w', encoding='utf-8') as f:
+        json.dump(state, f)
 
 # Initialize Flask app
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# Initialize maintenance path now that app is created
+try:
+    MAINTENANCE_FILE_PATH = os.path.join(app.instance_path, 'maintenance.json')
+except Exception:
+    # Fallback to default path if app.instance_path not available
+    MAINTENANCE_FILE_PATH = os.path.join(DEFAULT_INSTANCE_DIR, 'maintenance.json')
 
 # Make timedelta available in templates
 from datetime import timedelta
@@ -231,6 +260,87 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 def load_user(user_id):
     """Load user for Flask-Login"""
     return User.query.get(int(user_id))
+
+# --- Maintenance gate ---
+@app.before_request
+def maintenance_gate():
+    try:
+        state = read_maintenance_state()
+        if not state.get('enabled'):
+            return None
+
+        # Allow static and socket endpoints
+        if request.path.startswith('/static') or request.path.startswith('/socket.io'):
+            return None
+
+        # Allow maintenance endpoints so IT can toggle and for public status
+        if request.path.startswith('/maintenance'):
+            return None
+
+        # Allow health checks if any
+        if request.path.startswith('/health'):
+            return None
+
+        # Allow IT department users to proceed
+        if current_user.is_authenticated and (getattr(current_user, 'department', None) == 'IT'):
+            return None
+
+        # For everyone else, show maintenance page
+        message = state.get('message') or 'The system is undergoing maintenance. Please try again later.'
+        return render_template('maintenance.html', message=message), 503
+    except Exception:
+        # Fail-open on any error to avoid locking out IT unintentionally
+        return None
+
+# --- Maintenance endpoints (IT only) ---
+def it_department_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for('login'))
+        if getattr(current_user, 'department', None) != 'IT':
+            flash('Only IT department can perform this action.', 'danger')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return wrapper
+
+@app.route('/maintenance/status')
+@login_required
+@it_department_required
+def maintenance_status():
+    return jsonify(read_maintenance_state())
+
+@app.route('/maintenance/public_status')
+def maintenance_public_status():
+    state = read_maintenance_state()
+    return jsonify({ 'enabled': bool(state.get('enabled')) })
+
+@app.route('/maintenance/enable', methods=['POST'])
+@login_required
+@it_department_required
+def maintenance_enable():
+    message = request.form.get('message') or request.json.get('message') if request.is_json else None
+    write_maintenance_state(True, message)
+    log_action('Enabled maintenance mode')
+    try:
+        socketio.emit('maintenance_update', { 'enabled': True, 'message': message or '' }, broadcast=True)
+    except Exception:
+        pass
+    flash('Maintenance mode enabled.', 'warning')
+    return redirect(request.referrer or url_for('dashboard'))
+
+@app.route('/maintenance/disable', methods=['POST'])
+@login_required
+@it_department_required
+def maintenance_disable():
+    write_maintenance_state(False)
+    log_action('Disabled maintenance mode')
+    try:
+        socketio.emit('maintenance_update', { 'enabled': False }, broadcast=True)
+    except Exception:
+        pass
+    flash('Maintenance mode disabled.', 'success')
+    return redirect(request.referrer or url_for('dashboard'))
 
 
 def role_required(*roles):

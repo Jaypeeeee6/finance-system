@@ -69,6 +69,33 @@ function initRealTimeUpdates() {
         
         console.log(`🔔 DEBUG: User role: ${userRole} - Joined real-time notification rooms`);
     });
+
+    // Maintenance mode updates
+    socket.on('maintenance_update', function(state) {
+        try {
+            const dept = document.body.getAttribute('data-user-department');
+            const isIT = dept === 'IT';
+            if (!state) return;
+            if (state.enabled) {
+                if (isIT) {
+                    const banner = document.getElementById('maintenance-banner');
+                    if (banner) banner.style.display = 'block';
+                } else {
+                    window.location.reload();
+                }
+            } else {
+                if (isIT) {
+                    const banner = document.getElementById('maintenance-banner');
+                    if (banner) banner.style.display = 'none';
+                } else {
+                    // Bring users back if they were on maintenance page
+                    window.location.reload();
+                }
+            }
+        } catch (e) {
+            console.error('maintenance_update handling error', e);
+        }
+    });
     
     // Listen for disconnection
     socket.on('disconnect', function() {
@@ -125,6 +152,37 @@ function initRealTimeUpdates() {
     
     // Add visual indicator
     addRefreshIndicator();
+
+    // Polling fallback each 5s to ensure clients react even if sockets fail
+    try {
+        setInterval(function(){
+            fetch('/maintenance/public_status')
+                .then(r=>r.json())
+                .then(s=>{
+                    if (!s) return;
+                    const dept = document.body.getAttribute('data-user-department');
+                    const isIT = dept === 'IT';
+                    const onMaintPage = !!document.getElementById('maintenance-page');
+                    if (s.enabled) {
+                        if (!isIT) {
+                            window.location.reload();
+                        } else {
+                            const banner = document.getElementById('maintenance-banner');
+                            if (banner) banner.style.display = 'block';
+                        }
+                    } else {
+                        // If maintenance turned off while user is on maintenance page, bring them back
+                        if (onMaintPage) {
+                            window.location.reload();
+                        } else if (isIT) {
+                            const banner = document.getElementById('maintenance-banner');
+                            if (banner) banner.style.display = 'none';
+                        }
+                    }
+                })
+                .catch(()=>{});
+        }, 5000);
+    } catch (e) { /* ignore */ }
 }
 
 /**

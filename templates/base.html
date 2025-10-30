@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     {% block extra_css %}{% endblock %}
 </head>
-<body {% if current_user.is_authenticated %}data-user-role="{{ current_user.role }}"{% endif %}>
+<body {% if current_user.is_authenticated %}data-user-role="{{ current_user.role }}" data-user-department="{{ current_user.department }}"{% endif %}>
     {% if current_user.is_authenticated %}
     <nav class="navbar">
         <div class="nav-container">
@@ -67,6 +67,13 @@
                         <span class="user-role">{{ current_user.role }}</span>
                     </span>
                 </li>
+                {% if current_user.is_authenticated and current_user.department == 'IT' %}
+                <li>
+                    <button id="maintenance-toggle" class="nav-link" style="cursor: pointer;">
+                        <i class="fas fa-tools"></i> Maintenance
+                    </button>
+                </li>
+                {% endif %}
                 <li><a href="{{ url_for('logout') }}" class="nav-link logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
             </ul>
         </div>
@@ -74,6 +81,63 @@
     {% endif %}
 
     <main class="main-content">
+        {% set maint = None %}
+        {% if current_user.is_authenticated and current_user.department == 'IT' %}
+            {% set maint = namespace(enabled=false, message='') %}
+            {# IT users see an active maintenance banner if enabled #}
+            {% if false %}{% endif %}
+        {% endif %}
+        {% if current_user.is_authenticated and current_user.department == 'IT' %}
+        <div id="maintenance-banner" style="display:none;" class="maintenance-banner">
+            <div class="maintenance-banner-content">
+                <i class="fas fa-tools"></i>
+                <span><strong>Maintenance Mode</strong> is ON. Non-IT users see a maintenance page.</span>
+                <form method="POST" action="{{ url_for('maintenance_disable') }}" style="margin-left:auto;">
+                    <button class="btn btn-sm btn-warning" type="submit"><i class="fas fa-power-off"></i> Disable</button>
+                </form>
+            </div>
+        </div>
+        <script>
+        // Fetch status to toggle banner for IT users and set toggle button behavior
+        (function(){
+            const banner = document.getElementById('maintenance-banner');
+            const toggleBtn = document.getElementById('maintenance-toggle');
+            function setEnableBehavior(){
+                if(!toggleBtn) return;
+                toggleBtn.innerHTML = '<i class="fas fa-tools"></i> Enable Maintenance';
+                toggleBtn.onclick = async function(){
+                    const message = prompt('Optional message to display during maintenance:');
+                    try{
+                        await fetch('/maintenance/enable', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ message }) });
+                        location.reload();
+                    }catch(e){ console.error(e); }
+                };
+            }
+            function setDisableBehavior(){
+                if(!toggleBtn) return;
+                toggleBtn.innerHTML = '<i class="fas fa-tools"></i> Disable Maintenance';
+                toggleBtn.onclick = async function(){
+                    try{
+                        await fetch('/maintenance/disable', { method:'POST' });
+                        location.reload();
+                    }catch(e){ console.error(e); }
+                };
+            }
+            fetch('/maintenance/status')
+                .then(r=>r.json())
+                .then(s=>{
+                    if(s.enabled){
+                        if(banner) banner.style.display = 'block';
+                        setDisableBehavior();
+                    } else {
+                        if(banner) banner.style.display = 'none';
+                        setEnableBehavior();
+                    }
+                })
+                .catch(()=>{ setEnableBehavior(); });
+        })();
+        </script>
+        {% endif %}
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="flash-messages">
