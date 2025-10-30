@@ -76,6 +76,7 @@
                         <select name="role" id="role" required>
                             <option value="">-- Select Role --</option>
                             <!-- Management Roles -->
+                            <option value="CEO" {% if user_to_edit.role == 'CEO' %}selected{% endif %}>CEO</option>
                             <option value="GM" {% if user_to_edit.role == 'GM' %}selected{% endif %}>General Manager</option>
                             <option value="Finance Admin" {% if user_to_edit.role == 'Finance Admin' %}selected{% endif %}>Finance Admin</option>
                             <option value="Operation Manager" {% if user_to_edit.role == 'Operation Manager' %}selected{% endif %}>Operation Manager</option>
@@ -168,12 +169,12 @@ function updateManagerDisplay() {
         return;
     }
 
-    if (role === 'Department Manager' || (role === 'GM' && department === 'Office') || (role === 'Operation Manager' && department === 'Operation') || (role === 'Finance Admin' && department === 'Finance' && document.getElementById('name').value.trim() === 'Abdalaziz Al-Brashdi')) {
+    if (role === 'Department Manager' || ((role === 'GM' || role === 'CEO') && department === 'Office') || (role === 'Operation Manager' && department === 'Operation') || (role === 'Finance Admin' && department === 'Finance' && document.getElementById('name').value.trim() === 'Abdalaziz Al-Brashdi')) {
         managerIdInput.value = '';
         if (role === 'Department Manager') {
             setDisplay('General Manager and Operation Manager', '#d4edda', '#c3e6cb', 'As a Department Manager, both the GM and Operation Manager can approve your requests', '#28a745');
-        } else if (role === 'GM') {
-            setDisplay('Abdalaziz Al-Brashdi will be your assigned manager', '#d4edda', '#c3e6cb', 'As a General Manager, Abdalaziz will approve your requests', '#28a745');
+        } else if (role === 'GM' || role === 'CEO') {
+            setDisplay('Abdalaziz Al-Brashdi will be your assigned manager', '#d4edda', '#c3e6cb', 'As a GM/CEO, Abdalaziz will approve your requests', '#28a745');
         } else {
             setDisplay('You will be the assigned manager for this department', '#d4edda', '#c3e6cb', 'As a Manager, you will manage this department', '#28a745');
         }

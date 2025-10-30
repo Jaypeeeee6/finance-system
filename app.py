@@ -663,7 +663,7 @@ def notify_recurring_payment_due(request_id, user_id, title, message):
 def notify_system_wide(title, message, notification_type):
     """Notify all users who should receive system-wide notifications"""
     # Roles that receive system-wide notifications
-    system_roles = ['Finance Admin', 'Finance Staff', 'GM', 'Operation Manager', 'IT Staff', 'Department Manager']
+    system_roles = ['Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'Department Manager']
     
     for role in system_roles:
         users = User.query.filter_by(role=role).all()
@@ -1293,7 +1293,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                 )
             ).order_by(Notification.created_at.desc())
 
-    elif user.role == 'GM':
+    elif user.role in ['GM', 'CEO']:
         # GM: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide + temporary manager assignments
         query = Notification.query.filter(
             db.and_(
@@ -1475,7 +1475,7 @@ def get_unread_count_for_user(user):
                 )
             ).count()
     
-    elif user.role == 'GM':
+    elif user.role in ['GM', 'CEO']:
         # GM: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide
         return Notification.query.filter(
             db.and_(
@@ -2019,6 +2019,8 @@ def dashboard():
         return redirect(url_for('finance_dashboard'))
     elif role == 'GM':
         return redirect(url_for('gm_dashboard'))
+    elif role == 'CEO':
+        return redirect(url_for('ceo_dashboard'))
     elif role == 'IT Staff':
         return redirect(url_for('it_dashboard'))
     elif role == 'Department Manager':
@@ -2126,6 +2128,10 @@ def department_dashboard():
         # For regular users, show their own requests
         base_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
     
+    # Exclude CEO-submitted requests for non-authorized roles (visibility hardening)
+    if current_user.role not in ['Finance Admin', 'GM', 'Operation Manager']:
+        base_query = base_query.filter(~PaymentRequest.user.has(User.role == 'CEO'))
+
     # Apply urgent filter if provided (before tab filtering)
     if urgent_filter == 'urgent':
         base_query = base_query.filter(PaymentRequest.is_urgent == True)
@@ -2344,23 +2350,35 @@ def admin_dashboard():
     # Finance Admin can see finance-related statuses + Pending Manager Approval from Finance department only (or their own requests)
     finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
 
-    # For Abdalaziz, also include Pending Manager Approval requests from Finance department OR his own requests
+    # For Abdalaziz, also include Pending Manager Approval and Rejected by Manager
+    # for Finance department, his own requests, temporary manager assignments,
+    # and requests submitted by Finance Staff, GM, Operation Manager, and CEO
     if current_user.name == 'Abdalaziz Al-Brashdi':
-        # Include finance statuses + Pending Manager Approval from Finance department OR his own requests
+        special_submitter_roles = ['Finance Staff', 'GM', 'Operation Manager', 'CEO']
         query = PaymentRequest.query.filter(
             db.or_(
                 PaymentRequest.status.in_(finance_statuses),
-                # Pending Manager Approval from Finance department only
+                # Pending Manager Approval from Finance department
                 db.and_(
                     PaymentRequest.status == 'Pending Manager Approval',
                     PaymentRequest.department == 'Finance'
                 ),
+                # Rejected by Manager from Finance department
+                db.and_(
+                    PaymentRequest.status == 'Rejected by Manager',
+                    PaymentRequest.department == 'Finance'
+                ),
                 # Always include current user's own requests regardless of status
                 PaymentRequest.user_id == current_user.user_id,
-                # Also include requests where the current user is temporarily assigned as manager
+                # Include requests where the current user is temporarily assigned as manager
                 db.and_(
                     PaymentRequest.status == 'Pending Manager Approval',
                     PaymentRequest.temporary_manager_id == current_user.user_id
+                ),
+                # Include PMA/Rejected-by-Manager for specific submitter roles (GM/CEO/etc.)
+                db.and_(
+                    PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager']),
+                    PaymentRequest.user.has(User.role.in_(special_submitter_roles))
                 )
             )
         )
@@ -2478,6 +2496,9 @@ def finance_dashboard():
     
     # Base query for finance-related statuses
     query = PaymentRequest.query.filter(PaymentRequest.status.in_(finance_statuses))
+    # Visibility hardening: Finance Staff must not see CEO-submitted requests
+    if current_user.role == 'Finance Staff':
+        query = query.filter(~PaymentRequest.user.has(User.role == 'CEO'))
     
     # Add Finance Staff's own requests with Pending Manager Approval and Rejected by Manager
     if current_user.role == 'Finance Staff':
@@ -2692,6 +2713,102 @@ def gm_dashboard():
                          active_tab=tab)
 
 
+@app.route('/ceo/dashboard')
+@login_required
+@role_required('CEO')
+def ceo_dashboard():
+    """Dashboard for CEO - identical to GM but view-only (no approval actions)"""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    department_filter = request.args.get('department', None)
+    status_filter = request.args.get('status', None)
+    search_query = request.args.get('search', None)
+    urgent_filter = request.args.get('urgent', None)
+    tab = request.args.get('tab', 'all')
+
+    if per_page not in [10, 20, 50, 100]:
+        per_page = 10
+
+    query = PaymentRequest.query
+    if department_filter:
+        query = query.filter(PaymentRequest.department == department_filter)
+    if search_query:
+        try:
+            search_id = int(search_query)
+            query = query.filter(PaymentRequest.request_id == search_id)
+        except ValueError:
+            query = query.filter(PaymentRequest.request_id == -1)
+    if urgent_filter:
+        if urgent_filter == 'urgent':
+            query = query.filter(PaymentRequest.is_urgent == True)
+        elif urgent_filter == 'not_urgent':
+            query = query.filter(PaymentRequest.is_urgent == False)
+
+    if tab == 'completed':
+        query = query.filter(PaymentRequest.status.in_(['Completed', 'Paid', 'Approved']))
+    elif tab == 'rejected':
+        query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
+    elif tab == 'recurring':
+        query = query.filter(PaymentRequest.status == 'Recurring')
+    elif tab == 'my_requests':
+        query = query.filter(PaymentRequest.user_id == current_user.user_id)
+    elif tab == 'all':
+        if status_filter:
+            query = query.filter(PaymentRequest.status == status_filter)
+
+    requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+
+    all_requests = PaymentRequest.query.all()
+    stats = {
+        'total_requests': len(all_requests),
+        'approved': len([r for r in all_requests if r.status == 'Approved']),
+        'pending': len([r for r in all_requests if r.status == 'Pending']),
+        'total_amount': sum([float(r.amount) for r in all_requests if r.status == 'Approved'])
+    }
+
+    notifications = get_notifications_for_user(current_user)
+    unread_count = get_unread_count_for_user(current_user)
+
+    completed_query = PaymentRequest.query
+    rejected_query = PaymentRequest.query
+    recurring_query = PaymentRequest.query
+    if department_filter:
+        completed_query = completed_query.filter(PaymentRequest.department == department_filter)
+        rejected_query = rejected_query.filter(PaymentRequest.department == department_filter)
+        recurring_query = recurring_query.filter(PaymentRequest.department == department_filter)
+
+    completed_query = completed_query.filter(PaymentRequest.status == 'Completed')
+    rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
+    recurring_query = recurring_query.filter(PaymentRequest.status == 'Recurring')
+
+    completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
+    rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
+    recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
+
+    my_requests_query = PaymentRequest.query.filter(PaymentRequest.user_id == current_user.user_id)
+    my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+
+    return render_template('ceo_dashboard.html',
+                          requests=requests_pagination.items,
+                          pagination=requests_pagination,
+                          stats=stats,
+                          user=current_user,
+                          notifications=notifications,
+                          unread_count=unread_count,
+                          department_filter=department_filter,
+                          status_filter=status_filter,
+                          search_query=search_query,
+                          urgent_filter=urgent_filter,
+                          completed_requests=completed_requests,
+                          rejected_requests=rejected_requests,
+                          recurring_requests=recurring_requests,
+                          my_requests=my_requests_pagination.items,
+                          active_tab=tab)
+
 @app.route('/it/dashboard')
 @login_required
 @role_required('IT Staff', 'Department Manager')
@@ -2721,7 +2838,7 @@ def it_dashboard():
     
     # Build query with optional department and search filters
     if current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT'):
-        # IT users and IT Department Managers see all requests
+        # IT users and IT Department Managers see all requests (sensitive fields masked in UI)
         query = PaymentRequest.query
     else:
         # Other users should not see requests that are still pending manager approval
@@ -2808,7 +2925,10 @@ def it_dashboard():
     
     # Apply department filter if specified
     if department_filter and department_filter != 'all':
-        request_types_query = request_types_query.filter(RequestType.department == department_filter)
+        if department_filter == 'Management':
+            request_types_query = request_types_query.filter(RequestType.department.in_(['Management', 'General Manager']))
+        else:
+            request_types_query = request_types_query.filter(RequestType.department == department_filter)
     
     request_types = request_types_query.order_by(RequestType.id).all()
     
@@ -2821,9 +2941,12 @@ def it_dashboard():
     
     branches = branches_query.order_by(Branch.id).all()
     
-    # Get all departments for the filter dropdown
+    # Get all departments for the filter dropdown and normalize legacy label
     all_departments = db.session.query(RequestType.department).distinct().order_by(RequestType.department).all()
-    departments = [dept[0] for dept in all_departments]
+    departments = []
+    for dept in all_departments:
+        d = dept[0]
+        departments.append('Management' if d == 'General Manager' else d)
     
     return render_template('it_dashboard.html', 
                          requests=requests_pagination.items, 
@@ -2873,7 +2996,10 @@ def manage_request_types():
     query = RequestType.query
     
     if department_filter:
-        query = query.filter(RequestType.department == department_filter)
+        if department_filter == 'Management':
+            query = query.filter(RequestType.department.in_(['Management', 'General Manager']))
+        else:
+            query = query.filter(RequestType.department == department_filter)
     
     if search_query:
         query = query.filter(RequestType.name.contains(search_query))
@@ -2883,9 +3009,9 @@ def manage_request_types():
         page=page, per_page=per_page, error_out=False
     )
     
-    # Get all departments for filter dropdown
+    # Get all departments for filter dropdown (normalize legacy values)
     departments = db.session.query(RequestType.department).distinct().all()
-    departments = [dept[0] for dept in departments]
+    departments = [('Management' if dept[0] == 'General Manager' else dept[0]) for dept in departments]
     
     return render_template('manage_request_types.html',
                          request_types=request_types_pagination.items,
@@ -2944,7 +3070,7 @@ def add_request_type():
             return redirect(url_for('add_request_type'))
     
     # Get all departments for dropdown
-    departments = ['General Manager', 'Finance', 'Operation', 'PR', 'Maintenance', 'Marketing', 
+    departments = ['Management', 'Finance', 'Operation', 'PR', 'Maintenance', 'Marketing', 
                    'Logistic', 'HR', 'Quality Control', 'Procurement', 'IT', 'Customer Service', 
                    'Project']
     
@@ -3006,7 +3132,7 @@ def edit_request_type(request_type_id):
             return redirect(url_for('edit_request_type', request_type_id=request_type_id))
     
     # Get all departments for dropdown
-    departments = ['General Manager', 'Finance', 'Operation', 'PR', 'Maintenance', 'Marketing', 
+    departments = ['Management', 'Finance', 'Operation', 'PR', 'Maintenance', 'Marketing', 
                    'Logistic', 'HR', 'Quality Control', 'Procurement', 'IT', 'Customer Service', 
                    'Project']
     
@@ -3613,10 +3739,10 @@ def get_available_request_types():
     user_role = current_user.role
     
     # Query request types based on user's department and role
-    if user_role == 'GM':
-        # General Manager can only see Personal Expenses request type
+    if user_role in ['GM', 'CEO']:
+        # Management roles see request types under the Management department
         return RequestType.query.filter(
-            RequestType.name == 'Personal Expenses',
+            RequestType.department == 'Management',
             RequestType.is_active == True
         ).order_by(RequestType.id).all()
     elif user_role in ['Finance Admin', 'Finance Staff']:
@@ -4215,7 +4341,7 @@ def favicon():
 
 @app.route('/write-cheque', methods=['GET', 'POST'])
 @login_required
-@role_required('GM', 'Operation Manager')
+@role_required('GM', 'CEO', 'Operation Manager')
 def write_cheque():
     """Write a cheque for approved payment requests"""
     if request.method == 'POST':
@@ -4240,9 +4366,15 @@ def view_request(request_id):
         db.joinedload(PaymentRequest.user)
     ).get_or_404(request_id)
     
+    # Hard restriction: CEO requests are viewable by Finance Admins, GM, Operation Manager, IT roles, or the CEO themself
+    if getattr(req.user, 'role', None) == 'CEO':
+        it_allowed = (current_user.role == 'IT Staff') or (current_user.role == 'Department Manager' and current_user.department == 'IT')
+        if current_user.user_id != req.user_id and current_user.role not in ['Finance Admin', 'GM', 'Operation Manager'] and not it_allowed:
+            return render_template('403.html'), 403
+
     # Check permissions
     # Allow Operation Manager, IT users, and IT Department Managers to view all requests (same as GM visibility)
-    if current_user.role not in ['Finance Admin', 'Finance Staff', 'GM', 'IT Staff', 'Project Staff', 'Operation Manager']:
+    if current_user.role not in ['Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Project Staff', 'Operation Manager']:
         # Auditing Department users (Staff and Department Manager) can view their own requests OR Completed/Recurring requests from other departments
         if current_user.department == 'Auditing' and (current_user.role == 'Auditing Staff' or current_user.role == 'Department Manager'):
             # Allow if:
@@ -4291,9 +4423,9 @@ def view_request(request_id):
                 # Finance users can only view requests in finance-related statuses
                 finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
                 
-                # For Abdalaziz, also allow viewing Pending Manager Approval and Rejected by Manager requests from Finance department OR his own requests
+                # For Abdalaziz, also allow viewing PMA/Rejected-by-Manager for Finance dept, his own, and GM/CEO/Operation Manager submissions
                 if current_user.name == 'Abdalaziz Al-Brashdi' and req.status in ['Pending Manager Approval', 'Rejected by Manager']:
-                    if req.department == 'Finance' or req.user_id == current_user.user_id:
+                    if (req.department == 'Finance' or req.user_id == current_user.user_id or getattr(req.user, 'role', None) in ['GM', 'CEO', 'Operation Manager']):
                         pass  # Allow access
                     else:
                         flash('You do not have permission to view this request.', 'danger')
@@ -5534,8 +5666,16 @@ def manager_approve_request(request_id):
             is_authorized = False
     else:
         # No temporary manager assigned, use standard authorization checks
-        # New global rule: GM and Operation Manager can approve ANY request at manager stage
-        if current_user.role in ['GM', 'Operation Manager']:
+        # Hard rule: Requests submitted by GM/CEO/Operation Manager can ONLY be approved by Abdalaziz (Finance Admin)
+        if req.user.role in ['GM', 'CEO', 'Operation Manager']:
+            if current_user.name == 'Abdalaziz Al-Brashdi':
+                is_authorized = True
+                print("DEBUG: Authorized via Abdalaziz-only rule for GM/CEO/Operation Manager submitter")
+            else:
+                is_authorized = False
+                print("DEBUG: Blocked - only Abdalaziz can approve GM/CEO/Operation Manager submitter")
+        # General rule for other requests
+        elif current_user.role in ['GM', 'Operation Manager']:
             is_authorized = True
             print("DEBUG: Authorized via global GM/Operation Manager rule")
         else:
@@ -5554,10 +5694,10 @@ def manager_approve_request(request_id):
         elif (current_user.role == 'Operation Manager' and req.user.role == 'Department Manager'):
             is_authorized = True
             print("DEBUG: Authorized via Operation Manager role for Department Manager")
-        # Special case: Abdalaziz can approve General Manager requests
-        elif (current_user.name == 'Abdalaziz Al-Brashdi' and req.user.role == 'GM'):
+        # Special case: Abdalaziz can approve General Manager and CEO requests
+        elif (current_user.name == 'Abdalaziz Al-Brashdi' and req.user.role in ['GM','CEO']):
             is_authorized = True
-            print("DEBUG: Authorized via Abdalaziz role for General Manager")
+            print("DEBUG: Authorized via Abdalaziz role for GM/CEO")
         # Special case: Abdalaziz can approve Finance Staff requests
         elif (current_user.name == 'Abdalaziz Al-Brashdi' and req.user.role == 'Finance Staff'):
             is_authorized = True
@@ -6404,7 +6544,7 @@ def get_installment_edit_history(schedule_id):
 
 @app.route('/reports')
 @login_required
-@role_required('Finance Admin', 'Finance Staff', 'GM', 'IT Staff', 'Department Manager', 'Operation Manager')
+@role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager')
 def reports():
     """View reports page"""
     # Restrict Department Managers to IT department only
@@ -6518,7 +6658,7 @@ def api_request_types():
 
 @app.route('/reports/export/excel')
 @login_required
-@role_required('Finance Admin', 'Finance Staff', 'GM', 'IT Staff', 'Operation Manager')
+@role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Operation Manager')
 def export_reports_excel():
     """Export filtered reports to an Excel file with frozen columns"""
     # Lazy imports to avoid hard dependency during app startup
@@ -6981,8 +7121,8 @@ def new_user():
         if role == 'Department Manager':
             gm_user = User.query.filter_by(role='GM').first()
             final_manager_id = gm_user.user_id if gm_user else None
-        # If the new user IS a General Manager, they are managed by Abdalaziz (Finance Admin)
-        elif role == 'GM':
+        # If the new user IS a General Manager or CEO, they are managed by Abdalaziz (Finance Admin)
+        elif role in ['GM', 'CEO']:
             abdalaziz_user = User.query.filter_by(name='Abdalaziz Al-Brashdi', department='Finance').first()
             final_manager_id = abdalaziz_user.user_id if abdalaziz_user else None
         else:
@@ -7075,7 +7215,7 @@ def edit_user(user_id):
         if new_role == 'Department Manager':
             gm_user = User.query.filter_by(role='GM').first()
             final_manager_id = gm_user.user_id if gm_user else None
-        elif new_role == 'GM':
+        elif new_role in ['GM', 'CEO']:
             abdalaziz_user = User.query.filter_by(name='Abdalaziz Al-Brashdi', department='Finance').first()
             final_manager_id = abdalaziz_user.user_id if abdalaziz_user else None
         else:
@@ -7613,13 +7753,13 @@ def internal_error(error):
 
 
 @app.route('/admin/calendar')
-@role_required('Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'Operation Manager', 'IT Staff', 'IT Department Manager')
+@role_required('Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'IT Department Manager')
 def admin_calendar():
     """Calendar view for recurring payments (Admin and Project roles)"""
     return render_template('admin_calendar.html')
 
 @app.route('/api/admin/recurring-events')
-@role_required('Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'Operation Manager', 'IT Staff', 'IT Department Manager')
+@role_required('Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'IT Department Manager')
 def api_admin_recurring_events():
     """API endpoint for calendar events (Admin and Project roles)"""
     try:

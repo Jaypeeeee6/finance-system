@@ -42,6 +42,11 @@ This document describes who can view what, who can approve/reject, and how a pay
   - **Approve/Reject (Manager Stage)**: All requests regardless of department and role
   - Note: If a temporary manager is assigned, only the temporary manager can approve/reject.
 
+- **CEO**
+  - **View**: All departments, all roles, all statuses (same visibility as GM)
+  - **Approve/Reject**: None (view-only everywhere)
+  - Note: CEO cannot take approval or rejection actions at any stage.
+
 - **Operation Manager**
   - **View**: All departments, all roles, all statuses
   - **Approve/Reject (Manager Stage)**: All requests regardless of department and role
@@ -51,14 +56,13 @@ This document describes who can view what, who can approve/reject, and how a pay
 - **Finance Admin** (users: Mahmood Al-Mandhari, Abdalaziz Al-Brashdi)
   - **View**: All departments, all roles; finance-related statuses across the board
     - Statuses of interest: Pending Finance Approval, Proof Pending, Proof Sent, Recurring, Completed, Rejected by Finance
-    - Additional for Abdalaziz Al-Brashdi: Pending Manager Approval (only for Finance Staff, General Manager, and Operation Manager requests)
-    - Additional for Abdalaziz Al-Brashdi: Rejected by Manager (only for Finance Staff, General Manager, and Operation Manager requests)
+    - Additional for Abdalaziz Al-Brashdi: Pending Manager Approval (Finance Dept requests; and for Finance Staff, General Manager, Operation Manager, and CEO requests)
   - **Approve/Reject**: All departments as Finance Admin approvers, only after manager approval
 
 - **Finance Admin (Abdalaziz Al-Brashdi)**
   - **View**: Same as Finance Admin
   - **Approve/Reject**: Same as Finance Admin
-  - **Additional Responsibility**: Assigned Manager for Finance Staff, General Manager, and Operation Manager requests (performs manager approval for these roles before Finance Admin approval stage)
+  - **Additional Responsibility**: Assigned Manager for Finance Staff, CEO, General Manager, and Operation Manager requests (performs manager approval for these roles before Finance Admin approval stage)
 
 - **Finance Staff**
   - **View**: All departments, all roles; finance-related statuses across the board
@@ -109,6 +113,7 @@ Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Qual
 ### Manager Assignment Rules
 - **Department Managers**: Assigned to General Manager and Operation Manager
 - **General Manager**: Assigned to Abdalaziz Al-Brashdi (Finance Admin)
+- **CEO**: Assigned to Abdalaziz Al-Brashdi (Finance Admin)
 - **Operation Department**: Assigned to Operation Manager
 - **Project**: Assigned to Operation Manager (same as Operation Department)
 - **Finance Department**: Assigned to Abdalaziz Al-Brashdi (Finance Admin)
@@ -158,6 +163,11 @@ Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Qual
 - **System-wide notifications** (all types)
 
 ### **General Manager (GM)**
+- **New submissions** from users with role "Department Manager" only
+- **Updates on their own requests** (status changes, approvals, rejections, etc.)
+- **System-wide notifications** (all types)
+
+### **CEO**
 - **New submissions** from users with role "Department Manager" only
 - **Updates on their own requests** (status changes, approvals, rejections, etc.)
 - **System-wide notifications** (all types)
@@ -291,6 +301,7 @@ The calendar feature (`/admin/calendar`) provides a visual view of upcoming recu
 - **Finance Admin** - Full calendar access to all departments' recurring payments
 - **Finance Staff** - Full calendar access to all departments' recurring payments  
 - **General Manager (GM)** - Full calendar access to all departments' recurring payments
+- **CEO** - Full calendar access to all departments' recurring payments
 - **Operation Manager** - Full calendar access to all departments' recurring payments
 - **IT Staff** - Full calendar access to all departments' recurring payments
 - **IT Department Manager** - Full calendar access to all departments' recurring payments
