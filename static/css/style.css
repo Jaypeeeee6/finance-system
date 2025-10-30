@@ -690,7 +690,7 @@ body {
 }
 
 .nav-container {
-    max-width: 1400px;
+    max-width: 1980px;
     margin: 0 auto;
     padding: 1rem 2rem;
     display: flex;
@@ -996,9 +996,9 @@ body {
 
 /* ==================== MAIN CONTENT ==================== */
 .main-content {
-    max-width: 1400px;
+    max-width: 1980px;
     margin: 2rem auto;
-    padding: 0 2rem;
+    padding: 0 0.5rem;
     min-height: calc(100vh - 200px);
 }
 
@@ -1006,7 +1006,7 @@ body {
 .dashboard-container {
     background: var(--white);
     border-radius: 15px;
-    padding: 2rem;
+    padding: 1.5rem 0.5rem;
     box-shadow: var(--shadow);
 }
 
@@ -1096,7 +1096,7 @@ body {
 .card-header {
     background: var(--dark-color) !important;
     color: var(--white) !important;
-    padding: 1rem 1.5rem;
+    padding: 0.75rem 0.75rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1118,7 +1118,7 @@ body {
 }
 
 .card-body {
-    padding: 1.5rem;
+    padding: 0.75rem;
 }
 
 /* ==================== FORMS ==================== */
