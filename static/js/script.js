@@ -371,9 +371,25 @@ if (mobileToggle) {
 }
 
 // ==================== LOADING INDICATOR ====================
+let isLoadingShown = false;
+let navigationIntentDetected = false;
+
 function showLoading() {
+    // Prevent showing loader if already shown or if no navigation intent
+    if (isLoadingShown || !navigationIntentDetected) {
+        return;
+    }
+    
+    // Double-check that we don't already have a loader
+    if (document.getElementById('global-loader')) {
+        isLoadingShown = true;
+        return;
+    }
+    
+    isLoadingShown = true;
     const loader = document.createElement('div');
     loader.id = 'global-loader';
+    loader.dataset.createdAt = Date.now().toString();
     loader.innerHTML = '<div class="spinner"></div>';
     loader.style.cssText = `
         position: fixed;
@@ -412,14 +428,85 @@ function showLoading() {
 }
 
 function hideLoading() {
+    isLoadingShown = false;
+    navigationIntentDetected = false;
     const loader = document.getElementById('global-loader');
     if (loader) {
         loader.remove();
     }
 }
 
-// Show loading on page navigation
-window.addEventListener('beforeunload', showLoading);
+// Track user navigation intent (clicks on links, form submissions, etc.)
+document.addEventListener('click', function(e) {
+    const target = e.target;
+    // Check if clicking on a link that navigates away
+    if (target.tagName === 'A' && target.href && !target.href.startsWith('javascript:') && !target.hasAttribute('download')) {
+        const currentHost = window.location.host;
+        const linkHost = new URL(target.href, window.location.href).host;
+        // Only set navigation intent for external links or links that change the page
+        if (linkHost !== currentHost || target.target === '_blank') {
+            navigationIntentDetected = true;
+        } else {
+            // For same-origin links, check if it's actually a navigation
+            const currentPath = window.location.pathname;
+            const linkPath = new URL(target.href, window.location.href).pathname;
+            if (linkPath !== currentPath) {
+                navigationIntentDetected = true;
+            }
+        }
+    }
+}, true); // Use capture phase to catch all clicks
+
+// Track form submissions
+document.addEventListener('submit', function(e) {
+    const form = e.target;
+    // Only show loading for forms that actually submit (not AJAX forms)
+    if (form.tagName === 'FORM' && !form.hasAttribute('data-no-loading')) {
+        navigationIntentDetected = true;
+    }
+}, true);
+
+// Reset navigation intent after a short delay (in case beforeunload doesn't fire)
+setTimeout(function() {
+    navigationIntentDetected = false;
+}, 100);
+
+// Show loading on page navigation, but only if navigation was intentional
+window.addEventListener('beforeunload', function(e) {
+    // Only show loading if we detected actual navigation intent
+    // AND the event is actually a navigation (not just browser optimization)
+    if (navigationIntentDetected) {
+        showLoading();
+    }
+});
+
+// Auto-hide loading if page becomes visible again (user came back)
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+        // Hide any stuck loaders when user returns to tab
+        hideLoading();
+    }
+});
+
+// Hide loading on page load (in case it got stuck)
+document.addEventListener('DOMContentLoaded', function() {
+    hideLoading();
+});
+
+// Additional safety: Hide loading if it's been visible for more than 5 seconds
+setInterval(function() {
+    const loader = document.getElementById('global-loader');
+    if (loader && isLoadingShown) {
+        const createdAt = parseInt(loader.dataset.createdAt || '0');
+        if (createdAt > 0) {
+            const loaderAge = Date.now() - createdAt;
+            if (loaderAge > 5000) {
+                console.warn('Loading indicator was visible for too long, hiding it');
+                hideLoading();
+            }
+        }
+    }
+}, 1000);
 
 // ==================== DATA VALIDATION HELPERS ====================
 // Email validation
