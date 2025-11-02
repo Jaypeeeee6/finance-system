@@ -70,26 +70,47 @@ function initRealTimeUpdates() {
         console.log(`🔔 DEBUG: User role: ${userRole} - Joined real-time notification rooms`);
     });
 
+    // Track maintenance state for WebSocket updates
+    let wsMaintenanceState = null;
+    
     // Maintenance mode updates
     socket.on('maintenance_update', function(state) {
         try {
+            if (!state) return;
+            
+            // Only reload if state has actually changed
+            if (wsMaintenanceState === state.enabled) {
+                return; // State hasn't changed, skip
+            }
+            
+            // Update tracked state
+            wsMaintenanceState = state.enabled;
+            
             const dept = document.body.getAttribute('data-user-department');
             const isIT = dept === 'IT';
-            if (!state) return;
+            const onMaintPage = !!document.getElementById('maintenance-page');
+            
             if (state.enabled) {
+                // Maintenance just turned ON
                 if (isIT) {
                     const banner = document.getElementById('maintenance-banner');
                     if (banner) banner.style.display = 'block';
                 } else {
-                    window.location.reload();
+                    // Only reload if we're not already on maintenance page
+                    if (!onMaintPage) {
+                        window.location.reload();
+                    }
                 }
             } else {
+                // Maintenance just turned OFF
                 if (isIT) {
                     const banner = document.getElementById('maintenance-banner');
                     if (banner) banner.style.display = 'none';
                 } else {
-                    // Bring users back if they were on maintenance page
-                    window.location.reload();
+                    // Only reload if we're on maintenance page (to bring user back)
+                    if (onMaintPage) {
+                        window.location.reload();
+                    }
                 }
             }
         } catch (e) {
@@ -154,35 +175,68 @@ function initRealTimeUpdates() {
     addRefreshIndicator();
 
     // Polling fallback each 5s to ensure clients react even if sockets fail
+    // Track previous maintenance state to only reload when state actually changes
+    let previousMaintenanceState = null;
+    let maintenanceCheckInitialized = false;
+    
     try {
-        setInterval(function(){
+        const maintenanceCheckInterval = setInterval(function(){
             fetch('/maintenance/public_status')
                 .then(r=>r.json())
                 .then(s=>{
                     if (!s) return;
+                    
+                    // Skip first check to establish baseline
+                    if (!maintenanceCheckInitialized) {
+                        previousMaintenanceState = s.enabled;
+                        maintenanceCheckInitialized = true;
+                        return;
+                    }
+                    
+                    // Only proceed if maintenance state has actually changed
+                    if (previousMaintenanceState === s.enabled) {
+                        return; // State hasn't changed, no action needed
+                    }
+                    
+                    // State has changed - update and handle accordingly
+                    previousMaintenanceState = s.enabled;
+                    
                     const dept = document.body.getAttribute('data-user-department');
                     const isIT = dept === 'IT';
                     const onMaintPage = !!document.getElementById('maintenance-page');
+                    
                     if (s.enabled) {
+                        // Maintenance just turned ON
                         if (!isIT) {
-                            window.location.reload();
+                            // Non-IT users should be redirected to maintenance page
+                            // Only reload if we're not already on maintenance page
+                            if (!onMaintPage) {
+                                window.location.reload();
+                            }
                         } else {
+                            // IT users see banner
                             const banner = document.getElementById('maintenance-banner');
                             if (banner) banner.style.display = 'block';
                         }
                     } else {
-                        // If maintenance turned off while user is on maintenance page, bring them back
+                        // Maintenance just turned OFF
                         if (onMaintPage) {
+                            // If maintenance was just turned off and we're on maintenance page, go back
                             window.location.reload();
                         } else if (isIT) {
+                            // IT users: hide banner
                             const banner = document.getElementById('maintenance-banner');
                             if (banner) banner.style.display = 'none';
                         }
                     }
                 })
-                .catch(()=>{});
+                .catch(()=>{
+                    // Silently ignore errors - don't reload on network errors
+                });
         }, 5000);
-    } catch (e) { /* ignore */ }
+    } catch (e) { 
+        console.error('Maintenance polling error:', e);
+    }
 }
 
 /**
