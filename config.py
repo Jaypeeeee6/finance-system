@@ -18,8 +18,9 @@ class Config:
     
     # File upload configuration
     UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads', 'receipts')
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
+    MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB max total request size (all files + form data)
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB max per file
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf', 'doc', 'docx', 'xls', 'xlsx'}
     
     # Session configuration
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=10)

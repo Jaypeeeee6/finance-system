@@ -1567,7 +1567,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                      data-max-files="10"
                                      data-required="true"
                                      data-label="Upload Receipt"
-                                     data-help-text="Required for Finance Admin approval (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
+                                     data-help-text="Required for Finance Admin approval (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)">
                                 </div>
                                 
                                 <!-- Receipt Reference Number Field (moved after upload) -->
@@ -1718,7 +1718,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                  data-max-files="10"
                                  data-required="true"
                                  data-label="Upload Proof of Payment"
-                                 data-help-text="Upload multiple proof files (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
+                                 data-help-text="Upload multiple proof files (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)">
                             </div>
                             <div class="step-actions">
                                 <button type="submit" class="btn btn-success">
@@ -1769,7 +1769,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                  data-max-files="10"
                                  data-required="true"
                                  data-label="Upload New Proof of Payment"
-                                 data-help-text="Upload multiple proof files (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
+                                 data-help-text="Upload multiple proof files (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)">
                             </div>
                             <div class="step-actions">
                                 <button type="submit" class="btn btn-success">
@@ -1801,7 +1801,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                          data-max-files="10"
                                          data-required="false"
                                          data-label="Select Files"
-                                         data-help-text="Upload additional files (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
+                                         data-help-text="Upload additional files (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)">
                                     </div>
                                     <div class="form-group" style="margin-top: 15px;">
                                         <label for="file_note">Note about these files (optional)</label>
@@ -2373,19 +2373,19 @@ function uploadInstallmentReceipt(scheduleId, paymentDate) {
     fileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (file) {
-            // Validate file size (10MB max)
-            const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+            // Validate file size (50MB max)
+            const maxSize = 50 * 1024 * 1024; // 50MB in bytes
             if (file.size > maxSize) {
-                alert(`File "${file.name}" is too large. Maximum size is 10MB.`);
+                alert(`File "${file.name}" is too large. Maximum size is 50MB.`);
                 fileInput.value = '';
                 return;
             }
             
             // Validate file type
-            const allowedTypes = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'];
+            const allowedTypes = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'];
             const fileExtension = file.name.split('.').pop().toLowerCase();
             if (!allowedTypes.includes(fileExtension)) {
-                alert(`Invalid file type for "${file.name}". Allowed types: PDF, JPG, PNG, DOC, DOCX`);
+                alert(`Invalid file type for "${file.name}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX`);
                 fileInput.value = '';
                 return;
             }
@@ -2522,19 +2522,19 @@ function uploadInstallmentInvoice(scheduleId, paymentDate) {
     fileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (file) {
-            // Validate file size (10MB max)
-            const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+            // Validate file size (50MB max)
+            const maxSize = 50 * 1024 * 1024; // 50MB in bytes
             if (file.size > maxSize) {
-                alert(`File "${file.name}" is too large. Maximum size is 10MB.`);
+                alert(`File "${file.name}" is too large. Maximum size is 50MB.`);
                 fileInput.value = '';
                 return;
             }
             
             // Validate file type
-            const allowedTypes = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'];
+            const allowedTypes = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'];
             const fileExtension = file.name.split('.').pop().toLowerCase();
             if (!allowedTypes.includes(fileExtension)) {
-                alert(`Invalid file type for "${file.name}". Allowed types: PDF, JPG, PNG, DOC, DOCX`);
+                alert(`Invalid file type for "${file.name}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX`);
                 fileInput.value = '';
                 return;
             }

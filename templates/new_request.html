@@ -232,11 +232,11 @@
                             Click to select one or multiple files
                         </span>
                     </div>
-                    <small>Upload multiple receipts or proof of payment (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)</small>
+                    <small>Upload multiple receipts or proof of payment (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)</small>
                     <div id="file-preview" style="margin-top: 10px;"></div>
                     
                     <!-- Hidden file input for actual file selection -->
-                    <input type="file" name="receipt_files" id="receipt_files" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" multiple style="display: none;">
+                    <input type="file" name="receipt_files" id="receipt_files" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" multiple style="display: none;">
                 </div>
 
                 <!-- Show only for Supplier/Rental type -->
@@ -3254,19 +3254,50 @@ document.getElementById('add-files-btn').addEventListener('click', function() {
 // File selection handling
 document.getElementById('receipt_files').addEventListener('change', function(e) {
     const newFiles = Array.from(e.target.files);
+    const maxFileSize = 50 * 1024 * 1024; // 50MB in bytes
+    const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'];
     
-    // Add new files to the global array
+    const validFiles = [];
+    const errors = [];
+    
+    // Validate each file before adding
     newFiles.forEach(file => {
         // Check if file already exists (by name and size)
         const exists = allSelectedFiles.some(existingFile => 
             existingFile.name === file.name && existingFile.size === file.size
         );
-        if (!exists) {
-            allSelectedFiles.push(file);
+        
+        if (exists) {
+            return; // Skip duplicate files
         }
+        
+        // Validate file size
+        if (file.size > maxFileSize) {
+            errors.push(`File "${file.name}" is too large. Maximum size is 50MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB.`);
+            return;
+        }
+        
+        // Validate file extension
+        const fileExtension = file.name.split('.').pop().toLowerCase();
+        if (!allowedExtensions.includes(fileExtension)) {
+            errors.push(`Invalid file type for "${file.name}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX`);
+            return;
+        }
+        
+        // File is valid
+        validFiles.push(file);
     });
     
-    updateFilePreview();
+    // Show validation errors if any
+    if (errors.length > 0) {
+        alert(errors.join('\n\n'));
+    }
+    
+    // Add only valid files to the global array
+    if (validFiles.length > 0) {
+        allSelectedFiles.push(...validFiles);
+        updateFilePreview();
+    }
     
     // Clear the file input to prevent showing old file names
     e.target.value = '';
@@ -3380,14 +3411,43 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
             // Redirect to dashboard on success
             window.location.href = '/dashboard';
         } else {
-            // Handle error
-            console.error('Form submission failed');
-            alert('Form submission failed. Please try again.');
+            // Handle specific error codes
+            if (response.status === 413) {
+                // Request Entity Too Large - try to get error message from response
+                response.json().then(data => {
+                    alert(data.message || 'File upload failed: The uploaded file(s) exceed the maximum allowed size of 100MB total. Please reduce file sizes and try again.');
+                }).catch(() => {
+                    alert('File upload failed: The uploaded file(s) exceed the maximum allowed size of 100MB total. Please reduce file sizes and try again.');
+                });
+            } else if (response.status === 400) {
+                // Bad Request - likely file validation error
+                response.json().then(data => {
+                    alert(data.message || data.error || 'File validation failed. Please check file sizes and types.');
+                }).catch(() => {
+                    alert('File validation failed. Please check file sizes and types.');
+                });
+            } else {
+                // Try to get error message from response
+                response.text().then(text => {
+                    try {
+                        const data = JSON.parse(text);
+                        alert(data.message || data.error || 'Form submission failed. Please try again.');
+                    } catch {
+                        alert('Form submission failed. Please check your connection and try again.');
+                    }
+                }).catch(() => {
+                    alert('Form submission failed. Please try again.');
+                });
+            }
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred. Please try again.');
+        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+            alert('Network error: Unable to connect to the server. Please check your connection and try again.');
+        } else {
+            alert('An error occurred: ' + error.message);
+        }
     });
 });
 </script>

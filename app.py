@@ -4087,13 +4087,21 @@ def new_request():
                 upload_folder = os.path.join(app.root_path, 'uploads', 'receipts')
                 os.makedirs(upload_folder, exist_ok=True)
                 
-                allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+                allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
                 
                 for receipt_file in receipt_files:
                     if receipt_file and receipt_file.filename:
-                        # Validate file size (10MB max)
-                        if len(receipt_file.read()) > 10 * 1024 * 1024:  # 10MB
-                            flash(f'File "{receipt_file.filename}" is too large. Maximum size is 10MB.', 'error')
+                        # Validate file size (50MB max)
+                        max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+                        file_size = len(receipt_file.read())
+                        if file_size > max_file_size:
+                            file_size_mb = file_size / (1024 * 1024)
+                            error_msg = f'File "{receipt_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB. Your file size is {file_size_mb:.2f}MB.'
+                            # Check if this is a fetch request (FormData submission)
+                            # Fetch requests with FormData typically don't have Accept: text/html
+                            if 'text/html' not in request.headers.get('Accept', ''):
+                                return jsonify({'error': 'File too large', 'message': error_msg}), 400
+                            flash(error_msg, 'error')
                             available_request_types = get_available_request_types()
                             return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
                         
@@ -4103,7 +4111,11 @@ def new_request():
                         # Validate file extension
                         file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
                         if file_extension not in allowed_extensions:
-                            flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
+                            error_msg = f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX'
+                            # Check if this is a fetch request (FormData submission)
+                            if 'text/html' not in request.headers.get('Accept', ''):
+                                return jsonify({'error': 'Invalid file type', 'message': error_msg}), 400
+                            flash(error_msg, 'error')
                             available_request_types = get_available_request_types()
                             return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
                         
@@ -4899,13 +4911,14 @@ def approve_request(request_id):
         
         # Handle multiple receipt uploads
         uploaded_files = []
-        allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+        allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
         
         for receipt_file in receipt_files:
             if receipt_file and receipt_file.filename:
-                # Validate file size (10MB max)
-                if len(receipt_file.read()) > 10 * 1024 * 1024:  # 10MB
-                    flash(f'File "{receipt_file.filename}" is too large. Maximum size is 10MB.', 'error')
+                # Validate file size (50MB max)
+                max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+                if len(receipt_file.read()) > max_file_size:
+                    flash(f'File "{receipt_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'error')
                     return redirect(url_for('view_request', request_id=request_id))
                 
                 # Reset file pointer
@@ -4914,7 +4927,7 @@ def approve_request(request_id):
                 # Validate file extension
                 file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
                 if file_extension not in allowed_extensions:
-                    flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
+                    flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'error')
                     return redirect(url_for('view_request', request_id=request_id))
                 
                 # Generate unique filename
@@ -5123,13 +5136,14 @@ def approve_request(request_id):
         
         # Handle multiple receipt uploads
         uploaded_files = []
-        allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+        allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
         
         for receipt_file in receipt_files:
             if receipt_file and receipt_file.filename:
-                # Validate file size (10MB max)
-                if len(receipt_file.read()) > 10 * 1024 * 1024:  # 10MB
-                    flash(f'File "{receipt_file.filename}" is too large. Maximum size is 10MB.', 'error')
+                # Validate file size (50MB max)
+                max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+                if len(receipt_file.read()) > max_file_size:
+                    flash(f'File "{receipt_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'error')
                     return redirect(url_for('view_request', request_id=request_id))
                 
                 # Reset file pointer
@@ -5138,7 +5152,7 @@ def approve_request(request_id):
                 # Validate file extension
                 file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
                 if file_extension not in allowed_extensions:
-                    flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
+                    flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'error')
                     return redirect(url_for('view_request', request_id=request_id))
                 
                 # Generate unique filename
@@ -5406,7 +5420,7 @@ def upload_additional_files(request_id):
         print(f"DEBUG: File {i}: {file.filename if file else 'None'}")
     
     uploaded_files = []
-    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
     
     # First, validate all files and collect valid ones
     valid_files = []
@@ -5414,9 +5428,10 @@ def upload_additional_files(request_id):
     
     for file in files:
         if file and file.filename:
-            # Validate file size (10MB max)
-            if len(file.read()) > 10 * 1024 * 1024:  # 10MB
-                validation_errors.append(f'File "{file.filename}" is too large. Maximum size is 10MB.')
+            # Validate file size (50MB max)
+            max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+            if len(file.read()) > max_file_size:
+                validation_errors.append(f'File "{file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.')
                 continue
             
             # Reset file pointer
@@ -5425,7 +5440,7 @@ def upload_additional_files(request_id):
             # Validate file extension
             file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
             if file_extension not in allowed_extensions:
-                validation_errors.append(f'Invalid file type for "{file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX')
+                validation_errors.append(f'Invalid file type for "{file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX')
                 continue
             
             # File is valid, add to valid files list
@@ -5654,7 +5669,7 @@ def upload_proof(request_id):
         return redirect(url_for('view_request', request_id=request_id))
     
     uploaded_files = []
-    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
     
     # Determine next batch number for this request
     import glob, os
@@ -5683,9 +5698,10 @@ def upload_proof(request_id):
 
     for file in proof_files:
         if file and file.filename:
-            # Validate file size (10MB max)
-            if len(file.read()) > 10 * 1024 * 1024:  # 10MB
-                flash(f'File "{file.filename}" is too large. Maximum size is 10MB.', 'error')
+            # Validate file size (50MB max)
+            max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+            if len(file.read()) > max_file_size:
+                flash(f'File "{file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'error')
                 return redirect(url_for('view_request', request_id=request_id))
             
             # Reset file pointer
@@ -5694,7 +5710,7 @@ def upload_proof(request_id):
             # Validate file extension
             file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
             if file_extension not in allowed_extensions:
-                flash(f'Invalid file type for "{file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
+                flash(f'Invalid file type for "{file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'error')
                 return redirect(url_for('view_request', request_id=request_id))
             
             # Generate unique filename
@@ -6453,11 +6469,12 @@ def upload_installment_receipt(request_id):
         flash('No receipt file selected.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
-    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
     
-    # Validate file size (10MB max)
-    if len(receipt_file.read()) > 10 * 1024 * 1024:  # 10MB
-        flash(f'File "{receipt_file.filename}" is too large. Maximum size is 10MB.', 'error')
+    # Validate file size (50MB max)
+    max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+    if len(receipt_file.read()) > max_file_size:
+        flash(f'File "{receipt_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
     # Reset file pointer
@@ -6466,7 +6483,7 @@ def upload_installment_receipt(request_id):
     # Validate file extension
     file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
     if file_extension not in allowed_extensions:
-        flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
+        flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
     try:
@@ -6535,11 +6552,12 @@ def upload_installment_invoice(request_id):
         flash('No invoice file selected.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
-    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
     
-    # Validate file size (10MB max)
-    if len(invoice_file.read()) > 10 * 1024 * 1024:  # 10MB
-        flash(f'File "{invoice_file.filename}" is too large. Maximum size is 10MB.', 'error')
+    # Validate file size (50MB max)
+    max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+    if len(invoice_file.read()) > max_file_size:
+        flash(f'File "{invoice_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
     # Reset file pointer
@@ -6548,7 +6566,7 @@ def upload_installment_invoice(request_id):
     # Validate file extension
     file_extension = invoice_file.filename.rsplit('.', 1)[1].lower() if '.' in invoice_file.filename else ''
     if file_extension not in allowed_extensions:
-        flash(f'Invalid file type for "{invoice_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX', 'error')
+        flash(f'Invalid file type for "{invoice_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
     try:
@@ -8001,6 +8019,47 @@ def forbidden(error):
 def internal_error(error):
     db.session.rollback()
     return render_template('500.html'), 500
+
+
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    """Handle request entity too large errors (file upload size exceeded)"""
+    error_message = 'The uploaded file(s) exceed the maximum allowed size of 100MB total. Please reduce file sizes and try again.'
+    
+    # Check if it's a fetch request from /request/new (new payment request form)
+    # Fetch requests don't set Accept: application/json for FormData, so we check the path
+    if request.path == '/request/new' and request.method == 'POST':
+        try:
+            return jsonify({
+                'error': 'Request too large',
+                'message': error_message
+            }), 413
+        except:
+            pass
+    
+    # Check if client accepts JSON (AJAX/fetch requests)
+    accepts_json = 'application/json' in request.headers.get('Accept', '')
+    if accepts_json or request.is_json:
+        try:
+            return jsonify({
+                'error': 'Request too large',
+                'message': error_message
+            }), 413
+        except:
+            pass
+    
+    # For regular form submissions, redirect with flash message
+    flash(f'File upload failed: {error_message}', 'error')
+    if request.path == '/request/new':
+        try:
+            return redirect(url_for('new_request')), 413
+        except:
+            pass
+    try:
+        return redirect(request.referrer or url_for('dashboard')), 413
+    except:
+        # Fallback if redirect fails
+        return f'File upload failed: {error_message}', 413
 
 
 

@@ -9,13 +9,13 @@ if (typeof MultipleFileUpload === 'undefined') {
     constructor(options = {}) {
         this.containerId = options.containerId || 'file-upload-container';
         this.inputName = options.inputName || 'files';
-        this.acceptedTypes = options.acceptedTypes || '.pdf,.jpg,.jpeg,.png,.doc,.docx';
-        this.maxSize = options.maxSize || 10 * 1024 * 1024; // 10MB
+        this.acceptedTypes = options.acceptedTypes || '.pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx';
+        this.maxSize = options.maxSize || 50 * 1024 * 1024; // 50MB
         this.maxFiles = options.maxFiles || 10;
-        this.allowedExtensions = options.allowedExtensions || ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'];
+        this.allowedExtensions = options.allowedExtensions || ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'];
         this.required = options.required || false;
         this.label = options.label || 'Upload Files';
-        this.helpText = options.helpText || 'Upload multiple files (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)';
+        this.helpText = options.helpText || 'Upload multiple files (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)';
         
         this.allSelectedFiles = [];
         this.init();
@@ -167,6 +167,9 @@ if (typeof MultipleFileUpload === 'undefined') {
                 } else if (['doc', 'docx'].includes(extension)) {
                     fileIcon.className = 'fas fa-file-word';
                     fileIcon.style.cssText = 'color: #007bff; margin-right: 8px;';
+                } else if (['xls', 'xlsx'].includes(extension)) {
+                    fileIcon.className = 'fas fa-file-excel';
+                    fileIcon.style.cssText = 'color: #28a745; margin-right: 8px;';
                 } else {
                     fileIcon.className = 'fas fa-file';
                     fileIcon.style.cssText = 'color: #6c757d; margin-right: 8px;';
@@ -241,12 +244,12 @@ if (typeof MultipleFileUpload === 'undefined') {
             const options = {
                 containerId: container.id,
                 inputName: container.dataset.inputName || 'files',
-                acceptedTypes: container.dataset.acceptedTypes || '.pdf,.jpg,.jpeg,.png,.doc,.docx',
-                maxSize: parseInt(container.dataset.maxSize) || 10 * 1024 * 1024,
+                acceptedTypes: container.dataset.acceptedTypes || '.pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx',
+                maxSize: parseInt(container.dataset.maxSize) || 50 * 1024 * 1024,
                 maxFiles: parseInt(container.dataset.maxFiles) || 10,
                 required: container.dataset.required === 'true',
                 label: container.dataset.label || 'Upload Files',
-                helpText: container.dataset.helpText || 'Upload multiple files (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)'
+                helpText: container.dataset.helpText || 'Upload multiple files (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)'
             };
             
             const component = new MultipleFileUpload(options);
