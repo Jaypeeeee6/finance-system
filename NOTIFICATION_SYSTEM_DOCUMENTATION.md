@@ -19,6 +19,7 @@ All notifications appear in **two locations**:
 - **Operation Manager**: Receives notifications from ALL requests (all roles and departments)
 - **IT Department Manager**: Only when requestor is IT Staff
 - **Other Department Managers**: Only when requestor is from their department staff
+- **Abdalaziz Al-Brashdi (Finance Admin)**: Only when requestor is Finance Staff, CEO, General Manager, or Operation Manager (as their assigned manager)
 
 **When it's sent:** When a new payment request is submitted (before manager approval)
 
@@ -464,14 +465,21 @@ These are likely planned for future implementation.
 - Installment edited
 
 ### GM
-- New submissions (from Department Managers only)
-- Updates on their own requests
+- New submissions from ALL users (all roles and departments)
+- Updates on ALL requests (status changes, approvals, rejections, proof uploaded, etc.)
+- Overdue notifications for ALL requests (finance approval timing alerts)
 - Temporary manager assignments
 - System-wide notifications
 
+### CEO
+- Updates on their own requests only (including confirmation when submitting their own requests)
+- System-wide notifications
+- **Note**: CEO does NOT receive new_submission notifications for requests submitted by other users
+
 ### Operation Manager
-- New submissions (from Operation Staff only)
-- Updates on their own requests
+- New submissions from ALL users (all roles and departments)
+- Updates on ALL requests (status changes, approvals, rejections, proof uploaded, etc.)
+- Overdue notifications for ALL requests (finance approval timing alerts)
 - Temporary manager assignments
 - System-wide notifications
 
@@ -489,8 +497,9 @@ These are likely planned for future implementation.
 
 ### Department Managers (Non-IT)
 - New submissions (from their department staff only)
+- Updates on their own requests (status changes, approvals, rejections, etc.)
+- Updates on their department staff's requests (status changes, approvals, rejections, proof uploaded, etc.)
 - Recurring payment due (for their department)
-- Updates on their own requests
 - Temporary manager assignments
 
 ### Department Staff

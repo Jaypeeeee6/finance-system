@@ -197,13 +197,23 @@ function handleNewRequest(data) {
     // Update notification count immediately
     updateNotificationCount();
     
-    // Update dashboard table dynamically
-    updateDashboardTable();
-    
-    // Force a small delay to ensure the server has processed the request
-    setTimeout(() => {
-        updateDashboardTable();
-    }, 1000);
+    // Don't update dashboard table immediately if we just submitted a form (to avoid permission errors during redirect)
+    // Only update if we're already on a dashboard page, not during redirects
+    const currentPath = window.location.pathname;
+    if (currentPath.includes('/dashboard') || 
+        currentPath.includes('/finance') || 
+        currentPath.includes('/admin') || 
+        currentPath.includes('/it') || 
+        currentPath.includes('/gm') || 
+        currentPath.includes('/operation') || 
+        currentPath.includes('/project') ||
+        currentPath.includes('/department') ||
+        currentPath.includes('/ceo')) {
+        // Update dashboard table dynamically with delay to ensure redirect is complete
+        setTimeout(() => {
+            updateDashboardTable();
+        }, 2000); // Increased delay to ensure redirect completes
+    }
 }
 
 /**
@@ -480,7 +490,8 @@ function updateDashboardTable() {
         !currentPath.includes('/gm') && 
         !currentPath.includes('/operation') && 
         !currentPath.includes('/project') &&
-        !currentPath.includes('/department')) {
+        !currentPath.includes('/department') &&
+        !currentPath.includes('/ceo')) {
         return;
     }
     
@@ -489,14 +500,27 @@ function updateDashboardTable() {
         return;
     }
     
+    // Don't fetch if we're on the main /dashboard route (which redirects) - wait until we're on actual dashboard
+    if (currentPath === '/dashboard' || currentPath === '/dashboard/') {
+        return; // Skip update during redirect
+    }
+    
     // Preserve current URL parameters
     const currentUrl = new URL(window.location);
     const params = new URLSearchParams(currentUrl.search);
     
     // Fetch updated data from the current page with same parameters
     fetch(window.location.href)
-        .then(response => response.text())
+        .then(response => {
+            // Check if response is OK, if not, don't try to parse
+            if (!response.ok && (response.status === 403 || response.status === 401)) {
+                console.log('Dashboard update skipped - permission issue');
+                return null;
+            }
+            return response.text();
+        })
         .then(html => {
+            if (!html) return; // Skip if we got null from permission check
             // Parse the response and extract the table content
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');

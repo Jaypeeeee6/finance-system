@@ -549,6 +549,113 @@ def create_notification(user_id, title, message, notification_type, request_id=N
     print(f"DEBUG: Notification created successfully with ID: {notification.notification_id}")
     return notification
 
+def get_authorized_manager_approvers(request):
+    """Get all users who are authorized to approve this request at the manager stage.
+    This mirrors the authorization logic in manager_approve_request."""
+    authorized_users = []
+    
+    # If temporary manager is assigned, only that user is authorized
+    if request.temporary_manager_id:
+        temp_manager = User.query.get(request.temporary_manager_id)
+        if temp_manager:
+            authorized_users.append(temp_manager)
+            print(f"DEBUG: Found temporary manager: {temp_manager.name} (ID: {temp_manager.user_id})")
+        return authorized_users
+    
+    # No temporary manager, use standard authorization checks
+    
+    # Hard rule: Requests submitted by GM/CEO/Operation Manager can ONLY be approved by Abdalaziz
+    # Abdalaziz is their assigned manager and should receive notifications
+    if request.user.role in ['GM', 'CEO', 'Operation Manager']:
+        abdalaziz = User.query.filter_by(name='Abdalaziz Al-Brashdi').first()
+        if abdalaziz:
+            authorized_users.append(abdalaziz)
+            print(f"DEBUG: Added Abdalaziz for GM/CEO/Operation Manager submitter (assigned manager)")
+    else:
+        # General Manager - can approve all requests (except GM/CEO/Operation Manager)
+        gm_users = User.query.filter_by(role='GM').all()
+        for user in gm_users:
+            if user.user_id != request.user_id:  # Can't approve own request
+                authorized_users.append(user)
+                print(f"DEBUG: Added GM: {user.name}")
+        
+        # Operation Manager - can approve all requests (except GM/CEO/Operation Manager)
+        op_manager_users = User.query.filter_by(role='Operation Manager').all()
+        for user in op_manager_users:
+            if user.user_id != request.user_id:  # Can't approve own request
+                authorized_users.append(user)
+                print(f"DEBUG: Added Operation Manager: {user.name}")
+        
+        # Check if submitter has a manager_id (direct manager relationship)
+        if request.user.manager_id:
+            manager = User.query.get(request.user.manager_id)
+            if manager and manager.user_id != request.user_id:
+                if manager not in authorized_users:
+                    authorized_users.append(manager)
+                    print(f"DEBUG: Added direct manager: {manager.name} (ID: {manager.user_id})")
+        
+        # Special case: General Manager can approve Department Manager requests
+        if request.user.role == 'Department Manager':
+            gm_users = User.query.filter_by(role='GM').all()
+            for user in gm_users:
+                if user not in authorized_users:
+                    authorized_users.append(user)
+                    print(f"DEBUG: Added GM for Department Manager request: {user.name}")
+            
+            # Operation Manager can also approve Department Manager requests
+            op_manager_users = User.query.filter_by(role='Operation Manager').all()
+            for user in op_manager_users:
+                if user not in authorized_users:
+                    authorized_users.append(user)
+                    print(f"DEBUG: Added Operation Manager for Department Manager request: {user.name}")
+        
+        # Special case: Abdalaziz can approve GM, CEO, Finance Staff, and Operation Manager requests
+        # (But GM/CEO/Operation Manager requests are handled above, so this covers Finance Staff)
+        # Abdalaziz is the assigned manager for Finance Staff and should receive notifications
+        if request.user.role == 'Finance Staff':
+            abdalaziz = User.query.filter_by(name='Abdalaziz Al-Brashdi').first()
+            if abdalaziz and abdalaziz not in authorized_users:
+                authorized_users.append(abdalaziz)
+                print(f"DEBUG: Added Abdalaziz for Finance Staff request (assigned manager)")
+        
+        # Special case: Operation Manager can approve Operation department and Project requests
+        if (request.user.department == 'Operation' or request.user.department == 'Project') and \
+           request.user.role != 'Operation Manager':
+            op_manager_users = User.query.filter_by(role='Operation Manager').all()
+            for user in op_manager_users:
+                if user.user_id != request.user_id and user not in authorized_users:
+                    authorized_users.append(user)
+                    print(f"DEBUG: Added Operation Manager for Operation/Project department: {user.name}")
+        
+        # Special case: Finance Admin can approve Finance department requests
+        if request.user.department == 'Finance' and request.user.role != 'Finance Admin':
+            finance_admins = User.query.filter_by(role='Finance Admin').all()
+            for user in finance_admins:
+                if user.user_id != request.user_id and user not in authorized_users:
+                    authorized_users.append(user)
+                    print(f"DEBUG: Added Finance Admin for Finance department: {user.name}")
+        
+        # Special case: Department Manager can approve same department requests
+        dept_managers = User.query.filter_by(
+            role='Department Manager',
+            department=request.user.department
+        ).all()
+        for user in dept_managers:
+            if user.user_id != request.user_id and user not in authorized_users:
+                authorized_users.append(user)
+                print(f"DEBUG: Added Department Manager for same department: {user.name}")
+    
+    # Remove duplicates (in case a user was added multiple times)
+    seen = set()
+    unique_authorized = []
+    for user in authorized_users:
+        if user.user_id not in seen:
+            seen.add(user.user_id)
+            unique_authorized.append(user)
+    
+    print(f"DEBUG: Total authorized manager approvers: {len(unique_authorized)}")
+    return unique_authorized
+
 def notify_users_by_role(request, notification_type, title, message, request_id=None):
     """Notify users based on RBAC notification permissions"""
     
@@ -577,32 +684,56 @@ def notify_users_by_role(request, notification_type, title, message, request_id=
     
     # Handle new_submission notifications
     elif notification_type == 'new_submission':
-        print(f"DEBUG: Processing new_submission for role: {requestor_role}")
+        print(f"DEBUG: Processing new_submission for role: {requestor_role}, department: {requestor_department}")
+        
+        # First, notify the submitting user (request creator)
+        submitter_notification_title = "Payment Request Submitted"
+        request_type_name = getattr(request, 'request_type', 'payment request')
+        if hasattr(request, 'amount') and request.amount is not None:
+            try:
+                amount_str = f"{float(request.amount):.3f}"
+            except (ValueError, TypeError):
+                amount_str = str(request.amount)
+        else:
+            amount_str = 'N/A'
+        submitter_notification_message = f"Your {request_type_name} request for OMR {amount_str} has been submitted successfully and is awaiting manager approval."
+        create_notification(request.user_id, submitter_notification_title, submitter_notification_message, notification_type, request_id)
+        print(f"DEBUG: Notified submitting user: {request.user.name} (ID: {request.user_id})")
+        
+        # Get all authorized manager approvers using the helper function
+        authorized_approvers = get_authorized_manager_approvers(request)
+        
+        # Notify all authorized manager approvers
+        for approver in authorized_approvers:
+            create_notification(approver.user_id, title, message, notification_type, request_id)
+            print(f"DEBUG: Notified authorized approver: {approver.name} (ID: {approver.user_id}, Role: {approver.role})")
         
         # General Manager - receives notifications from ALL requests (regardless of role/department)
         gm_users = User.query.filter_by(role='GM').all()
         for user in gm_users:
-            create_notification(user.user_id, title, message, notification_type, request_id)
+            # Only notify if not already in authorized_approvers (avoid duplicates)
+            if user not in authorized_approvers:
+                create_notification(user.user_id, title, message, notification_type, request_id)
+                print(f"DEBUG: Notified GM {user.username} about new_submission")
         
         # Operation Manager - receives notifications from ALL requests (regardless of role/department)
         op_manager_users = User.query.filter_by(role='Operation Manager').all()
         for user in op_manager_users:
-            create_notification(user.user_id, title, message, notification_type, request_id)
+            # Only notify if not already in authorized_approvers (avoid duplicates)
+            if user not in authorized_approvers:
+                create_notification(user.user_id, title, message, notification_type, request_id)
+                print(f"DEBUG: Notified Operation Manager {user.username} about new_submission")
         
-        # IT Department Manager - only from IT Staff submissions
-        if requestor_role == 'IT Staff':
+        # IT Department Manager - only from IT Staff submissions (explicitly notify even if not in authorized_approvers)
+        if requestor_role == 'IT Staff' or requestor_department == 'IT':
             it_manager_users = User.query.filter_by(role='Department Manager', department='IT').all()
             for user in it_manager_users:
-                create_notification(user.user_id, title, message, notification_type, request_id)
+                # Only notify if not already in authorized_approvers (avoid duplicates)
+                if user not in authorized_approvers:
+                    create_notification(user.user_id, title, message, notification_type, request_id)
+                    print(f"DEBUG: Notified IT Department Manager {user.username} about IT Staff request")
         
-        # Department Managers (Non-IT) - only from their own department staff
-        if (requestor_role.endswith(' Staff') or requestor_role == 'Project Staff' or requestor_role in ['Finance Staff', 'HR Staff', 'Operation Staff', 'IT Staff']):
-            print(f"DEBUG: Notifying Department Managers for {requestor_role} from {requestor_department}")
-            dept_managers = User.query.filter_by(role='Department Manager', department=requestor_department).all()
-            print(f"DEBUG: Found {len(dept_managers)} Department Managers for department {requestor_department}")
-            for user in dept_managers:
-                print(f"DEBUG: Notifying Department Manager {user.username} ({user.role}) from {user.department}")
-                create_notification(user.user_id, title, message, notification_type, request_id)
+        print(f"DEBUG: Total notifications sent for new_submission: 1 to submitter + {len(authorized_approvers)} to authorized approvers + GM/Operation Manager/IT Manager")
     
     # Requestor - for updates on their own requests
     elif notification_type in ['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed']:
@@ -1261,7 +1392,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                 )
             ).order_by(Notification.created_at.desc())
         elif user.name == 'Abdalaziz Al-Brashdi':
-            # Abdalaziz gets finance notifications + updates on Finance Staff, GM, and Operation Manager requests
+            # Abdalaziz gets finance notifications + new_submission from GM/Operation Manager/Finance Staff + updates on Finance Staff, GM, and Operation Manager requests
             query = Notification.query.filter(
                 db.and_(
                     Notification.user_id == user.user_id,
@@ -1276,7 +1407,19 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                             'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                             'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
                             'installment_paid'
-                        ])
+                        ]),
+                        # new_submission only for GM, Operation Manager, Finance Staff, or CEO (his assigned managers)
+                        db.and_(
+                            Notification.notification_type == 'new_submission',
+                            Notification.request_id.isnot(None),
+                            db.exists().where(
+                                db.and_(
+                                    PaymentRequest.request_id == Notification.request_id,
+                                    PaymentRequest.user_id == User.user_id,
+                                    User.role.in_(['GM', 'CEO', 'Operation Manager', 'Finance Staff'])
+                                )
+                            )
+                        )
                     )
                 )
             ).order_by(Notification.created_at.desc())
@@ -1341,7 +1484,24 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
-                    db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('IT Staff')),
+                    # new_submission only if it's from IT Staff (join with PaymentRequest to check)
+                    db.and_(
+                        Notification.notification_type == 'new_submission',
+                        Notification.request_id.isnot(None),
+                        db.or_(
+                            # Request created by IT Staff (check user role)
+                            db.exists().where(
+                                db.and_(
+                                    PaymentRequest.request_id == Notification.request_id,
+                                    PaymentRequest.department == 'IT',
+                                    User.user_id == PaymentRequest.user_id,
+                                    User.role == 'IT Staff'
+                                )
+                            ),
+                            # Or request from IT department with IT Staff role in message (fallback for existing notifications)
+                            Notification.message.contains('IT')
+                        )
+                    ),
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'status_changed',
                         'proof_required', 'recurring_approved', 'request_completed', 'installment_paid',
@@ -1452,14 +1612,26 @@ def get_unread_count_for_user(user):
                 )
             ).count()
         elif user.name == 'Abdalaziz Al-Brashdi':
-            # Abdalaziz gets finance notifications + updates on Finance Staff, GM, and Operation Manager requests
+            # Abdalaziz gets finance notifications + new_submission from GM/Operation Manager/Finance Staff + updates on Finance Staff, GM, and Operation Manager requests
             return Notification.query.filter(
                 db.and_(
                     Notification.user_id == user.user_id,
                     Notification.is_read == False,
                     db.or_(
                         Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
+                        # new_submission only for GM, Operation Manager, Finance Staff, or CEO (his assigned managers)
+                        db.and_(
+                            Notification.notification_type == 'new_submission',
+                            Notification.request_id.isnot(None),
+                            db.exists().where(
+                                db.and_(
+                                    PaymentRequest.request_id == Notification.request_id,
+                                    PaymentRequest.user_id == User.user_id,
+                                    User.role.in_(['GM', 'CEO', 'Operation Manager', 'Finance Staff'])
+                                )
+                            )
+                        )
                     )
                 )
             ).count()
@@ -1512,7 +1684,24 @@ def get_unread_count_for_user(user):
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
                 db.or_(
-                    db.and_(Notification.notification_type == 'new_submission', Notification.message.contains('IT Staff')),
+                    # new_submission only if it's from IT Staff (join with PaymentRequest to check)
+                    db.and_(
+                        Notification.notification_type == 'new_submission',
+                        Notification.request_id.isnot(None),
+                        db.or_(
+                            # Request created by IT Staff (check user role)
+                            db.exists().where(
+                                db.and_(
+                                    PaymentRequest.request_id == Notification.request_id,
+                                    PaymentRequest.department == 'IT',
+                                    User.user_id == PaymentRequest.user_id,
+                                    User.role == 'IT Staff'
+                                )
+                            ),
+                            # Or request from IT department (fallback for existing notifications)
+                            Notification.message.contains('IT')
+                        )
+                    ),
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
@@ -7525,7 +7714,7 @@ def debug_requests():
 
 @app.route('/notifications')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def notifications():
     """View all notifications based on RBAC permissions with pagination"""
     page = request.args.get('page', 1, type=int)
@@ -7541,7 +7730,7 @@ def notifications():
 
 @app.route('/notifications/mark_read/<int:notification_id>')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def mark_notification_read(notification_id):
     """Mark a notification as read"""
     notification = Notification.query.filter_by(notification_id=notification_id, user_id=current_user.user_id).first()
@@ -7554,7 +7743,7 @@ def mark_notification_read(notification_id):
 
 @app.route('/notifications/mark_all_read')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def mark_all_notifications_read():
     """Mark all notifications as read for current user"""
     Notification.query.filter_by(user_id=current_user.user_id, is_read=False).update({'is_read': True})
@@ -7563,7 +7752,7 @@ def mark_all_notifications_read():
 
 @app.route('/notifications/mark_paid/<int:notification_id>')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def mark_notification_paid(notification_id):
     """Mark a recurring payment notification as paid and delete it"""
     notification = Notification.query.filter_by(
@@ -7595,7 +7784,7 @@ def mark_notification_paid(notification_id):
 
 @app.route('/notifications/delete/<int:notification_id>')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def delete_notification(notification_id):
     """Delete a specific notification"""
     notification = Notification.query.filter_by(notification_id=notification_id, user_id=current_user.user_id).first()
@@ -7607,7 +7796,7 @@ def delete_notification(notification_id):
 
 @app.route('/notifications/delete_all')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def delete_all_notifications():
     """Delete all notifications for current user"""
     try:
@@ -7621,7 +7810,7 @@ def delete_all_notifications():
 
 @app.route('/api/notifications/unread_count')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def unread_notifications_count():
     """Get count of unread notifications based on RBAC"""
     count = get_unread_count_for_user(current_user)
@@ -7639,7 +7828,7 @@ def overdue_requests_count():
 
 @app.route('/api/notifications/recent')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def recent_notifications():
     """Get recent notifications for the user based on RBAC"""
     notifications = get_notifications_for_user(current_user)

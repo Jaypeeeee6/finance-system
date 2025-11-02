@@ -153,7 +153,9 @@ Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Qual
 - **Recurring payment due** notifications
 - **Installment date edited** notifications (when requestors edit payment dates)
 - **System-wide notifications** (all types)
-- **Additional for Abdalaziz Al-Brashdi**: Updates on Finance Staff, General Manager, and Operation Manager requests (including rejections)
+- **Additional for Abdalaziz Al-Brashdi**: 
+  - **New submissions** from Finance Staff, CEO, General Manager, and Operation Manager (as their assigned manager)
+  - **Updates on Finance Staff, General Manager, and Operation Manager requests** (including rejections)
 
 ### **Finance Staff**
 - **New submissions** when requests reach "Pending Finance Approval"
@@ -163,18 +165,20 @@ Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Qual
 - **System-wide notifications** (all types)
 
 ### **General Manager (GM)**
-- **New submissions** from users with role "Department Manager" only
-- **Updates on their own requests** (status changes, approvals, rejections, etc.)
+- **New submissions** from ALL users (all roles and departments)
+- **Updates on ALL requests** (status changes, approvals, rejections, proof uploaded, etc.)
+- **Overdue notifications** for ALL requests (finance approval timing alerts)
 - **System-wide notifications** (all types)
 
 ### **CEO**
-- **New submissions** from users with role "Department Manager" only
-- **Updates on their own requests** (status changes, approvals, rejections, etc.)
+- **Updates on their own requests only** (status changes, approvals, rejections, etc., including confirmation when submitting their own requests)
 - **System-wide notifications** (all types)
+- **Note**: CEO does NOT receive notifications for new requests submitted by other users
 
 ### **Operation Manager**
-- **New submissions** from users with role "Operation Staff" and "Project Staff" only
-- **Updates on their own requests** (status changes, approvals, rejections, etc.)
+- **New submissions** from ALL users (all roles and departments)
+- **Updates on ALL requests** (status changes, approvals, rejections, proof uploaded, etc.)
+- **Overdue notifications** for ALL requests (finance approval timing alerts)
 - **System-wide notifications** (all types)
 
 ### **IT Department Manager**
@@ -195,6 +199,7 @@ Departments covered by the above: PR, Maintenance, Marketing, Logistic, HR, Qual
 
 ### **Department Managers (Non-IT)**
 - **New submissions** from their own department staff only
+- **Updates on their department staff's requests** (status changes, approvals, rejections, proof uploaded, etc.)
 - **Recurring payment due** notifications for their department
 
 ### **Department Staff (All departments)**
