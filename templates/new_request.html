@@ -556,6 +556,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize searchable branch dropdown
     initializeBranchSearch();
+    
+    // Ensure SWIFT code updates when bank name changes
+    const bankSelect = document.getElementById('bank_name');
+    if (bankSelect) {
+        // Add event listener in addition to inline onchange for reliability
+        bankSelect.addEventListener('change', showSwiftCode);
+        // Also call it initially in case a bank is already selected
+        showSwiftCode();
+    }
 });
 
 function initializeBranchSearch() {
@@ -564,6 +573,10 @@ function initializeBranchSearch() {
     const dropdown = document.getElementById('branch_dropdown');
     
     if (!searchInput || !hiddenSelect || !dropdown) return;
+    
+    // Flag to track if we're clicking on an option
+    let clickingOnOption = false;
+    let blurTimeout = null;
     
     // Build dropdown from select options
     function buildDropdown() {
@@ -593,8 +606,19 @@ function initializeBranchSearch() {
             optionDiv.setAttribute('data-value', option.value);
             optionDiv.setAttribute('data-restaurant', restaurant);
             
-            optionDiv.addEventListener('click', function() {
+            // Use mousedown instead of click for better trackpad support
+            // mousedown fires before blur, ensuring selection happens on trackpad taps
+            optionDiv.addEventListener('mousedown', function(e) {
+                e.preventDefault(); // Prevent blur from firing
+                clickingOnOption = true;
                 selectBranch(option.value, option.textContent);
+            });
+            
+            // Keep click as fallback for accessibility
+            optionDiv.addEventListener('click', function(e) {
+                if (!clickingOnOption) {
+                    selectBranch(option.value, option.textContent);
+                }
             });
             
             dropdown.appendChild(optionDiv);
@@ -602,10 +626,21 @@ function initializeBranchSearch() {
     }
     
     function selectBranch(value, text) {
+        // Clear any pending blur timeout
+        if (blurTimeout) {
+            clearTimeout(blurTimeout);
+            blurTimeout = null;
+        }
+        
         searchInput.value = text;
         hiddenSelect.value = value;
         dropdown.style.display = 'none';
         searchInput.blur();
+        
+        // Reset flag after a short delay
+        setTimeout(() => {
+            clickingOnOption = false;
+        }, 100);
     }
     
     function filterBranches(searchTerm) {
@@ -669,8 +704,16 @@ function initializeBranchSearch() {
     
     searchInput.addEventListener('blur', function() {
         // Delay hiding to allow clicks on options
-        setTimeout(() => {
-            dropdown.style.display = 'none';
+        // Clear any existing timeout first
+        if (blurTimeout) {
+            clearTimeout(blurTimeout);
+        }
+        blurTimeout = setTimeout(() => {
+            // Only hide if not clicking on an option
+            if (!clickingOnOption) {
+                dropdown.style.display = 'none';
+            }
+            blurTimeout = null;
         }, 200);
     });
     
@@ -3233,6 +3276,12 @@ function showSwiftCode() {
     const swiftDisplay = document.getElementById('swift-code-display');
     const swiftText = document.getElementById('swift-code-text');
     
+    // Check if all required elements exist
+    if (!bankSelect || !swiftDisplay || !swiftText) {
+        console.error('SWIFT code elements not found');
+        return;
+    }
+    
     const swiftCodes = {
         'Bank Dhofar': 'BDOFOMRU',
         'Bank Muscat': 'BMUSOMRX',
@@ -3242,7 +3291,7 @@ function showSwiftCode() {
         'HSBC Bank Oman': 'BBMEOMRX',
         'Ahli Bank': 'AUBOOMRU',
         'Oman Development Bank': 'ODBLOMRX',
-        'Oman Housing Bank': 'OHLBOMRX',
+        'Oman Housing Bank': 'OHLBOMRU',
         'Meethaq Islamic Banking (Bank Dhofar)': 'BDOFOMRUMIB',
         'Meethaq Islamic Banking (Bank Muscat)': 'BMUSOMRXISL',
         'Muzn Islamic Banking (National Bank of Oman)': 'NBOMOMRXIBS',
@@ -3259,8 +3308,10 @@ function showSwiftCode() {
         'Al Yusr Islamic Banking Services (Oman Arab Bank)': 'OMABOMRUYSR'
     };
     
-    if (bankSelect.value && swiftCodes[bankSelect.value]) {
-        swiftText.textContent = swiftCodes[bankSelect.value];
+    const selectedBank = bankSelect.value ? bankSelect.value.trim() : '';
+    
+    if (selectedBank && swiftCodes[selectedBank]) {
+        swiftText.textContent = swiftCodes[selectedBank];
         swiftDisplay.style.display = 'block';
     } else {
         swiftDisplay.style.display = 'none';

@@ -65,7 +65,7 @@
             <div class="card-header">
                 <div class="header-top">
                     <div class="filter-controls">
-                        <select id="departmentFilter" onchange="filterTable()" class="form-select">
+                        <select id="departmentFilter" onchange="filterByDepartment()" class="form-select">
                             <option value="">All Departments</option>
                             <option value="HR" {% if department_filter == 'HR' %}selected{% endif %}>HR</option>
                             <option value="Finance" {% if department_filter == 'Finance' %}selected{% endif %}>Finance</option>
@@ -94,7 +94,7 @@
                             <option value="Proof Rejected" {% if status_filter == 'Proof Rejected' %}selected{% endif %}>Proof Rejected</option>
                         </select>
                         {% endif %}
-                        <select id="urgentFilter" onchange="filterTable()" class="form-select">
+                        <select id="urgentFilter" onchange="filterByUrgent()" class="form-select">
                             <option value="">All Requests</option>
                             <option value="urgent" {% if urgent_filter == 'urgent' %}selected{% endif %}>🔴 Urgent Only</option>
                             <option value="not_urgent" {% if urgent_filter == 'not_urgent' %}selected{% endif %}>⚪ Not Urgent</option>
@@ -335,8 +335,8 @@
                         </div>
                     {% else %}
                         <div class="empty-state">
-                            <i class="fas fa-user"></i>
-                            <p>No requests found for you.</p>
+                            <i class="fas fa-inbox"></i>
+                            <p>No payment requests found.</p>
                         </div>
                     {% endif %}
                 </div>
@@ -396,9 +396,9 @@
                             </table>
                         </div>
                     {% else %}
-                        <div class="no-data">
-                            <i class="fas fa-check-circle"></i>
-                            <p>No completed requests found.</p>
+                        <div class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <p>No payment requests found.</p>
                         </div>
                     {% endif %}
                 </div>
@@ -459,8 +459,8 @@
                         </div>
                     {% else %}
                         <div class="empty-state">
-                            <i class="fas fa-sync-alt"></i>
-                            <p>No recurring payment requests.</p>
+                            <i class="fas fa-inbox"></i>
+                            <p>No payment requests found.</p>
                         </div>
                     {% endif %}
                 </div>
@@ -520,9 +520,9 @@
                             </table>
                         </div>
                     {% else %}
-                        <div class="no-data">
-                            <i class="fas fa-times-circle"></i>
-                            <p>No rejected requests found.</p>
+                        <div class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <p>No payment requests found.</p>
                         </div>
                     {% endif %}
                 </div>
@@ -1132,6 +1132,42 @@ function applyStatusFilter() {
     window.location.href = url.toString();
 }
 
+function filterByDepartment() {
+    // Redirect to dashboard with department filter
+    const departmentFilter = document.getElementById('departmentFilter');
+    const departmentValue = departmentFilter.value;
+    
+    const url = new URL(window.location);
+    if (departmentValue) {
+        url.searchParams.set('department', departmentValue);
+    } else {
+        url.searchParams.delete('department');
+    }
+    // Preserve current tab and other filters
+    const tab = url.searchParams.get('tab') || 'all';
+    url.searchParams.set('tab', tab);
+    url.searchParams.set('page', '1'); // Reset to page 1 when filtering
+    window.location.href = url.toString();
+}
+
+function filterByUrgent() {
+    // Redirect to dashboard with urgent filter
+    const urgentFilter = document.getElementById('urgentFilter');
+    const urgentValue = urgentFilter.value;
+    
+    const url = new URL(window.location);
+    if (urgentValue) {
+        url.searchParams.set('urgent', urgentValue);
+    } else {
+        url.searchParams.delete('urgent');
+    }
+    // Preserve current tab and other filters
+    const tab = url.searchParams.get('tab') || 'all';
+    url.searchParams.set('tab', tab);
+    url.searchParams.set('page', '1'); // Reset to page 1 when filtering
+    window.location.href = url.toString();
+}
+
 function filterTable() {
     const searchInput = document.getElementById('tabSearchInput');
     const departmentFilter = document.getElementById('departmentFilter');
@@ -1172,23 +1208,8 @@ function filterTable() {
                 }
             }
             
-            // Filter by department
-            if (departmentValue && showRow) {
-                const department = departmentCell.textContent || departmentCell.innerText;
-                if (department !== departmentValue) {
-                    showRow = false;
-                }
-            }
-            
-            // Filter by urgent status
-            if (urgentValue && showRow) {
-                const isUrgent = urgentBadge !== null;
-                if (urgentValue === 'urgent' && !isUrgent) {
-                    showRow = false;
-                } else if (urgentValue === 'not_urgent' && isUrgent) {
-                    showRow = false;
-                }
-            }
+            // Note: Department and urgent filtering are now handled server-side via filterByDepartment() and filterByUrgent()
+            // This client-side filter is only for search input
             
             // Show or hide row
             row.style.display = showRow ? '' : 'none';

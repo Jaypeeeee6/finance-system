@@ -171,7 +171,7 @@
             {% else %}
                 <div class="empty-state">
                     <i class="fas fa-inbox"></i>
-                    <p>No payment requests yet. Click "New Payment Request" to submit one.</p>
+                    <p>No payment requests found.</p>
                 </div>
             {% endif %}
             
@@ -314,8 +314,8 @@
                     </div>
                 {% else %}
                     <div class="empty-state">
-                        <i class="fas fa-user"></i>
-                        <p>No requests found for you.</p>
+                        <i class="fas fa-inbox"></i>
+                        <p>No payment requests found.</p>
                     </div>
                 {% endif %}
             </div>
@@ -382,9 +382,9 @@
                         </table>
                     </div>
                 {% else %}
-                    <div class="no-data">
-                        <i class="fas fa-check-circle"></i>
-                        <p>No completed requests found.</p>
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>No payment requests found.</p>
                     </div>
                 {% endif %}
             </div>
@@ -450,9 +450,9 @@
                         </table>
                     </div>
                 {% else %}
-                    <div class="no-data">
-                        <i class="fas fa-times-circle"></i>
-                        <p>No rejected requests found.</p>
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>No payment requests found.</p>
                     </div>
                 {% endif %}
             </div>
@@ -511,8 +511,8 @@
                     </div>
                 {% else %}
                     <div class="empty-state">
-                        <i class="fas fa-sync-alt"></i>
-                        <p>No recurring payment requests.</p>
+                        <i class="fas fa-inbox"></i>
+                        <p>No payment requests found.</p>
                     </div>
                 {% endif %}
             </div>
