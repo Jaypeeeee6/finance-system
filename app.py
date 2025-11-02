@@ -6553,6 +6553,8 @@ def reports():
         return redirect(url_for('dashboard'))
     
     # Get filter parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
     department_filter = request.args.get('department', '')
     request_type_filter = request.args.get('request_type', '')
     company_filter = request.args.get('company', '')
@@ -6561,15 +6563,27 @@ def reports():
     date_to = request.args.get('date_to', '')
     status_filter = request.args.get('status', '')
     
-    # Build query - show Completed and Recurring requests
-    query = PaymentRequest.query.filter(PaymentRequest.status.in_(['Completed', 'Recurring']))
+    # Validate per_page to prevent abuse
+    if per_page not in [10, 20, 50, 100]:
+        per_page = 10
+    
+    # Build query - show ALL statuses by default
+    query = PaymentRequest.query
     
     if status_filter:
-        query = query.filter_by(status=status_filter)
+        if status_filter == 'All Pending':
+            # Show both pending statuses
+            query = query.filter(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
+        else:
+            query = query.filter_by(status=status_filter)
     if department_filter:
         query = query.filter_by(department=department_filter)
     if request_type_filter:
-        query = query.filter_by(request_type=request_type_filter)
+        # Special handling for "Others" to match both "Others" and "Others:..."
+        if request_type_filter == 'Others':
+            query = query.filter(PaymentRequest.request_type.like('Others%'))
+        else:
+            query = query.filter_by(request_type=request_type_filter)
     if company_filter:
         # Filter by person_company field only (company_name is no longer used)
         query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
@@ -6577,25 +6591,50 @@ def reports():
         # Filter by branch name
         query = query.filter(PaymentRequest.branch_name == branch_filter)
     
-    # Date filtering and sorting for completed requests (use approval_date)
+    # Date filtering - use submission date (date field) which exists for all requests
     if date_from:
-        query = query.filter(PaymentRequest.approval_date >= datetime.strptime(date_from, '%Y-%m-%d').date())
+        query = query.filter(PaymentRequest.date >= datetime.strptime(date_from, '%Y-%m-%d').date())
     if date_to:
-        query = query.filter(PaymentRequest.approval_date <= datetime.strptime(date_to, '%Y-%m-%d').date())
-    requests = query.order_by(PaymentRequest.approval_date.desc()).all()
+        query = query.filter(PaymentRequest.date <= datetime.strptime(date_to, '%Y-%m-%d').date())
+    # Sort by date (submission date) descending
+    # Get all filtered requests for stats calculation (before pagination)
+    all_filtered_requests = query.order_by(PaymentRequest.date.desc()).all()
+    
+    # Calculate stats from all filtered requests
+    total_requests = len(all_filtered_requests)
+    completed_count = len([r for r in all_filtered_requests if r.status == 'Completed'])
+    pending_count = len([r for r in all_filtered_requests if r.status in ['Pending Manager Approval', 'Pending Finance Approval']])
+    
+    # Calculate total amount - handle IT Staff/Department Manager special case
+    if current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT'):
+        it_requests = [r for r in all_filtered_requests if r.department == 'IT']
+        total_amount = sum(float(r.amount) for r in it_requests) if it_requests else 0
+        it_amount = total_amount
+    else:
+        total_amount = sum(float(r.amount) for r in all_filtered_requests)
+        it_amount = None
+    
+    # Paginate the query for display
+    pagination = query.order_by(PaymentRequest.date.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    requests = pagination.items
     
     # Get unique departments for filter
     departments = db.session.query(PaymentRequest.department).distinct().all()
     departments = [d[0] for d in departments]
     
     # Get unique companies for filter (only person_company field since company_name is no longer used)
+    # Show companies from all statuses, or filter by status if status_filter is provided
     companies_query = db.session.query(PaymentRequest.person_company).filter(
-        PaymentRequest.status.in_(['Completed', 'Recurring']),
         PaymentRequest.person_company.isnot(None),
         PaymentRequest.person_company != ''
     )
     if status_filter:
-        companies_query = companies_query.filter(PaymentRequest.status == status_filter)
+        if status_filter == 'All Pending':
+            companies_query = companies_query.filter(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
+        else:
+            companies_query = companies_query.filter(PaymentRequest.status == status_filter)
     companies = companies_query.distinct().all()
     companies = [c[0] for c in companies if c[0]]
     companies.sort()  # Sort alphabetically
@@ -6620,6 +6659,7 @@ def reports():
     
     return render_template('reports.html', 
                          requests=requests, 
+                         pagination=pagination,
                          departments=departments,
                          companies=companies,
                          branches=branches,
@@ -6627,6 +6667,15 @@ def reports():
                          company_filter=company_filter,
                          branch_filter=branch_filter,
                          status_filter=status_filter,
+                         department_filter=department_filter,
+                         request_type_filter=request_type_filter,
+                         date_from=date_from,
+                         date_to=date_to,
+                         total_requests=total_requests,
+                         completed_count=completed_count,
+                         pending_count=pending_count,
+                         total_amount=total_amount,
+                         it_amount=it_amount,
                          user=current_user)
 
 
@@ -6683,14 +6732,23 @@ def export_reports_excel():
     date_to = request.args.get('date_to', '')
     status_filter = request.args.get('status', '')
 
-    query = PaymentRequest.query.filter(PaymentRequest.status.in_(['Completed', 'Recurring']))
+    # Show ALL statuses by default (consistent with reports() view)
+    query = PaymentRequest.query
     
     if status_filter:
-        query = query.filter_by(status=status_filter)
+        if status_filter == 'All Pending':
+            # Show both pending statuses
+            query = query.filter(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
+        else:
+            query = query.filter_by(status=status_filter)
     if department_filter:
         query = query.filter_by(department=department_filter)
     if request_type_filter:
-        query = query.filter_by(request_type=request_type_filter)
+        # Special handling for "Others" to match both "Others" and "Others:..."
+        if request_type_filter == 'Others':
+            query = query.filter(PaymentRequest.request_type.like('Others%'))
+        else:
+            query = query.filter_by(request_type=request_type_filter)
     if company_filter:
         # Filter by person_company field only (company_name is no longer used)
         query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
@@ -6710,7 +6768,7 @@ def export_reports_excel():
         except Exception:
             return 0.0
 
-    # All requests are completed, so sum all amounts
+    # Sum all amounts (requests may be in any status)
     total_amount = sum(to_float(r.amount) for r in result_requests)
 
     try:
@@ -6863,14 +6921,23 @@ def export_reports_pdf():
     date_to = request.args.get('date_to', '')
     status_filter = request.args.get('status', '')
 
-    query = PaymentRequest.query.filter(PaymentRequest.status.in_(['Completed', 'Recurring']))
+    # Show ALL statuses by default (consistent with reports() view)
+    query = PaymentRequest.query
     
     if status_filter:
-        query = query.filter_by(status=status_filter)
+        if status_filter == 'All Pending':
+            # Show both pending statuses
+            query = query.filter(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
+        else:
+            query = query.filter_by(status=status_filter)
     if department_filter:
         query = query.filter_by(department=department_filter)
     if request_type_filter:
-        query = query.filter_by(request_type=request_type_filter)
+        # Special handling for "Others" to match both "Others" and "Others:..."
+        if request_type_filter == 'Others':
+            query = query.filter(PaymentRequest.request_type.like('Others%'))
+        else:
+            query = query.filter_by(request_type=request_type_filter)
     if company_filter:
         # Filter by person_company field only (company_name is no longer used)
         query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
@@ -6878,21 +6945,21 @@ def export_reports_pdf():
         # Filter by branch name
         query = query.filter(PaymentRequest.branch_name == branch_filter)
 
-    # Date filtering and sorting for completed requests (use approval_date)
+    # Date filtering - use submission date (date field) which exists for all requests
     if date_from:
-        query = query.filter(PaymentRequest.approval_date >= datetime.strptime(date_from, '%Y-%m-%d').date())
+        query = query.filter(PaymentRequest.date >= datetime.strptime(date_from, '%Y-%m-%d').date())
     if date_to:
-        query = query.filter(PaymentRequest.approval_date <= datetime.strptime(date_to, '%Y-%m-%d').date())
-    result_requests = query.order_by(PaymentRequest.approval_date.desc()).all()
+        query = query.filter(PaymentRequest.date <= datetime.strptime(date_to, '%Y-%m-%d').date())
+    result_requests = query.order_by(PaymentRequest.date.desc()).all()
 
-    # Compute total amount (all requests are completed)
+    # Helper function to convert to float
     def to_float(value):
         try:
             return float(value)
         except Exception:
             return 0.0
 
-    # All requests are completed, so sum all amounts
+    # Sum all amounts (requests may be in any status)
     total_amount = sum(to_float(r.amount) for r in result_requests)
 
     try:

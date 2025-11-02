@@ -75,8 +75,18 @@
                         <label for="status">Status</label>
                         <select name="status" id="status">
                             <option value="">All Statuses</option>
-                            <option value="Completed" {% if status_filter == 'Completed' %}selected{% endif %}>Completed</option>
+                            <option value="All Pending" {% if status_filter == 'All Pending' %}selected{% endif %}>All Pending</option>
+                            <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
+                            <option value="Pending Finance Approval" {% if status_filter == 'Pending Finance Approval' %}selected{% endif %}>Pending Finance Approval</option>
+                            <option value="Rejected by Manager" {% if status_filter == 'Rejected by Manager' %}selected{% endif %}>Rejected by Manager</option>
+                            <option value="Rejected by Finance" {% if status_filter == 'Rejected by Finance' %}selected{% endif %}>Rejected by Finance</option>
+                            <option value="Proof Pending" {% if status_filter == 'Proof Pending' %}selected{% endif %}>Proof Pending</option>
+                            <option value="Proof Sent" {% if status_filter == 'Proof Sent' %}selected{% endif %}>Proof Sent</option>
+                            <option value="Proof Rejected" {% if status_filter == 'Proof Rejected' %}selected{% endif %}>Proof Rejected</option>
+                            <option value="Payment Pending" {% if status_filter == 'Payment Pending' %}selected{% endif %}>Payment Pending</option>
+                            <option value="Paid" {% if status_filter == 'Paid' %}selected{% endif %}>Paid</option>
                             <option value="Recurring" {% if status_filter == 'Recurring' %}selected{% endif %}>Recurring</option>
+                            <option value="Completed" {% if status_filter == 'Completed' %}selected{% endif %}>Completed</option>
                         </select>
                     </div>
                 </div>
@@ -111,7 +121,7 @@
                 <i class="fas fa-file-invoice"></i>
             </div>
             <div class="stat-info">
-                <h3>{{ requests|length }}</h3>
+                <h3>{{ total_requests }}</h3>
                 <p>Total Results</p>
             </div>
         </div>
@@ -120,7 +130,7 @@
                 <i class="fas fa-check-circle"></i>
             </div>
             <div class="stat-info">
-                <h3>{{ requests|selectattr('status', 'equalto', 'Completed')|list|length }}</h3>
+                <h3>{{ completed_count }}</h3>
                 <p>Completed</p>
             </div>
         </div>
@@ -129,7 +139,7 @@
                 <i class="fas fa-clock"></i>
             </div>
             <div class="stat-info">
-                <h3>{{ requests|selectattr('status', 'in', ['Pending Manager Approval', 'Pending Finance Approval'])|list|length }}</h3>
+                <h3>{{ pending_count }}</h3>
                 <p>Pending</p>
             </div>
         </div>
@@ -139,15 +149,14 @@
             </div>
             <div class="stat-info">
                 {% if user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT') %}
-                    {% set it_requests = requests|selectattr('department', 'equalto', 'IT')|list %}
-                    {% if it_requests|length > 0 %}
-                        <h3>OMR {{ "%.3f"|format(it_requests|map(attribute='amount')|sum) }}</h3>
-                        <small style="color: #666;">(IT Department Only - Completed)</small>
+                    {% if it_amount is not none and it_amount > 0 %}
+                        <h3>OMR {{ "%.3f"|format(it_amount) }}</h3>
+                        <small style="color: #666;">(IT Department Only)</small>
                     {% else %}
-                        <h3 style="color: #999;">***</h3>
+                        <h3 style="color: #999;">OMR 0.000</h3>
                     {% endif %}
                 {% else %}
-                    <h3>OMR {{ "%.3f"|format(requests|map(attribute='amount')|sum) }}</h3>
+                    <h3>OMR {{ "%.3f"|format(total_amount) }}</h3>
                 {% endif %}
                 <p>Total Amount</p>
             </div>
@@ -286,6 +295,56 @@
                         </tbody>
                     </table>
                 </div>
+                
+                <!-- Pagination Controls -->
+                {% if pagination %}
+                <div class="pagination-container">
+                    <div class="pagination-left">
+                        <div class="pagination-info">
+                            Showing {{ pagination.per_page * (pagination.page - 1) + 1 }} to 
+                            {{ pagination.per_page * (pagination.page - 1) + pagination.items|length }} 
+                            of {{ pagination.total }} requests
+                        </div>
+                        <div class="items-per-page">
+                            <label for="per_page">Show:</label>
+                            <select id="per_page" onchange="changeItemsPerPage(this.value)">
+                                <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10</option>
+                                <option value="20" {% if pagination.per_page == 20 %}selected{% endif %}>20</option>
+                                <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50</option>
+                                <option value="100" {% if pagination.per_page == 100 %}selected{% endif %}>100</option>
+                            </select>
+                            <span>per page</span>
+                        </div>
+                    </div>
+                    {% if pagination.pages > 1 %}
+                    <div class="pagination">
+                        {% if pagination.has_prev %}
+                            <a href="{{ url_for('reports', page=pagination.prev_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter) }}" class="btn btn-sm btn-secondary">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        {% endif %}
+                        
+                        {% for page_num in pagination.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != pagination.page %}
+                                    <a href="{{ url_for('reports', page=page_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
+                                {% else %}
+                                    <span class="btn btn-sm btn-primary">{{ page_num }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="pagination-ellipsis">...</span>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if pagination.has_next %}
+                            <a href="{{ url_for('reports', page=pagination.next_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter) }}" class="btn btn-sm btn-secondary">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
             {% else %}
                 <div class="empty-state">
                     <i class="fas fa-search"></i>
@@ -387,6 +446,14 @@ document.getElementById('department').addEventListener('change', function() {
             console.error('Error fetching request types:', error);
         });
 });
+
+function changeItemsPerPage(perPage) {
+    // Redirect to page 1 with new per_page value, preserving all filters
+    const url = new URL(window.location);
+    url.searchParams.set('per_page', perPage);
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}
 </script>
 {% endblock %}
 
