@@ -168,10 +168,10 @@
             <h2><i class="fas fa-table"></i> Report Results</h2>
             {% if requests and requests|length > 0 %}
             <div class="header-actions">
-                <a class="btn btn-success" id="export-excel-btn" href="{{ url_for('export_reports_excel', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to',''), status=request.args.get('status','')) }}" onclick="showExportLoading()">
+                <a class="btn btn-success" id="export-excel-btn" href="{{ url_for('export_reports_excel', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to',''), status=request.args.get('status','')) }}" onclick="return showExportLoading(event)">
                     <i class="fas fa-file-excel"></i> <span id="export-excel-text">Export Excel</span>
                 </a>
-                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to',''), status=request.args.get('status','')) }}" onclick="showExportLoading()">
+                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to',''), status=request.args.get('status','')) }}" onclick="return showExportLoading(event)">
                     <i class="fas fa-file-pdf"></i> <span id="export-text">Export PDF</span>
                 </a>
             </div>
@@ -360,67 +360,245 @@
 <script>
 let exportTimeout;
 let isExporting = false;
+let exportingType = null; // 'pdf' or 'excel'
+let windowBlurred = false;
+let downloadStartTime = null;
+let loaderCheckInterval = null;
 
-function showExportLoading() {
-    if (isExporting) return; // Prevent multiple clicks
+// Helper function to hide global loader if it exists
+function hideGlobalLoader() {
+    const globalLoader = document.getElementById('global-loader');
+    if (globalLoader) {
+        globalLoader.remove();
+    }
+    // Also try calling hideLoading if it exists
+    if (typeof hideLoading === 'function') {
+        hideLoading();
+    }
+}
+
+function showExportLoading(event) {
+    if (isExporting) {
+        event.preventDefault();
+        return false; // Prevent multiple clicks
+    }
     
-    const btn = document.getElementById('export-pdf-btn');
-    const text = document.getElementById('export-text');
-    if (btn && text) {
-        isExporting = true;
-        btn.style.pointerEvents = 'none';
-        text.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
-        
-        // Clear any existing timeout
-        if (exportTimeout) {
-            clearTimeout(exportTimeout);
+    // IMPORTANT: Hide any global loader that might have been triggered
+    hideGlobalLoader();
+    
+    // Safety check: if event is not provided, try to determine from context
+    if (!event || !event.target) {
+        console.warn('showExportLoading called without event object');
+        return false;
+    }
+    
+    // Determine which button was clicked
+    const clickedElement = event.target;
+    let targetBtn, targetText, exportType;
+    
+    if (clickedElement.id === 'export-pdf-btn' || clickedElement.closest('#export-pdf-btn')) {
+        targetBtn = document.getElementById('export-pdf-btn');
+        targetText = document.getElementById('export-text');
+        exportType = 'pdf';
+    } else if (clickedElement.id === 'export-excel-btn' || clickedElement.closest('#export-excel-btn')) {
+        targetBtn = document.getElementById('export-excel-btn');
+        targetText = document.getElementById('export-excel-text');
+        exportType = 'excel';
+    } else {
+        // Fallback: check which button triggered this
+        const pdfBtn = document.getElementById('export-pdf-btn');
+        const excelBtn = document.getElementById('export-excel-btn');
+        if (event.target === pdfBtn || (pdfBtn && pdfBtn.contains(event.target))) {
+            targetBtn = pdfBtn;
+            targetText = document.getElementById('export-text');
+            exportType = 'pdf';
+        } else if (event.target === excelBtn || (excelBtn && excelBtn.contains(event.target))) {
+            targetBtn = excelBtn;
+            targetText = document.getElementById('export-excel-text');
+            exportType = 'excel';
+        } else {
+            return true; // Allow normal link behavior
         }
-        
-        // Reset button state after 5 seconds
-        exportTimeout = setTimeout(function() {
-            resetExportButton();
-        }, 5000);
+    }
+    
+    if (!targetBtn || !targetText) {
+        return true; // Allow normal link behavior if we can't find elements
+    }
+    
+    // Set exporting state
+    isExporting = true;
+    exportingType = exportType;
+    downloadStartTime = Date.now();
+    
+    // Disable both buttons to prevent multiple exports
+    const pdfBtn = document.getElementById('export-pdf-btn');
+    const excelBtn = document.getElementById('export-excel-btn');
+    if (pdfBtn) {
+        pdfBtn.style.pointerEvents = 'none';
+        pdfBtn.style.opacity = '0.6';
+    }
+    if (excelBtn) {
+        excelBtn.style.pointerEvents = 'none';
+        excelBtn.style.opacity = '0.6';
+    }
+    
+    // Update the clicked button's text
+    if (exportType === 'pdf') {
+        targetText.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
+    } else {
+        targetText.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating Excel...';
+    }
+    
+    // Track window blur (user might switch tabs/windows for download)
+    windowBlurred = false;
+    
+    // Clear any existing timeout
+    if (exportTimeout) {
+        clearTimeout(exportTimeout);
+    }
+    
+    // IMPORTANT: Continuously monitor and hide global loader
+    if (loaderCheckInterval) {
+        clearInterval(loaderCheckInterval);
+    }
+    loaderCheckInterval = setInterval(function() {
+        hideGlobalLoader();
+        if (!isExporting) {
+            clearInterval(loaderCheckInterval);
+            loaderCheckInterval = null;
+        }
+    }, 100);
+    
+    // Multiple detection methods for download completion:
+    
+    // 1. Reset after short initial delay (download likely started)
+    setTimeout(function() {
+        if (isExporting) {
+            resetExportButtons();
+        }
+    }, 2500);
+    
+    // 2. Safety timeout: Reset after 8 seconds if still exporting
+    exportTimeout = setTimeout(function() {
+        resetExportButtons();
+    }, 8000);
+    
+    // Allow the download to proceed normally (don't prevent default)
+    // The global loader will be continuously hidden
+    return true;
+}
+
+function resetExportButtons() {
+    // Hide global loader first
+    hideGlobalLoader();
+    
+    // Clear loader check interval
+    if (loaderCheckInterval) {
+        clearInterval(loaderCheckInterval);
+        loaderCheckInterval = null;
+    }
+    
+    const pdfBtn = document.getElementById('export-pdf-btn');
+    const pdfText = document.getElementById('export-text');
+    const excelBtn = document.getElementById('export-excel-btn');
+    const excelText = document.getElementById('export-excel-text');
+    
+    if (pdfBtn && pdfText) {
+        pdfBtn.style.pointerEvents = 'auto';
+        pdfBtn.style.opacity = '1';
+        pdfText.innerHTML = 'Export PDF';
+    }
+    
+    if (excelBtn && excelText) {
+        excelBtn.style.pointerEvents = 'auto';
+        excelBtn.style.opacity = '1';
+        excelText.innerHTML = 'Export Excel';
+    }
+    
+    isExporting = false;
+    exportingType = null;
+    downloadStartTime = null;
+    
+    if (exportTimeout) {
+        clearTimeout(exportTimeout);
+        exportTimeout = null;
     }
 }
 
-function resetExportButton() {
-    const btn = document.getElementById('export-pdf-btn');
-    const text = document.getElementById('export-text');
-    if (btn && text) {
-        btn.style.pointerEvents = 'auto';
-        text.innerHTML = 'Export PDF';
-        isExporting = false;
-        if (exportTimeout) {
-            clearTimeout(exportTimeout);
-            exportTimeout = null;
-        }
-    }
-}
-
-// Reset button state when page becomes visible again
+// Reset button state when page becomes visible again (user likely returned after download)
 document.addEventListener('visibilitychange', function() {
-    if (!document.hidden) {
-        resetExportButton();
+    if (!document.hidden && isExporting) {
+        // Check if enough time has passed (at least 2 seconds)
+        if (downloadStartTime && (Date.now() - downloadStartTime) > 2000) {
+            setTimeout(function() {
+                resetExportButtons();
+            }, 300);
+        }
     }
 });
 
-// Reset button state when user clicks anywhere on the page (except the export button)
+// Reset when window regains focus (user clicked back to the tab)
+window.addEventListener('focus', function() {
+    if (isExporting && windowBlurred) {
+        // Check if enough time has passed
+        if (downloadStartTime && (Date.now() - downloadStartTime) > 2000) {
+            setTimeout(function() {
+                resetExportButtons();
+            }, 500);
+        }
+    }
+    windowBlurred = false;
+});
+
+// Track when window loses focus (user might be saving/downloading file)
+window.addEventListener('blur', function() {
+    if (isExporting) {
+        windowBlurred = true;
+    }
+});
+
+// Reset button state when user clicks anywhere on the page (except the export buttons)
 document.addEventListener('click', function(e) {
-    if (e.target.id !== 'export-pdf-btn' && e.target.closest('#export-pdf-btn') === null) {
-        resetExportButton();
+    const isPdfBtn = e.target.id === 'export-pdf-btn' || e.target.closest('#export-pdf-btn');
+    const isExcelBtn = e.target.id === 'export-excel-btn' || e.target.closest('#export-excel-btn');
+    
+    if (!isPdfBtn && !isExcelBtn && isExporting) {
+        // Only reset if enough time has passed since download started
+        if (downloadStartTime && (Date.now() - downloadStartTime) > 2000) {
+            setTimeout(function() {
+                resetExportButtons();
+            }, 300);
+        }
     }
 });
 
 // Reset button state when user presses Escape key
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        resetExportButton();
+    if (e.key === 'Escape' && isExporting) {
+        resetExportButtons();
     }
 });
 
 // Reset button state when the page loads (in case of refresh)
 document.addEventListener('DOMContentLoaded', function() {
-    resetExportButton();
+    resetExportButtons();
+    
+    // Also hide any global loader that might be stuck
+    hideGlobalLoader();
+});
+
+// Monitor for mouse movement - user interaction indicates they're back
+let lastMouseMove = Date.now();
+document.addEventListener('mousemove', function() {
+    if (isExporting && (Date.now() - lastMouseMove) > 1000) {
+        lastMouseMove = Date.now();
+        if (downloadStartTime && (Date.now() - downloadStartTime) > 2000) {
+            setTimeout(function() {
+                resetExportButtons();
+            }, 300);
+        }
+    }
+    lastMouseMove = Date.now();
 });
 
 // Update request types when department changes
