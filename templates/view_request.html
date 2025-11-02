@@ -370,6 +370,42 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     <textarea id="purpose" rows="4" readonly style="background: #f5f5f5;">{{ request.purpose }}</textarea>
                 </div>
 
+                <div class="form-group">
+                    <label for="bank_name">Bank Name</label>
+                    <input type="text" id="bank_name" value="{{ request.bank_name }}" readonly style="background: #f5f5f5;">
+                    {% set swift_codes = {
+                        'Bank Dhofar': 'BDOFOMRU',
+                        'Bank Muscat': 'BMUSOMRX',
+                        'National Bank of Oman': 'NBOMOMRX',
+                        'Oman Arab Bank': 'OMABOMRU',
+                        'Bank Sohar': 'BSHROMRU',
+                        'HSBC Bank Oman': 'BBMEOMRX',
+                        'Ahli Bank': 'AUBOOMRU',
+                        'Oman Development Bank': 'ODBLOMRX',
+                        'Oman Housing Bank': 'OHLBOMRU',
+                        'Meethaq Islamic Banking (Bank Dhofar)': 'BDOFOMRUMIB',
+                        'Meethaq Islamic Banking (Bank Muscat)': 'BMUSOMRXISL',
+                        'Muzn Islamic Banking (National Bank of Oman)': 'NBOMOMRXIBS',
+                        'Al Hilal Islamic Banking (Ahli Bank)': 'AUBOOMRUALH',
+                        'National Bank of Abu Dhabi': 'NBADOMRX',
+                        'Qatar National Bank': 'QNBAOMRX',
+                        'Standard Chartered Bank': 'SCBLOMRX',
+                        'Bank of Baroda': 'BABEOMRX',
+                        'Bank of Beirut': 'BARBOMMX',
+                        'State Bank of India': 'SBINOMRX',
+                        'Habib Bank AG Zurich': 'HABBOMRX',
+                        'Alizz Islamic Bank': 'IZZBOMRU',
+                        'Sohar Islamic (Sohar Bank)': 'BSHROMRUISL',
+                        'Al Yusr Islamic Banking Services (Oman Arab Bank)': 'OMABOMRUYSR'
+                    } %}
+                    {% set bank_name_normalized = request.bank_name.strip() if request.bank_name else '' %}
+                    {% if bank_name_normalized and bank_name_normalized in swift_codes %}
+                    <div id="swift-code-display" style="margin-top: 8px; padding: 10px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                        <strong>SWIFT Code:</strong> <span id="swift-code-text">{{ swift_codes[bank_name_normalized] }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label for="account_name">Account Name</label>
@@ -388,11 +424,6 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                             <input type="text" id="account_number" value="{{ request.account_number }}" readonly style="background: #f5f5f5;">
                         {% endif %}
                     </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="bank_name">Bank Name</label>
-                    <input type="text" id="bank_name" value="{{ request.bank_name }}" readonly style="background: #f5f5f5;">
                 </div>
 
                 <div class="form-group">
@@ -2157,6 +2188,45 @@ document.addEventListener('DOMContentLoaded', function() {
             requestDetailsSection.style.display = 'none';
         } else if (activeTabStep && activeTabStep.getAttribute('data-step') === 'submit') {
             requestDetailsSection.style.display = 'block';
+        }
+    }
+    
+    // Display SWIFT code for the selected bank
+    const bankNameInput = document.getElementById('bank_name');
+    const swiftDisplay = document.getElementById('swift-code-display');
+    const swiftText = document.getElementById('swift-code-text');
+    
+    if (bankNameInput && swiftDisplay && swiftText) {
+        const swiftCodes = {
+            'Bank Dhofar': 'BDOFOMRU',
+            'Bank Muscat': 'BMUSOMRX',
+            'National Bank of Oman': 'NBOMOMRX',
+            'Oman Arab Bank': 'OMABOMRU',
+            'Bank Sohar': 'BSHROMRU',
+            'HSBC Bank Oman': 'BBMEOMRX',
+            'Ahli Bank': 'AUBOOMRU',
+            'Oman Development Bank': 'ODBLOMRX',
+            'Oman Housing Bank': 'OHLBOMRU',
+            'Meethaq Islamic Banking (Bank Dhofar)': 'BDOFOMRUMIB',
+            'Meethaq Islamic Banking (Bank Muscat)': 'BMUSOMRXISL',
+            'Muzn Islamic Banking (National Bank of Oman)': 'NBOMOMRXIBS',
+            'Al Hilal Islamic Banking (Ahli Bank)': 'AUBOOMRUALH',
+            'National Bank of Abu Dhabi': 'NBADOMRX',
+            'Qatar National Bank': 'QNBAOMRX',
+            'Standard Chartered Bank': 'SCBLOMRX',
+            'Bank of Baroda': 'BABEOMRX',
+            'Bank of Beirut': 'BARBOMMX',
+            'State Bank of India': 'SBINOMRX',
+            'Habib Bank AG Zurich': 'HABBOMRX',
+            'Alizz Islamic Bank': 'IZZBOMRU',
+            'Sohar Islamic (Sohar Bank)': 'BSHROMRUISL',
+            'Al Yusr Islamic Banking Services (Oman Arab Bank)': 'OMABOMRUYSR'
+        };
+        
+        const bankName = bankNameInput.value.trim();
+        if (bankName && swiftCodes[bankName]) {
+            swiftText.textContent = swiftCodes[bankName];
+            swiftDisplay.style.display = 'block';
         }
     }
 });
