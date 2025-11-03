@@ -2624,14 +2624,21 @@ def admin_dashboard():
     
     # Apply search filter (before tab filtering)
     if search_query:
-        # Search by request ID only
+        # Search by request ID or requestor name
         try:
             # Try to convert to integer for exact match
             search_id = int(search_query)
             query = query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
-            # If not a number, no results (only search by request ID)
-            query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
+            # If not a number, search by requestor name or other text fields
+            search_term = f'%{search_query}%'
+            query = query.filter(
+                db.or_(
+                    PaymentRequest.requestor_name.ilike(search_term),
+                    PaymentRequest.purpose.ilike(search_term),
+                    PaymentRequest.account_name.ilike(search_term)
+                )
+            )
     
     # Apply urgent filter (before tab filtering)
     if urgent_filter:
@@ -2759,14 +2766,21 @@ def finance_dashboard():
     
     # Apply search filter (before tab filtering)
     if search_query:
-        # Search by request ID only
+        # Search by request ID or requestor name
         try:
             # Try to convert to integer for exact match
             search_id = int(search_query)
             query = query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
-            # If not a number, no results (only search by request ID)
-            query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
+            # If not a number, search by requestor name or other text fields
+            search_term = f'%{search_query}%'
+            query = query.filter(
+                db.or_(
+                    PaymentRequest.requestor_name.ilike(search_term),
+                    PaymentRequest.purpose.ilike(search_term),
+                    PaymentRequest.account_name.ilike(search_term)
+                )
+            )
     
     # Apply urgent filter (before tab filtering)
     if urgent_filter:
@@ -2857,14 +2871,21 @@ def gm_dashboard():
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     if search_query:
-        # Search by request ID only
+        # Search by request ID or requestor name
         try:
             # Try to convert to integer for exact match
             search_id = int(search_query)
             query = query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
-            # If not a number, no results (only search by request ID)
-            query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
+            # If not a number, search by requestor name or other text fields
+            search_term = f'%{search_query}%'
+            query = query.filter(
+                db.or_(
+                    PaymentRequest.requestor_name.ilike(search_term),
+                    PaymentRequest.purpose.ilike(search_term),
+                    PaymentRequest.account_name.ilike(search_term)
+                )
+            )
     if urgent_filter:
         if urgent_filter == 'urgent':
             query = query.filter(PaymentRequest.is_urgent == True)
@@ -2982,11 +3003,20 @@ def ceo_dashboard():
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     if search_query:
+        # Search by request ID or requestor name
         try:
             search_id = int(search_query)
             query = query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
-            query = query.filter(PaymentRequest.request_id == -1)
+            # If not a number, search by requestor name or other text fields
+            search_term = f'%{search_query}%'
+            query = query.filter(
+                db.or_(
+                    PaymentRequest.requestor_name.ilike(search_term),
+                    PaymentRequest.purpose.ilike(search_term),
+                    PaymentRequest.account_name.ilike(search_term)
+                )
+            )
     if urgent_filter:
         if urgent_filter == 'urgent':
             query = query.filter(PaymentRequest.is_urgent == True)
@@ -3106,14 +3136,21 @@ def it_dashboard():
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     if search_query:
-        # Search by request ID only
+        # Search by request ID or requestor name
         try:
             # Try to convert to integer for exact match
             search_id = int(search_query)
             query = query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
-            # If not a number, no results (only search by request ID)
-            query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
+            # If not a number, search by requestor name or other text fields
+            search_term = f'%{search_query}%'
+            query = query.filter(
+                db.or_(
+                    PaymentRequest.requestor_name.ilike(search_term),
+                    PaymentRequest.purpose.ilike(search_term),
+                    PaymentRequest.account_name.ilike(search_term)
+                )
+            )
     if urgent_filter:
         if urgent_filter == 'urgent':
             query = query.filter(PaymentRequest.is_urgent == True)
@@ -3876,14 +3913,21 @@ def project_dashboard():
     if status_filter and tab != 'all':
         query = query.filter(PaymentRequest.status == status_filter)
     if search_query:
-        # Search by request ID only
+        # Search by request ID or requestor name
         try:
             # Try to convert to integer for exact match
             search_id = int(search_query)
             query = query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
-            # If not a number, no results (only search by request ID)
-            query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
+            # If not a number, search by requestor name or other text fields
+            search_term = f'%{search_query}%'
+            query = query.filter(
+                db.or_(
+                    PaymentRequest.requestor_name.ilike(search_term),
+                    PaymentRequest.purpose.ilike(search_term),
+                    PaymentRequest.account_name.ilike(search_term)
+                )
+            )
     if urgent_filter:
         if urgent_filter == 'urgent':
             query = query.filter(PaymentRequest.is_urgent == True)
@@ -3986,14 +4030,21 @@ def operation_dashboard():
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     if search_query:
-        # Search by request ID only
+        # Search by request ID or requestor name
         try:
             # Try to convert to integer for exact match
             search_id = int(search_query)
             query = query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
-            # If not a number, no results (only search by request ID)
-            query = query.filter(PaymentRequest.request_id == -1)  # This will return no results
+            # If not a number, search by requestor name or other text fields
+            search_term = f'%{search_query}%'
+            query = query.filter(
+                db.or_(
+                    PaymentRequest.requestor_name.ilike(search_term),
+                    PaymentRequest.purpose.ilike(search_term),
+                    PaymentRequest.account_name.ilike(search_term)
+                )
+            )
     if urgent_filter:
         if urgent_filter == 'urgent':
             query = query.filter(PaymentRequest.is_urgent == True)

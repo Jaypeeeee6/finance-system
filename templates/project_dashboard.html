@@ -30,8 +30,8 @@
             <i class="fas fa-sync-alt"></i> Recurring
         </button>
         <div class="tab-search">
-            <input type="text" id="tabSearchInput" placeholder="Search..." class="tab-search-input">
-            <button type="button" class="tab-search-btn">
+            <input type="text" id="tabSearchInput" placeholder="Search by request # or requestor name..." class="tab-search-input" value="{{ search_query or '' }}">
+            <button type="button" class="tab-search-btn" onclick="performSearch()">
                 <i class="fas fa-search"></i>
             </button>
         </div>
@@ -480,69 +480,115 @@ function updateNotificationCount() {
         });
 }
 
-function filterTable() {
+// Debounce timer for search
+let searchDebounceTimer = null;
+
+function performSearch(commit) {
     const searchInput = document.getElementById('tabSearchInput');
-    const urgentFilter = document.getElementById('urgentFilter');
+    const searchValue = searchInput.value.trim();
+    const url = new URL(window.location);
     
-    const searchFilter = searchInput.value.toLowerCase();
+    // Update search query parameter
+    if (searchValue) {
+        url.searchParams.set('search', searchValue);
+    } else {
+        url.searchParams.delete('search');
+    }
+    
+    // Reset to page 1 when searching
+    url.searchParams.set('page', '1');
+    
+    if (commit) {
+        window.location.href = url.toString();
+        return;
+    }
+    
+    fetch(url.toString(), { headers: { 'X-Requested-With': 'fetch' } })
+        .then(res => res.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newTable = doc.querySelector('.data-table tbody');
+            const curTable = document.querySelector('.data-table tbody');
+            if (newTable && curTable) {
+                curTable.innerHTML = newTable.innerHTML;
+            }
+            const newPagination = doc.querySelector('.pagination-container');
+            const curPagination = document.querySelector('.pagination-container');
+            if (newPagination && curPagination) {
+                curPagination.innerHTML = newPagination.innerHTML;
+            }
+        })
+        .catch(() => {});
+}
+
+function filterTable() {
+    // This function is kept for urgent filter (client-side filtering for urgent status)
+    const urgentFilter = document.getElementById('urgentFilter');
     const urgentValue = urgentFilter.value;
     
     const table = document.querySelector('.data-table');
+    if (!table) return;
+    
     const rows = table.getElementsByTagName('tr');
     
     // Skip header row (index 0)
     for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        const cells = row.getElementsByTagName('td');
+        const urgentBadge = row.querySelector('[style*="background: #dc3545"]'); // URGENT badge
         
-        if (cells.length >= 1) {
-            const requestIdCell = cells[0]; // Request ID
-            const urgentBadge = row.querySelector('[style*="background: #dc3545"]'); // URGENT badge
-            
-            let showRow = true;
-            
-            // Filter by search term (request ID)
-            if (searchFilter) {
-                const requestId = requestIdCell.textContent || requestIdCell.innerText;
-                const requestIdText = requestId.toLowerCase();
-                if (!requestIdText.includes(searchFilter)) {
-                    showRow = false;
-                }
+        let showRow = true;
+        
+        // Filter by urgent status (client-side only)
+        if (urgentValue) {
+            const isUrgent = urgentBadge !== null;
+            if (urgentValue === 'urgent' && !isUrgent) {
+                showRow = false;
+            } else if (urgentValue === 'not_urgent' && isUrgent) {
+                showRow = false;
             }
-            
-            // Filter by urgent status
-            if (urgentValue && showRow) {
-                const isUrgent = urgentBadge !== null;
-                if (urgentValue === 'urgent' && !isUrgent) {
-                    showRow = false;
-                } else if (urgentValue === 'not_urgent' && isUrgent) {
-                    showRow = false;
-                }
-            }
-            
-            // Show or hide row
-            row.style.display = showRow ? '' : 'none';
         }
+        
+        // Show or hide row
+        row.style.display = showRow ? '' : 'none';
     }
 }
 
 function clearSearch() {
     document.getElementById('tabSearchInput').value = '';
-    filterTable();
+    performSearch();
 }
 
 // Initialize tab search functionality when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Set up tab search functionality
+    // Set up tab search functionality with debouncing
     const tabSearchInput = document.getElementById('tabSearchInput');
     if (tabSearchInput) {
-        tabSearchInput.addEventListener('keyup', filterTable);
+        // Clear any existing debounce timer
+        tabSearchInput.addEventListener('input', function() {
+            clearTimeout(searchDebounceTimer);
+            // Wait 500ms after user stops typing before performing search
+            searchDebounceTimer = setTimeout(function() {
+                performSearch(false);
+            }, 500);
+        });
+        
+        // Also trigger search on Enter key
+        tabSearchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                clearTimeout(searchDebounceTimer);
+                performSearch(true);
+            }
+        });
     }
     
     // Set up tab search button
     const tabSearchBtn = document.querySelector('.tab-search-btn');
     if (tabSearchBtn) {
-        tabSearchBtn.addEventListener('click', filterTable);
+        tabSearchBtn.addEventListener('click', function() {
+            clearTimeout(searchDebounceTimer);
+            performSearch(true);
+        });
     }
 });
 </script>
