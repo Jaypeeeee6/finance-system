@@ -5178,6 +5178,31 @@ def edit_request(request_id):
                 INSERT INTO request_field_edits (request_id, field_name) VALUES (:rid, :fname)
                 ON CONFLICT(request_id, field_name) DO UPDATE SET last_edited_at = CURRENT_TIMESTAMP
             '''), { 'rid': request_id, 'fname': key })
+        # Also persist detailed edit history per field (old/new values)
+        db.session.execute(db.text('''
+            CREATE TABLE IF NOT EXISTS request_field_edit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_id INTEGER NOT NULL,
+                field_name TEXT NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                edited_by_user_id INTEGER,
+                edited_by_name TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        '''))
+        for key in edited_fields:
+            db.session.execute(db.text('''
+                INSERT INTO request_field_edit_logs (request_id, field_name, old_value, new_value, edited_by_user_id, edited_by_name)
+                VALUES (:rid, :fname, :oldv, :newv, :uid, :uname)
+            '''), {
+                'rid': request_id,
+                'fname': key,
+                'oldv': str(original.get(key, '')),
+                'newv': str(updated.get(key, '')),
+                'uid': current_user.user_id,
+                'uname': current_user.name
+            })
         db.session.commit()
     except Exception as e:
         app.logger.warning(f"Failed to persist edited fields: {e}")
@@ -5247,6 +5272,59 @@ def edit_request(request_id):
 
     flash('Edits saved successfully.', 'success')
     return redirect(url_for('view_request', request_id=request_id, tab='submit', edited='1', edited_fields=','.join(edited_fields)))
+
+
+@app.route('/request/<int:request_id>/field_history')
+@login_required
+def request_field_history(request_id: int):
+    """Return JSON history entries for a specific field for this request."""
+    field = request.args.get('field', '').strip()
+    if not field:
+        return jsonify({'success': False, 'error': 'Missing field parameter'}), 400
+
+    # Basic permission: reuse view permission; if user can't view the request, block
+    req = PaymentRequest.query.get_or_404(request_id)
+    # Minimal reuse: allow anyone who can open the view_request page (same route did checks)
+    # Here, we do a simplified check: if current user is the requestor or IT/GM/Operation Manager/Finance Admin/Department Manager
+    if not (
+        current_user.user_id == req.user_id or
+        current_user.department == 'IT' or
+        current_user.role in ['GM', 'Operation Manager', 'Finance Admin', 'Department Manager']
+    ):
+        return jsonify({'success': False, 'error': 'Not authorized'}), 403
+
+    try:
+        db.session.execute(db.text('''
+            CREATE TABLE IF NOT EXISTS request_field_edit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_id INTEGER NOT NULL,
+                field_name TEXT NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                edited_by_user_id INTEGER,
+                edited_by_name TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        '''))
+        rows = db.session.execute(
+            db.text('''SELECT old_value, new_value, edited_by_name, created_at
+                       FROM request_field_edit_logs
+                       WHERE request_id = :rid AND field_name = :fname
+                       ORDER BY created_at DESC'''),
+            {'rid': request_id, 'fname': field}
+        ).fetchall()
+        history = [
+            {
+                'old_value': r[0],
+                'new_value': r[1],
+                'edited_by': r[2],
+                'edited_at': r[3]
+            }
+            for r in rows
+        ]
+        return jsonify({'success': True, 'field': field, 'history': history})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/request/<int:request_id>/approve', methods=['POST'])

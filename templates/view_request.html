@@ -85,6 +85,18 @@ optgroup option { font-weight: normal; color: #212529; padding-left: 20px; }
     letter-spacing: 0.2px;
 }
 .edited-info i { color: #b00020; }
+
+/* Field history modal */
+.field-history-modal { position: fixed; inset: 0; display: none; z-index: 2000; }
+.field-history-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); }
+.field-history-container { position: relative; max-width: 720px; margin: 8vh auto; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+.field-history-header { display:flex; align-items:center; justify-content: space-between; padding: 14px 18px; background: #e3f2fd; border-bottom: 1px solid #cfe3ff; }
+.field-history-header h4 { margin: 0; font-size: 1.05rem; color: #0d47a1; }
+.field-history-body { max-height: 60vh; overflow: auto; padding: 16px 18px; }
+.history-row { padding: 10px 0; border-bottom: 1px solid #f1f3f4; }
+.history-meta { font-size: 0.85rem; color: #555; display:flex; gap:10px; }
+.history-values { margin-top: 6px; font-size: 0.95rem; }
+.field-history-close { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; color: #0d47a1; }
 .mark-paid-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -402,7 +414,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
             <form method="POST" action="{{ url_for('edit_request', request_id=request.request_id) }}">
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="request_type">Request Type {% if 'request_type' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                        <label for="request_type">Request Type {% if 'request_type' in edited_fields %}<span class="edited-badge" data-field="request_type" role="button" tabindex="0">Edited</span>{% endif %}</label>
                         {% if user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status == 'Pending Manager Approval' %}
                         {% set is_others = request.request_type.startswith('Others:') %}
                         {% set others_spec = is_others and request.request_type.split(':', 1)[1].strip() or '' %}
@@ -423,6 +435,18 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         {% endif %}
                     </div>
 
+            <!-- Field History Modal -->
+            <div id="fieldHistoryModal" class="field-history-modal" style="display:none;">
+                <div class="field-history-overlay" onclick="(function(){ const m=document.getElementById('fieldHistoryModal'); if(m){m.style.display='none'; document.body.style.overflow='';}})()"></div>
+                <div class="field-history-container">
+                    <div class="field-history-header">
+                        <h4 id="fieldHistoryTitle">Edit History</h4>
+                        <button type="button" class="field-history-close" onclick="(function(){ const m=document.getElementById('fieldHistoryModal'); if(m){m.style.display='none'; document.body.style.overflow='';}})()">&times;</button>
+                    </div>
+                    <div class="field-history-body" id="fieldHistoryBody"></div>
+                </div>
+            </div>
+
                     <div class="form-group">
                         <label for="requestor_name">Requestor Name</label>
                         <input type="text" id="requestor_name" value="{{ request.requestor_name }}" readonly style="background: #f5f5f5;">
@@ -440,7 +464,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 {% endif %}
 
                 <div class="form-group">
-                    <label for="branch_name">Branch Name {% if 'branch_name' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                    <label for="branch_name">Branch Name {% if 'branch_name' in edited_fields %}<span class="edited-badge" data-field="branch_name" role="button" tabindex="0">Edited</span>{% endif %}</label>
                     {% if user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status == 'Pending Manager Approval' %}
                     <div class="branch-select-container">
                         <input type="text" id="branch_search" class="form-control" placeholder="Search branches..." autocomplete="off" value="{{ request.branch_name }}">
@@ -475,19 +499,19 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 <!-- Dynamic fields based on request type -->
                 {% if request.item_name %}
                 <div class="form-group">
-                    <label for="item_name">Item Name {% if 'item_name' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                    <label for="item_name">Item Name {% if 'item_name' in edited_fields %}<span class="edited-badge" data-field="item_name" role="button" tabindex="0">Edited</span>{% endif %}</label>
                     <input type="text" id="item_name" name="item_name" value="{{ request.item_name }}" readonly style="background: #f5f5f5;">
                 </div>
                 {% endif %}
 
                 <div class="form-group">
-                    <label for="person_company">Person/Company Name {% if 'person_company' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                    <label for="person_company">Person/Company Name {% if 'person_company' in edited_fields %}<span class="edited-badge" data-field="person_company" role="button" tabindex="0">Edited</span>{% endif %}</label>
                     <input type="text" id="person_company" name="person_company" value="{{ request.person_company or '' }}" readonly style="background: #f5f5f5;">
                 </div>
 
                 {% if request.company_name %}
                 <div class="form-group">
-                    <label for="company_name">Company Name {% if 'company_name' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                    <label for="company_name">Company Name {% if 'company_name' in edited_fields %}<span class="edited-badge" data-field="company_name" role="button" tabindex="0">Edited</span>{% endif %}</label>
                     <input type="text" id="company_name" name="company_name" value="{{ request.company_name }}" readonly style="background: #f5f5f5;">
                 </div>
                 {% endif %}
@@ -505,14 +529,14 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 </div>
 
                 <div class="form-group">
-                    <label for="purpose">Purpose/Description {% if 'purpose' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                    <label for="purpose">Purpose/Description {% if 'purpose' in edited_fields %}<span class="edited-badge" data-field="purpose" role="button" tabindex="0">Edited</span>{% endif %}</label>
                     <textarea id="purpose" name="purpose" rows="4" readonly style="background: #f5f5f5;">{{ request.purpose }}</textarea>
                 </div>
 
                 
 
                 <div class="form-group">
-                    <label for="bank_name">Bank Name {% if 'bank_name' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                    <label for="bank_name">Bank Name {% if 'bank_name' in edited_fields %}<span class="edited-badge" data-field="bank_name" role="button" tabindex="0">Edited</span>{% endif %}</label>
                     {% if user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status == 'Pending Manager Approval' %}
                     <select id="bank_name" name="bank_name">
                         <option value="">-- Select Bank --</option>
@@ -578,7 +602,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="account_name">Account Name {% if 'account_name' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                        <label for="account_name">Account Name {% if 'account_name' in edited_fields %}<span class="edited-badge" data-field="account_name" role="button" tabindex="0">Edited</span>{% endif %}</label>
                         {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
                             <input type="text" id="account_name" name="account_name" value="***" readonly style="background: #f5f5f5; color: #999;">
                         {% else %}
@@ -587,7 +611,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     </div>
 
                     <div class="form-group">
-                        <label for="account_number">Account Number {% if 'account_number' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                        <label for="account_number">Account Number {% if 'account_number' in edited_fields %}<span class="edited-badge" data-field="account_number" role="button" tabindex="0">Edited</span>{% endif %}</label>
                         {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
                             <input type="text" id="account_number" name="account_number" value="********" readonly style="background: #f5f5f5; color: #999; letter-spacing: 2px;">
                         {% else %}
@@ -2317,6 +2341,77 @@ document.addEventListener('DOMContentLoaded', function() {
         initializeBranchSearch();
     }
 
+    // Edited badge click -> fetch field history
+    document.addEventListener('click', function(e) {
+        const badge = e.target.closest('.edited-badge');
+        if (!badge) return;
+        const field = badge.getAttribute('data-field');
+        if (!field) return;
+        fetch(`{{ url_for('request_field_history', request_id=request.request_id) }}?field=${encodeURIComponent(field)}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    alert(data.error || 'Failed to load history');
+                    return;
+                }
+                openFieldHistoryModal(field, data.history || []);
+            })
+            .catch(() => alert('Failed to load history'));
+    });
+
+    function openFieldHistoryModal(field, history) {
+        const modal = document.getElementById('fieldHistoryModal');
+        const title = document.getElementById('fieldHistoryTitle');
+        const body = document.getElementById('fieldHistoryBody');
+        title.textContent = `Edit History — ${prettyFieldName(field)}`;
+        if (!history.length) {
+            body.innerHTML = '<p style="margin:0; color:#666;">No edits recorded for this field.</p>';
+        } else {
+            body.innerHTML = history.map(h => `
+                <div class="history-row">
+                    <div class="history-meta">
+                        <span class="history-user">${escapeHtml(h.edited_by || 'Unknown')}</span>
+                        <span class="history-time">${escapeHtml(h.edited_at || '')}</span>
+                    </div>
+                    <div class="history-values">
+                        <div><strong>From:</strong> ${escapeHtml(h.old_value || '')}</div>
+                        <div><strong>To:</strong> ${escapeHtml(h.new_value || '')}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeFieldHistoryModal() {
+        const modal = document.getElementById('fieldHistoryModal');
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+    }
+
+    function prettyFieldName(key) {
+        const map = {
+            request_type: 'Request Type',
+            branch_name: 'Branch Name',
+            person_company: 'Person/Company Name',
+            company_name: 'Company Name',
+            purpose: 'Purpose/Description',
+            bank_name: 'Bank Name',
+            account_name: 'Account Name',
+            account_number: 'Account Number',
+            item_name: 'Item Name'
+        };
+        return map[key] || key;
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"]/g, function(c) {
+            return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]);
+        });
+    }
     function initializeBranchSearch() {
         const searchInput = document.getElementById('branch_search');
         const hiddenSelect = document.getElementById('branch_name');
