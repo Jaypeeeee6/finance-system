@@ -528,7 +528,7 @@
                 </div>
                 
                 <!-- Pagination Controls -->
-                {% if pagination %}
+                {% if active_tab == 'all' and pagination %}
                 <div class="pagination-container">
                     <div class="pagination-left">
                         <div class="pagination-info">
@@ -1196,15 +1196,10 @@ function performSearch(commit) {
         .then(html => {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
-            const newTable = doc.querySelector('.data-table tbody');
-            const curTable = document.querySelector('.data-table tbody');
-            if (newTable && curTable) {
-                curTable.innerHTML = newTable.innerHTML;
-            }
-            const newPagination = doc.querySelector('.pagination-container');
-            const curPagination = document.querySelector('.pagination-container');
-            if (newPagination && curPagination) {
-                curPagination.innerHTML = newPagination.innerHTML;
+            const newBody = doc.querySelector('.card-body');
+            const curBody = document.querySelector('.card-body');
+            if (newBody && curBody) {
+                curBody.innerHTML = newBody.innerHTML;
             }
         })
         .catch(() => {});

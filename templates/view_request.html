@@ -4,6 +4,87 @@
 
 {% block extra_css %}
 <style>
+/* Branch dropdown styles (match new_request.html) */
+.branch-select-container {
+    position: relative;
+}
+
+.branch-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ced4da;
+    border-top: none;
+    border-radius: 0 0 0.375rem 0.375rem;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.branch-group {
+    background-color: #f8f9fa;
+    padding: 8px 12px;
+    font-weight: bold;
+    color: #495057;
+    border-bottom: 1px solid #dee2e6;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.branch-option {
+    padding: 8px 20px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f3f4;
+    transition: background-color 0.2s;
+}
+
+.branch-option:hover {
+    background-color: #e9ecef;
+}
+
+.branch-option.selected {
+    background-color: #007bff;
+    color: white;
+}
+
+.branch-option.hidden { display: none; }
+
+optgroup { font-weight: bold; color: #495057; background-color: #f8f9fa; padding: 5px 0; }
+optgroup option { font-weight: normal; color: #212529; padding-left: 20px; }
+#branch_name { font-size: 14px; }
+
+/* Edited badge */
+.edited-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+.edited-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffe8e6;
+    color: #b00020;
+    border: 1px solid #ffb3ab;
+    padding: 6px 14px;
+    border-radius: 16px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.2px;
+}
+.edited-info i { color: #b00020; }
 .mark-paid-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -306,18 +387,40 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 
         <!-- Step 1: Submit Request -->
         <div class="step-content active request-details-section" id="step-submit">
-            <h3><i class="fas fa-paper-plane"></i> Request Details</h3>
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <h3 style="margin: 0;"><i class="fas fa-paper-plane"></i> Request Details {% if was_just_edited %}<span class="edited-badge">Edited</span>{% endif %}</h3>
+                {% if edited_fields and edited_fields|length > 0 %}
+                <div class="edited-info"><i class="fas fa-edit"></i> This request was edited</div>
+                {% endif %}
+            </div>
             <div class="admin-mode-warning">
                 <i class="fas fa-info-circle"></i>
                 <span>Request submitted successfully. This step is always completed.</span>
             </div>
 
             <!-- Request Details Form -->
-            <form>
+            <form method="POST" action="{{ url_for('edit_request', request_id=request.request_id) }}">
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="request_type">Request Type</label>
+                        <label for="request_type">Request Type {% if 'request_type' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                        {% if user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status == 'Pending Manager Approval' %}
+                        {% set is_others = request.request_type.startswith('Others:') %}
+                        {% set others_spec = is_others and request.request_type.split(':', 1)[1].strip() or '' %}
+                        {% set base_request_type = is_others and 'Others' or request.request_type %}
+                        {% if available_request_types and available_request_types|length > 0 %}
+                        <select id="request_type" name="request_type">
+                            <option value="">-- Select Type --</option>
+                            {% for rt in available_request_types %}
+                                <option value="{{ rt.name }}" {% if base_request_type == rt.name %}selected{% endif %}>{{ rt.name }}</option>
+                            {% endfor %}
+                        </select>
+                        {% else %}
                         <input type="text" id="request_type" value="{{ request.request_type }}" readonly style="background: #f5f5f5;">
+                        <small class="form-text text-muted">No request types configured for {{ request.department }} department.</small>
+                        {% endif %}
+                        {% else %}
+                        <input type="text" id="request_type" value="{{ request.request_type }}" readonly style="background: #f5f5f5;">
+                        {% endif %}
                     </div>
 
                     <div class="form-group">
@@ -326,28 +429,66 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     </div>
                 </div>
 
+                {% if user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status == 'Pending Manager Approval' %}
+                {% set is_others = request.request_type.startswith('Others:') %}
+                {% set others_spec = is_others and request.request_type.split(':', 1)[1].strip() or '' %}
+                <div class="form-group" id="othersDescriptionGroup" style="display: {% if is_others %}block{% else %}none{% endif %};">
+                    <label for="others_description_edit">Please specify the type of request</label>
+                    <input type="text" id="others_description_edit" name="others_description" value="{{ others_spec }}" placeholder="Enter the specific type of request">
+                    <small class="form-text text-muted">Shown only when Request Type is "Others".</small>
+                </div>
+                {% endif %}
+
                 <div class="form-group">
-                    <label for="branch_name">Branch Name</label>
+                    <label for="branch_name">Branch Name {% if 'branch_name' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                    {% if user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status == 'Pending Manager Approval' %}
+                    <div class="branch-select-container">
+                        <input type="text" id="branch_search" class="form-control" placeholder="Search branches..." autocomplete="off" value="{{ request.branch_name }}">
+                        <select id="branch_name" name="branch_name" class="form-control" style="display: none;">
+                            <option value="">-- Select Branch --</option>
+                            {% if available_branches %}
+                                {% set current_restaurant = "" %}
+                                {% for branch in available_branches %}
+                                    {% set restaurant = branch.restaurant %}
+                                    {% if restaurant != current_restaurant %}
+                                        {% if current_restaurant != "" %}
+                                            </optgroup>
+                                        {% endif %}
+                                        <optgroup label="{{ restaurant }} (Location)" data-restaurant="{{ restaurant }}">
+                                        {% set current_restaurant = restaurant %}
+                                    {% endif %}
+                                    <option value="{{ branch.name }}" data-restaurant="{{ restaurant }}" {% if request.branch_name == branch.name %}selected{% endif %}>{{ branch.name }}</option>
+                                {% endfor %}
+                                {% if current_restaurant != "" %}
+                                    </optgroup>
+                                {% endif %}
+                            {% endif %}
+                        </select>
+                        <div id="branch_dropdown" class="branch-dropdown" style="display: none;"></div>
+                    </div>
+                    <small class="form-text text-muted">Type to search or select the branch location for this request</small>
+                    {% else %}
                     <input type="text" id="branch_name" value="{{ request.branch_name }}" readonly style="background: #f5f5f5;">
+                    {% endif %}
                 </div>
 
                 <!-- Dynamic fields based on request type -->
                 {% if request.item_name %}
                 <div class="form-group">
-                    <label for="item_name">Item Name</label>
-                    <input type="text" id="item_name" value="{{ request.item_name }}" readonly style="background: #f5f5f5;">
+                    <label for="item_name">Item Name {% if 'item_name' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                    <input type="text" id="item_name" name="item_name" value="{{ request.item_name }}" readonly style="background: #f5f5f5;">
                 </div>
                 {% endif %}
 
                 <div class="form-group">
-                    <label for="person_company">Person/Company Name</label>
-                    <input type="text" id="person_company" value="{{ request.person_company or '' }}" readonly style="background: #f5f5f5;">
+                    <label for="person_company">Person/Company Name {% if 'person_company' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                    <input type="text" id="person_company" name="person_company" value="{{ request.person_company or '' }}" readonly style="background: #f5f5f5;">
                 </div>
 
                 {% if request.company_name %}
                 <div class="form-group">
-                    <label for="company_name">Company Name</label>
-                    <input type="text" id="company_name" value="{{ request.company_name }}" readonly style="background: #f5f5f5;">
+                    <label for="company_name">Company Name {% if 'company_name' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                    <input type="text" id="company_name" name="company_name" value="{{ request.company_name }}" readonly style="background: #f5f5f5;">
                 </div>
                 {% endif %}
 
@@ -364,13 +505,45 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 </div>
 
                 <div class="form-group">
-                    <label for="purpose">Purpose/Description</label>
-                    <textarea id="purpose" rows="4" readonly style="background: #f5f5f5;">{{ request.purpose }}</textarea>
+                    <label for="purpose">Purpose/Description {% if 'purpose' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                    <textarea id="purpose" name="purpose" rows="4" readonly style="background: #f5f5f5;">{{ request.purpose }}</textarea>
                 </div>
 
+                
+
                 <div class="form-group">
-                    <label for="bank_name">Bank Name</label>
+                    <label for="bank_name">Bank Name {% if 'bank_name' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
+                    {% if user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status == 'Pending Manager Approval' %}
+                    <select id="bank_name" name="bank_name">
+                        <option value="">-- Select Bank --</option>
+                        <option value="Bank Dhofar" {% if request.bank_name == 'Bank Dhofar' %}selected{% endif %}>Bank Dhofar</option>
+                        <option value="Bank Muscat" {% if request.bank_name == 'Bank Muscat' %}selected{% endif %}>Bank Muscat</option>
+                        <option value="National Bank of Oman" {% if request.bank_name == 'National Bank of Oman' %}selected{% endif %}>National Bank of Oman</option>
+                        <option value="Oman Arab Bank" {% if request.bank_name == 'Oman Arab Bank' %}selected{% endif %}>Oman Arab Bank</option>
+                        <option value="Bank Sohar" {% if request.bank_name == 'Bank Sohar' %}selected{% endif %}>Bank Sohar</option>
+                        <option value="HSBC Bank Oman" {% if request.bank_name == 'HSBC Bank Oman' %}selected{% endif %}>HSBC Bank Oman</option>
+                        <option value="Ahli Bank" {% if request.bank_name == 'Ahli Bank' %}selected{% endif %}>Ahli Bank</option>
+                        <option value="Oman Development Bank" {% if request.bank_name == 'Oman Development Bank' %}selected{% endif %}>Oman Development Bank</option>
+                        <option value="Oman Housing Bank" {% if request.bank_name == 'Oman Housing Bank' %}selected{% endif %}>Oman Housing Bank</option>
+                        <option value="Meethaq Islamic Banking (Bank Dhofar)" {% if request.bank_name == 'Meethaq Islamic Banking (Bank Dhofar)' %}selected{% endif %}>Meethaq Islamic Banking (Bank Dhofar)</option>
+                        <option value="Meethaq Islamic Banking (Bank Muscat)" {% if request.bank_name == 'Meethaq Islamic Banking (Bank Muscat)' %}selected{% endif %}>Meethaq Islamic Banking (Bank Muscat)</option>
+                        <option value="Muzn Islamic Banking (National Bank of Oman)" {% if request.bank_name == 'Muzn Islamic Banking (National Bank of Oman)' %}selected{% endif %}>Muzn Islamic Banking (National Bank of Oman)</option>
+                        <option value="Al Hilal Islamic Banking (Ahli Bank)" {% if request.bank_name == 'Al Hilal Islamic Banking (Ahli Bank)' %}selected{% endif %}>Al Hilal Islamic Banking (Ahli Bank)</option>
+                        <option value="National Bank of Abu Dhabi" {% if request.bank_name == 'National Bank of Abu Dhabi' %}selected{% endif %}>National Bank of Abu Dhabi</option>
+                        <option value="Qatar National Bank" {% if request.bank_name == 'Qatar National Bank' %}selected{% endif %}>Qatar National Bank</option>
+                        <option value="Standard Chartered Bank" {% if request.bank_name == 'Standard Chartered Bank' %}selected{% endif %}>Standard Chartered Bank</option>
+                        <option value="Bank of Baroda" {% if request.bank_name == 'Bank of Baroda' %}selected{% endif %}>Bank of Baroda</option>
+                        <option value="Bank of Beirut" {% if request.bank_name == 'Bank of Beirut' %}selected{% endif %}>Bank of Beirut</option>
+                        <option value="State Bank of India" {% if request.bank_name == 'State Bank of India' %}selected{% endif %}>State Bank of India</option>
+                        <option value="Habib Bank AG Zurich" {% if request.bank_name == 'Habib Bank AG Zurich' %}selected{% endif %}>Habib Bank AG Zurich</option>
+                        <option value="Alizz Islamic Bank" {% if request.bank_name == 'Alizz Islamic Bank' %}selected{% endif %}>Alizz Islamic Bank</option>
+                        <option value="Sohar Islamic (Sohar Bank)" {% if request.bank_name == 'Sohar Islamic (Sohar Bank)' %}selected{% endif %}>Sohar Islamic (Sohar Bank)</option>
+                        <option value="Al Yusr Islamic Banking Services (Oman Arab Bank)" {% if request.bank_name == 'Al Yusr Islamic Banking Services (Oman Arab Bank)' %}selected{% endif %}>Al Yusr Islamic Banking Services (Oman Arab Bank)</option>
+                        <option value="Bank Nizwa" {% if request.bank_name == 'Bank Nizwa' %}selected{% endif %}>Bank Nizwa</option>
+                    </select>
+                    {% else %}
                     <input type="text" id="bank_name" value="{{ request.bank_name }}" readonly style="background: #f5f5f5;">
+                    {% endif %}
                     {% set swift_codes = {
                         'Bank Dhofar': 'BDOFOMRU',
                         'Bank Muscat': 'BMUSOMRX',
@@ -398,29 +571,27 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         'Bank Nizwa': 'BNZWOMRX'
                     } %}
                     {% set bank_name_normalized = request.bank_name.strip() if request.bank_name else '' %}
-                    {% if bank_name_normalized and bank_name_normalized in swift_codes %}
-                    <div id="swift-code-display" style="margin-top: 8px; padding: 10px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
-                        <strong>SWIFT Code:</strong> <span id="swift-code-text">{{ swift_codes[bank_name_normalized] }}</span>
+                    <div id="swift-code-display" style="margin-top: 8px; padding: 10px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; {% if not (bank_name_normalized and bank_name_normalized in swift_codes) %}display: none;{% endif %}">
+                        <strong>SWIFT Code:</strong> <span id="swift-code-text">{% if bank_name_normalized and bank_name_normalized in swift_codes %}{{ swift_codes[bank_name_normalized] }}{% endif %}</span>
                     </div>
-                    {% endif %}
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="account_name">Account Name</label>
+                        <label for="account_name">Account Name {% if 'account_name' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
                         {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                            <input type="text" id="account_name" value="***" readonly style="background: #f5f5f5; color: #999;">
+                            <input type="text" id="account_name" name="account_name" value="***" readonly style="background: #f5f5f5; color: #999;">
                         {% else %}
-                            <input type="text" id="account_name" value="{{ request.account_name }}" readonly style="background: #f5f5f5;">
+                            <input type="text" id="account_name" name="account_name" value="{{ request.account_name }}" readonly style="background: #f5f5f5;">
                         {% endif %}
                     </div>
 
                     <div class="form-group">
-                        <label for="account_number">Account Number</label>
+                        <label for="account_number">Account Number {% if 'account_number' in edited_fields %}<span class="edited-badge">Edited</span>{% endif %}</label>
                         {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                            <input type="text" id="account_number" value="********" readonly style="background: #f5f5f5; color: #999; letter-spacing: 2px;">
+                            <input type="text" id="account_number" name="account_number" value="********" readonly style="background: #f5f5f5; color: #999; letter-spacing: 2px;">
                         {% else %}
-                            <input type="text" id="account_number" value="{{ request.account_number }}" readonly style="background: #f5f5f5;">
+                            <input type="text" id="account_number" name="account_number" value="{{ request.account_number }}" readonly style="background: #f5f5f5;">
                         {% endif %}
                     </div>
                 </div>
@@ -596,6 +767,11 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                             </div>
                         {% endif %}
                     </div>
+                </div>
+                {% endif %}
+                {% if user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status == 'Pending Manager Approval' %}
+                <div class="form-group" id="save-edits-container" style="display: none; margin-top: 15px;">
+                    <button type="submit" id="save-edits-btn" class="btn btn-primary">Save Edits</button>
                 </div>
                 {% endif %}
             </form>
@@ -2076,6 +2252,206 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
+    // IT department inline editability for Request Details (excluding specific fields)
+    const isItUser = {{ 1 if user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status == 'Pending Manager Approval' else 0 }} === 1;
+    if (isItUser) {
+        const form = document.querySelector('#step-submit form');
+        if (form) {
+            const excludedIds = new Set(['requestor_name', 'department', 'date', 'amount', 'payment_type']);
+            const fields = form.querySelectorAll('input, textarea, select');
+            const saveContainer = document.getElementById('save-edits-container');
+
+            const showSave = () => {
+                if (saveContainer && saveContainer.style.display !== 'block') {
+                    saveContainer.style.display = 'block';
+                }
+            };
+
+            fields.forEach((el) => {
+                const id = el.id || '';
+                const isMasked = typeof el.value === 'string' && /^\*+$/.test(el.value.trim());
+                if (!excludedIds.has(id) && !isMasked) {
+                    if (el.hasAttribute('readonly')) {
+                        el.removeAttribute('readonly');
+                    }
+                    // Reset background to editable state
+                    if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+                        el.style.background = '#ffffff';
+                    }
+                    el.addEventListener('input', showSave);
+                    el.addEventListener('change', showSave);
+                }
+            });
+        }
+    }
+    
+    // When IT user is editing, initialize branch search and SWIFT code behavior to match New Request
+    if (isItUser) {
+        // Toggle Others description visibility when request type changes
+        const requestTypeSelect = document.getElementById('request_type');
+        if (requestTypeSelect) {
+            const othersGroup = document.getElementById('othersDescriptionGroup');
+            const toggleOthers = () => {
+                if (!othersGroup) return;
+                if (requestTypeSelect.value === 'Others') {
+                    othersGroup.style.display = 'block';
+                } else {
+                    othersGroup.style.display = 'none';
+                }
+            };
+            requestTypeSelect.addEventListener('change', function(){
+                toggleOthers();
+                const saveContainerLocal = document.getElementById('save-edits-container');
+                if (saveContainerLocal && saveContainerLocal.style.display !== 'block') {
+                    saveContainerLocal.style.display = 'block';
+                }
+            });
+            toggleOthers();
+        }
+        // Initialize SWIFT display based on current selection
+        const bankSelect = document.getElementById('bank_name');
+        if (bankSelect) {
+            bankSelect.addEventListener('change', showSwiftCode);
+            showSwiftCode();
+        }
+        initializeBranchSearch();
+    }
+
+    function initializeBranchSearch() {
+        const searchInput = document.getElementById('branch_search');
+        const hiddenSelect = document.getElementById('branch_name');
+        const dropdown = document.getElementById('branch_dropdown');
+        if (!searchInput || !hiddenSelect || !dropdown) return;
+
+        let clickingOnOption = false;
+        let blurTimeout = null;
+
+        function buildDropdown() {
+            dropdown.innerHTML = '';
+            const options = hiddenSelect.querySelectorAll('option');
+            let currentGroup = null;
+            options.forEach(opt => {
+                if (!opt.value) return;
+                const restaurant = opt.getAttribute('data-restaurant') || 'Other';
+                if (!currentGroup || currentGroup.getAttribute('data-restaurant') !== restaurant) {
+                    currentGroup = document.createElement('div');
+                    currentGroup.className = 'branch-group';
+                    currentGroup.setAttribute('data-restaurant', restaurant);
+                    currentGroup.textContent = restaurant + ' (Location)';
+                    dropdown.appendChild(currentGroup);
+                }
+                const item = document.createElement('div');
+                item.className = 'branch-option';
+                item.textContent = opt.textContent;
+                item.setAttribute('data-value', opt.value);
+                item.setAttribute('data-restaurant', restaurant);
+                if (opt.selected) {
+                    item.classList.add('selected');
+                    searchInput.value = opt.value;
+                }
+                item.addEventListener('mousedown', function() {
+                    clickingOnOption = true;
+                });
+                item.addEventListener('click', function() {
+                    const value = this.getAttribute('data-value');
+                    hiddenSelect.value = value;
+                    searchInput.value = value;
+                    dropdown.style.display = 'none';
+                    clickingOnOption = false;
+                    // Reveal Save Edits when a branch is selected from dropdown
+                    const saveContainerLocal = document.getElementById('save-edits-container');
+                    if (saveContainerLocal && saveContainerLocal.style.display !== 'block') {
+                        saveContainerLocal.style.display = 'block';
+                    }
+                });
+                dropdown.appendChild(item);
+            });
+        }
+
+        buildDropdown();
+
+        searchInput.addEventListener('focus', function() {
+            dropdown.style.display = 'block';
+        });
+
+        searchInput.addEventListener('blur', function() {
+            if (blurTimeout) clearTimeout(blurTimeout);
+            blurTimeout = setTimeout(function() {
+                if (!clickingOnOption) {
+                    dropdown.style.display = 'none';
+                }
+                clickingOnOption = false;
+            }, 150);
+        });
+
+        searchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            const options = dropdown.querySelectorAll('.branch-option');
+            options.forEach(opt => {
+                const text = opt.textContent.toLowerCase();
+                if (text.includes(query)) {
+                    opt.classList.remove('hidden');
+                } else {
+                    opt.classList.add('hidden');
+                }
+            });
+
+            // Hide group headers that have no visible options
+            const groups = dropdown.querySelectorAll('.branch-group');
+            groups.forEach(group => {
+                const restaurant = group.getAttribute('data-restaurant');
+                const anyVisible = Array.from(dropdown.querySelectorAll(`.branch-option[data-restaurant="${restaurant}"]`))
+                    .some(opt => !opt.classList.contains('hidden'));
+                if (anyVisible) {
+                    group.style.display = '';
+                } else {
+                    group.style.display = 'none';
+                }
+            });
+
+            dropdown.style.display = 'block';
+        });
+    }
+
+    function showSwiftCode() {
+        const bankSelect = document.getElementById('bank_name');
+        const swiftDisplay = document.getElementById('swift-code-display');
+        const swiftText = document.getElementById('swift-code-text');
+        if (!bankSelect || !swiftDisplay || !swiftText) return;
+        const swiftCodes = {
+            'Bank Dhofar': 'BDOFOMRU',
+            'Bank Muscat': 'BMUSOMRX',
+            'National Bank of Oman': 'NBOMOMRX',
+            'Oman Arab Bank': 'OMABOMRU',
+            'Bank Sohar': 'BSHROMRU',
+            'HSBC Bank Oman': 'BBMEOMRX',
+            'Ahli Bank': 'AUBOOMRU',
+            'Oman Development Bank': 'ODBLOMRX',
+            'Oman Housing Bank': 'OHLBOMRU',
+            'Meethaq Islamic Banking (Bank Dhofar)': 'BDOFOMRUMIB',
+            'Meethaq Islamic Banking (Bank Muscat)': 'BMUSOMRXISL',
+            'Muzn Islamic Banking (National Bank of Oman)': 'NBOMOMRXIBS',
+            'Al Hilal Islamic Banking (Ahli Bank)': 'AUBOOMRUALH',
+            'National Bank of Abu Dhabi': 'NBADOMRX',
+            'Qatar National Bank': 'QNBAOMRX',
+            'Standard Chartered Bank': 'SCBLOMRX',
+            'Bank of Baroda': 'BABEOMRX',
+            'Bank of Beirut': 'BARBOMMX',
+            'State Bank of India': 'SBINOMRX',
+            'Habib Bank AG Zurich': 'HABBOMRX',
+            'Alizz Islamic Bank': 'IZZBOMRU',
+            'Sohar Islamic (Sohar Bank)': 'BSHROMRUISL',
+            'Al Yusr Islamic Banking Services (Oman Arab Bank)': 'OMABOMRUYSR',
+            'Bank Nizwa': 'BNZWOMRX'
+        };
+        const selectedBank = bankSelect.value ? bankSelect.value.trim() : '';
+        if (selectedBank && swiftCodes[selectedBank]) {
+            swiftText.textContent = swiftCodes[selectedBank];
+            swiftDisplay.style.display = 'block';
+        } else {
+            swiftDisplay.style.display = 'none';
+        }
+    }
     // Set initial active tab based on request status
     const requestStatus = '{{ request.status }}';
     const requestRecurring = '{{ request.recurring }}';

@@ -2358,14 +2358,10 @@ def department_dashboard():
             search_id = int(search_query)
             base_query = base_query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
-            # If not a number, search by requestor name or other text fields
+            # If not a number, search ONLY by requestor name
             search_term = f'%{search_query}%'
             base_query = base_query.filter(
-                db.or_(
-                    PaymentRequest.requestor_name.ilike(search_term),
-                    PaymentRequest.purpose.ilike(search_term),
-                    PaymentRequest.account_name.ilike(search_term)
-                )
+                PaymentRequest.requestor_name.ilike(search_term)
             )
     
     # Apply tab-based filtering
@@ -2630,14 +2626,10 @@ def admin_dashboard():
             search_id = int(search_query)
             query = query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
-            # If not a number, search by requestor name or other text fields
+            # If not a number, search ONLY by requestor name
             search_term = f'%{search_query}%'
             query = query.filter(
-                db.or_(
-                    PaymentRequest.requestor_name.ilike(search_term),
-                    PaymentRequest.purpose.ilike(search_term),
-                    PaymentRequest.account_name.ilike(search_term)
-                )
+                PaymentRequest.requestor_name.ilike(search_term)
             )
     
     # Apply urgent filter (before tab filtering)
@@ -2772,14 +2764,10 @@ def finance_dashboard():
             search_id = int(search_query)
             query = query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
-            # If not a number, search by requestor name or other text fields
+            # If not a number, search ONLY by requestor name
             search_term = f'%{search_query}%'
             query = query.filter(
-                db.or_(
-                    PaymentRequest.requestor_name.ilike(search_term),
-                    PaymentRequest.purpose.ilike(search_term),
-                    PaymentRequest.account_name.ilike(search_term)
-                )
+                PaymentRequest.requestor_name.ilike(search_term)
             )
     
     # Apply urgent filter (before tab filtering)
@@ -2877,14 +2865,10 @@ def gm_dashboard():
             search_id = int(search_query)
             query = query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
-            # If not a number, search by requestor name or other text fields
+            # If not a number, search ONLY by requestor name
             search_term = f'%{search_query}%'
             query = query.filter(
-                db.or_(
-                    PaymentRequest.requestor_name.ilike(search_term),
-                    PaymentRequest.purpose.ilike(search_term),
-                    PaymentRequest.account_name.ilike(search_term)
-                )
+                PaymentRequest.requestor_name.ilike(search_term)
             )
     if urgent_filter:
         if urgent_filter == 'urgent':
@@ -3008,14 +2992,10 @@ def ceo_dashboard():
             search_id = int(search_query)
             query = query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
-            # If not a number, search by requestor name or other text fields
+            # If not a number, search ONLY by requestor name
             search_term = f'%{search_query}%'
             query = query.filter(
-                db.or_(
-                    PaymentRequest.requestor_name.ilike(search_term),
-                    PaymentRequest.purpose.ilike(search_term),
-                    PaymentRequest.account_name.ilike(search_term)
-                )
+                PaymentRequest.requestor_name.ilike(search_term)
             )
     if urgent_filter:
         if urgent_filter == 'urgent':
@@ -3142,14 +3122,10 @@ def it_dashboard():
             search_id = int(search_query)
             query = query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
-            # If not a number, search by requestor name or other text fields
+            # If not a number, search ONLY by requestor name
             search_term = f'%{search_query}%'
             query = query.filter(
-                db.or_(
-                    PaymentRequest.requestor_name.ilike(search_term),
-                    PaymentRequest.purpose.ilike(search_term),
-                    PaymentRequest.account_name.ilike(search_term)
-                )
+                PaymentRequest.requestor_name.ilike(search_term)
             )
     if urgent_filter:
         if urgent_filter == 'urgent':
@@ -4526,10 +4502,8 @@ def new_request():
         flash('Payment request submitted successfully!', 'success')
         return redirect(url_for('dashboard'))
     
-    # Get available request types for the user's department and role
+    # Get available request types and branches for the New Request page
     available_request_types = get_available_request_types()
-    
-    # Get active branches for the branch dropdown, sorted by custom location order then branch name
     # Custom order: Office, Kucu, Boom, Thoum, Kitchen
     from sqlalchemy import case
     location_order = case(
@@ -4541,8 +4515,6 @@ def new_request():
         else_=6
     )
     available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
-    
-    # Pass today's date, available request types, and branches to template for display
     today = datetime.utcnow().date().strftime('%Y-%m-%d')
     return render_template('new_request.html', user=current_user, today=today, available_request_types=available_request_types, available_branches=available_branches)
 
@@ -5065,7 +5037,214 @@ def view_request(request_id):
                 else:
                     requestor_receipts = [req.receipt_path]
     
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts)
+    # Provide the same option lists used by the New Request form so edit UI can mirror creation behavior
+    from models import RequestType, Branch
+    # Map Office → Management for request type catalog
+    effective_department = 'Management' if req.department == 'Office' else req.department
+    available_request_types = RequestType.query.filter_by(department=effective_department, is_active=True).order_by(RequestType.name).all()
+    # Custom order: Office, Kucu, Boom, Thoum, Kitchen
+    from sqlalchemy import case
+    location_order = case(
+        (Branch.restaurant == 'Office', 1),
+        (Branch.restaurant == 'Kucu', 2),
+        (Branch.restaurant == 'Boom', 3),
+        (Branch.restaurant == 'Thoum', 4),
+        (Branch.restaurant == 'Kitchen', 5),
+        else_=6
+    )
+    available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+
+    was_just_edited = request.args.get('edited') == '1'
+    edited_fields_param = request.args.get('edited_fields', '')
+    edited_fields = [f for f in edited_fields_param.split(',') if f]
+    # Fetch all-time edited fields from audit table (created on demand)
+    try:
+        result = db.session.execute(db.text('''
+            CREATE TABLE IF NOT EXISTS request_field_edits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_id INTEGER NOT NULL,
+                field_name TEXT NOT NULL,
+                first_edited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_edited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(request_id, field_name)
+            );
+        '''))
+        result.close()
+        rows = db.session.execute(db.text('SELECT field_name FROM request_field_edits WHERE request_id = :rid'), { 'rid': req.request_id }).fetchall()
+        cumulative_fields = [r[0] for r in rows]
+    except Exception:
+        cumulative_fields = []
+    # Union of current-save markers and cumulative markers
+    edited_fields_all = sorted(set(edited_fields) | set(cumulative_fields))
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, was_just_edited=was_just_edited, edited_fields=edited_fields_all)
+
+
+@app.route('/request/<int:request_id>/edit', methods=['POST'])
+@login_required
+def edit_request(request_id):
+    """Save inline edits by IT users when status is Pending Manager Approval."""
+    req = PaymentRequest.query.get_or_404(request_id)
+
+    # Authorization: Only IT Staff and IT Department Manager
+    if not (current_user.department == 'IT' and current_user.role in ['IT Staff', 'Department Manager']):
+        flash('You are not authorized to edit this request.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+
+    # Status gate
+    if req.status != 'Pending Manager Approval':
+        flash('This request cannot be edited in its current status.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+
+    # Collect form fields (only those we allow)
+    # Track original values to compute which fields changed
+    original = {
+        'request_type': req.request_type or '',
+        'branch_name': req.branch_name or '',
+        'person_company': req.person_company or '',
+        'company_name': req.company_name or '',
+        'purpose': req.purpose or '',
+        'bank_name': req.bank_name or '',
+        'account_name': req.account_name or '',
+        'account_number': req.account_number or '',
+        'item_name': req.item_name or ''
+    }
+    new_request_type = request.form.get('request_type') or req.request_type
+    others_description = (request.form.get('others_description') or '').strip()
+    if new_request_type == 'Others':
+        if not others_description:
+            flash('Please specify the type of request for "Others".', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        new_request_type = f"Others: {others_description}"
+
+    req.request_type = new_request_type
+    req.branch_name = request.form.get('branch_name') or req.branch_name
+    req.person_company = request.form.get('person_company') or req.person_company
+    req.company_name = request.form.get('company_name') or req.company_name
+    req.purpose = request.form.get('purpose') or req.purpose
+    req.bank_name = request.form.get('bank_name') or req.bank_name
+    req.account_name = request.form.get('account_name') or req.account_name
+    req.account_number = request.form.get('account_number') or req.account_number
+    req.item_name = request.form.get('item_name') or req.item_name
+
+    db.session.commit()
+
+    # Build edited_fields list for UI badges: only fields submitted AND changed this save
+    def norm(v):
+        return (v or '').strip()
+    updated = {
+        'request_type': req.request_type or '',
+        'branch_name': req.branch_name or '',
+        'person_company': req.person_company or '',
+        'company_name': req.company_name or '',
+        'purpose': req.purpose or '',
+        'bank_name': req.bank_name or '',
+        'account_name': req.account_name or '',
+        'account_number': req.account_number or '',
+        'item_name': req.item_name or ''
+    }
+    submitted_keys = set(request.form.keys())
+    # Map form field names to our keys
+    form_to_key = {
+        'request_type': 'request_type',
+        'others_description': 'request_type',  # affects request_type
+        'branch_name': 'branch_name',
+        'person_company': 'person_company',
+        'company_name': 'company_name',
+        'purpose': 'purpose',
+        'bank_name': 'bank_name',
+        'account_name': 'account_name',
+        'account_number': 'account_number',
+        'item_name': 'item_name'
+    }
+    candidate_keys = set(form_to_key[k] for k in submitted_keys if k in form_to_key)
+    edited_fields = [key for key in candidate_keys if norm(original.get(key, '')) != norm(updated.get(key, ''))]
+
+    # Persist cumulative edited fields (create table if missing, upsert per field)
+    try:
+        db.session.execute(db.text('''
+            CREATE TABLE IF NOT EXISTS request_field_edits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_id INTEGER NOT NULL,
+                field_name TEXT NOT NULL,
+                first_edited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_edited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(request_id, field_name)
+            );
+        '''))
+        for key in edited_fields:
+            db.session.execute(db.text('''
+                INSERT INTO request_field_edits (request_id, field_name) VALUES (:rid, :fname)
+                ON CONFLICT(request_id, field_name) DO UPDATE SET last_edited_at = CURRENT_TIMESTAMP
+            '''), { 'rid': request_id, 'fname': key })
+        db.session.commit()
+    except Exception as e:
+        app.logger.warning(f"Failed to persist edited fields: {e}")
+
+    # Create notifications for all authorized persons
+    try:
+        recipients = set()
+        # Requestor
+        recipients.add(req.user_id)
+        # All IT department users (Staff + Department Manager)
+        it_users = User.query.filter(User.department == 'IT', User.role.in_(['IT Staff', 'Department Manager'])).all()
+        for u in it_users:
+            recipients.add(u.user_id)
+        # Assigned manager (direct manager)
+        if getattr(req.user, 'manager_id', None):
+            recipients.add(req.user.manager_id)
+        # Department Manager(s) of the requestor's department (in addition to direct manager)
+        dept_manager_users = User.query.filter_by(role='Department Manager', department=req.user.department).all()
+        for u in dept_manager_users:
+            if u.user_id != req.user_id:
+                recipients.add(u.user_id)
+        # Temporary manager
+        if getattr(req, 'temporary_manager_id', None):
+            recipients.add(req.temporary_manager_id)
+        # GM(s)
+        for u in User.query.filter_by(role='GM').all():
+            recipients.add(u.user_id)
+        # Operation Manager(s)
+        for u in User.query.filter_by(role='Operation Manager').all():
+            recipients.add(u.user_id)
+        # Finance Admins are NOT notified here (unless they are the requestor, handled above)
+
+        title = 'Request Updated'
+        requestor_name = getattr(req.user, 'name', 'Unknown')
+        for user_id in recipients:
+            if not user_id or user_id == current_user.user_id:
+                continue
+            if user_id == req.user_id:
+                # Personalized message for the requestor
+                message = f"Your request #{req.request_id} has been edited by {current_user.name}."
+            else:
+                # Include requestor name for all others
+                message = f"{requestor_name}'s request #{req.request_id} has been edited by {current_user.name}."
+            create_notification(user_id, title, message, 'status_changed', request_id=req.request_id)
+    except Exception as e:
+        app.logger.warning(f"Failed to create edit notifications: {e}")
+
+    # Real-time emit to all relevant rooms
+    try:
+        emit_request_update_to_all_rooms('request_updated', {
+            'request_id': req.request_id,
+            'status': req.status,
+            'department': req.department,
+            'request_type': req.request_type,
+            'branch_name': req.branch_name,
+            'action': 'edited'
+        })
+    except Exception:
+        pass
+
+    # Audit log entry
+    try:
+        requestor_name = getattr(req.user, 'name', 'Unknown')
+        log_action(f"{requestor_name}'s request #{request_id} edited by {current_user.name} - type: {req.request_type}, branch: {req.branch_name}")
+    except Exception:
+        pass
+
+    flash('Edits saved successfully.', 'success')
+    return redirect(url_for('view_request', request_id=request_id, tab='submit', edited='1', edited_fields=','.join(edited_fields)))
 
 
 @app.route('/request/<int:request_id>/approve', methods=['POST'])
