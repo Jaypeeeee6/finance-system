@@ -396,7 +396,8 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         'Habib Bank AG Zurich': 'HABBOMRX',
                         'Alizz Islamic Bank': 'IZZBOMRU',
                         'Sohar Islamic (Sohar Bank)': 'BSHROMRUISL',
-                        'Al Yusr Islamic Banking Services (Oman Arab Bank)': 'OMABOMRUYSR'
+                        'Al Yusr Islamic Banking Services (Oman Arab Bank)': 'OMABOMRUYSR',
+                        'Bank Nizwa': 'BNZWOMRX'
                     } %}
                     {% set bank_name_normalized = request.bank_name.strip() if request.bank_name else '' %}
                     {% if bank_name_normalized and bank_name_normalized in swift_codes %}
@@ -2220,7 +2221,8 @@ document.addEventListener('DOMContentLoaded', function() {
             'Habib Bank AG Zurich': 'HABBOMRX',
             'Alizz Islamic Bank': 'IZZBOMRU',
             'Sohar Islamic (Sohar Bank)': 'BSHROMRUISL',
-            'Al Yusr Islamic Banking Services (Oman Arab Bank)': 'OMABOMRUYSR'
+            'Al Yusr Islamic Banking Services (Oman Arab Bank)': 'OMABOMRUYSR',
+            'Bank Nizwa': 'BNZWOMRX'
         };
         
         const bankName = bankNameInput.value.trim();
