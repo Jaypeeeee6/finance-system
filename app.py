@@ -403,6 +403,30 @@ def log_action(action):
         db.session.commit()
 
 
+def get_status_priority_order():
+    """
+    Returns SQLAlchemy case expression for ordering payment requests by status priority.
+    Priority order:
+    1. Pending Manager Approval
+    2. Pending Finance Approval
+    3. Proof Pending
+    4. Proof Rejected
+    5. Recurring
+    6. Completed
+    7. Rejected (Rejected by Manager, Rejected by Finance, Proof Rejected)
+    """
+    return db.case(
+        (PaymentRequest.status == 'Pending Manager Approval', 1),
+        (PaymentRequest.status == 'Pending Finance Approval', 2),
+        (PaymentRequest.status == 'Proof Pending', 3),
+        (PaymentRequest.status == 'Proof Rejected', 4),
+        (PaymentRequest.status == 'Recurring', 5),
+        (PaymentRequest.status == 'Completed', 6),
+        (PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']), 7),
+        else_=99  # Any other status goes to the end
+    )
+
+
 def send_pin_email(user_email, user_name, pin):
     """Send PIN to user's email"""
     try:
@@ -2484,9 +2508,18 @@ def department_dashboard():
     recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
     
     # Paginate the main query
-    requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
+    # For 'all' tab, sort by status priority then by submission date (most recent first)
+    if tab == 'all':
+        requests_pagination = query.order_by(
+            get_status_priority_order(),
+            PaymentRequest.created_at.desc()
+        ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    else:
+        requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
     
     # Get notifications for department managers and regular users
     notifications = get_notifications_for_user(current_user)
@@ -2626,9 +2659,18 @@ def admin_dashboard():
             query = query.filter(PaymentRequest.status == status_filter)
     
     # Get paginated requests
-    requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
+    # For 'all' tab, sort by status priority then by submission date (most recent first)
+    if tab == 'all':
+        requests_pagination = query.order_by(
+            get_status_priority_order(),
+            PaymentRequest.created_at.desc()
+        ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    else:
+        requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
     
     notifications = get_notifications_for_user(current_user)
     unread_count = get_unread_count_for_user(current_user)
@@ -2753,9 +2795,18 @@ def finance_dashboard():
         # Otherwise show all requests that the user can see
     
     # Get paginated requests
-    requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
+    # For 'all' tab, sort by status priority then by submission date (most recent first)
+    if tab == 'all':
+        requests_pagination = query.order_by(
+            get_status_priority_order(),
+            PaymentRequest.created_at.desc()
+        ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    else:
+        requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
     
     notifications = get_notifications_for_user(current_user)
     unread_count = get_unread_count_for_user(current_user)
@@ -2838,9 +2889,18 @@ def gm_dashboard():
     # Default case also shows all requests
     
     # Get paginated requests
-    requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
+    # For 'all' tab, sort by status priority then by submission date (most recent first)
+    if tab == 'all':
+        requests_pagination = query.order_by(
+            get_status_priority_order(),
+            PaymentRequest.created_at.desc()
+        ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    else:
+        requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
     
     # Calculate statistics (all requests from all departments)
     all_requests = PaymentRequest.query.all()
@@ -2945,9 +3005,19 @@ def ceo_dashboard():
         if status_filter:
             query = query.filter(PaymentRequest.status == status_filter)
 
-    requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
+    # Get paginated requests
+    # For 'all' tab, sort by status priority then by submission date (most recent first)
+    if tab == 'all':
+        requests_pagination = query.order_by(
+            get_status_priority_order(),
+            PaymentRequest.created_at.desc()
+        ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    else:
+        requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
 
     all_requests = PaymentRequest.query.all()
     stats = {
@@ -3065,9 +3135,18 @@ def it_dashboard():
     # Default case also shows all requests
     
     # Get paginated requests
-    requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
+    # For 'all' tab, sort by status priority then by submission date (most recent first)
+    if tab == 'all':
+        requests_pagination = query.order_by(
+            get_status_priority_order(),
+            PaymentRequest.created_at.desc()
+        ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    else:
+        requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
     
     # Get notifications for IT users and IT Department Managers
     notifications = get_notifications_for_user(current_user)
@@ -3762,9 +3841,18 @@ def project_dashboard():
     # Default case also shows all requests
     
     # Get paginated requests
-    requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
+    # For 'all' tab, sort by status priority then by submission date (most recent first)
+    if tab == 'all':
+        requests_pagination = query.order_by(
+            get_status_priority_order(),
+            PaymentRequest.created_at.desc()
+        ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    else:
+        requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
     
     # Get notifications for project users (only due date notifications)
     notifications = get_notifications_for_user(current_user)
@@ -3864,20 +3952,20 @@ def operation_dashboard():
         # 'all' tab - apply status filter if provided (only on all tab)
         if status_filter:
             query = query.filter(PaymentRequest.status == status_filter)
-        # If no status filter, prioritize showing requests that need manager approval
-        else:
-            query = query.order_by(
-                db.case(
-                    (PaymentRequest.status == 'Pending Manager Approval', 1),
-                    else_=2
-                ),
-                PaymentRequest.created_at.desc()
-            )
     
     # Get paginated requests
-    requests_pagination = query.paginate(
-        page=page, per_page=per_page, error_out=False
-    )
+    # For 'all' tab, sort by status priority then by submission date (most recent first)
+    if tab == 'all':
+        requests_pagination = query.order_by(
+            get_status_priority_order(),
+            PaymentRequest.created_at.desc()
+        ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    else:
+        requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
     
     # Get notifications for operation manager (all notifications, same as admin)
     notifications = get_notifications_for_user(current_user)
