@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, send_file, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_socketio import SocketIO, emit, join_room
 from flask_mail import Mail, Message
@@ -3774,6 +3774,68 @@ def toggle_branch(branch_id):
         flash(f'Error updating branch: {str(e)}', 'danger')
     
     return redirect(url_for('manage_branches'))
+
+
+@app.route('/it/backup-database')
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def backup_database():
+    """Create a backup of the database and download it"""
+    try:
+        # Restrict Department Managers to IT department only
+        if current_user.role == 'Department Manager' and current_user.department != 'IT':
+            flash('You do not have permission to perform this action.', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        # Get the database path directly from config
+        from config import Config
+        db_path = Config._DB_PATH
+        
+        # Check if database file exists
+        if not os.path.exists(db_path):
+            flash(f'Database file not found at: {db_path}', 'danger')
+            return redirect(url_for('it_dashboard'))
+        
+        # Create backups directory if it doesn't exist (same directory as database)
+        backups_dir = os.path.join(os.path.dirname(db_path), 'backups')
+        os.makedirs(backups_dir, exist_ok=True)
+        
+        # Generate backup filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_filename = f'payment_system_backup_{timestamp}.db'
+        backup_path = os.path.join(backups_dir, backup_filename)
+        
+        # Copy the database file using shutil
+        import shutil
+        shutil.copy2(db_path, backup_path)
+        
+        # Verify backup was created
+        if not os.path.exists(backup_path):
+            flash('Failed to create backup file.', 'danger')
+            return redirect(url_for('it_dashboard'))
+        
+        # Log the backup action
+        log_action(f"Database backup created: {backup_filename}")
+        
+        # Send the backup file for download
+        return send_file(
+            backup_path,
+            as_attachment=True,
+            download_name=backup_filename,
+            mimetype='application/x-sqlite3'
+        )
+        
+    except Exception as e:
+        import traceback
+        error_msg = f'Error creating backup: {str(e)}'
+        print(f"Backup error: {error_msg}")
+        print(traceback.format_exc())
+        flash(error_msg, 'danger')
+        try:
+            log_action(f"Database backup failed: {str(e)}")
+        except:
+            pass
+        return redirect(url_for('it_dashboard'))
 
 
 @app.route('/project/dashboard')
