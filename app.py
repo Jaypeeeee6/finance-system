@@ -410,19 +410,21 @@ def get_status_priority_order():
     1. Pending Manager Approval
     2. Pending Finance Approval
     3. Proof Pending
-    4. Proof Rejected
-    5. Recurring
-    6. Completed
-    7. Rejected (Rejected by Manager, Rejected by Finance, Proof Rejected)
+    4. Proof Sent
+    5. Proof Rejected
+    6. Recurring
+    7. Completed
+    8. Rejected (Rejected by Manager, Rejected by Finance, Proof Rejected)
     """
     return db.case(
         (PaymentRequest.status == 'Pending Manager Approval', 1),
         (PaymentRequest.status == 'Pending Finance Approval', 2),
         (PaymentRequest.status == 'Proof Pending', 3),
-        (PaymentRequest.status == 'Proof Rejected', 4),
-        (PaymentRequest.status == 'Recurring', 5),
-        (PaymentRequest.status == 'Completed', 6),
-        (PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']), 7),
+        (PaymentRequest.status == 'Proof Sent', 4),
+        (PaymentRequest.status == 'Proof Rejected', 5),
+        (PaymentRequest.status == 'Recurring', 6),
+        (PaymentRequest.status == 'Completed', 7),
+        (PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']), 8),
         else_=99  # Any other status goes to the end
     )
 
