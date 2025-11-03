@@ -144,9 +144,9 @@
                     <input type="text" name="item_name" id="item_name">
                 </div>
 
-                <div id="personCompanyGroup" class="form-group" style="display: none;">
+                <div id="personCompanyGroup" class="form-group">
                     <label for="person_company">Person/Company Name *</label>
-                    <input type="text" name="person_company" id="person_company">
+                    <input type="text" name="person_company" id="person_company" required>
                 </div>
 
                 <div id="companyNameGroup" class="form-group" style="display: none;">
@@ -735,25 +735,23 @@ function handleRequestTypeChange() {
     
     // Hide all dynamic fields first
     document.getElementById('itemNameGroup').style.display = 'none';
-    document.getElementById('personCompanyGroup').style.display = 'none';
     document.getElementById('companyNameGroup').style.display = 'none';
     document.getElementById('othersDescriptionGroup').style.display = 'none';
     
     // Remove required attribute from all dynamic fields
     document.getElementById('item_name').required = false;
-    document.getElementById('person_company').required = false;
     document.getElementById('company_name').required = false;
     document.getElementById('others_description').required = false;
+    
+    // Person/Company Name field is always visible and required
+    document.getElementById('personCompanyGroup').style.display = 'block';
+    document.getElementById('person_company').required = true;
     
     // Show appropriate field based on request type
     if (requestType === 'Others') {
         // Show others description field
         document.getElementById('othersDescriptionGroup').style.display = 'block';
         document.getElementById('others_description').required = true;
-    } else {
-        // For all other request types, show person/company field by default
-        document.getElementById('personCompanyGroup').style.display = 'block';
-        document.getElementById('person_company').required = true;
     }
     
     // Always show Payment Type dropdown for all request types
