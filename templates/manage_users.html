@@ -21,7 +21,7 @@
             <div class="search-form">
                 <div class="search-input-container">
                     <i class="fas fa-search search-icon"></i>
-                    <input type="text" class="form-control" id="userSearch" placeholder="Search users by name, department, role, or email...">
+                    <input type="text" class="form-control" id="userSearch" placeholder="Search users by name, department, or role...">
                     <button type="button" class="clear-search-btn" id="clearSearch" style="display: none;">
                         <i class="fas fa-times"></i>
                     </button>
@@ -267,8 +267,12 @@ function filterUsers() {
             const cells = row.querySelectorAll('td');
             let isVisible = false;
             
-            // Check each cell for the search term (skip checkbox and actions columns)
+            // Check each cell for the search term (skip checkbox, email, and actions columns)
+            // Column indices: 0=checkbox, 1=ID, 2=Full Name, 3=Department, 4=Role, 5=Email (skip), 6=Account Status, 7=Created At, 8=Actions
             for (let i = 1; i < cells.length - 1; i++) {
+                // Skip email column (index 5)
+                if (i === 5) continue;
+                
                 const cellText = cells[i].textContent.toLowerCase();
                 if (cellText.includes(searchTerm)) {
                     isVisible = true;
