@@ -429,6 +429,26 @@ def get_status_priority_order():
     )
 
 
+def get_all_tab_datetime_order():
+    """Secondary ordering for All Requests: if status is Completed, use completion_date (fallback approval_date), else use created_at; all descending."""
+    return db.case(
+        (
+            PaymentRequest.status == 'Completed',
+            db.func.coalesce(PaymentRequest.completion_date, PaymentRequest.approval_date, PaymentRequest.created_at)
+        ),
+        else_=PaymentRequest.created_at
+    ).desc()
+
+
+def get_all_tab_datetime_order():
+    """
+    Secondary ordering for the All Requests tab:
+    - For Completed requests: use completion_date (most recent first)
+    - For all other statuses: fallback to created_at (most recent first)
+    """
+    return db.desc(db.func.coalesce(PaymentRequest.completion_date, PaymentRequest.created_at))
+
+
 def send_pin_email(user_email, user_name, pin):
     """Send PIN to user's email"""
     try:
@@ -2529,17 +2549,22 @@ def department_dashboard():
             )
     
     # Get data for each tab
-    completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
+    completed_requests = completed_query.order_by(PaymentRequest.approval_date.desc()).all()
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
     recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
     
     # Paginate the main query
-    # For 'all' tab, sort by status priority then by submission date (most recent first)
+    # For 'all' tab, sort by status priority then by date (Completed by completion_date, others by created_at)
     if tab == 'all':
         requests_pagination = query.order_by(
             get_status_priority_order(),
-            PaymentRequest.created_at.desc()
+            get_all_tab_datetime_order()
         ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    elif tab == 'completed':
+        # Completed tab sorted by approval_date (most recent first)
+        requests_pagination = query.order_by(PaymentRequest.approval_date.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
     else:
@@ -2688,12 +2713,16 @@ def admin_dashboard():
             query = query.filter(PaymentRequest.status == status_filter)
     
     # Get paginated requests
-    # For 'all' tab, sort by status priority then by submission date (most recent first)
+    # For 'all' tab, sort by status priority then by date (Completed by completion_date, others by created_at)
     if tab == 'all':
         requests_pagination = query.order_by(
             get_status_priority_order(),
-            PaymentRequest.created_at.desc()
+            get_all_tab_datetime_order()
         ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    elif tab == 'completed':
+        requests_pagination = query.order_by(PaymentRequest.approval_date.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
     else:
@@ -2827,12 +2856,16 @@ def finance_dashboard():
         # Otherwise show all requests that the user can see
     
     # Get paginated requests
-    # For 'all' tab, sort by status priority then by submission date (most recent first)
+    # For 'all' tab, sort by status priority then by date (Completed by completion_date, others by created_at)
     if tab == 'all':
         requests_pagination = query.order_by(
             get_status_priority_order(),
-            PaymentRequest.created_at.desc()
+            get_all_tab_datetime_order()
         ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    elif tab == 'completed':
+        requests_pagination = query.order_by(PaymentRequest.approval_date.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
     else:
@@ -2924,12 +2957,16 @@ def gm_dashboard():
     # Default case also shows all requests
     
     # Get paginated requests
-    # For 'all' tab, sort by status priority then by submission date (most recent first)
+    # For 'all' tab, sort by status priority then by date (Completed by completion_date, others by created_at)
     if tab == 'all':
         requests_pagination = query.order_by(
             get_status_priority_order(),
-            PaymentRequest.created_at.desc()
+            get_all_tab_datetime_order()
         ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    elif tab == 'completed':
+        requests_pagination = query.order_by(PaymentRequest.approval_date.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
     else:
@@ -2969,7 +3006,7 @@ def gm_dashboard():
     rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     recurring_query = recurring_query.filter(PaymentRequest.status == 'Recurring')
     
-    completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
+    completed_requests = completed_query.order_by(PaymentRequest.approval_date.desc()).all()
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
     recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
     
@@ -3046,12 +3083,16 @@ def ceo_dashboard():
             query = query.filter(PaymentRequest.status == status_filter)
 
     # Get paginated requests
-    # For 'all' tab, sort by status priority then by submission date (most recent first)
+    # For 'all' tab, sort by status priority then by date (Completed by completion_date, others by created_at)
     if tab == 'all':
         requests_pagination = query.order_by(
             get_status_priority_order(),
-            PaymentRequest.created_at.desc()
+            get_all_tab_datetime_order()
         ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    elif tab == 'completed':
+        requests_pagination = query.order_by(PaymentRequest.approval_date.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
     else:
@@ -3082,7 +3123,7 @@ def ceo_dashboard():
     rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     recurring_query = recurring_query.filter(PaymentRequest.status == 'Recurring')
 
-    completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
+    completed_requests = completed_query.order_by(PaymentRequest.approval_date.desc()).all()
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
     recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
 
@@ -3178,12 +3219,16 @@ def it_dashboard():
     # Default case also shows all requests
     
     # Get paginated requests
-    # For 'all' tab, sort by status priority then by submission date (most recent first)
+    # For 'all' tab, sort by status priority then by date (Completed by completion_date, others by created_at)
     if tab == 'all':
         requests_pagination = query.order_by(
             get_status_priority_order(),
-            PaymentRequest.created_at.desc()
+            get_all_tab_datetime_order()
         ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    elif tab == 'completed':
+        requests_pagination = query.order_by(PaymentRequest.approval_date.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
     else:
@@ -3218,7 +3263,7 @@ def it_dashboard():
     rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     recurring_query = recurring_query.filter(PaymentRequest.status == 'Recurring')
     
-    completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
+    completed_requests = completed_query.order_by(PaymentRequest.approval_date.desc()).all()
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
     recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
     
@@ -3953,12 +3998,16 @@ def project_dashboard():
     # Default case also shows all requests
     
     # Get paginated requests
-    # For 'all' tab, sort by status priority then by submission date (most recent first)
+    # For 'all' tab, sort by status priority then by date (Completed by completion_date, others by created_at)
     if tab == 'all':
         requests_pagination = query.order_by(
             get_status_priority_order(),
-            PaymentRequest.created_at.desc()
+            get_all_tab_datetime_order()
         ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    elif tab == 'completed':
+        requests_pagination = query.order_by(PaymentRequest.approval_date.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
     else:
@@ -3991,7 +4040,7 @@ def project_dashboard():
     rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     recurring_query = recurring_query.filter(PaymentRequest.recurring == 'Recurring')
     
-    completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
+    completed_requests = completed_query.order_by(PaymentRequest.approval_date.desc()).all()
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
     recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
     
@@ -4101,7 +4150,7 @@ def operation_dashboard():
     completed_query = completed_query.filter(PaymentRequest.status == 'Completed')
     rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     
-    completed_requests = completed_query.order_by(PaymentRequest.created_at.desc()).all()
+    completed_requests = completed_query.order_by(PaymentRequest.approval_date.desc()).all()
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
     
     # Get user's own requests for the My Requests tab
@@ -7432,9 +7481,12 @@ def reports():
         query = query.filter(PaymentRequest.date >= datetime.strptime(date_from, '%Y-%m-%d').date())
     if date_to:
         query = query.filter(PaymentRequest.date <= datetime.strptime(date_to, '%Y-%m-%d').date())
-    # Sort by date (submission date) descending
+    # Sort by status priority then by date (Completed by completion_date, others by created_at)
     # Get all filtered requests for stats calculation (before pagination)
-    all_filtered_requests = query.order_by(PaymentRequest.date.desc()).all()
+    all_filtered_requests = query.order_by(
+        get_status_priority_order(),
+        get_all_tab_datetime_order()
+    ).all()
     
     # Calculate stats from all filtered requests
     total_requests = len(all_filtered_requests)
@@ -7450,8 +7502,11 @@ def reports():
         total_amount = sum(float(r.amount) for r in all_filtered_requests)
         it_amount = None
     
-    # Paginate the query for display
-    pagination = query.order_by(PaymentRequest.date.desc()).paginate(
+    # Paginate the query for display with the same ordering
+    pagination = query.order_by(
+        get_status_priority_order(),
+        get_all_tab_datetime_order()
+    ).paginate(
         page=page, per_page=per_page, error_out=False
     )
     requests = pagination.items
