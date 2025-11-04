@@ -7245,11 +7245,6 @@ def get_installment_edit_history(schedule_id):
 @role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager')
 def reports():
     """View reports page"""
-    # Restrict Department Managers to IT department only
-    if current_user.role == 'Department Manager' and current_user.department != 'IT':
-        flash('You do not have permission to access this page.', 'danger')
-        return redirect(url_for('dashboard'))
-    
     # Get filter parameters
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
@@ -7267,6 +7262,26 @@ def reports():
     
     # Build query - show ALL statuses by default
     query = PaymentRequest.query
+    
+    # Filter for Department Managers based on their department
+    if current_user.role == 'Department Manager':
+        if current_user.department == 'IT':
+            # IT Department Manager can see ALL requests from ALL departments (all statuses)
+            # No filtering needed - they see everything
+            pass
+        elif current_user.department == 'Auditing':
+            # Auditing Department Manager can see:
+            # 1. ALL requests from Auditing department (all statuses)
+            # 2. Completed and Recurring requests from OTHER departments
+            query = query.filter(
+                db.or_(
+                    PaymentRequest.department == 'Auditing',
+                    PaymentRequest.status.in_(['Completed', 'Recurring'])
+                )
+            )
+        else:
+            # Other Department Managers (non-IT, non-Auditing) can ONLY see their own department's requests
+            query = query.filter(PaymentRequest.department == current_user.department)
     
     if status_filter:
         if status_filter == 'All Pending':
@@ -7319,8 +7334,13 @@ def reports():
     requests = pagination.items
     
     # Get unique departments for filter
-    departments = db.session.query(PaymentRequest.department).distinct().all()
-    departments = [d[0] for d in departments]
+    # For non-IT, non-Auditing Department Managers, only show their own department
+    if current_user.role == 'Department Manager' and current_user.department not in ['IT', 'Auditing']:
+        departments = [current_user.department] if current_user.department else []
+    else:
+        # For IT, Auditing Department Managers, and all other users, show all departments
+        departments = db.session.query(PaymentRequest.department).distinct().all()
+        departments = [d[0] for d in departments]
     
     # Get unique companies for filter (only person_company field since company_name is no longer used)
     # Show companies from all statuses, or filter by status if status_filter is provided
@@ -7405,7 +7425,7 @@ def api_request_types():
 
 @app.route('/reports/export/excel')
 @login_required
-@role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Operation Manager')
+@role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager')
 def export_reports_excel():
     """Export filtered reports to an Excel file with frozen columns"""
     # Lazy imports to avoid hard dependency during app startup
@@ -7432,6 +7452,26 @@ def export_reports_excel():
 
     # Show ALL statuses by default (consistent with reports() view)
     query = PaymentRequest.query
+    
+    # Filter for Department Managers based on their department (same logic as reports() view)
+    if current_user.role == 'Department Manager':
+        if current_user.department == 'IT':
+            # IT Department Manager can see ALL requests from ALL departments (all statuses)
+            # No filtering needed - they see everything
+            pass
+        elif current_user.department == 'Auditing':
+            # Auditing Department Manager can see:
+            # 1. ALL requests from Auditing department (all statuses)
+            # 2. Completed and Recurring requests from OTHER departments
+            query = query.filter(
+                db.or_(
+                    PaymentRequest.department == 'Auditing',
+                    PaymentRequest.status.in_(['Completed', 'Recurring'])
+                )
+            )
+        else:
+            # Other Department Managers (non-IT, non-Auditing) can ONLY see their own department's requests
+            query = query.filter(PaymentRequest.department == current_user.department)
     
     if status_filter:
         if status_filter == 'All Pending':
@@ -7593,7 +7633,7 @@ def export_reports_excel():
 
 @app.route('/reports/export/pdf')
 @login_required
-@role_required('Finance Admin', 'Finance Staff', 'GM', 'IT Staff', 'Operation Manager')
+@role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager')
 def export_reports_pdf():
     """Export filtered reports to a PDF including total amount and full list"""
     # Lazy imports to avoid hard dependency during app startup
@@ -7621,6 +7661,26 @@ def export_reports_pdf():
 
     # Show ALL statuses by default (consistent with reports() view)
     query = PaymentRequest.query
+    
+    # Filter for Department Managers based on their department (same logic as reports() view)
+    if current_user.role == 'Department Manager':
+        if current_user.department == 'IT':
+            # IT Department Manager can see ALL requests from ALL departments (all statuses)
+            # No filtering needed - they see everything
+            pass
+        elif current_user.department == 'Auditing':
+            # Auditing Department Manager can see:
+            # 1. ALL requests from Auditing department (all statuses)
+            # 2. Completed and Recurring requests from OTHER departments
+            query = query.filter(
+                db.or_(
+                    PaymentRequest.department == 'Auditing',
+                    PaymentRequest.status.in_(['Completed', 'Recurring'])
+                )
+            )
+        else:
+            # Other Department Managers (non-IT, non-Auditing) can ONLY see their own department's requests
+            query = query.filter(PaymentRequest.department == current_user.department)
     
     if status_filter:
         if status_filter == 'All Pending':
