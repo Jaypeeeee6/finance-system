@@ -381,7 +381,13 @@
                                                 <span style="color: #999;">-</span>
                                             {% endif %}
                                         </td>
-                                        <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                        <td>
+                                            {% if req.department != 'IT' %}
+                                                <span style="color: #999;">***</span>
+                                            {% else %}
+                                                OMR {{ "%.3f"|format(req.amount) }}
+                                            {% endif %}
+                                        </td>
                                         <td>
                                             <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
                                         </td>
@@ -443,7 +449,13 @@
                                         <td>{{ req.requestor_name }}</td>
                                         <td>{{ req.department }}</td>
                                         <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
-                                        <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                        <td>
+                                            {% if req.department != 'IT' %}
+                                                <span style="color: #999;">***</span>
+                                            {% else %}
+                                                OMR {{ "%.3f"|format(req.amount) }}
+                                            {% endif %}
+                                        </td>
                                         <td>
                                             <span class="badge" style="background: #ffc107; color: #212529;">↻ {{ req.status }}</span>
                                         </td>
@@ -505,7 +517,13 @@
                                                 <span style="color: #999;">-</span>
                                             {% endif %}
                                         </td>
-                                        <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                        <td>
+                                            {% if req.department != 'IT' %}
+                                                <span style="color: #999;">***</span>
+                                            {% else %}
+                                                OMR {{ "%.3f"|format(req.amount) }}
+                                            {% endif %}
+                                        </td>
                                         <td>
                                             <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
                                         </td>
