@@ -3378,6 +3378,17 @@ document.getElementById('receipt_files').addEventListener('change', function(e) 
     e.target.value = '';
 });
 
+// Helper function to format file size intelligently
+function formatFileSize(bytes) {
+    if (bytes < 1024) {
+        return bytes + ' B';
+    } else if (bytes < 1024 * 1024) {
+        return (bytes / 1024).toFixed(2) + ' KB';
+    } else {
+        return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+    }
+}
+
 function updateFilePreview() {
     const preview = document.getElementById('file-preview');
     const button = document.getElementById('add-files-btn');
@@ -3391,9 +3402,44 @@ function updateFilePreview() {
         const fileList = document.createElement('div');
         fileList.style.cssText = 'border: 1px solid #28a745; border-radius: 4px; padding: 10px; background: #d4edda;';
         
+        // Calculate total size of all files
+        const totalSize = allSelectedFiles.reduce((sum, file) => sum + file.size, 0);
+        
         const header = document.createElement('div');
-        header.style.cssText = 'font-weight: bold; margin-bottom: 8px; color: #155724; display: flex; align-items: center;';
-        header.innerHTML = `<i class="fas fa-check-circle" style="margin-right: 8px; color: #28a745;"></i>Selected Files (${allSelectedFiles.length}):`;
+        header.style.cssText = 'font-weight: bold; margin-bottom: 8px; color: #155724; display: flex; align-items: center; justify-content: space-between;';
+        
+        const headerLeft = document.createElement('div');
+        headerLeft.style.cssText = 'display: flex; align-items: center;';
+        headerLeft.innerHTML = `<i class="fas fa-check-circle" style="margin-right: 8px; color: #28a745;"></i>Selected Files (${allSelectedFiles.length}):`;
+        
+        const headerRight = document.createElement('div');
+        headerRight.style.cssText = 'display: flex; align-items: center; gap: 10px;';
+        
+        const totalSizeDiv = document.createElement('div');
+        totalSizeDiv.style.cssText = 'font-size: 13px; color: #155724; font-weight: normal;';
+        totalSizeDiv.textContent = `Total: ${formatFileSize(totalSize)}`;
+        headerRight.appendChild(totalSizeDiv);
+        
+        // Add "Compress All" button if total size is >= 1 MB and there are image files
+        const minSizeForCompressAll = 1024 * 1024; // 1 MB in bytes
+        const hasImageFiles = allSelectedFiles.some(file => {
+            const ext = file.name.split('.').pop().toLowerCase();
+            return ['jpg', 'jpeg', 'png'].includes(ext);
+        });
+        
+        if (totalSize >= minSizeForCompressAll && hasImageFiles) {
+            const compressAllBtn = document.createElement('button');
+            compressAllBtn.type = 'button';
+            compressAllBtn.innerHTML = '<i class="fas fa-compress-arrows-alt"></i> Compress All Images';
+            compressAllBtn.style.cssText = 'background: #17a2b8; color: white; border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; white-space: nowrap;';
+            compressAllBtn.onclick = function() {
+                compressAllImages();
+            };
+            headerRight.appendChild(compressAllBtn);
+        }
+        
+        header.appendChild(headerLeft);
+        header.appendChild(headerRight);
         fileList.appendChild(header);
         
         allSelectedFiles.forEach((file, index) => {
@@ -3421,7 +3467,7 @@ function updateFilePreview() {
             }
             
             const fileName = document.createElement('span');
-            fileName.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+            fileName.textContent = `${file.name} (${formatFileSize(file.size)})`;
             
             fileInfo.appendChild(fileIcon);
             fileInfo.appendChild(fileName);
@@ -3430,14 +3476,16 @@ function updateFilePreview() {
             const buttonContainer = document.createElement('div');
             buttonContainer.style.cssText = 'display: flex; gap: 8px; align-items: center;';
             
-            // Add Compress Image button for image files
-            if (['jpg', 'jpeg', 'png'].includes(extension)) {
+            // Add Compress Image button for image files that are large enough to benefit from compression
+            // Show button for images larger than 500KB (0.5MB)
+            const minSizeForCompression = 500 * 1024; // 500KB in bytes
+            if (['jpg', 'jpeg', 'png'].includes(extension) && file.size > minSizeForCompression) {
                 const compressBtn = document.createElement('button');
                 compressBtn.type = 'button';
                 compressBtn.innerHTML = '<i class="fas fa-compress"></i> Compress Image';
                 compressBtn.style.cssText = 'background: #17a2b8; color: white; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; white-space: nowrap;';
                 compressBtn.onclick = function() {
-                    compressImage(index);
+                    compressImage(file);
                 };
                 buttonContainer.appendChild(compressBtn);
             }
@@ -3447,7 +3495,7 @@ function updateFilePreview() {
             removeBtn.innerHTML = '<i class="fas fa-times"></i>';
             removeBtn.style.cssText = 'background: #dc3545; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;';
             removeBtn.onclick = function() {
-                removeFileFromList(index);
+                removeFileFromList(file);
             };
             
             buttonContainer.appendChild(removeBtn);
@@ -3467,9 +3515,166 @@ function updateFilePreview() {
 
 // Function removed - using FormData approach instead
 
+// Compress all image files function
+async function compressAllImages() {
+    // Get all image files
+    const imageFiles = allSelectedFiles.filter(file => {
+        const ext = file.name.split('.').pop().toLowerCase();
+        return ['jpg', 'jpeg', 'png'].includes(ext);
+    });
+    
+    if (imageFiles.length === 0) {
+        alert('No image files found to compress.');
+        return;
+    }
+    
+    // Confirm with user
+    const confirmMessage = `This will compress ${imageFiles.length} image file(s). This may take a few moments. Continue?`;
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    // Calculate original total size
+    const originalTotalSize = allSelectedFiles.reduce((sum, file) => sum + file.size, 0);
+    
+    // Compress each image file sequentially
+    // Store indices first to avoid issues with file references changing
+    const imageFileIndices = [];
+    for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        const fileIndex = allSelectedFiles.findIndex(f => f === file);
+        if (fileIndex !== -1) {
+            imageFileIndices.push(fileIndex);
+        }
+    }
+    
+    let compressedCount = 0;
+    let totalCompressed = 0;
+    
+    // Compress files in reverse order to avoid index shifting issues
+    for (let i = imageFileIndices.length - 1; i >= 0; i--) {
+        const fileIndex = imageFileIndices[i];
+        const file = allSelectedFiles[fileIndex];
+        
+        try {
+            
+            // Compress the image (reusing the compression logic)
+            const extension = file.name.split('.').pop().toLowerCase();
+            const originalSize = file.size;
+            
+            // Create a canvas to compress the image
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            // Create a promise to handle image loading
+            const imageLoadPromise = new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+                
+                // Create object URL from file
+                const objectUrl = URL.createObjectURL(file);
+                img.src = objectUrl;
+            });
+            
+            await imageLoadPromise;
+            
+            // Calculate new dimensions (max width/height of 1920px, maintain aspect ratio)
+            const maxWidth = 1920;
+            const maxHeight = 1920;
+            let width = img.width;
+            let height = img.height;
+            
+            if (width > maxWidth || height > maxHeight) {
+                if (width > height) {
+                    height = (height / width) * maxWidth;
+                    width = maxWidth;
+                } else {
+                    width = (width / height) * maxHeight;
+                    height = maxHeight;
+                }
+            }
+            
+            // Set canvas dimensions
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Draw image on canvas
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Determine output format and quality
+            let outputFormat = 'image/jpeg';
+            let quality = 0.75; // 75% quality for JPEG
+            
+            // If original is PNG and smaller than 2MB, keep as PNG with resizing only
+            if (extension === 'png' && originalSize < 2 * 1024 * 1024) {
+                outputFormat = 'image/png';
+            }
+            
+            // Convert canvas to blob
+            const blob = await new Promise((resolve) => {
+                if (outputFormat === 'image/png') {
+                    canvas.toBlob(resolve, outputFormat);
+                } else {
+                    canvas.toBlob(resolve, outputFormat, quality);
+                }
+            });
+            
+            // Revoke the object URL
+            URL.revokeObjectURL(img.src);
+            
+            // Create a new File object with the compressed image
+            let compressedFileName = file.name;
+            if (extension === 'png' && outputFormat === 'image/jpeg') {
+                compressedFileName = file.name.replace(/\.png$/i, '.jpg');
+            }
+            
+            const compressedFile = new File([blob], compressedFileName, {
+                type: outputFormat,
+                lastModified: Date.now()
+            });
+            
+            // Replace the original file with compressed version
+            allSelectedFiles[fileIndex] = compressedFile;
+            compressedCount++;
+            totalCompressed += (originalSize - compressedFile.size);
+            
+        } catch (error) {
+            console.error(`Error compressing ${file.name}:`, error);
+            // Continue with next file even if one fails
+        }
+    }
+    
+    // Calculate new total size
+    const newTotalSize = allSelectedFiles.reduce((sum, file) => sum + file.size, 0);
+    const totalReduction = ((1 - newTotalSize / originalTotalSize) * 100).toFixed(1);
+    
+    // Update preview once after all compressions
+    updateFilePreview();
+    
+    // Show success message
+    alert(`Compression complete!\n\nCompressed: ${compressedCount} of ${imageFiles.length} image(s)\n\nOriginal total: ${formatFileSize(originalTotalSize)}\nNew total: ${formatFileSize(newTotalSize)}\nTotal reduction: ${totalReduction}%`);
+}
+
 // Image compression function
-async function compressImage(fileIndex) {
-    const file = allSelectedFiles[fileIndex];
+async function compressImage(fileToCompress) {
+    // Find the file in the array by reference
+    let file = fileToCompress;
+    let fileIndex = allSelectedFiles.findIndex(f => f === fileToCompress);
+    
+    // Fallback: find by name and size if reference doesn't match
+    if (fileIndex === -1) {
+        fileIndex = allSelectedFiles.findIndex(f => 
+            f.name === fileToCompress.name && f.size === fileToCompress.size
+        );
+        if (fileIndex !== -1) {
+            file = allSelectedFiles[fileIndex];
+        } else {
+            alert('File not found. Please try again.');
+            return;
+        }
+    }
+    
     const extension = file.name.split('.').pop().toLowerCase();
     
     // Only compress image files
@@ -3480,7 +3685,6 @@ async function compressImage(fileIndex) {
     
     // Show loading message
     const originalSize = file.size;
-    const originalSizeMB = (originalSize / 1024 / 1024).toFixed(2);
     
     try {
         // Create a canvas to compress the image
@@ -3561,15 +3765,16 @@ async function compressImage(fileIndex) {
         });
         
         // Replace the original file with compressed version
-        allSelectedFiles[fileIndex] = compressedFile;
+        if (fileIndex !== -1) {
+            allSelectedFiles[fileIndex] = compressedFile;
+        }
         
         // Update preview to show new file size
         updateFilePreview();
         
         // Show success message
-        const newSizeMB = (compressedFile.size / 1024 / 1024).toFixed(2);
         const reduction = ((1 - compressedFile.size / originalSize) * 100).toFixed(1);
-        alert(`Image compressed successfully!\n\nOriginal size: ${originalSizeMB} MB\nCompressed size: ${newSizeMB} MB\nSize reduction: ${reduction}%`);
+        alert(`Image compressed successfully!\n\nOriginal size: ${formatFileSize(originalSize)}\nCompressed size: ${formatFileSize(compressedFile.size)}\nSize reduction: ${reduction}%`);
         
     } catch (error) {
         console.error('Compression error:', error);
@@ -3577,9 +3782,24 @@ async function compressImage(fileIndex) {
     }
 }
 
-function removeFileFromList(indexToRemove) {
-    allSelectedFiles.splice(indexToRemove, 1);
-    updateFilePreview();
+function removeFileFromList(fileToRemove) {
+    // Remove file by reference (more reliable than index)
+    const index = allSelectedFiles.findIndex(f => f === fileToRemove);
+    if (index !== -1) {
+        allSelectedFiles.splice(index, 1);
+        updateFilePreview();
+    } else {
+        // Fallback: try to find by name and size if reference doesn't match
+        const fileIndex = allSelectedFiles.findIndex(f => 
+            f.name === fileToRemove.name && f.size === fileToRemove.size
+        );
+        if (fileIndex !== -1) {
+            allSelectedFiles.splice(fileIndex, 1);
+            updateFilePreview();
+        } else {
+            console.error('File not found in list:', fileToRemove.name);
+        }
+    }
 }
 
 // Form submission handler to ensure files are properly submitted
