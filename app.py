@@ -1417,7 +1417,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid'
+                        'installment_paid', 'finance_note_added'
                     ])
                 )
             )
@@ -1440,7 +1440,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         Notification.notification_type.in_([
                             'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                             'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                            'installment_paid'
+                            'installment_paid', 'finance_note_added'
                         ])
                     )
                 )
@@ -1460,7 +1460,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         Notification.notification_type.in_([
                             'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                             'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                            'installment_paid'
+                            'installment_paid', 'finance_note_added'
                         ]),
                         # new_submission only for GM, Operation Manager, Finance Staff, or CEO (his assigned managers)
                         db.and_(
@@ -1500,7 +1500,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid'
+                        'installment_paid', 'finance_note_added'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -1559,7 +1559,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'status_changed',
                         'proof_required', 'recurring_approved', 'request_completed', 'installment_paid',
-                        'user_created', 'user_updated', 'user_deleted'
+                        'user_created', 'user_updated', 'user_deleted', 'finance_note_added'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -1579,7 +1579,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'status_changed',
                         'proof_required', 'recurring_approved', 'request_completed', 'installment_paid',
-                        'user_created', 'user_updated', 'user_deleted'
+                        'user_created', 'user_updated', 'user_deleted', 'finance_note_added'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -1608,7 +1608,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid'
+                        'installment_paid', 'finance_note_added'
                     ]),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -1623,7 +1623,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                 Notification.notification_type.in_([
                     'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                     'status_changed', 'recurring_due', 'proof_required', 'recurring_approved',
-                    'request_completed', 'installment_paid'
+                    'request_completed', 'installment_paid', 'finance_note_added'
                 ])
             )
         ).order_by(Notification.created_at.desc())
@@ -1709,7 +1709,7 @@ def get_unread_count_for_user(user):
                 Notification.is_read == False,
                 db.or_(
                     Notification.notification_type == 'new_submission',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'finance_note_added']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -1756,7 +1756,7 @@ def get_unread_count_for_user(user):
                             Notification.message.contains('IT')
                         )
                     ),
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -1770,7 +1770,7 @@ def get_unread_count_for_user(user):
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
                 db.or_(
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
                 )
             )
@@ -6278,14 +6278,137 @@ def save_finance_note(request_id):
     
     log_action(f"Finance admin added note to payment request #{request_id}")
     
-    # Notify the requestor about the note
+    # Notify all authorized persons about the note: requestor, assigned managers (incl. temporary), and other finance admins
+    notification_title = "Finance Admin Note Added"
+    # Include who added the note for clarity
+    notification_message = f"{current_user.name} added a finance admin note to payment request #{request_id}."
+    # Notify requestor
     create_notification(
         user_id=req.user_id,
-        title="Finance Admin Note Added",
-        message=f"Finance admin has added a note to your payment request #{request_id}. Please check the request details.",
+        title=notification_title,
+        message=notification_message,
         notification_type="finance_note_added",
         request_id=request_id
     )
+    
+    # Notify assigned managers and temporary manager (if any)
+    try:
+        authorized_managers = get_authorized_manager_approvers(req)
+    except Exception as e:
+        authorized_managers = []
+        print(f"DEBUG: get_authorized_manager_approvers failed in save_finance_note: {e}")
+    
+    notified_user_ids = {req.user_id}
+    for manager_user in authorized_managers:
+        if manager_user and manager_user.user_id not in notified_user_ids:
+            create_notification(
+                user_id=manager_user.user_id,
+                title=notification_title,
+                message=notification_message,
+                notification_type="finance_note_added",
+                request_id=request_id
+            )
+            notified_user_ids.add(manager_user.user_id)
+    
+    # Notify other Finance Admins
+    try:
+        other_finance_admins = User.query.filter_by(role='Finance Admin').all()
+    except Exception as e:
+        other_finance_admins = []
+        print(f"DEBUG: querying Finance Admins failed in save_finance_note: {e}")
+    for fa_user in other_finance_admins:
+        if fa_user and fa_user.user_id not in notified_user_ids and fa_user.user_id != current_user.user_id:
+            create_notification(
+                user_id=fa_user.user_id,
+                title=notification_title,
+                message=notification_message,
+                notification_type="finance_note_added",
+                request_id=request_id
+            )
+            notified_user_ids.add(fa_user.user_id)
+
+    # Notify ALL IT Staff regardless of request owner
+    try:
+        it_staff_users = User.query.filter_by(role='IT Staff').all()
+    except Exception as e:
+        it_staff_users = []
+        print(f"DEBUG: querying IT Staff failed in save_finance_note: {e}")
+    for it_user in it_staff_users:
+        if it_user and it_user.user_id not in notified_user_ids:
+            create_notification(
+                user_id=it_user.user_id,
+                title=notification_title,
+                message=notification_message,
+                notification_type="finance_note_added",
+                request_id=request_id
+            )
+            notified_user_ids.add(it_user.user_id)
+
+    # Notify IT Department Manager(s) regardless of request owner
+    try:
+        it_managers = User.query.filter_by(role='Department Manager', department='IT').all()
+    except Exception as e:
+        it_managers = []
+        print(f"DEBUG: querying IT Department Managers failed in save_finance_note: {e}")
+    for mgr in it_managers:
+        if mgr and mgr.user_id not in notified_user_ids:
+            create_notification(
+                user_id=mgr.user_id,
+                title=notification_title,
+                message=notification_message,
+                notification_type="finance_note_added",
+                request_id=request_id
+            )
+            notified_user_ids.add(mgr.user_id)
+
+    # Notify General Managers (ALL GMs)
+    try:
+        gm_users = User.query.filter_by(role='GM').all()
+    except Exception as e:
+        gm_users = []
+        print(f"DEBUG: querying GM users failed in save_finance_note: {e}")
+    for gm in gm_users:
+        if gm and gm.user_id not in notified_user_ids:
+            create_notification(
+                user_id=gm.user_id,
+                title=notification_title,
+                message=notification_message,
+                notification_type="finance_note_added",
+                request_id=request_id
+            )
+            notified_user_ids.add(gm.user_id)
+
+    # Notify Operation Managers (ALL Operation Managers)
+    try:
+        op_manager_users = User.query.filter_by(role='Operation Manager').all()
+    except Exception as e:
+        op_manager_users = []
+        print(f"DEBUG: querying Operation Managers failed in save_finance_note: {e}")
+    for opm in op_manager_users:
+        if opm and opm.user_id not in notified_user_ids:
+            create_notification(
+                user_id=opm.user_id,
+                title=notification_title,
+                message=notification_message,
+                notification_type="finance_note_added",
+                request_id=request_id
+            )
+            notified_user_ids.add(opm.user_id)
+    
+    # Emit real-time notification events
+    try:
+        socketio.emit('new_notification', {
+            'title': notification_title,
+            'message': notification_message,
+            'type': 'finance_note_added',
+            'request_id': request_id
+        }, room='all_users')
+        socketio.emit('notification_update', {
+            'action': 'new_notification',
+            'type': 'finance_note_added'
+        }, room='all_users')
+    except Exception as e:
+        print(f"Error emitting finance_note_added WebSocket events: {e}")
     
     # Emit real-time update
     socketio.emit('request_updated', {
