@@ -956,27 +956,35 @@ def get_overdue_requests_count():
     try:
         current_time = datetime.utcnow()
         
-        # Get all requests that are pending finance approval and have started timing
+        # Get ALL requests that have started finance approval timing but haven't ended
+        # Finance approval is still moving if finance_approval_start_time is set
+        # and finance_approval_end_time is None
         pending_requests = PaymentRequest.query.filter(
-            PaymentRequest.status == 'Pending Finance Approval',
             PaymentRequest.finance_approval_start_time.isnot(None),
-            PaymentRequest.finance_approval_end_time.is_(None)  # Not yet completed
+            PaymentRequest.finance_approval_end_time.is_(None)  # Finance approval still moving
         ).all()
         
         overdue_count = 0
         for request in pending_requests:
+            # EXCLUDE requests with status "Completed" or "Recurring"
+            # These statuses mean the request is no longer in finance approval stage
+            if request.status in ['Completed', 'Recurring']:
+                continue
+            
             # Calculate time elapsed since finance approval started
             time_elapsed = current_time - request.finance_approval_start_time
             
             # Determine alert thresholds based on urgency
             if request.is_urgent:
-                # Urgent requests: 2 hours
+                # Urgent requests: 2 hours or more
                 alert_threshold = timedelta(hours=2)
             else:
-                # Non-urgent requests: 24 hours
+                # Non-urgent requests: 24 hours or more (includes days)
                 alert_threshold = timedelta(hours=24)
             
             # Check if this request is overdue
+            # If time elapsed >= threshold, it MUST be counted
+            # This includes requests showing "days" since 1 day = 24 hours
             if time_elapsed >= alert_threshold:
                 overdue_count += 1
         
@@ -984,6 +992,8 @@ def get_overdue_requests_count():
         
     except Exception as e:
         print(f"Error getting overdue requests count: {e}")
+        import traceback
+        traceback.print_exc()
         return 0
 
 
@@ -992,36 +1002,52 @@ def get_overdue_requests():
     try:
         current_time = datetime.utcnow()
         
-        # Get all requests that are pending finance approval and have started timing
+        # Get ALL requests that have started finance approval timing but haven't ended
+        # Finance approval is still moving if finance_approval_start_time is set
+        # and finance_approval_end_time is None
         pending_requests = PaymentRequest.query.filter(
-            PaymentRequest.status == 'Pending Finance Approval',
             PaymentRequest.finance_approval_start_time.isnot(None),
-            PaymentRequest.finance_approval_end_time.is_(None)  # Not yet completed
+            PaymentRequest.finance_approval_end_time.is_(None)  # Finance approval still moving
         ).all()
         
         overdue_requests = []
         for request in pending_requests:
+            # EXCLUDE requests with status "Completed" or "Recurring"
+            # These statuses mean the request is no longer in finance approval stage
+            if request.status in ['Completed', 'Recurring']:
+                continue
+            
             # Calculate time elapsed since finance approval started
             time_elapsed = current_time - request.finance_approval_start_time
             
             # Determine alert thresholds based on urgency
             if request.is_urgent:
-                # Urgent requests: 2 hours
+                # Urgent requests: 2 hours or more
                 alert_threshold = timedelta(hours=2)
             else:
-                # Non-urgent requests: 24 hours
+                # Non-urgent requests: 24 hours or more (includes days)
                 alert_threshold = timedelta(hours=24)
             
             # Check if this request is overdue
+            # If time elapsed >= threshold, it MUST appear on overdue page
+            # This includes requests showing "days" since 1 day = 24 hours
             if time_elapsed >= alert_threshold:
-                # Format time elapsed for display
-                hours = int(time_elapsed.total_seconds() // 3600)
-                minutes = int((time_elapsed.total_seconds() % 3600) // 60)
+                # Format time elapsed for display (show days, hours, and minutes)
+                total_seconds = int(time_elapsed.total_seconds())
+                days = total_seconds // 86400
+                hours = (total_seconds % 86400) // 3600
+                minutes = (total_seconds % 3600) // 60
                 
+                # Build time display string with appropriate units
+                time_parts = []
+                if days > 0:
+                    time_parts.append(f"{days} day{'s' if days != 1 else ''}")
                 if hours > 0:
-                    time_display = f"{hours} hour{'s' if hours != 1 else ''} and {minutes} minute{'s' if minutes != 1 else ''}"
-                else:
-                    time_display = f"{minutes} minute{'s' if minutes != 1 else ''}"
+                    time_parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+                if minutes > 0 or len(time_parts) == 0:  # Show minutes if no days/hours, or if there are minutes
+                    time_parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+                
+                time_display = " and ".join(time_parts)
                 
                 overdue_requests.append({
                     'request': request,
@@ -1037,6 +1063,8 @@ def get_overdue_requests():
         
     except Exception as e:
         print(f"Error getting overdue requests: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 
@@ -4681,17 +4709,18 @@ def overdue_requests():
     """Display all overdue finance approval requests"""
     try:
         page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
+        per_page = request.args.get('per_page', 50, type=int)  # Default to 50 to show more requests
         
-        # Validate per_page to prevent abuse
-        if per_page not in [10, 20, 50, 100]:
-            per_page = 10
+        # Validate per_page to prevent abuse - allow higher limits to show all overdue requests
+        if per_page not in [10, 20, 50, 100, 200, 500]:
+            per_page = 50
         
+        # Get ALL overdue requests (no limit in the query)
         overdue_requests_list = get_overdue_requests()
         overdue_count = len(overdue_requests_list)
         
         # Calculate pagination
-        total_pages = (overdue_count + per_page - 1) // per_page  # Ceiling division
+        total_pages = (overdue_count + per_page - 1) // per_page if overdue_count > 0 else 1  # Ceiling division
         start_index = (page - 1) * per_page
         end_index = start_index + per_page
         
@@ -4706,6 +4735,8 @@ def overdue_requests():
                              total_pages=total_pages)
     except Exception as e:
         flash(f'Error loading overdue requests: {str(e)}', 'error')
+        import traceback
+        traceback.print_exc()
         return redirect(url_for('admin_dashboard'))
 
 
