@@ -3426,6 +3426,22 @@ function updateFilePreview() {
             fileInfo.appendChild(fileIcon);
             fileInfo.appendChild(fileName);
             
+            // Create button container
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+            
+            // Add Compress Image button for image files
+            if (['jpg', 'jpeg', 'png'].includes(extension)) {
+                const compressBtn = document.createElement('button');
+                compressBtn.type = 'button';
+                compressBtn.innerHTML = '<i class="fas fa-compress"></i> Compress Image';
+                compressBtn.style.cssText = 'background: #17a2b8; color: white; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; white-space: nowrap;';
+                compressBtn.onclick = function() {
+                    compressImage(index);
+                };
+                buttonContainer.appendChild(compressBtn);
+            }
+            
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
             removeBtn.innerHTML = '<i class="fas fa-times"></i>';
@@ -3434,8 +3450,10 @@ function updateFilePreview() {
                 removeFileFromList(index);
             };
             
+            buttonContainer.appendChild(removeBtn);
+            
             fileItem.appendChild(fileInfo);
-            fileItem.appendChild(removeBtn);
+            fileItem.appendChild(buttonContainer);
             fileList.appendChild(fileItem);
         });
         
@@ -3448,6 +3466,116 @@ function updateFilePreview() {
 }
 
 // Function removed - using FormData approach instead
+
+// Image compression function
+async function compressImage(fileIndex) {
+    const file = allSelectedFiles[fileIndex];
+    const extension = file.name.split('.').pop().toLowerCase();
+    
+    // Only compress image files
+    if (!['jpg', 'jpeg', 'png'].includes(extension)) {
+        alert('Only image files (JPG, JPEG, PNG) can be compressed.');
+        return;
+    }
+    
+    // Show loading message
+    const originalSize = file.size;
+    const originalSizeMB = (originalSize / 1024 / 1024).toFixed(2);
+    
+    try {
+        // Create a canvas to compress the image
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        // Create a promise to handle image loading
+        const imageLoadPromise = new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            
+            // Create object URL from file
+            const objectUrl = URL.createObjectURL(file);
+            img.src = objectUrl;
+        });
+        
+        await imageLoadPromise;
+        
+        // Calculate new dimensions (max width/height of 1920px, maintain aspect ratio)
+        const maxWidth = 1920;
+        const maxHeight = 1920;
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > maxWidth || height > maxHeight) {
+            if (width > height) {
+                height = (height / width) * maxWidth;
+                width = maxWidth;
+            } else {
+                width = (width / height) * maxHeight;
+                height = maxHeight;
+            }
+        }
+        
+        // Set canvas dimensions
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Draw image on canvas
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Determine output format and quality
+        // For better compression, convert PNG to JPEG (unless user wants to preserve transparency)
+        // For PNG, we'll convert to JPEG for better compression, but keep original filename
+        let outputFormat = 'image/jpeg';
+        let quality = 0.75; // 75% quality for JPEG (good balance between size and quality)
+        
+        // If original is PNG and smaller than 2MB, keep as PNG with resizing only
+        // Otherwise convert to JPEG for better compression
+        if (extension === 'png' && originalSize < 2 * 1024 * 1024) {
+            outputFormat = 'image/png';
+        }
+        
+        // Convert canvas to blob
+        const blob = await new Promise((resolve) => {
+            if (outputFormat === 'image/png') {
+                // PNG doesn't use quality parameter
+                canvas.toBlob(resolve, outputFormat);
+            } else {
+                canvas.toBlob(resolve, outputFormat, quality);
+            }
+        });
+        
+        // Revoke the object URL
+        URL.revokeObjectURL(img.src);
+        
+        // Create a new File object with the compressed image
+        // Update filename extension if format changed (e.g., PNG to JPEG)
+        let compressedFileName = file.name;
+        if (extension === 'png' && outputFormat === 'image/jpeg') {
+            compressedFileName = file.name.replace(/\.png$/i, '.jpg');
+        }
+        
+        const compressedFile = new File([blob], compressedFileName, {
+            type: outputFormat,
+            lastModified: Date.now()
+        });
+        
+        // Replace the original file with compressed version
+        allSelectedFiles[fileIndex] = compressedFile;
+        
+        // Update preview to show new file size
+        updateFilePreview();
+        
+        // Show success message
+        const newSizeMB = (compressedFile.size / 1024 / 1024).toFixed(2);
+        const reduction = ((1 - compressedFile.size / originalSize) * 100).toFixed(1);
+        alert(`Image compressed successfully!\n\nOriginal size: ${originalSizeMB} MB\nCompressed size: ${newSizeMB} MB\nSize reduction: ${reduction}%`);
+        
+    } catch (error) {
+        console.error('Compression error:', error);
+        alert('Failed to compress image. Please try again or use a different image.');
+    }
+}
 
 function removeFileFromList(indexToRemove) {
     allSelectedFiles.splice(indexToRemove, 1);
