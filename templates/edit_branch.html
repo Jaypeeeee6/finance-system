@@ -73,6 +73,32 @@
                     </a>
                 </div>
             </form>
+
+            <hr>
+            <h3>Aliases</h3>
+            <p class="form-text text-muted">Add old names for this branch so reports include historical entries.</p>
+
+            <div class="form-group">
+                <form method="POST" action="{{ url_for('add_branch_alias', branch_id=branch.id) }}" style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" name="alias_name" class="form-control" placeholder="e.g., Kucu Al Khoud" required>
+                    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-plus"></i> Add Alias</button>
+                </form>
+            </div>
+
+            {% if branch.aliases %}
+            <div class="form-group">
+                <ul class="list-group">
+                    {% for alias in branch.aliases %}
+                    <li class="list-group-item" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>{{ alias.alias_name }}</span>
+                        <form method="POST" action="{{ url_for('delete_branch_alias', alias_id=alias.id, branch_id=branch.id) }}" onsubmit="return confirm('Delete alias \"{{ alias.alias_name }}\"?');" style="margin: 0;">
+                            <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
         </div>
     </div>
 

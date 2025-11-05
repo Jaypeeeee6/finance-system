@@ -451,6 +451,22 @@ class Branch(db.Model):
         return f'<Branch {self.id} - {self.name}>'
 
 
+class BranchAlias(db.Model):
+    """Alternate names for a Branch (used to match historical request entries)"""
+    __tablename__ = 'branch_aliases'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=False)
+    alias_name = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationship back to Branch; access via branch.aliases
+    branch = db.relationship('Branch', backref='aliases')
+    
+    def __repr__(self):
+        return f"<BranchAlias {self.id} - {self.alias_name} (branch_id={self.branch_id})>"
+
+
 class FinanceAdminNote(db.Model):
     """Model for storing multiple finance admin notes for payment requests"""
     __tablename__ = 'finance_admin_notes'

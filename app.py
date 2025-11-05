@@ -11,7 +11,7 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType, Branch, FinanceAdminNote
+from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType, Branch, BranchAlias, FinanceAdminNote
 from config import Config
 import json
 
@@ -4101,6 +4101,70 @@ def edit_branch(branch_id):
     return render_template('edit_branch.html', branch=branch, user=current_user)
 
 
+@app.route('/it/branches/<int:branch_id>/aliases/add', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def add_branch_alias(branch_id):
+    """Add an alias name for a branch"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to perform this action.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    branch = Branch.query.get_or_404(branch_id)
+    alias_name = (request.form.get('alias_name') or '').strip()
+    if not alias_name:
+        flash('Alias name is required.', 'danger')
+        return redirect(url_for('edit_branch', branch_id=branch_id))
+
+    # Prevent duplicate alias for the same branch or alias equal to current name
+    existing = BranchAlias.query.filter(
+        db.func.lower(BranchAlias.alias_name) == alias_name.lower(),
+        BranchAlias.branch_id == branch_id
+    ).first()
+    if existing or alias_name.lower() == (branch.name or '').lower():
+        flash('This alias already exists or matches the current branch name.', 'warning')
+        return redirect(url_for('edit_branch', branch_id=branch_id))
+
+    try:
+        new_alias = BranchAlias(branch_id=branch_id, alias_name=alias_name)
+        db.session.add(new_alias)
+        db.session.commit()
+        log_action(f'Added alias "{alias_name}" for branch {branch.name} (ID {branch.id})')
+        flash('Alias added successfully.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error adding alias: {str(e)}', 'danger')
+
+    return redirect(url_for('edit_branch', branch_id=branch_id))
+
+
+@app.route('/it/branches/<int:branch_id>/aliases/<int:alias_id>/delete', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def delete_branch_alias(branch_id, alias_id):
+    """Delete an alias from a branch"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to perform this action.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    alias = BranchAlias.query.get_or_404(alias_id)
+    if alias.branch_id != branch_id:
+        flash('Alias does not belong to the specified branch.', 'danger')
+        return redirect(url_for('edit_branch', branch_id=branch_id))
+
+    try:
+        db.session.delete(alias)
+        db.session.commit()
+        log_action(f'Deleted alias "{alias.alias_name}" from branch ID {branch_id}')
+        flash('Alias deleted successfully.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting alias: {str(e)}', 'danger')
+
+    return redirect(url_for('edit_branch', branch_id=branch_id))
+
 @app.route('/it/branches/delete/<int:branch_id>', methods=['POST'])
 @login_required
 @role_required('IT Staff', 'Department Manager')
@@ -7958,8 +8022,14 @@ def reports():
         # Filter by person_company field only (company_name is no longer used)
         query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
     if branch_filter:
-        # Filter by branch name
-        query = query.filter(PaymentRequest.branch_name == branch_filter)
+        # Alias-aware branch filtering: include canonical name and any aliases
+        selected_branch = Branch.query.filter_by(name=branch_filter).first()
+        if selected_branch:
+            alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
+            names = [selected_branch.name] + alias_names
+            query = query.filter(PaymentRequest.branch_name.in_(names))
+        else:
+            query = query.filter(PaymentRequest.branch_name == branch_filter)
     # Payment type filter
     if payment_type_filter:
         if payment_type_filter == 'Recurring':
@@ -8125,6 +8195,7 @@ def export_reports_excel():
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
     status_filter = request.args.get('status', '')
+    payment_type_filter = request.args.get('payment_type', '')
 
     # Show ALL statuses by default (consistent with reports() view)
     query = PaymentRequest.query
@@ -8167,7 +8238,14 @@ def export_reports_excel():
         # Filter by person_company field only (company_name is no longer used)
         query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
     if branch_filter:
-        query = query.filter_by(branch_name=branch_filter)
+        # Alias-aware branch filtering for Excel export
+        selected_branch = Branch.query.filter_by(name=branch_filter).first()
+        if selected_branch:
+            alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
+            names = [selected_branch.name] + alias_names
+            query = query.filter(PaymentRequest.branch_name.in_(names))
+        else:
+            query = query.filter_by(branch_name=branch_filter)
     if payment_type_filter:
         if payment_type_filter == 'Recurring':
             query = query.filter(PaymentRequest.recurring == 'Recurring')
@@ -8359,6 +8437,7 @@ def export_reports_pdf():
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
     status_filter = request.args.get('status', '')
+    payment_type_filter = request.args.get('payment_type', '')
 
     # Show ALL statuses by default (consistent with reports() view)
     query = PaymentRequest.query
@@ -8401,8 +8480,14 @@ def export_reports_pdf():
         # Filter by person_company field only (company_name is no longer used)
         query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
     if branch_filter:
-        # Filter by branch name
-        query = query.filter(PaymentRequest.branch_name == branch_filter)
+        # Alias-aware branch filtering for PDF export
+        selected_branch = Branch.query.filter_by(name=branch_filter).first()
+        if selected_branch:
+            alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
+            names = [selected_branch.name] + alias_names
+            query = query.filter(PaymentRequest.branch_name.in_(names))
+        else:
+            query = query.filter(PaymentRequest.branch_name == branch_filter)
 
     # Date filtering - use submission date (date field) which exists for all requests
     if date_from:
