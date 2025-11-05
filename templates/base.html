@@ -16,7 +16,12 @@
                 <i class="fas fa-file-invoice-dollar"></i>
                 <span>Payment System</span>
             </div>
-            <ul class="nav-menu">
+            <button class="hamburger-menu" id="hamburger-menu" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <ul class="nav-menu" id="nav-menu">
                 <li><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="fas fa-home"></i> Dashboard</a></li>
                 
                 
@@ -188,6 +193,41 @@
     })();
     </script>
     {% endif %}
+    
+    <!-- Hamburger Menu JavaScript -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const hamburgerMenu = document.getElementById('hamburger-menu');
+        const navMenu = document.getElementById('nav-menu');
+        
+        if (hamburgerMenu && navMenu) {
+            hamburgerMenu.addEventListener('click', function() {
+                hamburgerMenu.classList.toggle('active');
+                navMenu.classList.toggle('active');
+            });
+            
+            // Close menu when clicking outside
+            document.addEventListener('click', function(event) {
+                const isClickInsideMenu = navMenu.contains(event.target);
+                const isClickOnHamburger = hamburgerMenu.contains(event.target);
+                
+                if (!isClickInsideMenu && !isClickOnHamburger && navMenu.classList.contains('active')) {
+                    hamburgerMenu.classList.remove('active');
+                    navMenu.classList.remove('active');
+                }
+            });
+            
+            // Close menu when clicking on a nav link
+            const navLinks = navMenu.querySelectorAll('.nav-link');
+            navLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    hamburgerMenu.classList.remove('active');
+                    navMenu.classList.remove('active');
+                });
+            });
+        }
+    });
+    </script>
     
     <!-- Notification Bell JavaScript -->
     <script>
