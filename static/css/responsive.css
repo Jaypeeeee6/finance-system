@@ -1,0 +1,94 @@
+.notification-bell-container-responsive {
+    display: none;
+}
+
+@media (max-width: 1280px) {
+    /* Layout: brand | bell | hamburger */
+    .notification-bell-container-responsive {
+        display: flex;
+        align-items: center;
+        order: 2;
+        margin-left: auto; /* push bell + hamburger to the right */
+        position: relative;
+    }
+
+    .hamburger-menu {
+        display: flex;
+        order: 3;
+        margin-left: 0.5rem;
+    }
+
+    .nav-brand {
+        order: 1;
+    }
+
+    /* Hide desktop bell in collapsed menu; keep user visible */
+    .nav-menu .notification-bell-container {
+        display: none;
+    }
+
+    /* Show user info at top of menu */
+    .nav-menu .nav-user {
+        display: block;
+        order: -1;
+        width: 100%;
+        padding-top: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    /* Position dropdown for responsive bell */
+    .notification-bell-container-responsive .notification-dropdown {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        left: auto;
+        width: 90vw;
+        max-width: 400px;
+        margin-top: 0.5rem;
+        z-index: 1002;
+    }
+
+    /* --- Tabs: prevent horizontal overflow and enable swipe scroll --- */
+    .tab-navigation {
+        display: flex;
+        gap: 0.5rem;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 0.25rem;
+        max-width: 100%;
+    }
+
+    .tab-navigation .tab-button {
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+
+    /* Optional slimmer scrollbar */
+    .tab-navigation::-webkit-scrollbar { height: 6px; }
+    .tab-navigation::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+    .tab-navigation::-webkit-scrollbar-track { background: transparent; }
+
+    /* Keep the search block from forcing overflow */
+    .tab-navigation .tab-search { flex: 0 0 auto; min-width: 240px; margin-left: auto; }
+
+    /* --- Dashboard top tabs (Requests, Users, etc.) --- */
+    .dashboard-tabs {
+        display: flex;
+        gap: 0.5rem;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 0.25rem;
+        max-width: 100%;
+    }
+
+    .dashboard-tabs .tab-btn {
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+
+    .dashboard-tabs::-webkit-scrollbar { height: 6px; }
+    .dashboard-tabs::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+    .dashboard-tabs::-webkit-scrollbar-track { background: transparent; }
+}
+
+
