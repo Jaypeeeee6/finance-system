@@ -4,14 +4,14 @@
 
 {% block content %}
 <style>
-    .data-table th:nth-child(5),
-    .data-table td:nth-child(5) {
+    .data-table th:nth-child(6),
+    .data-table td:nth-child(6) {
         width: 150px;
         min-width: 150px;
     }
     
-    .data-table th:nth-child(6),
-    .data-table td:nth-child(6) {
+    .data-table th:nth-child(7),
+    .data-table td:nth-child(7) {
         text-align: left;
     }
 </style>
@@ -68,6 +68,15 @@
                             {% for branch in branches %}
                             <option value="{{ branch.name }}" {% if branch_filter == branch.name %}selected{% endif %}>{{ branch.name }}</option>
                             {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="payment_type">Payment Type</label>
+                        <select name="payment_type" id="payment_type">
+                            <option value="" {% if not payment_type_filter %}selected{% endif %}>All Payment Types</option>
+                            <option value="One-Time" {% if payment_type_filter == 'One-Time' %}selected{% endif %}>One-Time</option>
+                            <option value="Recurring" {% if payment_type_filter == 'Recurring' %}selected{% endif %}>Recurring</option>
                         </select>
                     </div>
 
@@ -165,10 +174,10 @@
             <h2><i class="fas fa-table"></i> Report Results</h2>
             {% if requests and requests|length > 0 %}
             <div class="header-actions">
-                <a class="btn btn-success" id="export-excel-btn" href="{{ url_for('export_reports_excel', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to',''), status=request.args.get('status','')) }}" onclick="return showExportLoading(event)">
+                <a class="btn btn-success" id="export-excel-btn" href="{{ url_for('export_reports_excel', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to',''), status=request.args.get('status',''), payment_type=request.args.get('payment_type','')) }}" onclick="return showExportLoading(event)">
                     <i class="fas fa-file-excel"></i> <span id="export-excel-text">Export Excel</span>
                 </a>
-                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to',''), status=request.args.get('status','')) }}" onclick="return showExportLoading(event)">
+                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to',''), status=request.args.get('status',''), payment_type=request.args.get('payment_type','')) }}" onclick="return showExportLoading(event)">
                     <i class="fas fa-file-pdf"></i> <span id="export-text">Export PDF</span>
                 </a>
             </div>
@@ -184,6 +193,7 @@
                                 <th>Type</th>
                                 <th>Requestor</th>
                                 <th>Department</th>
+                                <th>Payment Type</th>
                                 <th>Branch Name</th>
                                 <th>Person/Company</th>
                                 <th>Submitted</th>
@@ -217,6 +227,7 @@
                                 <td><span class="badge badge-info">{{ req.request_type }}</span></td>
                                 <td>{{ req.requestor_name }}</td>
                                 <td>{{ req.department }}</td>
+                                <td>{{ req.recurring or 'One-Time' }}</td>
                                 <td>
                                     {% if req.branch_name %}
                                         <span class="badge badge-primary">{{ req.branch_name }}</span>
@@ -316,7 +327,7 @@
                     {% if pagination.pages > 1 %}
                     <div class="pagination">
                         {% if pagination.has_prev %}
-                            <a href="{{ url_for('reports', page=pagination.prev_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter) }}" class="btn btn-sm btn-secondary">
+                            <a href="{{ url_for('reports', page=pagination.prev_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter, payment_type=payment_type_filter) }}" class="btn btn-sm btn-secondary">
                                 <i class="fas fa-chevron-left"></i> Previous
                             </a>
                         {% endif %}
@@ -324,7 +335,7 @@
                         {% for page_num in pagination.iter_pages() %}
                             {% if page_num %}
                                 {% if page_num != pagination.page %}
-                                    <a href="{{ url_for('reports', page=page_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
+                                    <a href="{{ url_for('reports', page=page_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter, payment_type=payment_type_filter) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
                                 {% else %}
                                     <span class="btn btn-sm btn-primary">{{ page_num }}</span>
                                 {% endif %}
@@ -334,7 +345,7 @@
                         {% endfor %}
                         
                         {% if pagination.has_next %}
-                            <a href="{{ url_for('reports', page=pagination.next_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter) }}" class="btn btn-sm btn-secondary">
+                            <a href="{{ url_for('reports', page=pagination.next_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter, payment_type=payment_type_filter) }}" class="btn btn-sm btn-secondary">
                                 Next <i class="fas fa-chevron-right"></i>
                             </a>
                         {% endif %}

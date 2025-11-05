@@ -7906,6 +7906,12 @@ def reports():
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
     status_filter = request.args.get('status', '')
+    payment_type_filter = request.args.get('payment_type', '')
+    payment_type_filter = request.args.get('payment_type', '')
+    payment_type_filter = request.args.get('payment_type', '')
+    payment_type_filter = request.args.get('payment_type', '')
+    payment_type_filter = request.args.get('payment_type', '')
+    payment_type_filter = request.args.get('payment_type', '')  # 'One-Time' or 'Recurring'
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -7954,6 +7960,18 @@ def reports():
     if branch_filter:
         # Filter by branch name
         query = query.filter(PaymentRequest.branch_name == branch_filter)
+    # Payment type filter
+    if payment_type_filter:
+        if payment_type_filter == 'Recurring':
+            query = query.filter(PaymentRequest.recurring == 'Recurring')
+        elif payment_type_filter == 'One-Time':
+            query = query.filter(
+                db.or_(
+                    PaymentRequest.recurring == None,
+                    PaymentRequest.recurring == '',
+                    PaymentRequest.recurring == 'One-Time'
+                )
+            )
     
     # Date filtering - use submission date (date field) which exists for all requests
     if date_from:
@@ -8042,6 +8060,7 @@ def reports():
                          company_filter=company_filter,
                          branch_filter=branch_filter,
                          status_filter=status_filter,
+                         payment_type_filter=payment_type_filter,
                          department_filter=department_filter,
                          request_type_filter=request_type_filter,
                          date_from=date_from,
@@ -8149,6 +8168,17 @@ def export_reports_excel():
         query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
     if branch_filter:
         query = query.filter_by(branch_name=branch_filter)
+    if payment_type_filter:
+        if payment_type_filter == 'Recurring':
+            query = query.filter(PaymentRequest.recurring == 'Recurring')
+        elif payment_type_filter == 'One-Time':
+            query = query.filter(
+                db.or_(
+                    PaymentRequest.recurring == None,
+                    PaymentRequest.recurring == '',
+                    PaymentRequest.recurring == 'One-Time'
+                )
+            )
     if date_from:
         query = query.filter(PaymentRequest.date >= datetime.strptime(date_from, '%Y-%m-%d').date())
     if date_to:
@@ -8179,7 +8209,7 @@ def export_reports_excel():
         generation_date = datetime.now().strftime('%Y-%m-%d %H:%M')
         ws['A2'] = f"Report Generated: {generation_date}"
         
-        filters_line = f"Dept: {department_filter or 'All'} | Type: {request_type_filter or 'All'} | Branch: {branch_filter or 'All'}"
+        filters_line = f"Dept: {department_filter or 'All'} | Type: {request_type_filter or 'All'} | Branch: {branch_filter or 'All'} | Payment: {payment_type_filter or 'All'}"
         ws['A3'] = filters_line
         
         # Date scope
@@ -8279,7 +8309,8 @@ def export_reports_excel():
         from flask import make_response
         response = make_response(buffer.getvalue())
         response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        response.headers['Content-Disposition'] = 'attachment; filename=reports.xlsx'
+        ts = datetime.now().strftime('%Y-%m-%d_%H-%M')
+        response.headers['Content-Disposition'] = f'attachment; filename=reports_{ts}.xlsx'
         response.headers['Content-Length'] = str(len(buffer.getvalue()))
         return response
         
@@ -8300,12 +8331,25 @@ def export_reports_pdf():
         from reportlab.pdfgen import canvas
         from reportlab.lib.units import mm
         from reportlab.lib.utils import simpleSplit
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
     except ImportError:
         flash('PDF export requires reportlab. Install with: pip install reportlab', 'warning')
         return redirect(url_for('reports', **request.args))
     except Exception as e:
         flash(f'Error importing PDF library: {str(e)}', 'error')
         return redirect(url_for('reports', **request.args))
+
+    # Optional Arabic shaping dependencies (used if available)
+    try:
+        import os
+        import unicodedata
+        import re
+        import arabic_reshaper  # pip install arabic-reshaper
+        from bidi.algorithm import get_display  # pip install python-bidi
+    except Exception:
+        arabic_reshaper = None
+        get_display = None
 
     # Reuse the same filters as the reports() view
     department_filter = request.args.get('department', '')
@@ -8384,6 +8428,76 @@ def export_reports_pdf():
         c = canvas.Canvas(buffer, pagesize=landscape(A4))
         width, height = landscape(A4)
 
+        # Register and select a font that supports Arabic if available
+        arabic_font_name = None
+        try:
+            # Candidate fonts: prefer bundled fonts, then system fonts (Windows/Linux/macOS)
+            font_candidates = [
+                # Project-bundled fonts
+                os.path.join(app.root_path, 'static', 'fonts', 'Amiri-Regular.ttf'),
+                os.path.join(app.root_path, 'static', 'fonts', 'NotoNaskhArabic-Regular.ttf'),
+                os.path.join(app.root_path, 'static', 'fonts', 'NotoSansArabic-Regular.ttf'),
+                os.path.join(app.root_path, 'static', 'fonts', 'Cairo-Regular.ttf'),
+                os.path.join(app.root_path, 'static', 'fonts', 'Tahoma.ttf'),
+                os.path.join(app.root_path, 'static', 'fonts', 'Arial.ttf'),
+                # Windows common fonts
+                r'C:\\Windows\\Fonts\\trado.ttf',            # Traditional Arabic
+                r'C:\\Windows\\Fonts\\Tahoma.ttf',
+                r'C:\\Windows\\Fonts\\arial.ttf',
+                r'C:\\Windows\\Fonts\\arialuni.ttf',        # Arial Unicode MS (if present)
+                r'C:\\Windows\\Fonts\\times.ttf',
+                r'C:\\Windows\\Fonts\\segoeui.ttf',
+                r'C:\\Windows\\Fonts\\segoeuib.ttf',
+                # Linux
+                '/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf',
+                '/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf',
+                '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+                # macOS
+                '/Library/Fonts/Arial Unicode.ttf',
+                '/Library/Fonts/Tahoma.ttf',
+                '/System/Library/Fonts/Supplemental/Times New Roman.ttf',
+            ]
+            for font_path in font_candidates:
+                if os.path.exists(font_path):
+                    try:
+                        pdfmetrics.registerFont(TTFont('ArabicFont', font_path))
+                        arabic_font_name = 'ArabicFont'
+                        break
+                    except Exception:
+                        continue
+        except Exception:
+            # If anything goes wrong, we will fall back to built-in fonts
+            arabic_font_name = None
+
+        # Use Arabic-capable font for all body text if available
+        body_font = arabic_font_name or 'Helvetica'
+
+        # Helpers for Arabic detection and shaping
+        def contains_arabic(text):
+            if not text:
+                return False
+            for ch in str(text):
+                code = ord(ch)
+                if (
+                    0x0600 <= code <= 0x06FF  # Arabic
+                    or 0x0750 <= code <= 0x077F  # Arabic Supplement
+                    or 0x08A0 <= code <= 0x08FF  # Arabic Extended-A
+                    or 0xFB50 <= code <= 0xFDFF  # Arabic Presentation Forms-A
+                    or 0xFE70 <= code <= 0xFEFF  # Arabic Presentation Forms-B
+                ):
+                    return True
+            return False
+
+        def prepare_text(value: object) -> str:
+            s = '' if value is None else str(value)
+            if arabic_reshaper and get_display and contains_arabic(s):
+                try:
+                    s = get_display(arabic_reshaper.reshape(s))
+                except Exception:
+                    # If shaping fails, return original text
+                    pass
+            return s
+
         # Margins (reduced for more space)
         left = 8 * mm
         right = width - 8 * mm
@@ -8393,28 +8507,28 @@ def export_reports_pdf():
         # Header
         c.setFont('Helvetica-Bold', 14)
         c.drawString(left, y, 'Payment Reports')
-        c.setFont('Helvetica', 10)
+        c.setFont(body_font, 10)
         y -= 14
         
         # Report generation date
         generation_date = datetime.now().strftime('%Y-%m-%d %H:%M')
-        c.drawString(left, y, f"Report Generated: {generation_date}")
+        c.drawString(left, y, prepare_text(f"Report Generated: {generation_date}"))
         y -= 12
         
         # Filters
-        filters_line = f"Dept: {department_filter or 'All'} | Type: {request_type_filter or 'All'} | Branch: {branch_filter or 'All'}"
-        c.drawString(left, y, filters_line)
+        filters_line = f"Dept: {department_filter or 'All'} | Type: {request_type_filter or 'All'} | Branch: {branch_filter or 'All'} | Payment: {payment_type_filter or 'All'}"
+        c.drawString(left, y, prepare_text(filters_line))
         y -= 12
         
         # Date scope
         if date_from and date_to:
-            c.drawString(left, y, f"Date Range: {date_from} to {date_to}")
+            c.drawString(left, y, prepare_text(f"Date Range: {date_from} to {date_to}"))
         elif date_from:
-            c.drawString(left, y, f"Date From: {date_from} (no end date)")
+            c.drawString(left, y, prepare_text(f"Date From: {date_from} (no end date)"))
         elif date_to:
-            c.drawString(left, y, f"Date To: {date_to} (no start date)")
+            c.drawString(left, y, prepare_text(f"Date To: {date_to} (no start date)"))
         else:
-            c.drawString(left, y, "Date Range: All dates (no filter applied)")
+            c.drawString(left, y, prepare_text("Date Range: All dates (no filter applied)"))
         y -= 12
 
         # Total amount
@@ -8423,75 +8537,86 @@ def export_reports_pdf():
         y -= 18
 
         # Helper function to wrap text manually
-        def wrap_text(text, max_width, font_name='Helvetica', font_size=9):
-            """Wrap text to fit within specified width with more aggressive wrapping"""
-            if not text:
+        def wrap_text(text, max_width, font_name=body_font, font_size=9):
+            """Wrap text to fit within specified width using actual font metrics."""
+            s = '' if text is None else str(text)
+            s = prepare_text(s)
+            if not s:
                 return ['']
-            
-            # More conservative character width estimate for better wrapping
-            char_width = font_size * 0.45  # Even more conservative character width
-            max_chars = int(max_width / char_width)
-            
-            words = str(text).split()
+
+            words = s.split()
             lines = []
-            current_line = []
-            
+            current = ''
+
+            def string_width(t: str) -> float:
+                try:
+                    return pdfmetrics.stringWidth(t, font_name, font_size)
+                except Exception:
+                    # Fallback estimate if metrics are unavailable
+                    return len(t) * font_size * 0.5
+
+            # Use a slightly smaller width to keep text away from column border
+            effective_width = max(0, max_width - (1.5 * mm))
             for word in words:
-                # Check if adding this word would exceed the line length
-                test_line = ' '.join(current_line + [word])
-                if len(test_line) <= max_chars:
-                    current_line.append(word)
+                candidate = (current + ' ' + word).strip()
+                if current and string_width(candidate) > effective_width:
+                    lines.append(current)
+                    current = word
                 else:
-                    if current_line:
-                        lines.append(' '.join(current_line))
-                        current_line = [word]
+                    current = candidate
+
+            if current:
+                lines.append(current)
+
+            # Hard-break extremely long tokens that exceed width
+            fixed_lines = []
+            for line in lines:
+                if string_width(line) <= effective_width:
+                    fixed_lines.append(line)
+                    continue
+                # Break by characters
+                buf = ''
+                for ch in line:
+                    if string_width(buf + ch) > effective_width and buf:
+                        fixed_lines.append(buf)
+                        buf = ch
                     else:
-                        # Single word is too long, force break it
-                        if len(word) > max_chars:
-                            # Break long words more aggressively
-                            while len(word) > max_chars:
-                                lines.append(word[:max_chars])
-                                word = word[max_chars:]
-                            if word:
-                                current_line = [word]
-                        else:
-                            lines.append(word)
-            
-            if current_line:
-                lines.append(' '.join(current_line))
-            
-            return lines if lines else ['']
+                        buf += ch
+                if buf:
+                    fixed_lines.append(buf)
+            return fixed_lines or ['']
         
         # Table header
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(body_font if arabic_font_name else 'Helvetica-Bold', 9)
         headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver']
         # Column widths optimized for landscape A4 with proper spacing
         # [ID, Type, Requestor, Department, Payment, Amount, Branch, Company, Submitted, Approved, Approver]
         col_widths = [14*mm, 32*mm, 24*mm, 20*mm, 18*mm, 18*mm, 28*mm, 28*mm, 16*mm, 16*mm, 30*mm]  # Increased Approver column width slightly
         # Calculate column positions based on widths to prevent overlapping
+        column_gap = 4 * mm  # slightly larger inter-column gap
         col_x = [left]
         for i in range(1, len(col_widths)):
-            col_x.append(col_x[i-1] + col_widths[i-1] + 3*mm)  # Add 3mm spacing between columns to prevent overlap
+            col_x.append(col_x[i-1] + col_widths[i-1] + column_gap)
         for hx, text in zip(col_x, headers):
-            c.drawString(hx, y, text)
+            c.drawString(hx, y, prepare_text(text))
         y -= 10
         c.line(left, y, right, y)
         y -= 8
 
         # Rows
-        c.setFont('Helvetica', 9)
+        c.setFont(body_font, 9)
         row_height = 10
         for r in result_requests:
             if y < 15 * mm:  # Reduced from 20mm to fit more rows per page
                 c.showPage()
                 y = top
-                c.setFont('Helvetica-Bold', 9)
+                c.setFont(body_font if arabic_font_name else 'Helvetica-Bold', 9)
                 for hx, text in zip(col_x, headers):
-                    c.drawString(hx, y, text)
+                    c.drawString(hx, y, prepare_text(text))
                 y -= 10
                 c.line(left, y, right, y)
                 y -= 8
-                c.setFont('Helvetica', 9)
+                c.setFont(body_font, 9)
 
             # Calculate the maximum height needed for this row across all columns
             max_height = 0
@@ -8530,13 +8655,13 @@ def export_reports_pdf():
             # Calculate height for each column
             for i, (data, width) in enumerate(zip(row_data, col_widths)):
                 if data:
-                    lines = wrap_text(str(data), width, 'Helvetica', 9)
+                    lines = wrap_text(str(data), width, body_font, 9)
                     max_height = max(max_height, len(lines) * 10)
             
             # Draw each column with wrapping
             for i, (data, width) in enumerate(zip(row_data, col_widths)):
                 if data:
-                    lines = wrap_text(str(data), width, 'Helvetica', 9)
+                    lines = wrap_text(str(data), width, body_font, 9)
                     for j, line in enumerate(lines):
                         c.drawString(col_x[i], y - (j * 10), line)
             
@@ -8550,7 +8675,8 @@ def export_reports_pdf():
         from flask import make_response
         response = make_response(pdf_value)
         response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = 'attachment; filename=reports.pdf'
+        ts = datetime.now().strftime('%Y-%m-%d_%H-%M')
+        response.headers['Content-Disposition'] = f'attachment; filename=reports_{ts}.pdf'
         response.headers['Content-Length'] = str(len(pdf_value))
         return response
         
