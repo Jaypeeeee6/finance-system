@@ -187,11 +187,20 @@ class PaymentRequest(db.Model):
     # Temporary manager assignment (used when IT staff reassigns manager for specific request)
     temporary_manager_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
     
+    # Archive fields for soft delete
+    is_archived = db.Column(db.Boolean, default=False)  # Whether request is archived
+    archived_at = db.Column(db.DateTime, nullable=True)  # When request was archived
+    archived_by = db.Column(db.String(100), nullable=True)  # Name of user who archived the request
+    archived_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)  # ID of user who archived the request
+    
     # Relationship to User
     user = db.relationship('User', backref='payment_requests', foreign_keys=[user_id])
     
     # Relationship to temporary manager (if assigned)
     temporary_manager = db.relationship('User', foreign_keys=[temporary_manager_id], backref='temporarily_assigned_requests')
+    
+    # Relationship to user who archived the request
+    archiver = db.relationship('User', foreign_keys=[archived_by_user_id], backref='archived_requests')
     
     def to_dict(self):
         """Convert request to dictionary"""

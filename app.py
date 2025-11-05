@@ -1080,9 +1080,11 @@ def get_overdue_requests_count():
         # Get ALL requests that have started finance approval timing but haven't ended
         # Finance approval is still moving if finance_approval_start_time is set
         # and finance_approval_end_time is None
+        # Exclude archived requests
         pending_requests = PaymentRequest.query.filter(
             PaymentRequest.finance_approval_start_time.isnot(None),
-            PaymentRequest.finance_approval_end_time.is_(None)  # Finance approval still moving
+            PaymentRequest.finance_approval_end_time.is_(None),  # Finance approval still moving
+            PaymentRequest.is_archived == False  # Exclude archived requests
         ).all()
         
         overdue_count = 0
@@ -1126,9 +1128,11 @@ def get_overdue_requests():
         # Get ALL requests that have started finance approval timing but haven't ended
         # Finance approval is still moving if finance_approval_start_time is set
         # and finance_approval_end_time is None
+        # Exclude archived requests
         pending_requests = PaymentRequest.query.filter(
             PaymentRequest.finance_approval_start_time.isnot(None),
-            PaymentRequest.finance_approval_end_time.is_(None)  # Finance approval still moving
+            PaymentRequest.finance_approval_end_time.is_(None),  # Finance approval still moving
+            PaymentRequest.is_archived == False  # Exclude archived requests
         ).all()
         
         overdue_requests = []
@@ -1195,10 +1199,12 @@ def check_finance_approval_timing_alerts():
         current_time = datetime.utcnow()
         
         # Get all requests that are pending finance approval and have started timing
+        # Exclude archived requests
         pending_requests = PaymentRequest.query.filter(
             PaymentRequest.status == 'Pending Finance Approval',
             PaymentRequest.finance_approval_start_time.isnot(None),
-            PaymentRequest.finance_approval_end_time.is_(None)  # Not yet completed
+            PaymentRequest.finance_approval_end_time.is_(None),  # Not yet completed
+            PaymentRequest.is_archived == False  # Exclude archived requests
         ).all()
         
         for request in pending_requests:
@@ -1680,7 +1686,8 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'status_changed',
                         'proof_required', 'recurring_approved', 'request_completed', 'installment_paid',
-                        'user_created', 'user_updated', 'user_deleted', 'finance_note_added'
+                        'user_created', 'user_updated', 'user_deleted', 'finance_note_added',
+                        'request_archived', 'request_restored'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -1692,7 +1699,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
         ).order_by(Notification.created_at.desc())
 
     elif user.role == 'IT Staff':
-        # IT Staff: Updates on their own requests + system-wide + user management
+        # IT Staff: Updates on their own requests + system-wide + user management + request archives
         query = Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
@@ -1700,7 +1707,8 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'status_changed',
                         'proof_required', 'recurring_approved', 'request_completed', 'installment_paid',
-                        'user_created', 'user_updated', 'user_deleted', 'finance_note_added'
+                        'user_created', 'user_updated', 'user_deleted', 'finance_note_added',
+                        'request_archived', 'request_restored'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -1877,7 +1885,7 @@ def get_unread_count_for_user(user):
                             Notification.message.contains('IT')
                         )
                     ),
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -1885,13 +1893,13 @@ def get_unread_count_for_user(user):
         ).count()
     
     elif user.role == 'IT Staff':
-        # IT Staff: Updates on their own requests + system-wide + user management
+        # IT Staff: Updates on their own requests + system-wide + user management + request archives
         return Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
                 db.or_(
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
                 )
             )
@@ -2447,14 +2455,15 @@ def department_dashboard():
     if current_user.role in ['Department Manager', 'Operation Manager']:
         # Get requests from their department(s) (including completed/paid ones)
         if current_user.role == 'Operation Manager':
-            # Operation Manager can see ALL departments
-            base_query = PaymentRequest.query
+            # Operation Manager can see ALL departments (exclude archived)
+            base_query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
         elif current_user.department == 'Auditing':
             # Auditing Department Manager can see:
             # 1. All their own requests (regardless of status or department)
             # 2. All requests from Auditing department (as department manager)
             # 3. Completed and Recurring requests from OTHER departments (view-only)
             # 4. Any request where they are the temporary manager
+            # Exclude archived requests
             base_query = PaymentRequest.query.filter(
                 db.or_(
                     PaymentRequest.user_id == current_user.user_id,
@@ -2464,21 +2473,25 @@ def department_dashboard():
                         PaymentRequest.department != 'Auditing',
                         PaymentRequest.status.in_(['Completed', 'Recurring'])
                     )
-                )
+                ),
+                PaymentRequest.is_archived == False
             )
         else:
             # Other Department Managers can see ALL their department's requests
             # plus any request where they are the temporary manager
+            # Exclude archived requests
             base_query = PaymentRequest.query.filter(
                 db.or_(
                     PaymentRequest.department == current_user.department,
                     PaymentRequest.temporary_manager_id == current_user.user_id
-                )
+                ),
+                PaymentRequest.is_archived == False
             )
     elif current_user.department == 'Auditing' and current_user.role == 'Auditing Staff':
         # Auditing Staff can see:
         # 1. All their own requests (regardless of status or department)
         # 2. Completed and Recurring requests from OTHER departments (view-only)
+        # Exclude archived requests
         base_query = PaymentRequest.query.filter(
             db.or_(
                 PaymentRequest.user_id == current_user.user_id,
@@ -2486,11 +2499,15 @@ def department_dashboard():
                     PaymentRequest.department != 'Auditing',
                     PaymentRequest.status.in_(['Completed', 'Recurring'])
                 )
-            )
+            ),
+            PaymentRequest.is_archived == False
         )
     else:
-        # For regular users, show their own requests
-        base_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
+        # For regular users, show their own requests (exclude archived)
+        base_query = PaymentRequest.query.filter(
+            PaymentRequest.user_id == current_user.user_id,
+            PaymentRequest.is_archived == False
+        )
     
     # Exclude CEO-submitted requests for non-authorized roles (visibility hardening)
     if current_user.role not in ['Finance Admin', 'GM', 'Operation Manager']:
@@ -2677,8 +2694,11 @@ def department_dashboard():
     notifications = get_notifications_for_user(current_user)
     unread_count = get_unread_count_for_user(current_user)
     
-    # Get user's own requests for the My Requests tab
-    my_requests_query = PaymentRequest.query.filter(PaymentRequest.user_id == current_user.user_id)
+    # Get user's own requests for the My Requests tab (exclude archived)
+    my_requests_query = PaymentRequest.query.filter(
+        PaymentRequest.user_id == current_user.user_id,
+        PaymentRequest.is_archived == False
+    )
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -2754,7 +2774,8 @@ def admin_dashboard():
                     PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager']),
                     PaymentRequest.user.has(User.role.in_(special_submitter_roles))
                 )
-            )
+            ),
+            PaymentRequest.is_archived == False
         )
     else:
         # Other Finance Admins only see finance-related statuses plus temporary assignments awaiting manager approval
@@ -2767,7 +2788,8 @@ def admin_dashboard():
                     PaymentRequest.status == 'Pending Manager Approval',
                     PaymentRequest.temporary_manager_id == current_user.user_id
                 )
-            )
+            ),
+            PaymentRequest.is_archived == False
         )
     
     # Apply department filter (before tab filtering)
@@ -2837,8 +2859,11 @@ def admin_dashboard():
     # Get overdue requests count
     overdue_count = get_overdue_requests_count()
     
-    # Get user's own requests for the My Requests tab
-    my_requests_query = PaymentRequest.query.filter(PaymentRequest.user_id == current_user.user_id)
+    # Get user's own requests for the My Requests tab (exclude archived)
+    my_requests_query = PaymentRequest.query.filter(
+        PaymentRequest.user_id == current_user.user_id,
+        PaymentRequest.is_archived == False
+    )
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -2884,23 +2909,27 @@ def finance_dashboard():
     # Abdalaziz can see finance-related statuses + Pending Manager Approval + Rejected by Manager for Finance department only (or his own requests)
     finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
     
-    # Base query for finance-related statuses
-    query = PaymentRequest.query.filter(PaymentRequest.status.in_(finance_statuses))
+    # Base query for finance-related statuses (exclude archived)
+    query = PaymentRequest.query.filter(
+        PaymentRequest.status.in_(finance_statuses),
+        PaymentRequest.is_archived == False
+    )
     # Visibility hardening: Finance Staff must not see CEO-submitted requests
     if current_user.role == 'Finance Staff':
         query = query.filter(~PaymentRequest.user.has(User.role == 'CEO'))
     
-    # Add Finance Staff's own requests with Pending Manager Approval and Rejected by Manager
+    # Add Finance Staff's own requests with Pending Manager Approval and Rejected by Manager (exclude archived)
     if current_user.role == 'Finance Staff':
         own_pending_requests = PaymentRequest.query.filter(
             db.and_(
                 PaymentRequest.user_id == current_user.user_id,
-                PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager'])
+                PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager']),
+                PaymentRequest.is_archived == False
             )
         )
         query = query.union(own_pending_requests)
     
-    # Add Abdalaziz's special permissions: Finance department requests OR his own requests
+    # Add Abdalaziz's special permissions: Finance department requests OR his own requests (exclude archived)
     elif current_user.name == 'Abdalaziz Al-Brashdi':
         abdalaziz_special_requests = PaymentRequest.query.filter(
             db.and_(
@@ -2908,10 +2937,12 @@ def finance_dashboard():
                 db.or_(
                     PaymentRequest.department == 'Finance',
                     PaymentRequest.user_id == current_user.user_id
-                )
+                ),
+                PaymentRequest.is_archived == False
             )
         )
         query = query.union(abdalaziz_special_requests)
+    
     # Apply department filter (before tab filtering)
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
@@ -2980,8 +3011,11 @@ def finance_dashboard():
     # Get overdue requests count
     overdue_count = get_overdue_requests_count()
     
-    # Get user's own requests for the My Requests tab
-    my_requests_query = PaymentRequest.query.filter(PaymentRequest.user_id == current_user.user_id)
+    # Get user's own requests for the My Requests tab (exclude archived)
+    my_requests_query = PaymentRequest.query.filter(
+        PaymentRequest.user_id == current_user.user_id,
+        PaymentRequest.is_archived == False
+    )
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -3019,7 +3053,8 @@ def gm_dashboard():
     
     # Build query with optional department and search filters
     # GM can see ALL requests from ALL departments including rejected by manager
-    query = PaymentRequest.query
+    # Exclude archived requests
+    query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     if search_query:
@@ -3075,8 +3110,8 @@ def gm_dashboard():
             page=page, per_page=per_page, error_out=False
         )
     
-    # Calculate statistics (all requests from all departments)
-    all_requests = PaymentRequest.query.all()
+    # Calculate statistics (all requests from all departments - exclude archived)
+    all_requests = PaymentRequest.query.filter(PaymentRequest.is_archived == False).all()
     total_requests = len(all_requests)
     approved = len([r for r in all_requests if r.status == 'Approved'])
     pending = len([r for r in all_requests if r.status == 'Pending'])
@@ -3111,8 +3146,11 @@ def gm_dashboard():
     rejected_requests = rejected_query.order_by(get_rejected_datetime_order()).all()
     recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
     
-    # Get user's own requests for the My Requests tab
-    my_requests_query = PaymentRequest.query.filter(PaymentRequest.user_id == current_user.user_id)
+    # Get user's own requests for the My Requests tab (exclude archived)
+    my_requests_query = PaymentRequest.query.filter(
+        PaymentRequest.user_id == current_user.user_id,
+        PaymentRequest.is_archived == False
+    )
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -3280,10 +3318,15 @@ def it_dashboard():
     # Build query with optional department and search filters
     if current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT'):
         # IT users and IT Department Managers see all requests (sensitive fields masked in UI)
-        query = PaymentRequest.query
+        # Exclude archived requests
+        query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
     else:
         # Other users should not see requests that are still pending manager approval
-        query = PaymentRequest.query.filter(PaymentRequest.status != 'Pending Manager Approval')
+        # Exclude archived requests
+        query = PaymentRequest.query.filter(
+            PaymentRequest.status != 'Pending Manager Approval',
+            PaymentRequest.is_archived == False
+        )
     
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
@@ -3342,9 +3385,10 @@ def it_dashboard():
     unread_count = get_unread_count_for_user(current_user)
     
     # Get separate queries for completed, rejected, and recurring requests for tab content
-    completed_query = PaymentRequest.query
-    rejected_query = PaymentRequest.query
-    recurring_query = PaymentRequest.query
+    # Exclude archived requests from all queries
+    completed_query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
+    rejected_query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
+    recurring_query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
     
     if current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT'):
         # IT users and IT Department Managers see all requests
@@ -3368,8 +3412,11 @@ def it_dashboard():
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
     recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
     
-    # Get user's own requests for the My Requests tab
-    my_requests_query = PaymentRequest.query.filter(PaymentRequest.user_id == current_user.user_id)
+    # Get user's own requests for the My Requests tab (exclude archived)
+    my_requests_query = PaymentRequest.query.filter(
+        PaymentRequest.user_id == current_user.user_id,
+        PaymentRequest.is_archived == False
+    )
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -3426,6 +3473,192 @@ def it_dashboard():
                          rejected_requests=rejected_requests,
                          recurring_requests=recurring_requests,
                          active_tab=tab)
+
+
+@app.route('/it/archives')
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def archives():
+    """Archives page for IT department - shows archived requests"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    department_filter = request.args.get('department', None)
+    status_filter = request.args.get('status', None)
+    search_query = request.args.get('search', None)
+    urgent_filter = request.args.get('urgent', None)
+    
+    # Validate per_page to prevent abuse
+    if per_page not in [10, 20, 50, 100]:
+        per_page = 10
+    
+    # Build query for archived requests only
+    query = PaymentRequest.query.filter(PaymentRequest.is_archived == True)
+    
+    # Apply filters
+    if department_filter:
+        query = query.filter(PaymentRequest.department == department_filter)
+    
+    if search_query:
+        # Search by request ID or requestor name
+        try:
+            search_id = int(search_query)
+            query = query.filter(PaymentRequest.request_id == search_id)
+        except ValueError:
+            search_term = f'%{search_query}%'
+            query = query.filter(
+                PaymentRequest.requestor_name.ilike(search_term)
+            )
+    
+    if urgent_filter:
+        if urgent_filter == 'urgent':
+            query = query.filter(PaymentRequest.is_urgent == True)
+        elif urgent_filter == 'not_urgent':
+            query = query.filter(PaymentRequest.is_urgent == False)
+    
+    if status_filter:
+        query = query.filter(PaymentRequest.status == status_filter)
+    
+    # Get paginated archived requests
+    requests_pagination = query.order_by(PaymentRequest.archived_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    # Get all departments for the filter dropdown
+    all_departments = db.session.query(RequestType.department).distinct().order_by(RequestType.department).all()
+    departments = []
+    for dept in all_departments:
+        d = dept[0]
+        departments.append('Management' if d == 'General Manager' else d)
+    
+    return render_template('archives.html',
+                         requests=requests_pagination.items,
+                         pagination=requests_pagination,
+                         departments=departments,
+                         user=current_user,
+                         department_filter=department_filter,
+                         status_filter=status_filter,
+                         search_query=search_query,
+                         urgent_filter=urgent_filter)
+
+
+@app.route('/request/<int:request_id>/restore', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def restore_request(request_id):
+    """Restore an archived payment request (IT only)"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    req = PaymentRequest.query.get_or_404(request_id)
+    
+    # Check if request is archived
+    if not req.is_archived:
+        flash(f'Payment request #{request_id} is not archived.', 'warning')
+        return redirect(url_for('archives'))
+    
+    # Resume any paused approval timing when restoring
+    # If timing was paused (end_time was set during archiving), resume it from where it left off
+    # We adjust the start_time to account for the pause duration, so elapsed time continues correctly
+    
+    # Store archived_at before clearing it (needed for timing check)
+    archived_at_time = req.archived_at
+    restore_time = datetime.utcnow()
+    
+    # Resume manager approval timing if it was paused
+    if req.manager_approval_start_time and req.manager_approval_end_time:
+        # Check if end_time was set during archiving (close to archived_at time)
+        if archived_at_time and abs((req.manager_approval_end_time - archived_at_time).total_seconds()) < 60:
+            # Timing was paused during archiving - calculate elapsed time and adjust start_time
+            # Elapsed time = time from start to when it was paused
+            elapsed_time = req.manager_approval_end_time - req.manager_approval_start_time
+            # Adjust start_time so elapsed time calculation continues from where it left off
+            # New start_time = now - elapsed_time (so elapsed = now - new_start = elapsed_time + time_since_restore)
+            req.manager_approval_start_time = restore_time - elapsed_time
+            req.manager_approval_end_time = None  # Clear end_time to resume timing
+            print(f"DEBUG: Resumed manager approval timing for request #{request_id} (elapsed: {elapsed_time.total_seconds()}s)")
+    
+    # Resume finance approval timing if it was paused
+    if req.finance_approval_start_time and req.finance_approval_end_time:
+        # Check if end_time was set during archiving (close to archived_at time)
+        if archived_at_time and abs((req.finance_approval_end_time - archived_at_time).total_seconds()) < 60:
+            # Timing was paused during archiving - calculate elapsed time and adjust start_time
+            # Elapsed time = time from start to when it was paused
+            elapsed_time = req.finance_approval_end_time - req.finance_approval_start_time
+            # Adjust start_time so elapsed time calculation continues from where it left off
+            # New start_time = now - elapsed_time (so elapsed = now - new_start = elapsed_time + time_since_restore)
+            req.finance_approval_start_time = restore_time - elapsed_time
+            req.finance_approval_end_time = None  # Clear end_time to resume timing
+            print(f"DEBUG: Resumed finance approval timing for request #{request_id} (elapsed: {elapsed_time.total_seconds()}s)")
+    
+    # Restore the request
+    req.is_archived = False
+    req.archived_at = None
+    req.archived_by = None
+    req.archived_by_user_id = None
+    
+    db.session.commit()
+    
+    log_action(f"Restored payment request #{request_id}")
+    
+    # Notify all IT department users about the restore
+    it_users = User.query.filter(
+        db.or_(
+            User.role == 'IT Staff',
+            db.and_(User.role == 'Department Manager', User.department == 'IT')
+        )
+    ).all()
+    
+    print(f"DEBUG: Found {len(it_users)} IT department users for restore notification")
+    for u in it_users:
+        print(f"DEBUG: IT user: {u.username} (ID: {u.user_id}, Role: {u.role}, Dept: {u.department})")
+    
+    # Exclude the user who restored (they already know)
+    it_users_to_notify = [user for user in it_users if user.user_id != current_user.user_id]
+    
+    print(f"DEBUG: Will notify {len(it_users_to_notify)} IT users about restore (excluding restorer: {current_user.username})")
+    
+    notification_title = "Payment Request Restored"
+    notification_message = f"Payment request #{request_id} submitted by {req.requestor_name} has been restored by {current_user.name}."
+    
+    for it_user in it_users_to_notify:
+        print(f"DEBUG: Creating restore notification for IT user: {it_user.username} (ID: {it_user.user_id})")
+        create_notification(
+            user_id=it_user.user_id,
+            title=notification_title,
+            message=notification_message,
+            notification_type="request_restored",
+            request_id=request_id
+        )
+    
+    # Emit real-time notification to all users after creating database notifications
+    if it_users_to_notify:
+        try:
+            socketio.emit('new_notification', {
+                'title': notification_title,
+                'message': notification_message,
+                'type': 'request_restored',
+                'request_id': request_id
+            }, room='all_users')
+            
+            # Also emit a general update event to trigger notification count updates
+            socketio.emit('notification_update', {
+                'action': 'new_notification',
+                'type': 'request_restored'
+            }, room='all_users')
+            
+            print(f"DEBUG: WebSocket events emitted for request_restored")
+        except Exception as e:
+            print(f"Error emitting WebSocket notification: {e}")
+    
+    flash(f'Payment request #{request_id} has been restored.', 'success')
+    return redirect(url_for('archives'))
 
 
 # ==================== REQUEST TYPES MANAGEMENT ROUTES ====================
@@ -4052,15 +4285,25 @@ def project_dashboard():
         per_page = 10
     
     # Build query with optional status and search filters
+    # Exclude archived requests from all queries
     if current_user.role == 'Project Staff':
         # Project Staff see only their own requests
-        query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
+        query = PaymentRequest.query.filter(
+            PaymentRequest.user_id == current_user.user_id,
+            PaymentRequest.is_archived == False
+        )
     elif current_user.role == 'Department Manager' and current_user.department == 'Project':
         # Project Manager sees all requests from Project department
-        query = PaymentRequest.query.filter(PaymentRequest.department == 'Project')
+        query = PaymentRequest.query.filter(
+            PaymentRequest.department == 'Project',
+            PaymentRequest.is_archived == False
+        )
     else:
         # Fallback - should not happen due to role_required decorator
-        query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
+        query = PaymentRequest.query.filter(
+            PaymentRequest.user_id == current_user.user_id,
+            PaymentRequest.is_archived == False
+        )
     # Only apply status_filter for non-all tabs (All Requests tab shows all statuses)
     if status_filter and tab != 'all':
         query = query.filter(PaymentRequest.status == status_filter)
@@ -4121,21 +4364,49 @@ def project_dashboard():
     unread_count = get_unread_count_for_user(current_user)
     
     # Get separate queries for completed, rejected, and recurring requests for tab content
+    # Exclude archived requests from all queries
     if current_user.role == 'Project Staff':
         # Project Staff see only their own requests
-        completed_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
-        rejected_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
-        recurring_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
+        completed_query = PaymentRequest.query.filter(
+            PaymentRequest.user_id == current_user.user_id,
+            PaymentRequest.is_archived == False
+        )
+        rejected_query = PaymentRequest.query.filter(
+            PaymentRequest.user_id == current_user.user_id,
+            PaymentRequest.is_archived == False
+        )
+        recurring_query = PaymentRequest.query.filter(
+            PaymentRequest.user_id == current_user.user_id,
+            PaymentRequest.is_archived == False
+        )
     elif current_user.role == 'Department Manager' and current_user.department == 'Project':
         # Project Manager sees all requests from Project department
-        completed_query = PaymentRequest.query.filter(PaymentRequest.department == 'Project')
-        rejected_query = PaymentRequest.query.filter(PaymentRequest.department == 'Project')
-        recurring_query = PaymentRequest.query.filter(PaymentRequest.department == 'Project')
+        completed_query = PaymentRequest.query.filter(
+            PaymentRequest.department == 'Project',
+            PaymentRequest.is_archived == False
+        )
+        rejected_query = PaymentRequest.query.filter(
+            PaymentRequest.department == 'Project',
+            PaymentRequest.is_archived == False
+        )
+        recurring_query = PaymentRequest.query.filter(
+            PaymentRequest.department == 'Project',
+            PaymentRequest.is_archived == False
+        )
     else:
         # Fallback - should not happen due to role_required decorator
-        completed_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
-        rejected_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
-        recurring_query = PaymentRequest.query.filter_by(user_id=current_user.user_id)
+        completed_query = PaymentRequest.query.filter(
+            PaymentRequest.user_id == current_user.user_id,
+            PaymentRequest.is_archived == False
+        )
+        rejected_query = PaymentRequest.query.filter(
+            PaymentRequest.user_id == current_user.user_id,
+            PaymentRequest.is_archived == False
+        )
+        recurring_query = PaymentRequest.query.filter(
+            PaymentRequest.user_id == current_user.user_id,
+            PaymentRequest.is_archived == False
+        )
     
     completed_query = completed_query.filter(PaymentRequest.status == 'Completed')
     rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
@@ -4181,7 +4452,8 @@ def operation_dashboard():
         per_page = 10
     
     # Build query with optional status, department, and search filters - Operation Manager sees ALL departments
-    query = PaymentRequest.query
+    # Exclude archived requests
+    query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
     
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
@@ -4266,8 +4538,11 @@ def operation_dashboard():
     completed_requests = completed_query.order_by(get_completed_datetime_order()).all()
     rejected_requests = rejected_query.order_by(get_rejected_datetime_order()).all()
     
-    # Get user's own requests for the My Requests tab
-    my_requests_query = PaymentRequest.query.filter(PaymentRequest.user_id == current_user.user_id)
+    # Get user's own requests for the My Requests tab (exclude archived)
+    my_requests_query = PaymentRequest.query.filter(
+        PaymentRequest.user_id == current_user.user_id,
+        PaymentRequest.is_archived == False
+    )
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -4934,6 +5209,13 @@ def view_request(request_id):
     req = PaymentRequest.query.options(
         db.joinedload(PaymentRequest.user)
     ).get_or_404(request_id)
+    
+    # If request is archived, only IT department can view it (they can access via archives page)
+    if req.is_archived:
+        it_allowed = (current_user.role == 'IT Staff') or (current_user.role == 'Department Manager' and current_user.department == 'IT')
+        if not it_allowed:
+            flash('This request has been archived and is only accessible from the Archives page (IT Department only).', 'warning')
+            return redirect(url_for('dashboard'))
     
     # Hard restriction: CEO requests are viewable by Finance Admins, GM, Operation Manager, IT roles, or the CEO themself
     if getattr(req.user, 'role', None) == 'CEO':
@@ -7037,117 +7319,201 @@ def reassign_manager(request_id):
 @login_required
 @role_required('IT Staff', 'Department Manager')
 def delete_request(request_id):
-    """Delete a payment request (IT only)"""
+    """Archive a payment request (IT only) - soft delete"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
     req = PaymentRequest.query.get_or_404(request_id)
     
-    # Delete associated receipt files if they exist (both requestor and finance admin receipts)
-    import json
-    if req.requestor_receipt_path:
-        try:
-            requestor_receipts = json.loads(req.requestor_receipt_path)
-            for receipt_file in requestor_receipts:
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], receipt_file)
-                if os.path.exists(filepath):
-                    os.remove(filepath)
-        except (json.JSONDecodeError, TypeError):
-            # Handle legacy single file format
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.requestor_receipt_path)
-            if os.path.exists(filepath):
-                os.remove(filepath)
+    # Check if already archived
+    if req.is_archived:
+        flash(f'Payment request #{request_id} is already archived.', 'warning')
+        return redirect(url_for('archives'))
     
-    if req.finance_admin_receipt_path:
-        try:
-            finance_receipts = json.loads(req.finance_admin_receipt_path)
-            for receipt_file in finance_receipts:
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], receipt_file)
-                if os.path.exists(filepath):
-                    os.remove(filepath)
-        except (json.JSONDecodeError, TypeError):
-            # Handle legacy single file format
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.finance_admin_receipt_path)
-            if os.path.exists(filepath):
-                os.remove(filepath)
+    # Pause any ongoing approval timing before archiving
+    archive_time = datetime.utcnow()
     
-    # Also check legacy receipt_path for backwards compatibility
-    if req.receipt_path:
-        try:
-            legacy_receipts = json.loads(req.receipt_path)
-            for receipt_file in legacy_receipts:
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], receipt_file)
-                if os.path.exists(filepath):
-                    os.remove(filepath)
-        except (json.JSONDecodeError, TypeError):
-            # Handle legacy single file format
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.receipt_path)
-            if os.path.exists(filepath):
-                os.remove(filepath)
+    # Pause manager approval timing if in progress
+    if req.manager_approval_start_time and not req.manager_approval_end_time:
+        # Timing was in progress - pause it by setting end_time
+        req.manager_approval_end_time = archive_time
+        # Calculate and store duration
+        if not req.manager_approval_duration_minutes:
+            duration = archive_time - req.manager_approval_start_time
+            req.manager_approval_duration_minutes = int(duration.total_seconds())
+        print(f"DEBUG: Paused manager approval timing for request #{request_id}")
     
-    # Delete related InstallmentEditHistory records first
-    InstallmentEditHistory.query.filter_by(request_id=request_id).delete()
+    # Pause finance approval timing if in progress
+    if req.finance_approval_start_time and not req.finance_approval_end_time:
+        # Timing was in progress - pause it by setting end_time
+        req.finance_approval_end_time = archive_time
+        # Calculate and store duration
+        if not req.finance_approval_duration_minutes:
+            duration = archive_time - req.finance_approval_start_time
+            req.finance_approval_duration_minutes = int(duration.total_seconds())
+        print(f"DEBUG: Paused finance approval timing for request #{request_id}")
     
-    # Delete related RecurringPaymentSchedule records
-    RecurringPaymentSchedule.query.filter_by(request_id=request_id).delete()
+    # Archive the request (soft delete) - keep all files and related records
+    req.is_archived = True
+    req.archived_at = archive_time
+    req.archived_by = current_user.name
+    req.archived_by_user_id = current_user.user_id
     
-    # Delete related LateInstallment records
-    LateInstallment.query.filter_by(request_id=request_id).delete()
-    
-    # Delete related PaidNotification records
-    PaidNotification.query.filter_by(request_id=request_id).delete()
-    
-    # Delete related Notification records
-    Notification.query.filter_by(request_id=request_id).delete()
-    
-    # Delete related FinanceAdminNote records
-    FinanceAdminNote.query.filter_by(request_id=request_id).delete()
-    
-    # Now delete the main request
-    db.session.delete(req)
     db.session.commit()
     
-    log_action(f"Deleted payment request #{request_id}")
-    flash(f'Payment request #{request_id} has been deleted.', 'success')
+    log_action(f"Archived payment request #{request_id}")
+    
+    # Notify all IT department users about the archive
+    it_users = User.query.filter(
+        db.or_(
+            User.role == 'IT Staff',
+            db.and_(User.role == 'Department Manager', User.department == 'IT')
+        )
+    ).all()
+    
+    print(f"DEBUG: Found {len(it_users)} IT department users")
+    for u in it_users:
+        print(f"DEBUG: IT user: {u.username} (ID: {u.user_id}, Role: {u.role}, Dept: {u.department})")
+    
+    # Exclude the user who archived (they already know)
+    it_users_to_notify = [user for user in it_users if user.user_id != current_user.user_id]
+    
+    print(f"DEBUG: Will notify {len(it_users_to_notify)} IT users (excluding archiver: {current_user.username})")
+    
+    notification_title = "Payment Request Archived"
+    notification_message = f"Payment request #{request_id} submitted by {req.requestor_name} has been archived by {current_user.name}."
+    
+    for it_user in it_users_to_notify:
+        print(f"DEBUG: Creating notification for IT user: {it_user.username} (ID: {it_user.user_id})")
+        create_notification(
+            user_id=it_user.user_id,
+            title=notification_title,
+            message=notification_message,
+            notification_type="request_archived",
+            request_id=request_id
+        )
+    
+    # Emit real-time notification to all users after creating database notifications
+    if it_users_to_notify:
+        try:
+            socketio.emit('new_notification', {
+                'title': notification_title,
+                'message': notification_message,
+                'type': 'request_archived',
+                'request_id': request_id
+            }, room='all_users')
+            
+            # Also emit a general update event to trigger notification count updates
+            socketio.emit('notification_update', {
+                'action': 'new_notification',
+                'type': 'request_archived'
+            }, room='all_users')
+            
+            print(f"DEBUG: WebSocket events emitted for request_archived")
+        except Exception as e:
+            print(f"Error emitting WebSocket notification: {e}")
+    
+    flash(f'Payment request #{request_id} has been archived.', 'success')
     return redirect(url_for('it_dashboard'))
 
 @app.route('/bulk-delete-requests', methods=['POST'])
 @login_required
 @role_required('IT Staff', 'Department Manager')
 def bulk_delete_requests():
-    """Bulk delete payment requests (IT only)"""
+    """Bulk archive payment requests (IT only) - soft delete"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
     request_ids = request.form.getlist('request_ids')
     
     if not request_ids:
-        flash('No requests selected for deletion.', 'warning')
+        flash('No requests selected for archiving.', 'warning')
         return redirect(url_for('it_dashboard'))
     
-    deleted_count = 0
+    archived_count = 0
+    already_archived_count = 0
+    archived_requests = []  # Store archived requests for notifications
+    
     for request_id in request_ids:
         try:
             req = PaymentRequest.query.get(int(request_id))
             if req:
-                # Delete associated receipt file if exists
-                if req.receipt_path:
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.receipt_path)
-                    if os.path.exists(filepath):
-                        os.remove(filepath)
+                if req.is_archived:
+                    already_archived_count += 1
+                    continue
                 
-                # Delete related records first
-                InstallmentEditHistory.query.filter_by(request_id=request_id).delete()
-                RecurringPaymentSchedule.query.filter_by(request_id=request_id).delete()
-                LateInstallment.query.filter_by(request_id=request_id).delete()
-                PaidNotification.query.filter_by(request_id=request_id).delete()
-                Notification.query.filter_by(request_id=request_id).delete()
-                FinanceAdminNote.query.filter_by(request_id=request_id).delete()
+                # Archive the request (soft delete) - keep all files and related records
+                req.is_archived = True
+                req.archived_at = datetime.utcnow()
+                req.archived_by = current_user.name
+                req.archived_by_user_id = current_user.user_id
                 
-                # Log the deletion before deleting
-                log_action(f"Bulk deleted payment request #{request_id} - {req.request_type} - {req.purpose}")
-                db.session.delete(req)
-                deleted_count += 1
+                # Store request info for notifications
+                archived_requests.append({
+                    'request_id': request_id,
+                    'requestor_name': req.requestor_name
+                })
+                
+                # Log the archival
+                log_action(f"Bulk archived payment request #{request_id} - {req.request_type} - {req.purpose}")
+                archived_count += 1
         except (ValueError, TypeError):
             continue
     
     db.session.commit()
     
-    flash(f'{deleted_count} payment request(s) have been deleted.', 'success')
+    # Notify all IT department users about bulk archive
+    if archived_count > 0:
+        it_users = User.query.filter(
+            db.or_(
+                User.role == 'IT Staff',
+                db.and_(User.role == 'Department Manager', User.department == 'IT')
+            )
+        ).all()
+        
+        # Exclude the user who archived (they already know)
+        it_users_to_notify = [user for user in it_users if user.user_id != current_user.user_id]
+        
+        # Create notifications for each archived request
+        for archived_req in archived_requests:
+            notification_title = "Payment Request Archived"
+            notification_message = f"Payment request #{archived_req['request_id']} submitted by {archived_req['requestor_name']} has been archived by {current_user.name}."
+            
+            for it_user in it_users_to_notify:
+                create_notification(
+                    user_id=it_user.user_id,
+                    title=notification_title,
+                    message=notification_message,
+                    notification_type="request_archived",
+                    request_id=archived_req['request_id']
+                )
+            
+            # Emit real-time notification for each archived request
+            if it_users_to_notify:
+                try:
+                    socketio.emit('new_notification', {
+                        'title': notification_title,
+                        'message': notification_message,
+                        'type': 'request_archived',
+                        'request_id': archived_req['request_id']
+                    }, room='all_users')
+                    
+                    # Also emit a general update event to trigger notification count updates
+                    socketio.emit('notification_update', {
+                        'action': 'new_notification',
+                        'type': 'request_archived'
+                    }, room='all_users')
+                except Exception as e:
+                    print(f"Error emitting WebSocket notification: {e}")
+    
+    if already_archived_count > 0:
+        flash(f'{archived_count} payment request(s) have been archived. {already_archived_count} were already archived.', 'success')
+    else:
+        flash(f'{archived_count} payment request(s) have been archived.', 'success')
     return redirect(url_for('it_dashboard'))
 
 @app.route('/request/<int:request_id>/mark-installment-paid', methods=['POST'])

@@ -13,6 +13,9 @@
         <a href="{{ url_for('new_request') }}" class="btn btn-primary">
             <i class="fas fa-plus-circle"></i> New Payment Request
         </a>
+        <a href="{{ url_for('archives') }}" class="btn btn-secondary">
+            <i class="fas fa-archive"></i> Archives
+        </a>
     </div>
 
     <div class="dashboard-tabs">
@@ -739,9 +742,14 @@
         <div class="card">
             <div class="card-header">
                 <h2><i class="fas fa-users"></i> User Management</h2>
-                <a href="{{ url_for('new_user') }}" class="btn btn-primary">
-                    <i class="fas fa-user-plus"></i> Add User
-                </a>
+                <div class="header-buttons">
+                    <a href="{{ url_for('new_user') }}" class="btn btn-primary">
+                        <i class="fas fa-user-plus"></i> Add User
+                    </a>
+                    <a href="{{ url_for('manage_users') }}" class="btn btn-secondary">
+                        <i class="fas fa-cog"></i> Manage All Users
+                    </a>
+                </div>
             </div>
             <div class="card-body">
                 {% if users %}
