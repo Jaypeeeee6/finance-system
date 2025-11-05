@@ -18,7 +18,12 @@
                         <select name="request_type" id="request_type" required onchange="handleRequestTypeChange()">
                             <option value="">-- Select Type --</option>
                             {% if available_request_types %}
-                                {% for request_type in available_request_types %}
+                                {# Non-"Others" first #}
+                                {% for request_type in available_request_types | rejectattr('name', 'equalto', 'Others') %}
+                                <option value="{{ request_type.name }}">{{ request_type.name }}</option>
+                                {% endfor %}
+                                {# Ensure "Others" is always last if present #}
+                                {% for request_type in available_request_types | selectattr('name', 'equalto', 'Others') %}
                                 <option value="{{ request_type.name }}">{{ request_type.name }}</option>
                                 {% endfor %}
                             {% else %}

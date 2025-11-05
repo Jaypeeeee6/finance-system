@@ -42,7 +42,12 @@
                         <label for="request_type">Request Type</label>
                         <select name="request_type" id="request_type">
                             <option value="">All Types</option>
-                            {% for request_type in request_types %}
+                            {# Non-"Others" first #}
+                            {% for request_type in request_types | reject('equalto', 'Others') %}
+                            <option value="{{ request_type }}" {% if request.args.get('request_type') == request_type %}selected{% endif %}>{{ request_type }}</option>
+                            {% endfor %}
+                            {# Ensure "Others" is always last if present #}
+                            {% for request_type in request_types | select('equalto', 'Others') %}
                             <option value="{{ request_type }}" {% if request.args.get('request_type') == request_type %}selected{% endif %}>{{ request_type }}</option>
                             {% endfor %}
                         </select>

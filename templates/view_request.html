@@ -422,7 +422,12 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         {% if available_request_types and available_request_types|length > 0 %}
                         <select id="request_type" name="request_type">
                             <option value="">-- Select Type --</option>
-                            {% for rt in available_request_types %}
+                            {# Non-"Others" first #}
+                            {% for rt in available_request_types | rejectattr('name', 'equalto', 'Others') %}
+                                <option value="{{ rt.name }}" {% if base_request_type == rt.name %}selected{% endif %}>{{ rt.name }}</option>
+                            {% endfor %}
+                            {# Ensure "Others" is always last if present #}
+                            {% for rt in available_request_types | selectattr('name', 'equalto', 'Others') %}
                                 <option value="{{ rt.name }}" {% if base_request_type == rt.name %}selected{% endif %}>{{ rt.name }}</option>
                             {% endfor %}
                         </select>
