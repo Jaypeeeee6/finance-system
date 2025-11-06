@@ -3,6 +3,55 @@
 }
 
 @media (max-width: 1280px) {
+    /* Widen main content and dashboard tab area on responsive screens */
+    .main-content { padding-left: 0; padding-right: 0; }
+    .dashboard-container { padding-left: 0; padding-right: 0; }
+
+    /* Ensure tab navigation, filters, and table use full available width */
+    .tab-navigation, .tab-content, .dashboard-container .card {
+        width: 100%;
+    }
+
+    /* Make the primary card span edge-to-edge */
+    .dashboard-container .card {
+        margin-left: 0;
+        margin-right: 0;
+        border-radius: 0;
+    }
+
+    /* Widen ONLY the tabs + requests table section */
+    .dashboard-container .tab-navigation,
+    .dashboard-container .tab-navigation + .card,
+    .dashboard-container .tab-navigation ~ .tab-content {
+        /* Full-bleed widen only this container */
+        width: 100vw;
+        max-width: 100vw;
+        margin-left: calc(50% - 50vw);
+        margin-right: calc(50% - 50vw);
+        box-sizing: border-box;
+    }
+    /* Maintain inner gutters so filters don't hug edges */
+    .dashboard-container .tab-navigation { padding-left: 0.25rem; padding-right: 0.25rem; overflow-x: auto; }
+    .dashboard-container .tab-navigation + .card .card-header,
+    .dashboard-container .tab-navigation + .card .card-body { padding-left: 0.25rem; padding-right: 0.25rem; }
+    /* Push tabs, filters, and heading slightly to the right to avoid cutoff */
+    .dashboard-container .tab-navigation { padding-left: 2.5rem !important; }
+    .dashboard-container .tab-navigation + .card .card-header { padding-left: 3.5rem !important; }
+    .dashboard-container .tab-navigation + .card .card-body > .card-title { margin-left: 3rem !important; }
+    .dashboard-container .tab-navigation + .card .card-header,
+    .dashboard-container .tab-navigation + .card .card-body {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    /* Filters: slightly smaller so they don't overflow edges */
+    .dashboard-container .card-header .form-select {
+        min-width: 140px;
+        max-width: 28vw;
+        font-size: 13px;
+        padding: 6px 10px;
+        padding-right: 32px;
+        flex: 0 1 auto;
+    }
     /* Root scaling so rem-based text and headings shrink on responsive pages */
     html { font-size: 15px; }
 
@@ -26,7 +75,20 @@
         align-items: center;
         order: 2;
         margin-left: auto; /* push bell + hamburger to the right */
+        margin-right: 0.25rem; /* slightly smaller container width */
         position: relative;
+    }
+
+    /* Make the bell button itself a bit more compact on responsive */
+    .notification-bell-container-responsive .notification-bell {
+        padding: 0.4rem 0.6rem;
+        font-size: 1rem;
+        gap: 0.4rem;
+        width: auto;
+    }
+
+    .notification-bell-container-responsive .notification-bell i {
+        font-size: 1.1rem;
     }
 
     .hamburger-menu {
@@ -59,8 +121,8 @@
         top: 100%;
         right: 0;
         left: auto;
-        width: 90vw;
-        max-width: 400px;
+        width: 86vw; /* slightly smaller than before */
+        max-width: 360px;
         margin-top: 0.5rem;
         z-index: 1002;
     }
@@ -68,7 +130,7 @@
     /* --- Tabs: prevent horizontal overflow and enable swipe scroll --- */
     .tab-navigation {
         display: flex;
-        gap: 0.5rem;
+        gap: 0; /* no gaps between tabs on responsive */
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         padding-bottom: 0.25rem;
@@ -91,7 +153,7 @@
     /* --- Dashboard top tabs (Requests, Users, etc.) --- */
     .dashboard-tabs {
         display: flex;
-        gap: 0.5rem;
+        gap: 0;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         padding-bottom: 0.25rem;
@@ -101,6 +163,29 @@
     .dashboard-tabs .tab-btn {
         flex: 0 0 auto;
         white-space: nowrap;
+    }
+
+    /* Non-dashboard pages: add slight side padding to content containers */
+    .main-content > .card,
+    .main-content > section,
+    .main-content > .content-section,
+    .main-content > .container,
+    .main-content > div:not(.dashboard-container):not(.flash-messages):not(.maintenance-banner) {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+        box-sizing: border-box;
+    }
+    /* Pages without tab-navigation (e.g., Reports): give the dashboard-container gutters */
+    .dashboard-container:not(:has(.tab-navigation)) {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    /* Non-dashboard page headings: add side space */
+    .main-content > h1:not(.dashboard-title),
+    .main-content > div:not(.dashboard-container) > h1,
+    .main-content > section > h1 {
+        margin-left: 0.75rem !important;
+        margin-right: 0.75rem !important;
     }
 
     .dashboard-tabs::-webkit-scrollbar { height: 6px; }
@@ -203,6 +288,40 @@
 
 
 @media (max-width: 768px) {
+    /* Even wider feel on smaller devices (no gutters) */
+    .main-content { padding-left: 0; padding-right: 0; }
+    .dashboard-container { padding-left: 0; padding-right: 0; }
+    .tab-navigation, .tab-content, .dashboard-container .card { width: 100%; }
+    .dashboard-container .card { margin-left: 0; margin-right: 0; border-radius: 0; }
+
+    /* Widen ONLY the tabs + requests table section */
+    .dashboard-container .tab-navigation,
+    .dashboard-container .tab-navigation + .card,
+    .dashboard-container .tab-navigation ~ .tab-content {
+        width: 100vw;
+        max-width: 100vw;
+        margin-left: calc(50% - 50vw);
+        margin-right: calc(50% - 50vw);
+        box-sizing: border-box;
+    }
+    .dashboard-container .tab-navigation { padding-left: 0.25rem; padding-right: 0.25rem; overflow-x: auto; }
+    .dashboard-container .tab-navigation + .card .card-header,
+    .dashboard-container .tab-navigation + .card .card-body { padding-left: 0.25rem; padding-right: 0.25rem; }
+    /* Push tabs, filters, and heading slightly to the right to avoid cutoff */
+    .dashboard-container .tab-navigation { padding-left: 2rem !important; }
+    .dashboard-container .tab-navigation + .card .card-header { padding-left: 2.75rem !important; }
+    .dashboard-container .tab-navigation + .card .card-body > .card-title { margin-left: 2.25rem !important; }
+    .dashboard-container .tab-navigation + .card .card-header,
+    .dashboard-container .tab-navigation + .card .card-body { padding-left: 0.4rem; padding-right: 0.4rem; }
+    /* Filters: shrink more on small devices */
+    .dashboard-container .card-header .form-select {
+        min-width: 120px;
+        max-width: 40vw;
+        font-size: 12px;
+        padding: 6px 10px;
+        padding-right: 30px;
+        flex: 0 1 auto;
+    }
     /* Stronger root scaling for tablets/phones */
     html { font-size: 14px; }
 
@@ -225,6 +344,10 @@
         align-items: center;
         gap: 20px;
     }
+
+    /* No gaps between tabs on smaller screens */
+    .tab-navigation { gap: 0 !important; }
+    .dashboard-tabs { gap: 0 !important; }
 
     .pin-modal .pin-modal-body {
         overflow: hidden; /* guard against right-side overflow */
@@ -274,9 +397,64 @@
         order: 2;
         flex: 0 0 100%;
     }
+
+    /* Non-dashboard pages: add slight side padding to content containers */
+    .main-content > .card,
+    .main-content > section,
+    .main-content > .content-section,
+    .main-content > .container,
+    .main-content > div:not(.dashboard-container):not(.flash-messages):not(.maintenance-banner) {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+        box-sizing: border-box;
+    }
+    .dashboard-container:not(:has(.tab-navigation)) {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    .main-content > h1:not(.dashboard-title),
+    .main-content > div:not(.dashboard-container) > h1,
+    .main-content > section > h1 {
+        margin-left: 0.75rem !important;
+        margin-right: 0.75rem !important;
+    }
 }
 
 @media (max-width: 420px) {
+    /* Minimal gutters on very small devices */
+    .main-content { padding-left: 0; padding-right: 0; }
+    .dashboard-container { padding-left: 0; padding-right: 0; }
+    .tab-navigation, .tab-content, .dashboard-container .card { width: 100%; }
+    .dashboard-container .card { margin-left: 0; margin-right: 0; border-radius: 0; }
+
+    /* Widen ONLY the tabs + requests table section */
+    .dashboard-container .tab-navigation,
+    .dashboard-container .tab-navigation + .card,
+    .dashboard-container .tab-navigation ~ .tab-content {
+        width: 100vw;
+        max-width: 100vw;
+        margin-left: calc(50% - 50vw);
+        margin-right: calc(50% - 50vw);
+        box-sizing: border-box;
+    }
+    .dashboard-container .tab-navigation { padding-left: 0.2rem; padding-right: 0.2rem; overflow-x: auto; }
+    .dashboard-container .tab-navigation + .card .card-header,
+    .dashboard-container .tab-navigation + .card .card-body { padding-left: 0.2rem; padding-right: 0.2rem; }
+    /* Push tabs, filters, and heading slightly to the right to avoid cutoff */
+    .dashboard-container .tab-navigation { padding-left: 1.25rem !important; }
+    .dashboard-container .tab-navigation + .card .card-header { padding-left: 1.9rem !important; }
+    .dashboard-container .tab-navigation + .card .card-body > .card-title { margin-left: 1.5rem !important; }
+    .dashboard-container .tab-navigation + .card .card-header,
+    .dashboard-container .tab-navigation + .card .card-body { padding-left: 0.35rem; padding-right: 0.35rem; }
+    /* Filters: tightest sizing for very small devices */
+    .dashboard-container .card-header .form-select {
+        min-width: 110px;
+        max-width: 46vw;
+        font-size: 12px;
+        padding: 5px 9px;
+        padding-right: 28px;
+        flex: 0 1 auto;
+    }
     /* Tightest scaling for very small devices */
     html { font-size: 13px; }
 
@@ -296,6 +474,10 @@
     .pin-modal .pin-timer .timer-svg {
         max-width: 140px;
     }
+
+    /* No gaps between tabs on very small screens */
+    .tab-navigation { gap: 0 !important; }
+    .dashboard-tabs { gap: 0 !important; }
 
     /* Maintain below-heading placement on very small devices */
     .dashboard-header h1 .refresh-indicator,
@@ -319,6 +501,27 @@
     .dashboard-header .dashboard-title .refresh-indicator {
         order: 2;
         flex: 0 0 100%;
+    }
+
+    /* Non-dashboard pages: add slight side padding to content containers */
+    .main-content > .card,
+    .main-content > section,
+    .main-content > .content-section,
+    .main-content > .container,
+    .main-content > div:not(.dashboard-container):not(.flash-messages):not(.maintenance-banner) {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+        box-sizing: border-box;
+    }
+    .dashboard-container:not(:has(.tab-navigation)) {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    .main-content > h1:not(.dashboard-title),
+    .main-content > div:not(.dashboard-container) > h1,
+    .main-content > section > h1 {
+        margin-left: 0.75rem !important;
+        margin-right: 0.75rem !important;
     }
 }
 
