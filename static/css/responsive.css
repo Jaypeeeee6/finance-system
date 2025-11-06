@@ -3,6 +3,23 @@
 }
 
 @media (max-width: 1280px) {
+    /* Root scaling so rem-based text and headings shrink on responsive pages */
+    html { font-size: 15px; }
+
+    /* Global text scaling for responsive layouts */
+    body { font-size: 93%; }
+    /* Headings: ensure they scale down even if base CSS sets px/rem */
+    h1 { font-size: 2.0rem !important; }
+    h2 { font-size: 1.75rem !important; }
+    h3 { font-size: 1.5rem !important; }
+    h4 { font-size: 1.25rem !important; }
+    h5 { font-size: 1.1rem !important; }
+    h6 { font-size: 1.0rem !important; }
+
+    /* Ensure common text elements inherit the scaled size */
+    body, body p, body li, body a, body span, body label, body input, body select, body textarea, body button, body th, body td, body small {
+        font-size: inherit;
+    }
     /* Layout: brand | bell | hamburger */
     .notification-bell-container-responsive {
         display: flex;
@@ -157,10 +174,51 @@
         text-align: center !important;
         width: 100% !important;
     }
+
+    /* Place Real-Time: LIVE below the page title heading on responsive */
+    .dashboard-header h1 .refresh-indicator,
+    .dashboard-header .dashboard-title .refresh-indicator,
+    .dashboard-header > .refresh-indicator {
+        display: block !important;
+        width: 100% !important;
+        margin-top: 0.5rem !important;
+        margin-left: 0 !important;
+    }
+
+    /* Keep icon + title inline; wrap indicator to next line */
+    .dashboard-header h1,
+    .dashboard-header .dashboard-title {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .dashboard-header h1 .refresh-indicator,
+    .dashboard-header .dashboard-title .refresh-indicator {
+        order: 2;
+        flex: 0 0 100%;
+    }
 }
 
 
 @media (max-width: 768px) {
+    /* Stronger root scaling for tablets/phones */
+    html { font-size: 14px; }
+
+    /* Increase scaling on smaller screens */
+    body { font-size: 90%; }
+    /* Headings smaller on narrow screens */
+    h1 { font-size: 1.8rem !important; }
+    h2 { font-size: 1.6rem !important; }
+    h3 { font-size: 1.4rem !important; }
+    h4 { font-size: 1.2rem !important; }
+    h5 { font-size: 1.05rem !important; }
+    h6 { font-size: 0.95rem !important; }
+
+    body, body p, body li, body a, body span, body label, body input, body select, body textarea, body button, body th, body td, body small {
+        font-size: inherit;
+    }
     /* Enter PIN modal: stack vertically and center timer to prevent overflow */
     .pin-modal .pin-content-wrapper {
         flex-direction: column;
@@ -192,11 +250,75 @@
         max-width: 160px;
         height: auto;
     }
+
+    /* Ensure Real-Time: LIVE stays below title on smaller screens */
+    .dashboard-header h1 .refresh-indicator,
+    .dashboard-header .dashboard-title .refresh-indicator,
+    .dashboard-header > .refresh-indicator {
+        display: block !important;
+        width: 100% !important;
+        margin-top: 0.5rem !important;
+        margin-left: 0 !important;
+    }
+
+    .dashboard-header h1,
+    .dashboard-header .dashboard-title {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .dashboard-header h1 .refresh-indicator,
+    .dashboard-header .dashboard-title .refresh-indicator {
+        order: 2;
+        flex: 0 0 100%;
+    }
 }
 
 @media (max-width: 420px) {
+    /* Tightest scaling for very small devices */
+    html { font-size: 13px; }
+
+    /* Tightest scaling for very small devices */
+    body { font-size: 87%; }
+    /* Headings smallest on very small devices */
+    h1 { font-size: 1.6rem !important; }
+    h2 { font-size: 1.45rem !important; }
+    h3 { font-size: 1.3rem !important; }
+    h4 { font-size: 1.15rem !important; }
+    h5 { font-size: 1.0rem !important; }
+    h6 { font-size: 0.9rem !important; }
+
+    body, body p, body li, body a, body span, body label, body input, body select, body textarea, body button, body th, body td, body small {
+        font-size: inherit;
+    }
     .pin-modal .pin-timer .timer-svg {
         max-width: 140px;
+    }
+
+    /* Maintain below-heading placement on very small devices */
+    .dashboard-header h1 .refresh-indicator,
+    .dashboard-header .dashboard-title .refresh-indicator,
+    .dashboard-header > .refresh-indicator {
+        display: block !important;
+        width: 100% !important;
+        margin-top: 0.5rem !important;
+        margin-left: 0 !important;
+    }
+
+    .dashboard-header h1,
+    .dashboard-header .dashboard-title {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .dashboard-header h1 .refresh-indicator,
+    .dashboard-header .dashboard-title .refresh-indicator {
+        order: 2;
+        flex: 0 0 100%;
     }
 }
 
