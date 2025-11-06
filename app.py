@@ -9155,20 +9155,11 @@ def export_reports_pdf():
         # Rows
         c.setFont(body_font, 9)
         row_height = 10
+        bottom_margin = 15 * mm
         for r in result_requests:
-            if y < 15 * mm:  # Reduced from 20mm to fit more rows per page
-                c.showPage()
-                y = top
-                c.setFont(body_font if arabic_font_name else 'Helvetica-Bold', 9)
-                for hx, text in zip(col_x, headers):
-                    c.drawString(hx, y, prepare_text(text))
-                y -= 10
-                c.line(left, y, right, y)
-                y -= 8
-                c.setFont(body_font, 9)
-
-            # Calculate the maximum height needed for this row across all columns
+            # Calculate the maximum height needed for this row across all columns first
             max_height = 0
+            wrapped_lines_per_col = []
             
             # For Person/Company column, show person_company field only
             company_display = r.person_company
@@ -9209,18 +9200,31 @@ def export_reports_pdf():
                 str(r.approver or '')
             ]
             
-            # Calculate height for each column
+            # Pre-wrap and measure to know if the row fits in the remaining space
             for i, (data, width) in enumerate(zip(row_data, col_widths)):
                 if data:
                     lines = wrap_text(str(data), width, body_font, 9)
-                    max_height = max(max_height, len(lines) * 10)
-            
-            # Draw each column with wrapping
-            for i, (data, width) in enumerate(zip(row_data, col_widths)):
-                if data:
-                    lines = wrap_text(str(data), width, body_font, 9)
-                    for j, line in enumerate(lines):
-                        c.drawString(col_x[i], y - (j * 10), line)
+                else:
+                    lines = ['']
+                wrapped_lines_per_col.append(lines)
+                max_height = max(max_height, len(lines) * 10)
+
+            # If the row will overflow the page, create a new page and redraw the header
+            if y - max_height < bottom_margin:
+                c.showPage()
+                y = top
+                c.setFont(body_font if arabic_font_name else 'Helvetica-Bold', 9)
+                for hx, text in zip(col_x, headers):
+                    c.drawString(hx, y, prepare_text(text))
+                y -= 10
+                c.line(left, y, right, y)
+                y -= 8
+                c.setFont(body_font, 9)
+
+            # Draw each column with the precomputed wrapping
+            for i, lines in enumerate(wrapped_lines_per_col):
+                for j, line in enumerate(lines):
+                    c.drawString(col_x[i], y - (j * 10), line)
             
             y -= max_height + 3  # Reduced spacing between rows for more content
 
