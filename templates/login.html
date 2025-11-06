@@ -614,8 +614,14 @@
                     if (index < pinBoxes.length - 1) {
                         pinBoxes[index + 1].focus();
                     } else {
-                        // All boxes filled, focus submit button
-                        submitPinButton.focus();
+                        // Last box filled - automatically submit PIN
+                        const pin = Array.from(pinBoxes).map(box => box.value).join('');
+                        if (pin.length === 4) {
+                            // Small delay to ensure the value is set
+                            setTimeout(() => {
+                                submitPin();
+                            }, 50);
+                        }
                     }
                 } else {
                     this.classList.remove('filled');
@@ -653,9 +659,18 @@
                     }
                 });
                 
-                // Focus appropriate box
-                const nextIndex = Math.min(index + digits.length, pinBoxes.length - 1);
-                pinBoxes[nextIndex].focus();
+                // Check if all 4 digits were pasted and auto-submit
+                const pin = Array.from(pinBoxes).map(box => box.value).join('');
+                if (pin.length === 4) {
+                    // Small delay to ensure all values are set
+                    setTimeout(() => {
+                        submitPin();
+                    }, 50);
+                } else {
+                    // Focus appropriate box
+                    const nextIndex = Math.min(index + digits.length, pinBoxes.length - 1);
+                    pinBoxes[nextIndex].focus();
+                }
             });
         });
 
