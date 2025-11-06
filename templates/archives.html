@@ -148,6 +148,11 @@
                                             <i class="fas fa-undo"></i> Restore
                                         </button>
                                     </form>
+                                    <form method="POST" action="{{ url_for('delete_request_permanently', request_id=req.request_id) }}" style="display: inline;" onsubmit="return confirm('⚠️ WARNING: This will permanently delete request #{{ req.request_id }} from the database. This action CANNOT be undone. The request will be removed from reports, calendar, dashboards, and everywhere else. Are you absolutely sure?')">
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete Permanently">
+                                            <i class="fas fa-trash-alt"></i> Delete Permanently
+                                        </button>
+                                    </form>
                                 </td>
                             </tr>
                             {% endfor %}
