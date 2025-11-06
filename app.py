@@ -8521,7 +8521,7 @@ def export_reports_excel():
         ws['A5'].font = Font(size=12, bold=True)
 
         # Add headers starting from row 7
-        headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver', 'Manager Duration', 'Finance Duration']
+        headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment', 'Scheduled', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver', 'Manager Duration', 'Finance Duration']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=7, column=col, value=header)
             cell.font = Font(bold=True)
@@ -8552,12 +8552,20 @@ def export_reports_excel():
             manager_duration = format_duration(r.manager_approval_duration_minutes)
             finance_duration = format_duration(r.finance_approval_duration_minutes)
             
+            scheduled_date = ''
+            if (not getattr(r, 'recurring', None) or getattr(r, 'recurring', None) != 'Recurring') and getattr(r, 'payment_date', None):
+                try:
+                    scheduled_date = r.payment_date.strftime('%Y-%m-%d')
+                except Exception:
+                    scheduled_date = str(r.payment_date)
+
             row_data = [
                 f"#{r.request_id}",
                 str(r.request_type or ''),
                 str(r.requestor_name or ''),
                 str(r.department or ''),
                 str(r.recurring or 'One-Time'),
+                scheduled_date,
                 f"OMR {to_float(r.amount):.3f}",
                 str(r.branch_name or ''),
                 str(company_display or ''),
@@ -8890,10 +8898,10 @@ def export_reports_pdf():
         
         # Table header
         c.setFont(body_font if arabic_font_name else 'Helvetica-Bold', 9)
-        headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver']
+        headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment', 'Scheduled', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver']
         # Column widths optimized for landscape A4 with proper spacing
-        # [ID, Type, Requestor, Department, Payment, Amount, Branch, Company, Submitted, Approved, Approver]
-        col_widths = [14*mm, 32*mm, 24*mm, 20*mm, 18*mm, 18*mm, 28*mm, 28*mm, 16*mm, 16*mm, 30*mm]  # Increased Approver column width slightly
+        # [ID, Type, Requestor, Department, Payment, Scheduled, Amount, Branch, Company, Submitted, Approved, Approver]
+        col_widths = [14*mm, 30*mm, 22*mm, 18*mm, 16*mm, 18*mm, 18*mm, 26*mm, 26*mm, 16*mm, 16*mm, 28*mm]
         # Calculate column positions based on widths to prevent overlapping
         column_gap = 4 * mm  # slightly larger inter-column gap
         col_x = [left]
@@ -8940,12 +8948,20 @@ def export_reports_pdf():
                 local_end = utc_to_local(r.finance_approval_end_time)
                 finance_end_time_str = f" {local_end.strftime('%H:%M:%S')}"
 
+            scheduled_date = ''
+            if (not getattr(r, 'recurring', None) or getattr(r, 'recurring', None) != 'Recurring') and getattr(r, 'payment_date', None):
+                try:
+                    scheduled_date = r.payment_date.strftime('%Y-%m-%d')
+                except Exception:
+                    scheduled_date = str(r.payment_date)
+
             row_data = [
                 f"#{r.request_id}",
                 str(r.request_type or ''),
                 str(r.requestor_name or ''),
                 str(r.department or ''),
                 str(r.recurring or 'One-Time'),
+                scheduled_date,
                 f"OMR {to_float(r.amount):.3f}",
                 str(r.branch_name or ''),
                 str(company_display or ''),
@@ -9712,7 +9728,7 @@ def admin_calendar():
 @app.route('/api/admin/recurring-events')
 @role_required('Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'IT Department Manager')
 def api_admin_recurring_events():
-    """API endpoint for calendar events (Admin and Project roles)"""
+    """API endpoint for calendar events (recurring + one-time scheduled)."""
     try:
         # Build query for recurring payment requests with Recurring status
         query = PaymentRequest.query.filter(
@@ -9855,17 +9871,78 @@ def api_admin_recurring_events():
                         }
                     })
         
+        # Also include ONE-TIME scheduled payments that the current user is authorized to see
+        def is_authorized_for_one_time(req, user):
+            # Requestor
+            if req.user_id == user.user_id:
+                return True
+            # Temporary manager
+            if getattr(req, 'temporary_manager_id', None) == user.user_id:
+                return True
+            # GM and Operation Manager (global)
+            if user.role in ['GM', 'Operation Manager']:
+                return True
+            # IT Staff and IT Department Manager (global IT access)
+            if user.department == 'IT' and user.role in ['IT Staff', 'Department Manager']:
+                return True
+            # Assigned manager
+            if getattr(req.user, 'manager_id', None) == user.user_id:
+                return True
+            # Department Manager of same department
+            if user.role == 'Department Manager' and user.department == req.department:
+                return True
+            # Finance Admin special rules
+            if user.role == 'Finance Admin':
+                if req.status == 'Pending Finance Approval':
+                    if user.name == 'Abdalaziz Al-Brashdi':
+                        return req.user_id == user.user_id or getattr(req.user, 'manager_id', None) == user.user_id
+                    else:
+                        return req.user_id == user.user_id
+            return False
+
+        one_time_query = PaymentRequest.query.filter(
+            (PaymentRequest.recurring.is_(None)) | (PaymentRequest.recurring != 'Recurring'),
+            PaymentRequest.payment_date.isnot(None)
+        )
+        # Project Staff can only see their department's one-time requests as well
+        if current_user.role == 'Project Staff':
+            one_time_query = one_time_query.filter(PaymentRequest.department == current_user.department)
+        one_time_requests = one_time_query.all()
+
+        for req in one_time_requests:
+            if not is_authorized_for_one_time(req, current_user):
+                continue
+            date_key = req.payment_date.isoformat()
+            if date_key not in events_by_date:
+                events_by_date[date_key] = []
+            events_by_date[date_key].append({
+                'title': f'OMR {float(req.amount):.3f}',
+                'start': req.payment_date.isoformat(),
+                'color': '#0d6efd',  # blue for scheduled one-time
+                'url': f'/request/{req.request_id}',
+                'extendedProps': {
+                    'requestId': req.request_id,
+                    'requestType': req.request_type,
+                    'companyName': req.person_company or req.company_name or 'N/A',
+                    'department': req.department,
+                    'purpose': req.purpose,
+                    'baseAmount': f'OMR {float(req.amount):.3f}',
+                    'remainingAmount': None,
+                    'oneTime': True
+                }
+            })
+
         # Convert grouped events to calendar format
         calendar_events = []
         for date_key, day_events in events_by_date.items():
             # Create a summary event for the day
-            total_amount = sum(float(event['title'].replace('OMR ', '')) for event in day_events)
+            total_amount = sum(float(str(event['title']).replace('OMR ', '')) for event in day_events)
             count = len(day_events)
             
             # Determine the overall color for this date
             # Check if all payments are paid (green), all are late (red), or mixed/due (purple)
-            paid_count = sum(1 for event in day_events if event['color'] == '#2e7d32')
-            late_count = sum(1 for event in day_events if event['color'] == '#d32f2f')
+            paid_count = sum(1 for event in day_events if event.get('color') == '#2e7d32')
+            late_count = sum(1 for event in day_events if event.get('color') == '#d32f2f')
             
             if paid_count == count:
                 # All payments are paid - green

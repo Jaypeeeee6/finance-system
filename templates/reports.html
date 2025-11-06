@@ -199,6 +199,7 @@
                                 <th>Requestor</th>
                                 <th>Department</th>
                                 <th>Payment Type</th>
+                                <th>Scheduled Date</th>
                                 <th>Branch Name</th>
                                 <th>Person/Company</th>
                                 <th>Submitted</th>
@@ -233,6 +234,13 @@
                                 <td>{{ req.requestor_name }}</td>
                                 <td>{{ req.department }}</td>
                                 <td>{{ req.recurring or 'One-Time' }}</td>
+                                <td>
+                                    {% if (not req.recurring or req.recurring != 'Recurring') and req.payment_date %}
+                                        {{ req.payment_date.strftime('%Y-%m-%d') }}
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if req.branch_name %}
                                         <span class="badge badge-primary">{{ req.branch_name }}</span>
