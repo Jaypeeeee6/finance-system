@@ -89,6 +89,114 @@
     .dashboard-tabs::-webkit-scrollbar { height: 6px; }
     .dashboard-tabs::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
     .dashboard-tabs::-webkit-scrollbar-track { background: transparent; }
+
+    /* --- Enter PIN modal responsive layout --- */
+    .pin-modal .pin-content-wrapper {
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .pin-modal .pin-input-section {
+        width: 100%;
+    }
+
+    .pin-modal .pin-timer {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        margin-top: 8px;
+    }
+
+    .pin-modal .pin-timer .timer-svg {
+        max-width: 160px;
+        height: auto;
+    }
+
+    .pin-modal .timer-label {
+        text-align: center;
+        width: 100%;
+    }
+
+    /* Make selectors extra-specific to outrank inline/template styles */
+    #pinModal.pin-modal .pin-modal-body .pin-content-wrapper {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        justify-content: flex-start !important;
+        gap: 16px !important;
+    }
+
+    #pinModal.pin-modal .pin-modal-body .pin-input-section {
+        order: 1 !important;
+        width: 100% !important;
+    }
+
+    #pinModal.pin-modal .pin-modal-body .pin-timer {
+        order: 2 !important;
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin-top: 12px !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    #pinModal.pin-modal .pin-modal-body .pin-timer .timer-svg,
+    #pinModal.pin-modal .pin-modal-body .pin-timer .timer-circle {
+        max-width: 160px !important;
+        height: auto !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+
+    #pinModal.pin-modal .pin-modal-body .timer-label {
+        text-align: center !important;
+        width: 100% !important;
+    }
 }
 
+
+@media (max-width: 768px) {
+    /* Enter PIN modal: stack vertically and center timer to prevent overflow */
+    .pin-modal .pin-content-wrapper {
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .pin-modal .pin-modal-body {
+        overflow: hidden; /* guard against right-side overflow */
+    }
+
+    .pin-modal .pin-input-section {
+        width: 100%;
+    }
+
+    .pin-modal .pin-timer {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        margin-top: 8px;
+    }
+
+    .pin-modal .timer-label {
+        text-align: center;
+        width: 100%;
+    }
+
+    .pin-modal .pin-timer .timer-svg {
+        max-width: 160px;
+        height: auto;
+    }
+}
+
+@media (max-width: 420px) {
+    .pin-modal .pin-timer .timer-svg {
+        max-width: 140px;
+    }
+}
 
