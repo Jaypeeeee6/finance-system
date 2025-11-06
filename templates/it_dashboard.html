@@ -944,7 +944,7 @@
                                     <td>{{ log.log_id }}</td>
                                     <td>{{ log.user.name }}</td>
                                     <td>{{ log.action }}</td>
-                                    <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                    <td>{{ utc_to_local(log.timestamp).strftime('%Y-%m-%d %H:%M:%S') }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
