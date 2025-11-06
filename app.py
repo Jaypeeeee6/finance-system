@@ -1544,7 +1544,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid', 'finance_note_added'
+                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled'
                     ])
                 )
             )
@@ -1567,7 +1567,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         Notification.notification_type.in_([
                             'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                             'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                            'installment_paid', 'finance_note_added'
+                            'installment_paid', 'finance_note_added', 'one_time_payment_scheduled'
                         ])
                     )
                 )
@@ -1587,7 +1587,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         Notification.notification_type.in_([
                             'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                             'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                            'installment_paid', 'finance_note_added'
+                            'installment_paid', 'finance_note_added', 'one_time_payment_scheduled'
                         ]),
                         # new_submission only for GM, Operation Manager, Finance Staff, or CEO (his assigned managers)
                         db.and_(
@@ -1612,7 +1612,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited',
                         'finance_approval_timing_alert', 'finance_approval_timing_recurring',
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
-                        'admin_announcement'
+                        'admin_announcement', 'one_time_payment_scheduled'
                     ])
                 )
             ).order_by(Notification.created_at.desc())
@@ -1627,7 +1627,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid', 'finance_note_added'
+                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -1648,7 +1648,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid'
+                        'installment_paid', 'one_time_payment_scheduled'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -1687,7 +1687,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'request_rejected', 'request_approved', 'proof_uploaded', 'status_changed',
                         'proof_required', 'recurring_approved', 'request_completed', 'installment_paid',
                         'user_created', 'user_updated', 'user_deleted', 'finance_note_added',
-                        'request_archived', 'request_restored'
+                        'request_archived', 'request_restored', 'one_time_payment_scheduled'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -1708,7 +1708,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'request_rejected', 'request_approved', 'proof_uploaded', 'status_changed',
                         'proof_required', 'recurring_approved', 'request_completed', 'installment_paid',
                         'user_created', 'user_updated', 'user_deleted', 'finance_note_added',
-                        'request_archived', 'request_restored'
+                        'request_archived', 'request_restored', 'one_time_payment_scheduled'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -1737,7 +1737,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid', 'finance_note_added'
+                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled'
                     ]),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -1752,7 +1752,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                 Notification.notification_type.in_([
                     'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                     'status_changed', 'recurring_due', 'proof_required', 'recurring_approved',
-                    'request_completed', 'installment_paid', 'finance_note_added'
+                    'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled'
                 ])
             )
         ).order_by(Notification.created_at.desc())
@@ -1838,7 +1838,7 @@ def get_unread_count_for_user(user):
                 Notification.is_read == False,
                 db.or_(
                     Notification.notification_type == 'new_submission',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'finance_note_added']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -1885,7 +1885,7 @@ def get_unread_count_for_user(user):
                             Notification.message.contains('IT')
                         )
                     ),
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'one_time_payment_scheduled']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -1899,7 +1899,7 @@ def get_unread_count_for_user(user):
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
                 db.or_(
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'one_time_payment_scheduled']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
                 )
             )
@@ -1926,7 +1926,7 @@ def get_unread_count_for_user(user):
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
-                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled'])
             )
         ).count()
 
@@ -5359,6 +5359,46 @@ def view_request(request_id):
         ).update({'is_read': True})
         db.session.commit()
     
+    # Determine if current user can schedule a one-time payment date
+    can_schedule_one_time = False
+    one_time_scheduled_by = None
+
+    try:
+        # Authorization for scheduling one-time payment date
+        # 1) If a temporary manager is assigned, only they can schedule
+        if getattr(req, 'temporary_manager_id', None):
+            can_schedule_one_time = (req.temporary_manager_id == current_user.user_id)
+        else:
+            # 2) Global roles
+            if current_user.role in ['GM', 'Operation Manager']:
+                can_schedule_one_time = True
+            # 3) IT department (IT Staff and IT Department Manager)
+            elif current_user.department == 'IT' and current_user.role in ['IT Staff', 'Department Manager']:
+                can_schedule_one_time = True
+            # 4) Assigned manager of the requestor
+            elif getattr(req.user, 'manager_id', None) == current_user.user_id:
+                can_schedule_one_time = True
+            # 5) Department Manager of the same department as the requestor
+            elif current_user.role == 'Department Manager' and current_user.department == req.department:
+                can_schedule_one_time = True
+
+        # Resolve the name of the scheduler from audit logs (latest)
+        if req.payment_date:
+            from models import AuditLog
+            keyword = f"request #{request_id}"
+            log = (
+                AuditLog.query
+                .filter(AuditLog.action.like('%Scheduled one-time payment date%'))
+                .filter(AuditLog.action.like(f"%{keyword}%"))
+                .order_by(AuditLog.timestamp.desc())
+                .first()
+            )
+            if log:
+                one_time_scheduled_by = getattr(log.user, 'name', None) or log.username_snapshot or 'Unknown'
+    except Exception as e:
+        # Fail-safe: do not break view if any of the above fails
+        print(f"DEBUG: Error computing can_schedule_one_time or scheduled_by: {e}")
+
     # Get schedule rows for variable payments - show for Admin review, but only allow payments when approved
     schedule_rows = []
     total_paid_amount = 0
@@ -5617,7 +5657,184 @@ def view_request(request_id):
         cumulative_fields = []
     # Union of current-save markers and cumulative markers
     edited_fields_all = sorted(set(edited_fields) | set(cumulative_fields))
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, was_just_edited=was_just_edited, edited_fields=edited_fields_all)
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, was_just_edited=was_just_edited, edited_fields=edited_fields_all, can_schedule_one_time=can_schedule_one_time, one_time_scheduled_by=one_time_scheduled_by)
+
+
+@app.route('/request/<int:request_id>/schedule_one_time_payment', methods=['POST'])
+@login_required
+def schedule_one_time_payment(request_id):
+    """Allow authorized users to set a payment date for ONE-TIME requests (optional)."""
+    req = PaymentRequest.query.get_or_404(request_id)
+
+    # Only for One-Time requests
+    if req.recurring == 'Recurring':
+        flash('You can only schedule a payment date for one-time requests.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+
+    # Only allowed when request is in these statuses
+    if req.status not in ['Pending Manager Approval', 'Pending Finance Approval']:
+        flash('Payment date can only be scheduled when status is Pending Manager Approval or Pending Finance Approval.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+
+    # Authorization logic mirrors the view logic
+    authorized = False
+    if getattr(req, 'temporary_manager_id', None):
+        authorized = (req.temporary_manager_id == current_user.user_id)
+    else:
+        if current_user.role in ['GM', 'Operation Manager']:
+            authorized = True
+        elif current_user.department == 'IT' and current_user.role in ['IT Staff', 'Department Manager']:
+            authorized = True
+        elif getattr(req.user, 'manager_id', None) == current_user.user_id:
+            authorized = True
+        elif current_user.role == 'Department Manager' and current_user.department == req.department:
+            authorized = True
+
+    if not authorized:
+        flash('You are not authorized to schedule a payment date for this request.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+
+    payment_date_str = request.form.get('payment_date', '').strip()
+    if not payment_date_str:
+        flash('Please select a payment date.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+
+    try:
+        from datetime import datetime as _dt
+        payment_date_val = _dt.strptime(payment_date_str, '%Y-%m-%d').date()
+    except Exception:
+        flash('Invalid payment date format.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+
+    # Persist
+    req.payment_date = payment_date_val
+    req.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    # Audit and realtime
+    log_action(
+        f"Request #{request_id} from {getattr(req.user, 'name', 'Unknown')} in the {req.department} department has been scheduled for {payment_date_val} by {current_user.name}"
+    )
+    
+    # Notify all authorized users
+    try:
+        title = "One-time Payment Date Scheduled"
+        msg = (
+            f"Request #{request_id} from {getattr(req.user, 'name', 'Unknown')} in the {req.department} department "
+            f"has been scheduled for {payment_date_val.strftime('%B %d, %Y')} by {current_user.name}."
+        )
+        notified_user_ids = set()
+
+        def add_user(u):
+            if u and getattr(u, 'user_id', None):
+                notified_user_ids.add(u.user_id)
+
+        # Requestor
+        add_user(req.user)
+
+        # Department Manager of the requestor's department (all in that role/department)
+        try:
+            dept_managers = User.query.filter_by(role='Department Manager', department=req.user.department).all()
+        except Exception:
+            dept_managers = []
+        for u in dept_managers:
+            add_user(u)
+
+        # Assigned Manager (manager_id)
+        if getattr(req.user, 'manager_id', None):
+            assigned_manager = User.query.get(req.user.manager_id)
+            add_user(assigned_manager)
+
+        # General Managers (all)
+        try:
+            gms = User.query.filter_by(role='GM').all()
+        except Exception:
+            gms = []
+        for u in gms:
+            add_user(u)
+
+        # Operation Managers (all)
+        try:
+            opms = User.query.filter_by(role='Operation Manager').all()
+        except Exception:
+            opms = []
+        for u in opms:
+            add_user(u)
+
+        # Temporary Manager (if any)
+        if getattr(req, 'temporary_manager_id', None):
+            temp_manager = User.query.get(req.temporary_manager_id)
+            add_user(temp_manager)
+
+        # Finance Admin notifications (conditional rules)
+        try:
+            finance_admins = User.query.filter_by(role='Finance Admin').all()
+        except Exception:
+            finance_admins = []
+        # Find Abdalaziz specifically
+        abdalaziz = next((u for u in finance_admins if u and u.name == 'Abdalaziz Al-Brashdi'), None)
+        others_finance_admins = [u for u in finance_admins if u and (not abdalaziz or u.user_id != abdalaziz.user_id)]
+
+        # Notify Abdalaziz only if (is requestor OR assigned manager) AND status is PFA
+        if abdalaziz and req.status == 'Pending Finance Approval':
+            if (req.user_id == abdalaziz.user_id) or (getattr(req.user, 'manager_id', None) == abdalaziz.user_id):
+                add_user(abdalaziz)
+
+        # Notify other Finance Admins only if they are the requestor AND status is PFA
+        if req.status == 'Pending Finance Approval':
+            for fa in others_finance_admins:
+                if req.user_id == fa.user_id:
+                    add_user(fa)
+
+        # IT Department: IT Staff + IT Department Managers
+        try:
+            it_staff = User.query.filter_by(department='IT', role='IT Staff').all()
+        except Exception:
+            it_staff = []
+        try:
+            it_mgrs = User.query.filter_by(department='IT', role='Department Manager').all()
+        except Exception:
+            it_mgrs = []
+        for u in it_staff + it_mgrs:
+            add_user(u)
+
+        # Create notifications (deduped)
+        for uid in notified_user_ids:
+            create_notification(
+                user_id=uid,
+                title=title,
+                message=msg,
+                notification_type='one_time_payment_scheduled',
+                request_id=request_id
+            )
+
+        # Emit broadcast signal for clients to refresh notifications
+        try:
+            socketio.emit('new_notification', {
+                'title': title,
+                'message': msg,
+                'type': 'one_time_payment_scheduled',
+                'request_id': request_id
+            }, room='all_users')
+            socketio.emit('notification_update', {
+                'action': 'new_notification',
+                'type': 'one_time_payment_scheduled'
+            }, room='all_users')
+        except Exception as e:
+            print(f"DEBUG: WebSocket emit failed for notifications: {e}")
+    except Exception as e:
+        print(f"DEBUG: Failed to create notifications for schedule_one_time_payment: {e}")
+    try:
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'one_time_payment_scheduled': True,
+            'payment_date': payment_date_val.isoformat()
+        })
+    except Exception as e:
+        print(f"DEBUG: socket emit failed for schedule_one_time_payment: {e}")
+
+    flash('Payment date scheduled successfully.', 'success')
+    return redirect(url_for('view_request', request_id=request_id))
 
 
 @app.route('/request/<int:request_id>/edit', methods=['POST'])
