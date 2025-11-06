@@ -677,6 +677,17 @@
         // Submit PIN button
         submitPinButton.addEventListener('click', submitPin);
 
+        // Prevent Enter from submitting the underlying login form while PIN modal is open
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && pinModal.style.display === 'block') {
+                e.preventDefault();
+                const pin = Array.from(pinBoxes).map(box => box.value).join('');
+                if (pin.length === 4) {
+                    submitPin();
+                }
+            }
+        });
+
         function submitPin() {
             const pin = Array.from(pinBoxes).map(box => box.value).join('');
             
@@ -717,7 +728,11 @@
                 submitPinButton.innerHTML = '<i class="fas fa-check"></i> Submit';
                 
                 if (data.success) {
-                    // PIN is correct - redirect to dashboard
+                    // PIN is correct - store tab session ID if provided
+                    if (data.tab_session_id) {
+                        sessionStorage.setItem('tab_session_id', data.tab_session_id);
+                        sessionStorage.setItem('login_complete', 'true');
+                    }
                     stopTimer();
                     window.location.href = data.redirect_url;
                 } else {

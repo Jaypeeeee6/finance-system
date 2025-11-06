@@ -23,10 +23,15 @@ class Config:
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf', 'doc', 'docx', 'xls', 'xlsx'}
     
     # Session configuration
-    PERMANENT_SESSION_LIFETIME = timedelta(minutes=10)
+    # PERMANENT_SESSION_LIFETIME is only used when session.permanent = True
+    # We use session.permanent = False, so sessions expire on browser close
+    PERMANENT_SESSION_LIFETIME = timedelta(minutes=10)  # Used for idle timeout enforcement only
     SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+    # Ensure session cookie expires when browser closes (no Max-Age or Expires)
+    # When session.permanent = False, Flask should create a session cookie without expiration
+    # But we explicitly ensure this by not setting SESSION_COOKIE_EXPIRES
     
     # Email configuration (Flask-Mail)
     # IMPORTANT: For Gmail, you MUST use an App Password (not your regular password)

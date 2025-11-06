@@ -268,7 +268,7 @@ def enforce_idle_timeout():
         # Skip static files, socket traffic, and login/logout routes
         if request.path.startswith('/static') or request.path.startswith('/socket.io'):
             return None
-        if request.endpoint in ['login', 'logout']:
+        if request.endpoint in ['login', 'logout', 'check_tab_session']:
             return None
         # Allow maintenance endpoints and health checks to pass through
         if request.path.startswith('/maintenance') or request.path.startswith('/health'):
@@ -276,7 +276,23 @@ def enforce_idle_timeout():
 
         if current_user.is_authenticated:
             now_ts = datetime.utcnow().timestamp()
-            last_activity = session.get('last_activity', now_ts)
+            last_activity = session.get('last_activity')
+            session_start = session.get('session_start')
+            tab_session_id = session.get('tab_session_id')
+            
+            # If session doesn't have last_activity, session_start, or tab_session_id, it's a stale session
+            # This can happen if Flask-Login restored a user from an old session cookie or a new tab was opened
+            # Log them out immediately and clear all session data
+            if last_activity is None or session_start is None or tab_session_id is None:
+                try:
+                    logout_user()
+                except Exception:
+                    pass
+                # Clear all session data including Flask-Login's user_id
+                session.clear()
+                flash('Your session has expired. Please log in again.', 'warning')
+                return redirect(url_for('login'))
+            
             idle_seconds = now_ts - float(last_activity)
             # 10 minutes = 600 seconds
             if idle_seconds > 600:
@@ -2093,11 +2109,17 @@ def verify_pin():
             
             # Reset failed login attempts on successful login
             user.reset_failed_login()
-            login_user(user, remember=True)
-            # Mark session as permanent and set activity timestamp
+            login_user(user, remember=False)  # Session-only: expires when browser closes
+            # Set activity timestamp and session start time (session is non-permanent, expires on browser close)
+            # Generate unique tab session ID for tab-specific session tracking
             try:
-                session.permanent = True
-                session['last_activity'] = datetime.utcnow().timestamp()
+                session.permanent = False  # Session cookie expires when browser closes
+                now_ts = datetime.utcnow().timestamp()
+                session['last_activity'] = now_ts
+                session['session_start'] = now_ts  # Track when this session started
+                # Generate unique tab session ID
+                tab_session_id = f"{random.randint(100000, 999999)}{now_ts}{random.randint(100000, 999999)}"
+                session['tab_session_id'] = tab_session_id
             except Exception:
                 pass
             log_action(f"User {username} logged in successfully with email PIN")
@@ -2105,7 +2127,8 @@ def verify_pin():
             return jsonify({
                 'success': True,
                 'message': f'Welcome back, {user.name}!',
-                'redirect_url': url_for('dashboard')
+                'redirect_url': url_for('dashboard'),
+                'tab_session_id': session.get('tab_session_id')
             })
         else:
             # Invalid PIN - increment failed attempts
@@ -2132,7 +2155,7 @@ def verify_pin():
                 })
     
     except Exception as e:
-        app.logger.error(f"PIN verification error: {str(e)}")
+        app.logger.error(f"PIN verification error: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
             'message': 'An error occurred. Please try again.'
@@ -2159,8 +2182,23 @@ def login():
     except Exception as _e:
         # If DB not ready or other issue, continue to login page without blocking
         pass
+    # If user is authenticated but session doesn't have last_activity or session_start, it's a stale session
+    # Clear it and force re-login
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
+        if 'last_activity' not in session or 'session_start' not in session:
+            try:
+                logout_user()
+                # Clear only the session keys we care about, not the entire session
+                # This prevents issues with Flask's session initialization
+                session.pop('last_activity', None)
+                session.pop('session_start', None)
+                session.pop('user_id', None)  # Flask-Login's session key
+                session.pop('_permanent', None)  # Flask's permanent session flag
+            except Exception as e:
+                app.logger.error(f"Error clearing stale session: {str(e)}", exc_info=True)
+            flash('Your session has expired. Please log in again.', 'info')
+        else:
+            return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
         username = request.form.get('username')
@@ -2188,11 +2226,17 @@ def login():
                 app.logger.info(f"System account bypass triggered for {username}")
                 # Reset failed login attempts on successful login
                 user.reset_failed_login()
-                login_user(user, remember=True)
-                # Mark session as permanent and set activity timestamp
+                login_user(user, remember=False)  # Session-only: expires when browser closes
+                # Set activity timestamp and session start time (session is non-permanent, expires on browser close)
+                # Generate unique tab session ID for tab-specific session tracking
                 try:
-                    session.permanent = True
-                    session['last_activity'] = datetime.utcnow().timestamp()
+                    session.permanent = False  # Session cookie expires when browser closes
+                    now_ts = datetime.utcnow().timestamp()
+                    session['last_activity'] = now_ts
+                    session['session_start'] = now_ts  # Track when this session started
+                    # Generate unique tab session ID
+                    tab_session_id = f"{random.randint(100000, 999999)}{now_ts}{random.randint(100000, 999999)}"
+                    session['tab_session_id'] = tab_session_id
                 except Exception:
                     pass
                 app.logger.info(f"System user logged in successfully, redirecting to dashboard")
@@ -2227,11 +2271,17 @@ def login():
                 
                 # Reset failed login attempts on successful login
                 user.reset_failed_login()
-                login_user(user, remember=True)
-                # Mark session as permanent and set activity timestamp
+                login_user(user, remember=False)  # Session-only: expires when browser closes
+                # Set activity timestamp and session start time (session is non-permanent, expires on browser close)
+                # Generate unique tab session ID for tab-specific session tracking
                 try:
-                    session.permanent = True
-                    session['last_activity'] = datetime.utcnow().timestamp()
+                    session.permanent = False  # Session cookie expires when browser closes
+                    now_ts = datetime.utcnow().timestamp()
+                    session['last_activity'] = now_ts
+                    session['session_start'] = now_ts  # Track when this session started
+                    # Generate unique tab session ID
+                    tab_session_id = f"{random.randint(100000, 999999)}{now_ts}{random.randint(100000, 999999)}"
+                    session['tab_session_id'] = tab_session_id
                 except Exception:
                     pass
                 log_action(f"User {username} logged in successfully with email PIN")
@@ -2317,10 +2367,20 @@ def validate_credentials():
             # Generate a random 4-digit PIN
             pin = str(random.randint(1000, 9999))
             
-            # Store PIN in session (not database)
-            session['temp_login_pin'] = generate_password_hash(pin)
-            session['temp_pin_username'] = username
-            session['temp_pin_expires'] = (datetime.utcnow() + timedelta(minutes=app.config.get('PIN_EXPIRY_MINUTES', 5))).timestamp()
+            # Ensure session is properly initialized before storing data
+            try:
+                # Store PIN in session (not database)
+                session['temp_login_pin'] = generate_password_hash(pin)
+                session['temp_pin_username'] = username
+                session['temp_pin_expires'] = (datetime.utcnow() + timedelta(minutes=app.config.get('PIN_EXPIRY_MINUTES', 5))).timestamp()
+                # Mark session as modified to ensure it's saved
+                session.modified = True
+            except Exception as session_error:
+                app.logger.error(f"Error storing PIN in session: {str(session_error)}", exc_info=True)
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to initialize login session. Please try again.'
+                })
             
             # Send PIN via email
             success, message = send_pin_email(user.email, user.name, pin)
@@ -2366,18 +2426,59 @@ def validate_credentials():
                 })
     
     except Exception as e:
+        app.logger.error(f"Validate credentials error: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
             'message': 'An error occurred. Please try again.'
         })
 
 
+@app.route('/check_tab_session', methods=['POST'])
+def check_tab_session():
+    """Check if the client's tab session ID matches the server's session"""
+    try:
+        if not current_user.is_authenticated:
+            return jsonify({'valid': False, 'message': 'Not authenticated'})
+        
+        data = request.get_json()
+        client_tab_session_id = data.get('tab_session_id')
+        server_tab_session_id = session.get('tab_session_id')
+        
+        if not server_tab_session_id:
+            # Server doesn't have a tab session ID - invalidate
+            try:
+                logout_user()
+            except Exception:
+                pass
+            session.clear()
+            return jsonify({'valid': False, 'message': 'Session expired'})
+        
+        if client_tab_session_id != server_tab_session_id:
+            # Tab session IDs don't match - this is a different tab, invalidate
+            try:
+                logout_user()
+            except Exception:
+                pass
+            session.clear()
+            return jsonify({'valid': False, 'message': 'Tab session mismatch'})
+        
+        return jsonify({'valid': True, 'tab_session_id': server_tab_session_id})
+    except Exception as e:
+        app.logger.error(f"Tab session check error: {str(e)}", exc_info=True)
+        return jsonify({'valid': False, 'message': 'Error checking session'})
+
+
 @app.route('/logout')
-@login_required
 def logout():
-    """Logout current user"""
-    log_action(f"User {current_user.username} logged out")
-    logout_user()
+    """Logout current user - allow logout even if not authenticated (for tab session cleanup)"""
+    try:
+        if current_user.is_authenticated:
+            log_action(f"User {current_user.username} logged out")
+            logout_user()
+    except Exception:
+        pass
+    # Clear all session data including tab_session_id
+    session.clear()
     flash('You have been logged out successfully.', 'info')
     return redirect(url_for('login'))
 

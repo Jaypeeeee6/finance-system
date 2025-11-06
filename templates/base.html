@@ -8,8 +8,77 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     {% block extra_css %}{% endblock %}
+    <!-- Tab session validation - must run before page content -->
+    {% if current_user.is_authenticated %}
+    <script>
+    (function(){
+        // IMMEDIATE CHECK - Redirect before page renders if session is invalid
+        const TAB_SESSION_KEY = 'tab_session_id';
+        const serverTabSessionId = '{{ session.get("tab_session_id", "") }}';
+        const storedTabSessionId = sessionStorage.getItem(TAB_SESSION_KEY);
+        
+        // Check if this is a new tab: server has tab_session_id but client doesn't
+        // Exception: If we just logged in (login_complete flag or coming from /login), store it
+        const loginComplete = sessionStorage.getItem('login_complete');
+        const comingFromLogin = document.referrer && document.referrer.includes('/login');
+        
+        if (serverTabSessionId && !storedTabSessionId) {
+            if (loginComplete === 'true' || comingFromLogin) {
+                // We just logged in - store the tab_session_id for this tab
+                sessionStorage.setItem(TAB_SESSION_KEY, serverTabSessionId);
+                sessionStorage.setItem('login_complete', 'true');
+            } else {
+                // New tab detected - server has session but this tab doesn't - redirect to logout
+                sessionStorage.removeItem(TAB_SESSION_KEY);
+                sessionStorage.removeItem('login_complete');
+                window.location.replace("{{ url_for('logout') }}");
+                return; // Prevent further execution
+            }
+        }
+        
+        // If stored ID doesn't match server ID, invalidate
+        if (storedTabSessionId && serverTabSessionId && storedTabSessionId !== serverTabSessionId) {
+            sessionStorage.removeItem(TAB_SESSION_KEY);
+            window.location.replace("{{ url_for('logout') }}");
+            return;
+        }
+        
+        // Validate with server - if invalid, redirect immediately
+        if (storedTabSessionId || serverTabSessionId) {
+            fetch("{{ url_for('check_tab_session') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ tab_session_id: storedTabSessionId || serverTabSessionId }),
+                cache: 'no-cache'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.valid) {
+                    sessionStorage.removeItem(TAB_SESSION_KEY);
+                    window.location.replace("{{ url_for('logout') }}");
+                } else if (data.tab_session_id) {
+                    sessionStorage.setItem(TAB_SESSION_KEY, data.tab_session_id);
+                }
+            })
+            .catch(error => {
+                console.error('Tab session check failed:', error);
+                sessionStorage.removeItem(TAB_SESSION_KEY);
+                window.location.replace("{{ url_for('logout') }}");
+            });
+        }
+    })();
+    </script>
+    <style>
+        /* Hide body content until tab session is validated */
+        body.tab-session-pending {
+            visibility: hidden;
+        }
+    </style>
+    {% endif %}
 </head>
-<body {% if current_user.is_authenticated %}data-user-role="{{ current_user.role }}" data-user-department="{{ current_user.department }}"{% endif %}>
+<body {% if current_user.is_authenticated %}class="tab-session-pending" data-user-role="{{ current_user.role }}" data-user-department="{{ current_user.department }}"{% endif %}>
     {% if current_user.is_authenticated %}
     <nav class="navbar">
         <div class="nav-container">
@@ -195,16 +264,25 @@
     <script src="{{ url_for('static', filename='js/realtime.js') }}"></script>
     <script src="{{ url_for('static', filename='js/multiple-file-upload.js') }}"></script>
     
-    <!-- Inactivity auto-logout (10 minutes) -->
+    <!-- Tab session validation completion and inactivity auto-logout (10 minutes) -->
     {% if current_user.is_authenticated %}
     <script>
     (function(){
+        // Show page content after validation (if we get here, session is valid)
+        document.body.classList.remove('tab-session-pending');
+        
+        // Inactivity auto-logout (10 minutes)
+        const TAB_SESSION_KEY = 'tab_session_id'; // Define here for idle timeout
         let idleTimer = null;
-        const IDLE_LIMIT_MS = 10 * 60 * 1000; // 10 minutes
+        const IDLE_LIMIT_MS = 10 * 60 * 1000; // 10 minutes = 600,000 milliseconds
+        
         const resetTimer = () => {
             if (idleTimer) clearTimeout(idleTimer);
             idleTimer = setTimeout(() => {
-                // Redirect to server logout; server also enforces timeout
+                // User has been idle for 10 minutes - log them out
+                // Clear tab session and redirect to logout
+                sessionStorage.removeItem(TAB_SESSION_KEY);
+                sessionStorage.removeItem('login_complete');
                 window.location.href = "{{ url_for('logout') }}";
             }, IDLE_LIMIT_MS);
         };
@@ -215,6 +293,14 @@
         resetTimer();
         // Also reset when tab becomes visible again
         document.addEventListener('visibilitychange', function(){ if (!document.hidden) resetTimer(); });
+        
+        // Clear tab session when tab is closed (best effort - not always reliable)
+        window.addEventListener('beforeunload', function() {
+            // Try to clear sessionStorage (though this may not always execute)
+            try {
+                sessionStorage.removeItem(TAB_SESSION_KEY);
+            } catch(e) {}
+        });
     })();
     </script>
     {% endif %}
