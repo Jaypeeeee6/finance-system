@@ -3,48 +3,155 @@
 }
 
 @media (max-width: 1280px) {
+    /* Pagination: show info above buttons on responsive */
+    .pagination-container { flex-direction: column; align-items: center; gap: 0.5rem; width: 100%; }
+    .pagination-info { text-align: center; width: 100%; }
+    .pagination { margin-top: 0.25rem; justify-content: center; width: 100%; padding: 0 1rem; }
+    /* Compact list: show prev/next, first/last, current and neighbors; add ellipsis */
+    .pagination .btn { display: none; }
+    .pagination .btn[aria-label="Previous"],
+    .pagination .btn[aria-label="Next"],
+    .pagination .btn.btn-primary, /* active */
+    .pagination .btn.btn-primary + .btn, /* next after active */
+    .pagination .btn:has(+ .btn.btn-primary), /* previous before active */
+    .pagination .btn:first-of-type,
+    .pagination .btn:last-of-type { display: inline-flex; }
+    .pagination::after { content: '…'; display: inline-block; margin: 0 0.4rem; color: var(--secondary-color); }
+    /* Smaller pagination buttons on responsive */
+    .pagination .btn { padding: 0.4rem 0.6rem; min-width: 34px; font-size: 0.8rem; }
+
+    /* Payment Requests table: widen only the Actions column so buttons fit */
+    .table-responsive { overflow-x: auto; padding-right: 6px; }
+    .data-table th:last-child,
+    .data-table td:last-child { min-width: 240px; text-align: center; white-space: nowrap; padding-right: 12px; }
+    /* Strong specificity to ensure Actions column expands on dashboards */
+    .dashboard-container .card-body .table-responsive .data-table th:last-child,
+    .dashboard-container .card-body .table-responsive .data-table td:last-child {
+        min-width: 260px !important;
+        width: 260px !important;
+        max-width: 260px !important;
+        white-space: nowrap !important;
+    }
+    .dashboard-container .card-body .table-responsive .data-table td:last-child form,
+    .dashboard-container .card-body .table-responsive .data-table td:last-child .btn {
+        display: inline-flex !important;
+        vertical-align: middle;
+    }
+    .dashboard-container .card-body .table-responsive .data-table { table-layout: auto !important; }
+    /* Prevent action buttons from stretching full-width */
+    .data-table td:last-child .btn-block { width: auto !important; }
+    .data-table td:last-child .btn { width: auto !important; display: inline-flex !important; }
+    .data-table td:last-child .btn { margin: 0 0.25rem; display: inline-flex; }
+    .data-table td:last-child form { display: inline-block; }
     /* Widen main content and dashboard tab area on responsive screens */
     .main-content { padding-left: 0; padding-right: 0; }
-    .dashboard-container { padding-left: 0; padding-right: 0; }
+    /* Only remove padding from non-IT dashboards - IT dashboard needs full-bleed */
+    .dashboard-container:has(> .tab-navigation) { padding-left: 0; padding-right: 0; }
+    .dashboard-container:has(> .dashboard-tabs) { padding-left: 0; padding-right: 0; }
 
-    /* Ensure tab navigation, filters, and table use full available width */
-    .tab-navigation, .tab-content, .dashboard-container .card {
+    /* Ensure tab navigation, filters, and table use full available width - only for non-IT */
+    .dashboard-container:has(> .tab-navigation) .tab-navigation,
+    .dashboard-container:has(> .tab-navigation) .tab-content,
+    .dashboard-container:has(> .tab-navigation) .card {
         width: 100%;
     }
 
-    /* Make the primary card span edge-to-edge */
-    .dashboard-container .card {
+    /* Make the primary card span edge-to-edge - only for non-IT dashboards */
+    .dashboard-container:has(> .tab-navigation) .card {
         margin-left: 0;
         margin-right: 0;
         border-radius: 0;
     }
 
-    /* Widen ONLY the tabs + requests table section */
-    .dashboard-container .tab-navigation,
-    .dashboard-container .tab-navigation + .card,
-    .dashboard-container .tab-navigation ~ .tab-content {
-        /* Full-bleed widen only this container */
-        width: 100vw;
-        max-width: 100vw;
-        margin-left: calc(50% - 50vw);
-        margin-right: calc(50% - 50vw);
+    /* IT Dashboard: Full-bleed layout for .dashboard-tabs - MUST override conflicting width rules */
+    .dashboard-container .dashboard-tabs,
+    .dashboard-container .dashboard-tabs + .card,
+    .dashboard-container .dashboard-tabs ~ .tab-content {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin-left: calc(50% - 50vw) !important;
+        margin-right: calc(50% - 50vw) !important;
         box-sizing: border-box;
     }
-    /* Maintain inner gutters so filters don't hug edges */
-    .dashboard-container .tab-navigation { padding-left: 0.25rem; padding-right: 0.25rem; overflow-x: auto; }
-    .dashboard-container .tab-navigation + .card .card-header,
-    .dashboard-container .tab-navigation + .card .card-body { padding-left: 0.25rem; padding-right: 0.25rem; }
-    /* Push tabs, filters, and heading slightly to the right to avoid cutoff */
-    .dashboard-container .tab-navigation { padding-left: 2.5rem !important; }
-    .dashboard-container .tab-navigation + .card .card-header { padding-left: 3.5rem !important; }
-    .dashboard-container .tab-navigation + .card .card-body > .card-title { margin-left: 3rem !important; }
-    .dashboard-container .tab-navigation + .card .card-header,
-    .dashboard-container .tab-navigation + .card .card-body {
+    /* IT Dashboard: Maintain inner gutters so filters don't hug edges */
+    .dashboard-container .dashboard-tabs { padding-left: 2.5rem !important; padding-right: 0.25rem; overflow-x: auto; }
+    .dashboard-container .dashboard-tabs + .card .card-header { padding-left: 3.5rem !important; padding-right: 0.25rem; }
+    .dashboard-container .dashboard-tabs + .card .card-body > .card-title { margin-left: 3rem !important; }
+    .dashboard-container .dashboard-tabs + .card .card-header,
+    .dashboard-container .dashboard-tabs + .card .card-body {
         padding-left: 0.5rem;
         padding-right: 0.5rem;
     }
-    /* Filters: slightly smaller so they don't overflow edges */
-    .dashboard-container .card-header .form-select {
+    /* IT Dashboard: Move heading and description slightly to the right */
+    .dashboard-container:has(> .dashboard-tabs) .dashboard-header h1 {
+        padding-left: 2.25rem !important;
+    }
+    .dashboard-container:has(> .dashboard-tabs) .dashboard-header p {
+        padding-left: 2.25rem !important;
+    }
+    
+    /* Dashboard action buttons: Make width smaller and center them */
+    .dashboard-container .dashboard-actions {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+    .dashboard-container .dashboard-actions .btn {
+        width: auto !important;
+        max-width: 92% !important;
+        min-width: 0 !important;
+        flex: 0 1 auto !important;
+    }
+    /* IT Dashboard ONLY: Make buttons wider */
+    .dashboard-container:has(> .dashboard-tabs) .dashboard-actions .btn {
+        max-width: 98% !important;
+    }
+    /* IT Dashboard ONLY: Move buttons to the right (centered in their section) */
+    .dashboard-container:has(> .dashboard-tabs) .dashboard-actions {
+        margin-left: 2.5rem !important;
+    }
+    
+    /* Non-IT Dashboards ONLY: Make buttons wider */
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-actions .btn {
+        max-width: 97% !important;
+    }
+    /* Non-IT Dashboards ONLY: Move buttons to the right */
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-actions {
+        margin-left: 1.5rem !important;
+    }
+    /* Non-IT Dashboards ONLY: Add side padding instead of full-bleed */
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-header,
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-actions {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        overflow-x: auto;
+    }
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation + .card,
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation ~ .tab-content {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation + .card .card-header,
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation + .card .card-body {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    /* Filters: slightly smaller so they don't overflow edges - only for non-IT dashboards */
+    .dashboard-container:has(> .tab-navigation) .card-header .form-select {
+        min-width: 140px;
+        max-width: 28vw;
+        font-size: 13px;
+        padding: 6px 10px;
+        padding-right: 32px;
+        flex: 0 1 auto;
+    }
+    /* IT Dashboard filters keep original sizing */
+    .dashboard-container:has(> .dashboard-tabs) .card-header .form-select {
         min-width: 140px;
         max-width: 28vw;
         font-size: 13px;
@@ -79,16 +186,16 @@
         position: relative;
     }
 
-    /* Make the bell button itself a bit more compact on responsive */
+    /* Make the bell button bigger on responsive */
     .notification-bell-container-responsive .notification-bell {
-        padding: 0.4rem 0.6rem;
-        font-size: 1rem;
-        gap: 0.4rem;
+        padding: 0.7rem 0.9rem;
+        font-size: 1.3rem;
+        gap: 0.6rem;
         width: auto;
     }
 
     .notification-bell-container-responsive .notification-bell i {
-        font-size: 1.1rem;
+        font-size: 1.5rem;
     }
 
     .hamburger-menu {
@@ -288,33 +395,132 @@
 
 
 @media (max-width: 768px) {
+    /* Pagination: stack info above buttons */
+    .pagination-container { flex-direction: column; align-items: center; gap: 0.5rem; width: 100%; }
+    .pagination-info { text-align: center; width: 100%; }
+    .pagination { margin-top: 0.25rem; justify-content: center; width: 100%; padding: 0 1rem; }
+    .pagination .btn { display: none; }
+    .pagination .btn[aria-label="Previous"],
+    .pagination .btn[aria-label="Next"],
+    .pagination .btn.btn-primary,
+    .pagination .btn.btn-primary + .btn,
+    .pagination .btn:has(+ .btn.btn-primary),
+    .pagination .btn:first-of-type,
+    .pagination .btn:last-of-type { display: inline-flex; }
+    .pagination::after { content: '…'; display: inline-block; margin: 0 0.4rem; color: var(--secondary-color); }
+    .pagination .btn { padding: 0.35rem 0.55rem; min-width: 32px; font-size: 0.78rem; }
+
+    /* Ensure action column wide enough on small screens */
+    .table-responsive { overflow-x: auto; padding-right: 6px; }
+    .data-table th:last-child,
+    .data-table td:last-child { min-width: 220px; text-align: center; white-space: nowrap; padding-right: 10px; }
+    .dashboard-container .card-body .table-responsive .data-table th:last-child,
+    .dashboard-container .card-body .table-responsive .data-table td:last-child {
+        min-width: 240px !important;
+        width: 240px !important;
+        max-width: 240px !important;
+        white-space: nowrap !important;
+    }
+    .dashboard-container .card-body .table-responsive .data-table td:last-child .btn { margin: 0 0.2rem; }
+    .data-table td:last-child .btn-block { width: auto !important; }
+    .data-table td:last-child .btn { width: auto !important; display: inline-flex !important; }
+    .data-table td:last-child .btn { margin: 0 0.2rem; }
     /* Even wider feel on smaller devices (no gutters) */
     .main-content { padding-left: 0; padding-right: 0; }
-    .dashboard-container { padding-left: 0; padding-right: 0; }
-    .tab-navigation, .tab-content, .dashboard-container .card { width: 100%; }
-    .dashboard-container .card { margin-left: 0; margin-right: 0; border-radius: 0; }
+    /* Only remove padding from non-IT dashboards - IT dashboard needs full-bleed */
+    .dashboard-container:has(> .tab-navigation) { padding-left: 0; padding-right: 0; }
+    .dashboard-container:has(> .dashboard-tabs) { padding-left: 0; padding-right: 0; }
+    /* Only apply to non-IT dashboards */
+    .dashboard-container:has(> .tab-navigation) .tab-navigation,
+    .dashboard-container:has(> .tab-navigation) .tab-content,
+    .dashboard-container:has(> .tab-navigation) .card { width: 100%; }
+    .dashboard-container:has(> .tab-navigation) .card { margin-left: 0; margin-right: 0; border-radius: 0; }
 
-    /* Widen ONLY the tabs + requests table section */
-    .dashboard-container .tab-navigation,
-    .dashboard-container .tab-navigation + .card,
-    .dashboard-container .tab-navigation ~ .tab-content {
-        width: 100vw;
-        max-width: 100vw;
-        margin-left: calc(50% - 50vw);
-        margin-right: calc(50% - 50vw);
+    /* IT Dashboard: Full-bleed layout for .dashboard-tabs */
+    .dashboard-container .dashboard-tabs,
+    .dashboard-container .dashboard-tabs + .card,
+    .dashboard-container .dashboard-tabs ~ .tab-content {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin-left: calc(50% - 50vw) !important;
+        margin-right: calc(50% - 50vw) !important;
         box-sizing: border-box;
     }
-    .dashboard-container .tab-navigation { padding-left: 0.25rem; padding-right: 0.25rem; overflow-x: auto; }
-    .dashboard-container .tab-navigation + .card .card-header,
-    .dashboard-container .tab-navigation + .card .card-body { padding-left: 0.25rem; padding-right: 0.25rem; }
-    /* Push tabs, filters, and heading slightly to the right to avoid cutoff */
-    .dashboard-container .tab-navigation { padding-left: 2rem !important; }
-    .dashboard-container .tab-navigation + .card .card-header { padding-left: 2.75rem !important; }
-    .dashboard-container .tab-navigation + .card .card-body > .card-title { margin-left: 2.25rem !important; }
-    .dashboard-container .tab-navigation + .card .card-header,
-    .dashboard-container .tab-navigation + .card .card-body { padding-left: 0.4rem; padding-right: 0.4rem; }
-    /* Filters: shrink more on small devices */
-    .dashboard-container .card-header .form-select {
+    .dashboard-container .dashboard-tabs { padding-left: 2rem !important; padding-right: 0.25rem; overflow-x: auto; }
+    .dashboard-container .dashboard-tabs + .card .card-header { padding-left: 2.75rem !important; padding-right: 0.25rem; }
+    .dashboard-container .dashboard-tabs + .card .card-body > .card-title { margin-left: 2.25rem !important; }
+    .dashboard-container .dashboard-tabs + .card .card-header,
+    .dashboard-container .dashboard-tabs + .card .card-body { padding-left: 0.4rem; padding-right: 0.4rem; }
+    /* IT Dashboard: Move heading and description slightly to the right */
+    .dashboard-container:has(> .dashboard-tabs) .dashboard-header h1 {
+        padding-left: 2rem !important;
+    }
+    .dashboard-container:has(> .dashboard-tabs) .dashboard-header p {
+        padding-left: 2rem !important;
+    }
+    
+    /* Dashboard action buttons: Make width smaller and center them */
+    .dashboard-container .dashboard-actions {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.625rem;
+    }
+    .dashboard-container .dashboard-actions .btn {
+        width: auto !important;
+        max-width: 88% !important;
+        min-width: 0 !important;
+        flex: 0 1 auto !important;
+    }
+    /* IT Dashboard ONLY: Make buttons wider */
+    .dashboard-container:has(> .dashboard-tabs) .dashboard-actions .btn {
+        max-width: 96% !important;
+    }
+    /* IT Dashboard ONLY: Move buttons to the right (centered in their section) */
+    .dashboard-container:has(> .dashboard-tabs) .dashboard-actions {
+        margin-left: 2rem !important;
+    }
+    
+    /* Non-IT Dashboards ONLY: Make buttons wider */
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-actions .btn {
+        max-width: 94% !important;
+    }
+    /* Non-IT Dashboards ONLY: Move buttons to the right */
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-actions {
+        margin-left: 1.25rem !important;
+    }
+    /* Non-IT Dashboards ONLY: Add side padding instead of full-bleed */
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-header,
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-actions {
+        padding-left: 0.875rem !important;
+        padding-right: 0.875rem !important;
+    }
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation {
+        padding-left: 0.875rem !important;
+        padding-right: 0.875rem !important;
+        overflow-x: auto;
+    }
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation + .card,
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation ~ .tab-content {
+        padding-left: 0.875rem !important;
+        padding-right: 0.875rem !important;
+    }
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation + .card .card-header,
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation + .card .card-body {
+        padding-left: 0.875rem !important;
+        padding-right: 0.875rem !important;
+    }
+    /* Filters: shrink more on small devices - only for non-IT dashboards */
+    .dashboard-container:has(> .tab-navigation) .card-header .form-select {
+        min-width: 120px;
+        max-width: 40vw;
+        font-size: 12px;
+        padding: 6px 10px;
+        padding-right: 30px;
+        flex: 0 1 auto;
+    }
+    /* IT Dashboard filters keep original sizing */
+    .dashboard-container:has(> .dashboard-tabs) .card-header .form-select {
         min-width: 120px;
         max-width: 40vw;
         font-size: 12px;
@@ -421,33 +627,131 @@
 }
 
 @media (max-width: 420px) {
+    /* Pagination: stack vertically on very small devices */
+    .pagination-container { flex-direction: column; align-items: center; gap: 0.5rem; width: 100%; }
+    .pagination-info { text-align: center; width: 100%; }
+    .pagination { margin-top: 0.25rem; justify-content: center; width: 100%; padding: 0 0.75rem; }
+    .pagination .btn { display: none; }
+    .pagination .btn[aria-label="Previous"],
+    .pagination .btn[aria-label="Next"],
+    .pagination .btn.btn-primary,
+    .pagination .btn.btn-primary + .btn,
+    .pagination .btn:has(+ .btn.btn-primary),
+    .pagination .btn:first-of-type,
+    .pagination .btn:last-of-type { display: inline-flex; }
+    .pagination::after { content: '…'; display: inline-block; margin: 0 0.35rem; color: var(--secondary-color); }
+    .pagination .btn { padding: 0.3rem 0.5rem; min-width: 30px; font-size: 0.75rem; }
+
+    /* Tightest sizing but keep buttons inside */
+    .table-responsive { overflow-x: auto; padding-right: 6px; }
+    .data-table th:last-child,
+    .data-table td:last-child { min-width: 200px; text-align: center; white-space: nowrap; padding-right: 8px; }
+    .dashboard-container .card-body .table-responsive .data-table th:last-child,
+    .dashboard-container .card-body .table-responsive .data-table td:last-child {
+        min-width: 220px !important;
+        width: 220px !important;
+        max-width: 220px !important;
+        white-space: nowrap !important;
+    }
+    .data-table td:last-child .btn { margin: 0 0.15rem; }
+    .data-table td:last-child .btn-block { width: auto !important; }
+    .data-table td:last-child .btn { width: auto !important; display: inline-flex !important; }
     /* Minimal gutters on very small devices */
     .main-content { padding-left: 0; padding-right: 0; }
-    .dashboard-container { padding-left: 0; padding-right: 0; }
-    .tab-navigation, .tab-content, .dashboard-container .card { width: 100%; }
-    .dashboard-container .card { margin-left: 0; margin-right: 0; border-radius: 0; }
+    /* Only remove padding from non-IT dashboards - IT dashboard needs full-bleed */
+    .dashboard-container:has(> .tab-navigation) { padding-left: 0; padding-right: 0; }
+    .dashboard-container:has(> .dashboard-tabs) { padding-left: 0; padding-right: 0; }
+    /* Only apply to non-IT dashboards */
+    .dashboard-container:has(> .tab-navigation) .tab-navigation,
+    .dashboard-container:has(> .tab-navigation) .tab-content,
+    .dashboard-container:has(> .tab-navigation) .card { width: 100%; }
+    .dashboard-container:has(> .tab-navigation) .card { margin-left: 0; margin-right: 0; border-radius: 0; }
 
-    /* Widen ONLY the tabs + requests table section */
-    .dashboard-container .tab-navigation,
-    .dashboard-container .tab-navigation + .card,
-    .dashboard-container .tab-navigation ~ .tab-content {
-        width: 100vw;
-        max-width: 100vw;
-        margin-left: calc(50% - 50vw);
-        margin-right: calc(50% - 50vw);
+    /* IT Dashboard: Full-bleed layout for .dashboard-tabs */
+    .dashboard-container .dashboard-tabs,
+    .dashboard-container .dashboard-tabs + .card,
+    .dashboard-container .dashboard-tabs ~ .tab-content {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin-left: calc(50% - 50vw) !important;
+        margin-right: calc(50% - 50vw) !important;
         box-sizing: border-box;
     }
-    .dashboard-container .tab-navigation { padding-left: 0.2rem; padding-right: 0.2rem; overflow-x: auto; }
-    .dashboard-container .tab-navigation + .card .card-header,
-    .dashboard-container .tab-navigation + .card .card-body { padding-left: 0.2rem; padding-right: 0.2rem; }
-    /* Push tabs, filters, and heading slightly to the right to avoid cutoff */
-    .dashboard-container .tab-navigation { padding-left: 1.25rem !important; }
-    .dashboard-container .tab-navigation + .card .card-header { padding-left: 1.9rem !important; }
-    .dashboard-container .tab-navigation + .card .card-body > .card-title { margin-left: 1.5rem !important; }
-    .dashboard-container .tab-navigation + .card .card-header,
-    .dashboard-container .tab-navigation + .card .card-body { padding-left: 0.35rem; padding-right: 0.35rem; }
-    /* Filters: tightest sizing for very small devices */
-    .dashboard-container .card-header .form-select {
+    .dashboard-container .dashboard-tabs { padding-left: 1.25rem !important; padding-right: 0.2rem; overflow-x: auto; }
+    .dashboard-container .dashboard-tabs + .card .card-header { padding-left: 1.9rem !important; padding-right: 0.2rem; }
+    .dashboard-container .dashboard-tabs + .card .card-body > .card-title { margin-left: 1.5rem !important; }
+    .dashboard-container .dashboard-tabs + .card .card-header,
+    .dashboard-container .dashboard-tabs + .card .card-body { padding-left: 0.35rem; padding-right: 0.35rem; }
+    /* IT Dashboard: Move heading and description slightly to the right */
+    .dashboard-container:has(> .dashboard-tabs) .dashboard-header h1 {
+        padding-left: 1.75rem !important;
+    }
+    .dashboard-container:has(> .dashboard-tabs) .dashboard-header p {
+        padding-left: 1.75rem !important;
+    }
+    
+    /* Dashboard action buttons: Make width smaller and center them */
+    .dashboard-container .dashboard-actions {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    .dashboard-container .dashboard-actions .btn {
+        width: auto !important;
+        max-width: 85% !important;
+        min-width: 0 !important;
+        flex: 0 1 auto !important;
+    }
+    /* IT Dashboard ONLY: Make buttons wider */
+    .dashboard-container:has(> .dashboard-tabs) .dashboard-actions .btn {
+        max-width: 93% !important;
+    }
+    /* IT Dashboard ONLY: Move buttons to the right (centered in their section) */
+    .dashboard-container:has(> .dashboard-tabs) .dashboard-actions {
+        margin-left: 1.5rem !important;
+    }
+    
+    /* Non-IT Dashboards ONLY: Make buttons wider */
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-actions .btn {
+        max-width: 90% !important;
+    }
+    /* Non-IT Dashboards ONLY: Move buttons to the right */
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-actions {
+        margin-left: 1rem !important;
+    }
+    /* Non-IT Dashboards ONLY: Add side padding instead of full-bleed */
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-header,
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-actions {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+        overflow-x: auto;
+    }
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation + .card,
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation ~ .tab-content {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation + .card .card-header,
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation + .card .card-body {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    /* Filters: tightest sizing for very small devices - only for non-IT dashboards */
+    .dashboard-container:has(> .tab-navigation) .card-header .form-select {
+        min-width: 110px;
+        max-width: 46vw;
+        font-size: 12px;
+        padding: 5px 9px;
+        padding-right: 28px;
+        flex: 0 1 auto;
+    }
+    /* IT Dashboard filters keep original sizing */
+    .dashboard-container:has(> .dashboard-tabs) .card-header .form-select {
         min-width: 110px;
         max-width: 46vw;
         font-size: 12px;
@@ -522,6 +826,150 @@
     .main-content > section > h1 {
         margin-left: 0.75rem !important;
         margin-right: 0.75rem !important;
+    }
+}
+
+
+/* --- Overrides for IT dashboard layout (responsive) - only applies to .dashboard-tabs --- */
+@media (max-width: 1280px) {
+    /* IT Dashboard: Full-bleed even if the card is not immediately adjacent */
+    .dashboard-container .dashboard-tabs ~ .card,
+    .dashboard-container .dashboard-tabs ~ .tab-content {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin-left: calc(50% - 50vw) !important;
+        margin-right: calc(50% - 50vw) !important;
+        box-sizing: border-box;
+    }
+    /* IT Dashboard: Push filters/heading when the card is not adjacent */
+    .dashboard-container .dashboard-tabs ~ .card .card-header {
+        padding-left: 3.5rem !important;
+    }
+    .dashboard-container .dashboard-tabs ~ .card .card-body > .card-title {
+        margin-left: 3rem !important;
+    }
+    
+    /* Non-IT Dashboards ONLY: Add padding when card is not adjacent */
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation ~ .card,
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation ~ .tab-content {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation ~ .card .card-header,
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation ~ .card .card-body {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+}
+
+@media (max-width: 768px) {
+    /* IT Dashboard: Full-bleed even if the card is not immediately adjacent */
+    .dashboard-container .dashboard-tabs ~ .card,
+    .dashboard-container .dashboard-tabs ~ .tab-content {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin-left: calc(50% - 50vw) !important;
+        margin-right: calc(50% - 50vw) !important;
+        box-sizing: border-box;
+    }
+    .dashboard-container .dashboard-tabs ~ .card .card-header {
+        padding-left: 2.75rem !important;
+    }
+    .dashboard-container .dashboard-tabs ~ .card .card-body > .card-title {
+        margin-left: 2.25rem !important;
+    }
+    
+    /* Non-IT Dashboards ONLY: Add padding when card is not adjacent */
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation ~ .card,
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation ~ .tab-content {
+        padding-left: 0.875rem !important;
+        padding-right: 0.875rem !important;
+    }
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation ~ .card .card-header,
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation ~ .card .card-body {
+        padding-left: 0.875rem !important;
+        padding-right: 0.875rem !important;
+    }
+}
+
+@media (max-width: 420px) {
+    /* IT Dashboard: Full-bleed even if the card is not immediately adjacent */
+    .dashboard-container .dashboard-tabs ~ .card,
+    .dashboard-container .dashboard-tabs ~ .tab-content {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin-left: calc(50% - 50vw) !important;
+        margin-right: calc(50% - 50vw) !important;
+        box-sizing: border-box;
+    }
+    .dashboard-container .dashboard-tabs ~ .card .card-header {
+        padding-left: 1.9rem !important;
+    }
+    .dashboard-container .dashboard-tabs ~ .card .card-body > .card-title {
+        margin-left: 1.5rem !important;
+    }
+    
+    /* Non-IT Dashboards ONLY: Add padding when card is not adjacent */
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation ~ .card,
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation ~ .tab-content {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation ~ .card .card-header,
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation ~ .card .card-body {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+}
+
+
+/* Full-bleed container only for IT dashboard (.dashboard-tabs) */
+@media (max-width: 1280px) {
+    .dashboard-container:has(> .dashboard-tabs) {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin-left: calc(50% - 50vw) !important;
+        margin-right: calc(50% - 50vw) !important;
+        box-sizing: border-box;
+    }
+}
+@media (max-width: 768px) {
+    .dashboard-container:has(> .dashboard-tabs) {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin-left: calc(50% - 50vw) !important;
+        margin-right: calc(50% - 50vw) !important;
+        box-sizing: border-box;
+    }
+}
+@media (max-width: 420px) {
+    .dashboard-container:has(> .dashboard-tabs) {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin-left: calc(50% - 50vw) !important;
+        margin-right: calc(50% - 50vw) !important;
+        box-sizing: border-box;
+    }
+}
+
+/* Make step tabs same height on responsive screens */
+@media (max-width: 1280px) {
+    .step-tabs {
+        align-items: stretch;
+    }
+    
+    .step-tab {
+        display: flex;
+        align-items: stretch;
+    }
+    
+    .step-tab-content {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 60px;
+        height: 100%;
     }
 }
 

@@ -34,14 +34,28 @@
         <div class="calendar-main">
             <div class="card">
                 <div class="card-body">
-                     <div class="calendar-toolbar">
-                         <div class="legend">
-                             <span class="legend-item"><span class="legend-dot" style="background:#8e24aa"></span> Due</span>
-                             <span class="legend-item"><span class="legend-dot" style="background:#2e7d32"></span> Paid</span>
-                             <span class="legend-item"><span class="legend-dot" style="background:#d32f2f"></span> Late</span>
-                         </div>
-                     </div>
                     <div id="calendar"></div>
+                    <div class="calendar-legend-container">
+                        <div class="calendar-legend">
+                             <div class="legend">
+                                 <span class="legend-item"><span class="legend-dot" style="background:#8e24aa"></span> Due</span>
+                                 <span class="legend-item"><span class="legend-dot" style="background:#2e7d32"></span> Paid</span>
+                                 <span class="legend-item"><span class="legend-dot" style="background:#d32f2f"></span> Late</span>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Responsive Bottom Payment Details Section -->
+            <div class="payment-details-bottom" id="paymentDetailsBottom" style="display: none;">
+                <div class="payment-details-header">
+                    <h5 id="paymentDetailsTitle"><i class="fas fa-credit-card"></i> Payment Due Details</h5>
+                </div>
+                <div class="payment-details-content" id="paymentDetailsContent">
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-calendar-day" style="font-size: 2rem; opacity: 0.3;"></i>
+                        <p class="mt-2">Click on a calendar date to view payment details</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -89,8 +103,11 @@ document.addEventListener('DOMContentLoaded', function() {
     fixedWeekCount: false, // don't force 6 weeks; match actual month length
     showNonCurrentDates: false, // hide prev/next month days in current view
     headerToolbar: {
-      left: 'prev,next today',
+      left: 'prev',
       center: 'title',
+      right: 'next'
+    },
+    footerToolbar: {
       right: 'dayGridMonth,timeGridWeek,timeGridDay'
     },
     dayMaxEventRows: true,
@@ -107,8 +124,12 @@ document.addEventListener('DOMContentLoaded', function() {
        // Show count and status for the day
        const count = arg.event.extendedProps.count || 0;
        
+       // Check if responsive screen
+       const isResponsive = window.innerWidth <= 1280;
+       const paymentText = isResponsive ? '' : ` PAYMENT${count !== 1 ? 'S' : ''}`;
+       
        let innerHtml = `<div class=\"fc-event-main-custom\">
-         <div class=\"amount\">${count} PAYMENT${count !== 1 ? 'S' : ''}</div>
+         <div class=\"amount\">${count}${paymentText}</div>
        </div>`;
        return { html: innerHtml };
      },
@@ -127,6 +148,209 @@ document.addEventListener('DOMContentLoaded', function() {
        if (lateCount > 0) statusDetails += ` (${lateCount} late)`;
        
        info.el.title = `${count} payment${count !== 1 ? 's' : ''} ${status} on ${date}${statusDetails} - Total: ${totalAmount.toFixed(3)} OMR`;
+     },
+     eventClick: function(info) {
+       // Trigger date click when event is clicked - reuse dateClick logic
+       const clickedDate = info.event.startStr;
+       const dateEvent = info.event;
+       
+       // Format the date for display
+       const dateObj = new Date(clickedDate);
+       const formattedDate = dateObj.toLocaleDateString('en-US', { 
+         weekday: 'long', 
+         year: 'numeric', 
+         month: 'long', 
+         day: 'numeric' 
+       });
+       
+       // Check if responsive (mobile) screen
+       const isResponsive = window.innerWidth <= 1280;
+       
+       if (isResponsive) {
+         // Toggle bottom section on responsive screens
+         const bottomSection = document.getElementById('paymentDetailsBottom');
+         const bottomTitle = document.getElementById('paymentDetailsTitle');
+         if (bottomSection && bottomTitle) {
+           // Check if already showing this date
+           const currentTitle = bottomTitle.innerHTML;
+           const newTitle = `<i class="fas fa-calendar-day"></i> Payment Due Details - ${formattedDate}`;
+           
+           if (bottomSection.style.display === 'block' && currentTitle === newTitle) {
+             // Same date clicked - hide the section
+             bottomSection.style.display = 'none';
+             return; // Exit early, don't populate content
+           } else {
+             // Different date or not showing - show the section
+             bottomTitle.innerHTML = newTitle;
+             bottomSection.style.display = 'block';
+             // Scroll to bottom section
+             setTimeout(() => {
+               bottomSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+             }, 100);
+           }
+         }
+       } else {
+         // Update sidebar header for desktop
+         const sidebarHeader = document.querySelector('.sidebar-header h5');
+         if (sidebarHeader) {
+           sidebarHeader.innerHTML = `<i class="fas fa-calendar-day"></i> Payment Due Details - ${formattedDate}`;
+         }
+         // Show close button
+         document.getElementById('closeSidebar').style.display = 'block';
+       }
+       
+       // Get events for this date
+       const events = calendar.getEvents();
+       const dateEventFound = events.find(event => event.startStr === clickedDate);
+       
+       if (dateEventFound && dateEventFound.extendedProps && dateEventFound.extendedProps.events) {
+         const dayEvents = dateEventFound.extendedProps.events;
+         
+         // Check if responsive screen
+         const isResponsive = window.innerWidth <= 1280;
+         
+         if (isResponsive) {
+           // Populate bottom section on responsive screens
+           const bottomContent = document.getElementById('paymentDetailsContent');
+           if (bottomContent) {
+             // Create mobile-friendly event cards
+             let mobileContent = '<div class="payment-events-list-responsive">';
+             
+             dayEvents.forEach((event, index) => {
+               const ep = event.extendedProps || {};
+               
+               // Determine card color based on payment status
+               let cardColor = '#8e24aa'; // purple for due
+               let statusText = 'Due';
+               if (event.color === '#2e7d32') {
+                 cardColor = '#2e7d32'; // green for paid
+                 statusText = 'Paid';
+               } else if (event.color === '#d32f2f') {
+                 cardColor = '#d32f2f'; // red for late
+                 statusText = 'Late';
+               }
+               
+               // Format date range
+               const startDate = new Date(event.start);
+               const endDate = event.end ? new Date(event.end) : startDate;
+               const startDateStr = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+               const endDateStr = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+               const dateRange = startDateStr === endDateStr ? startDateStr : `${startDateStr} - ${endDateStr}`;
+               
+               mobileContent += `
+                 <div class="payment-event-card-responsive" style="border-left: 4px solid ${cardColor};">
+                   <div class="payment-event-header-responsive">
+                     <h6 class="payment-event-title-responsive">${event.title}</h6>
+                     <button class="payment-event-menu-btn"><i class="fas fa-ellipsis-v"></i></button>
+                   </div>
+                   <div class="payment-event-details-responsive">
+                     <div class="payment-event-date-responsive"><i class="fas fa-calendar"></i> ${dateRange}</div>
+                     <div class="payment-event-amount-responsive"><i class="fas fa-money-bill-wave"></i> ${event.title}</div>
+                     <div class="payment-event-info-responsive">${ep.requestType || 'N/A'} - ${ep.companyName || 'N/A'}</div>
+                   </div>
+                   <div class="payment-event-actions-responsive">
+                     <a href="${event.url}" class="btn btn-sm btn-outline-primary payment-view-btn">
+                       <i class="fas fa-eye"></i> View
+                     </a>
+                   </div>
+                 </div>
+               `;
+             });
+             
+             mobileContent += '</div>';
+             bottomContent.innerHTML = mobileContent;
+           }
+         } else {
+           // Use existing sidebar logic for desktop
+           const dayEvents = dateEventFound.extendedProps.events;
+           const count = dateEventFound.extendedProps.count || 0;
+           const totalAmount = dateEventFound.extendedProps.totalAmount || 0;
+           const status = dateEventFound.extendedProps.status || 'due';
+           const paidCount = dateEventFound.extendedProps.paidCount || 0;
+           const lateCount = dateEventFound.extendedProps.lateCount || 0;
+           
+           // Determine status color
+           let statusColor = 'bg-primary';
+           if (status === 'paid') statusColor = 'bg-success';
+           else if (status === 'late') statusColor = 'bg-danger';
+           
+           // Populate sidebar content
+           let sidebarContent = `
+             <div class="summary-cards mb-3">
+               <div class="summary-card ${statusColor}">
+                 <div class="summary-number">${count}</div>
+                 <div class="summary-label">Payment${count !== 1 ? 's' : ''} ${status}</div>
+               </div>
+               <div class="summary-card bg-success">
+                 <div class="summary-number">${totalAmount.toFixed(3)}</div>
+                 <div class="summary-label">Total OMR</div>
+               </div>
+               <div class="summary-card bg-warning summary-card-wide">
+                 <div class="summary-number">${paidCount}/${count}</div>
+                 <div class="summary-label">Paid Status</div>
+               </div>
+             </div>
+             <div class="events-list">
+           `;
+           
+           dayEvents.forEach((event, index) => {
+             const ep = event.extendedProps || {};
+             let borderColor = 'border-left-primary';
+             let statusBadge = 'badge-primary';
+             let statusText = 'Due';
+             
+             if (event.color === '#2e7d32') {
+               borderColor = 'border-left-success';
+               statusBadge = 'badge-success';
+               statusText = 'Paid';
+             } else if (event.color === '#d32f2f') {
+               borderColor = 'border-left-danger';
+               statusBadge = 'badge-danger';
+               statusText = 'Late';
+             }
+             
+             sidebarContent += `
+               <div class="event-item ${borderColor}">
+                 <div class="event-header">
+                   <span class="event-badge ${statusBadge}">#${index + 1} ${statusText}</span>
+                   <span class="event-amount">${event.title}</span>
+                 </div>
+                 <div class="event-details">
+                   <div class="event-type">${ep.requestType || 'N/A'}</div>
+                   <div class="event-company">${ep.companyName || 'N/A'} - ${ep.department || 'N/A'}</div>
+                   ${ep.purpose ? `<div class="event-purpose">${ep.purpose}</div>` : ''}
+                 </div>
+                 <div class="event-actions">
+                   <a href="${event.url}" class="btn btn-sm btn-outline-primary">
+                     <i class="fas fa-eye"></i> View
+                   </a>
+                 </div>
+               </div>
+             `;
+           });
+           
+           sidebarContent += '</div>';
+           document.getElementById('sidebarContent').innerHTML = sidebarContent;
+         }
+       } else {
+         // No events for this date
+         const isResponsive = window.innerWidth <= 1280;
+         const noEventsMsg = '<div class="text-center py-4"><i class="fas fa-calendar-times text-muted" style="font-size: 2rem;"></i><p class="text-muted mt-2">No payments due on this date.</p></div>';
+         
+         if (isResponsive) {
+           const bottomContent = document.getElementById('paymentDetailsContent');
+           if (bottomContent) {
+             bottomContent.innerHTML = noEventsMsg;
+           }
+         } else {
+           document.getElementById('sidebarContent').innerHTML = noEventsMsg;
+         }
+       }
+       
+       // Show the close button (desktop only)
+       if (window.innerWidth > 1280) {
+         document.getElementById('closeSidebar').style.display = 'block';
+       }
      },
      dateClick: function(info) {
        console.log('Date clicked:', info.dateStr);
@@ -149,12 +373,41 @@ document.addEventListener('DOMContentLoaded', function() {
          day: 'numeric' 
        });
        
-       // Update sidebar header
-       document.querySelector('.sidebar-header h5').innerHTML = 
-         `<i class="fas fa-calendar-day"></i> Payment Due Details - ${formattedDate}`;
+       // Check if responsive (mobile) screen
+       const isResponsive = window.innerWidth <= 1280;
        
-       // Show close button
-       document.getElementById('closeSidebar').style.display = 'block';
+       if (isResponsive) {
+         // Toggle bottom section on responsive screens
+         const bottomSection = document.getElementById('paymentDetailsBottom');
+         const bottomTitle = document.getElementById('paymentDetailsTitle');
+         if (bottomSection && bottomTitle) {
+           // Check if already showing this date
+           const currentTitle = bottomTitle.innerHTML;
+           const newTitle = `<i class="fas fa-calendar-day"></i> Payment Due Details - ${formattedDate}`;
+           
+           if (bottomSection.style.display === 'block' && currentTitle === newTitle) {
+             // Same date clicked - hide the section
+             bottomSection.style.display = 'none';
+             return; // Exit early, don't populate content
+           } else {
+             // Different date or not showing - show the section
+             bottomTitle.innerHTML = newTitle;
+             bottomSection.style.display = 'block';
+             // Scroll to bottom section
+             setTimeout(() => {
+               bottomSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+             }, 100);
+           }
+         }
+       } else {
+         // Update sidebar header for desktop
+         const sidebarHeader = document.querySelector('.sidebar-header h5');
+         if (sidebarHeader) {
+           sidebarHeader.innerHTML = `<i class="fas fa-calendar-day"></i> Payment Due Details - ${formattedDate}`;
+         }
+         // Show close button
+         document.getElementById('closeSidebar').style.display = 'block';
+       }
        
        if (dateEvent && dateEvent.extendedProps && dateEvent.extendedProps.events) {
          const dayEvents = dateEvent.extendedProps.events;
@@ -239,18 +492,111 @@ document.addEventListener('DOMContentLoaded', function() {
          
          sidebarContent += '</div>';
          
-         document.getElementById('sidebarContent').innerHTML = sidebarContent;
+         // Check if responsive screen
+         const isResponsive = window.innerWidth <= 1280;
+         
+         if (isResponsive) {
+           // Populate bottom section on responsive screens
+           const bottomContent = document.getElementById('paymentDetailsContent');
+           if (bottomContent) {
+             // Create mobile-friendly event cards
+             let mobileContent = '<div class="payment-events-list-responsive">';
+             
+             dayEvents.forEach((event, index) => {
+               const ep = event.extendedProps || {};
+               
+               // Determine card color based on payment status
+               let cardColor = '#8e24aa'; // purple for due
+               let statusText = 'Due';
+               if (event.color === '#2e7d32') {
+                 cardColor = '#2e7d32'; // green for paid
+                 statusText = 'Paid';
+               } else if (event.color === '#d32f2f') {
+                 cardColor = '#d32f2f'; // red for late
+                 statusText = 'Late';
+               }
+               
+               // Format date range
+               const startDate = new Date(event.start);
+               const endDate = event.end ? new Date(event.end) : startDate;
+               const startDateStr = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+               const endDateStr = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+               const dateRange = startDateStr === endDateStr ? startDateStr : `${startDateStr} - ${endDateStr}`;
+               
+               mobileContent += `
+                 <div class="payment-event-card-responsive" style="border-left: 4px solid ${cardColor};">
+                   <div class="payment-event-header-responsive">
+                     <h6 class="payment-event-title-responsive">${event.title}</h6>
+                     <button class="payment-event-menu-btn"><i class="fas fa-ellipsis-v"></i></button>
+                   </div>
+                   <div class="payment-event-details-responsive">
+                     <div class="payment-event-date-responsive"><i class="fas fa-calendar"></i> ${dateRange}</div>
+                     <div class="payment-event-amount-responsive"><i class="fas fa-money-bill-wave"></i> ${event.title}</div>
+                     <div class="payment-event-info-responsive">${ep.requestType || 'N/A'} - ${ep.companyName || 'N/A'}</div>
+                   </div>
+                   <div class="payment-event-actions-responsive">
+                     <a href="${event.url}" class="btn btn-sm btn-outline-primary payment-view-btn">
+                       <i class="fas fa-eye"></i> View
+                     </a>
+                   </div>
+                 </div>
+               `;
+             });
+             
+             mobileContent += '</div>';
+             bottomContent.innerHTML = mobileContent;
+           }
+         } else {
+           // Populate sidebar for desktop
+           document.getElementById('sidebarContent').innerHTML = sidebarContent;
+         }
        } else {
          // No events for this date
-         document.getElementById('sidebarContent').innerHTML = 
-           '<div class="text-center py-4"><i class="fas fa-calendar-times text-muted" style="font-size: 2rem;"></i><p class="text-muted mt-2">No payments due on this date.</p></div>';
+         const isResponsive = window.innerWidth <= 1280;
+         const noEventsMsg = '<div class="text-center py-4"><i class="fas fa-calendar-times text-muted" style="font-size: 2rem;"></i><p class="text-muted mt-2">No payments due on this date.</p></div>';
+         
+         if (isResponsive) {
+           const bottomContent = document.getElementById('paymentDetailsContent');
+           if (bottomContent) {
+             bottomContent.innerHTML = noEventsMsg;
+           }
+         } else {
+           document.getElementById('sidebarContent').innerHTML = noEventsMsg;
+         }
        }
        
-       // Show the close button
-       document.getElementById('closeSidebar').style.display = 'block';
+       // Show the close button (desktop only)
+       if (window.innerWidth > 1280) {
+         document.getElementById('closeSidebar').style.display = 'block';
+       }
      }
   });
   calendar.render();
+  
+  // Move legend and footer toolbar to same row below header toolbar
+  setTimeout(function() {
+    const headerToolbar = document.querySelector('.fc-header-toolbar');
+    const footerToolbar = document.querySelector('.fc-footer-toolbar');
+    const legendContainer = document.querySelector('.calendar-legend-container');
+    if (headerToolbar && footerToolbar && legendContainer) {
+      // Create a wrapper div for legend (left) and footer toolbar (right) on same row
+      const wrapper = document.createElement('div');
+      wrapper.className = 'fc-toolbar-legend-row';
+      wrapper.style.display = 'flex';
+      wrapper.style.justifyContent = 'space-between';
+      wrapper.style.alignItems = 'center';
+      wrapper.style.width = '100%';
+      wrapper.style.marginTop = '0.75rem';
+      wrapper.style.marginBottom = '1.5rem';
+      
+      // Insert wrapper after header toolbar
+      headerToolbar.parentNode.insertBefore(wrapper, headerToolbar.nextSibling);
+      
+      // Move legend and footer toolbar into wrapper
+      wrapper.appendChild(legendContainer);
+      wrapper.appendChild(footerToolbar);
+    }
+  }, 100);
   
   // Function to add paid dots to calendar cells
   function addPaidDots() {
@@ -308,6 +654,16 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(addPaidDots, 100); // Small delay to ensure DOM is updated
   });
   
+  // Update event content on window resize for responsive display
+  let resizeTimeout;
+  window.addEventListener('resize', function() {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(function() {
+      // Re-render events to update the display based on screen size
+      calendar.render();
+    }, 250);
+  });
+  
   // Close sidebar functionality
   document.getElementById('closeSidebar').addEventListener('click', function() {
     document.getElementById('closeSidebar').style.display = 'none';
@@ -322,15 +678,23 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     `;
   });
+  
 });
 </script>
 <style>
+/* Dashboard container spacing for calendar page */
+.dashboard-container:has(.calendar-layout) {
+  padding-bottom: 2rem;
+  margin-bottom: 2rem;
+}
+
 /* Calendar Layout */
 .calendar-layout {
   display: flex;
   gap: 20px;
-  height: calc(100vh - 200px);
+  height: calc(100vh - 300px);
   min-height: 600px;
+  margin-bottom: 4rem;
 }
 
 .payment-sidebar {
@@ -375,15 +739,73 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 #calendar { width: 100%; }
-.calendar-toolbar { display:flex; justify-content:flex-end; margin-bottom:10px; }
+/* Position legend below header toolbar on the left */
+.calendar-legend-container {
+  margin: 0;
+  padding: 0;
+  width: auto;
+  flex: 0 0 auto;
+}
+.calendar-legend { 
+  display: flex; 
+  justify-content: flex-start; 
+  padding: 0;
+  width: auto;
+}
+/* Style the wrapper row for legend and footer toolbar */
+.fc-toolbar-legend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-top: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+/* Position footer toolbar (month/week/day buttons) right below header */
+.fc-header-toolbar {
+  margin-bottom: 8px !important;
+}
+.fc-footer-toolbar {
+  margin: 0 !important;
+  padding: 0 !important;
+  order: 2;
+  flex: 0 0 auto;
+}
+.fc-footer-toolbar .fc-toolbar-chunk {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+/* Make month/week/day buttons smaller */
+.fc-footer-toolbar .fc-button {
+  padding: 0.4rem 0.8rem !important;
+  font-size: 0.85rem !important;
+  line-height: 1.2 !important;
+}
+.fc-footer-toolbar .fc-button-group .fc-button {
+  padding: 0.4rem 0.8rem !important;
+  font-size: 0.85rem !important;
+  line-height: 1.2 !important;
+}
+/* Ensure calendar container allows footer to appear after header */
+.fc {
+  display: flex;
+  flex-direction: column;
+}
+.fc-header-toolbar {
+  order: 1;
+}
+.fc-view-harness {
+  order: 3;
+}
 .legend { display:flex; gap:12px; align-items:center; }
 .legend-item { font-size: 12px; color:#555; }
 .legend-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; }
-.fc .fc-daygrid-event { padding: 0 2px; }
+.fc .fc-daygrid-event { padding: 0 2px; overflow: hidden; max-width: 100%; }
 .fc .paid-event .fc-event-main { opacity: 0.95; }
-.fc-event-main-custom { display:flex; flex-direction:column; line-height:1.15; padding:2px 0; }
-.fc-event-main-custom .amount { font-weight:600; font-size:12px; }
-.fc-event-main-custom .meta { font-size:10px; opacity:0.85; }
+.fc-event-main-custom { display:flex; flex-direction:column; line-height:1.15; padding:2px 0; overflow: hidden; max-width: 100%; width: 100%; box-sizing: border-box; }
+.fc-event-main-custom .amount { font-weight:600; font-size:12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.fc-event-main-custom .meta { font-size:10px; opacity:0.85; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 
 /* Modal styles */
 .modal-lg { max-width: 900px; }
@@ -435,7 +857,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /* Calendar event hover effects */
 .fc-event:hover { transform: scale(1.02); transition: transform 0.2s ease; }
-.fc-event { cursor: pointer; }
+.fc-event { cursor: pointer; overflow: hidden; max-width: 100%; }
 
 /* Calendar date cell hover effects */
 .fc-daygrid-day:hover { background-color: #f8f9fa; cursor: pointer; }
@@ -443,6 +865,16 @@ document.addEventListener('DOMContentLoaded', function() {
   transition: background-color 0.2s ease;
   position: relative;
   padding: 2px;
+  overflow: hidden;
+}
+/* Ensure event containers stay within cell boundaries */
+.fc-daygrid-day-events {
+  overflow: hidden;
+  max-width: 100%;
+}
+.fc-daygrid-event-harness {
+  max-width: 100%;
+  overflow: hidden;
 }
 
 /* Make event text more prominent */
@@ -451,6 +883,10 @@ document.addEventListener('DOMContentLoaded', function() {
   font-size: 13px; 
   color: #fff;
   text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 /* Paid dots styling */
@@ -598,23 +1034,125 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 /* Responsive adjustments */
-@media (max-width: 1200px) {
+@media (max-width: 1280px) {
   .calendar-layout {
     flex-direction: column;
     height: auto;
+    margin-bottom: 4rem;
   }
   
+  /* Hide left sidebar on responsive screens */
   .payment-sidebar {
-    width: 100%;
-    transform: translateY(-100%);
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 1050;
-    height: 50vh;
+    display: none !important;
   }
   
+  /* Show bottom payment details section on responsive */
+  .payment-details-bottom {
+    display: none;
+    margin-top: 1rem;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+  
+  .payment-details-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #dee2e6;
+    background: white;
+    border-radius: 8px 8px 0 0;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  
+  .payment-details-header h5 {
+    margin: 0;
+    color: #495057;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  
+  .payment-details-content {
+    padding: 16px;
+  }
+  
+  /* Responsive payment event cards */
+  .payment-events-list-responsive {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .payment-event-card-responsive {
+    background: white;
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .payment-event-header-responsive {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+  
+  .payment-event-title-responsive {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #212529;
+    flex: 1;
+  }
+  
+  .payment-event-menu-btn {
+    background: none;
+    border: none;
+    color: #6c757d;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  
+  .payment-event-details-responsive {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .payment-event-date-responsive,
+  .payment-event-amount-responsive,
+  .payment-event-info-responsive {
+    font-size: 0.85rem;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .payment-event-date-responsive i,
+  .payment-event-amount-responsive i {
+    font-size: 0.8rem;
+  }
+  
+  .payment-event-amount-responsive {
+    font-weight: 600;
+    color: #212529;
+  }
+  
+  .payment-event-actions-responsive {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e9ecef;
+    text-align: right;
+  }
+  
+  .payment-view-btn {
+    font-size: 0.8rem;
+    padding: 6px 12px;
+  }
 }
 
 </style>
