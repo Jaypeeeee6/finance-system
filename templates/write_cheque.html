@@ -309,7 +309,8 @@ const DHOFAR_PAYEE_LEFT_OFFSET_MM = -45; // Adjust this value to move payee more
 // Negative value moves left, positive moves right
 // This ONLY affects the amountWords field in print preview for Dhofar Islamic Bank
 // IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
-const DHOFAR_AMOUNT_WORDS_LEFT_OFFSET_MM = -50; // Adjust this value to move amount in words more/less to the left
+// ADDED 25mm SAFETY MARGIN to prevent printer from cutting off text on the left edge
+const DHOFAR_AMOUNT_WORDS_LEFT_OFFSET_MM = -25; // Adjusted from -50 to -25 (moved 25mm right to avoid printer margin cutting the beginning of words)
 
 // Offset to move AMOUNT field to the LEFT for Dhofar Islamic Bank print preview only (in mm)
 // Negative value moves left, positive moves right
