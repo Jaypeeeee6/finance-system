@@ -482,3 +482,145 @@
         flex-direction: column;
     }
 }
+
+/* ==================== PRINT CONTAINER (HIDDEN ON SCREEN) ==================== */
+.cheque-print-container {
+    display: none;
+}
+
+/* ==================== PRINT STYLES ==================== */
+/* Standard Oman cheque size: 6" × 3" = 152.4mm × 76.2mm */
+/* Template image: 893px × 418px */
+/* Conversion: 1px = 0.1707mm (width), 1px = 0.1823mm (height) */
+
+@media print {
+    /* Set exact page size for standard Oman cheque */
+    @page {
+        size: 152.4mm 76.2mm;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* Hide all UI elements */
+    nav,
+    header,
+    footer,
+    main,
+    .cheque-container,
+    .cheque-header,
+    .cheque-form-panel,
+    .cheque-preview-panel,
+    .bank-selection,
+    .preview-actions,
+    .modal,
+    .modal-content,
+    .modal-header,
+    .modal-footer,
+    .btn,
+    .form-section,
+    .info-message,
+    .cheque-overlay,
+    .field-overlay,
+    .cheque-template,
+    .modal-cheque-template {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    
+    /* Show only the cheque print container */
+    .cheque-print-container {
+        display: block !important;
+        visibility: visible !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 152.4mm !important;
+        height: 76.2mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        z-index: 9999 !important;
+        background: transparent !important;
+        overflow: visible !important;
+    }
+    
+    .cheque-print-overlay {
+        position: relative !important;
+        width: 152.4mm !important;
+        height: 76.2mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+        visibility: visible !important;
+    }
+    
+    /* Ensure all print container children are visible */
+    .cheque-print-container * {
+        visibility: visible !important;
+    }
+    
+    /* Print field overlays - positioned in mm for exact alignment */
+    .print-field-overlay {
+        position: absolute !important;
+        background: transparent !important;
+        color: #000000 !important;
+        font-family: Arial, sans-serif !important;
+        word-wrap: break-word !important;
+        white-space: normal !important;
+        margin: 0 !important;
+        padding: 2px 4px !important;
+        visibility: visible !important;
+        display: block !important;
+        opacity: 1 !important;
+        z-index: 10000 !important;
+        line-height: 1.2 !important;
+    }
+    
+    /* Specific field styles for print - matching screen styles exactly */
+    .print-date-overlay {
+        font-size: 3.8mm; /* ~14px converted */
+        line-height: 1.2 !important;
+    }
+    
+    .print-payee-overlay {
+        font-size: 4.4mm; /* ~16px converted */
+        max-width: 68.3mm; /* ~400px converted */
+        line-height: 1.2 !important;
+    }
+    
+    .print-amount-overlay {
+        font-size: 4.4mm; /* ~16px converted */
+        line-height: 1.2 !important;
+        white-space: nowrap !important; /* Prevent amount from wrapping */
+    }
+    
+    .print-amount-words-overlay {
+        font-size: 3.8mm; /* ~14px converted */
+        max-width: 51.2mm; /* ~300px converted - allow wrapping like screen */
+        line-height: 2.0 !important; /* Match screen line-height: 2.0 exactly */
+        white-space: normal !important; /* Allow wrapping to match screen */
+    }
+    
+    .print-crossing-overlay {
+        font-size: 4.9mm; /* ~18px converted */
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        transform: rotate(-25deg) !important;
+        color: rgba(200, 0, 0, 0.6) !important;
+        line-height: 1.2 !important;
+        white-space: nowrap !important; /* Prevent crossing from wrapping */
+    }
+    
+    /* Remove all borders, shadows, and decorative elements */
+    * {
+        border: none !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+    }
+    
+    /* Ensure no page breaks */
+    .cheque-print-container {
+        page-break-inside: avoid;
+        page-break-after: avoid;
+        page-break-before: avoid;
+    }
+}
