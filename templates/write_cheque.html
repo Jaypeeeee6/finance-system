@@ -285,15 +285,47 @@ function amountToWords(amount) {
 }
 
 // Conversion constants
-// Standard Oman cheque: 152.4mm × 76.2mm
-const CHEQUE_WIDTH_MM = 152.4;
-const CHEQUE_HEIGHT_MM = 76.2;
+// Cheque size: 7.5" × 3.5" = 190.5mm × 88.9mm
+const CHEQUE_WIDTH_MM = 190.5;
+const CHEQUE_HEIGHT_MM = 88.9;
+
+// Offset to move all print text to the right (in mm)
+// This only affects print preview, not the on-screen preview
+const PRINT_RIGHT_OFFSET_MM = 5; // Adjust this value to move text more/less to the right
+
+// Offset to move DATE field to the LEFT for Dhofar Islamic Bank print preview only (in mm)
+// Negative value moves left, positive moves right
+// This ONLY affects the date field in print preview for Dhofar Islamic Bank
+// IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
+const DHOFAR_DATE_LEFT_OFFSET_MM = -53; // Adjust this value to move date more/less to the left
+
+// Offset to move PAYEE NAME field to the LEFT for Dhofar Islamic Bank print preview only (in mm)
+// Negative value moves left, positive moves right
+// This ONLY affects the payee field in print preview for Dhofar Islamic Bank
+// IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
+const DHOFAR_PAYEE_LEFT_OFFSET_MM = -45; // Adjust this value to move payee more/less to the left
+
+// Offset to move AMOUNT IN WORDS field to the LEFT for Dhofar Islamic Bank print preview only (in mm)
+// Negative value moves left, positive moves right
+// This ONLY affects the amountWords field in print preview for Dhofar Islamic Bank
+// IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
+const DHOFAR_AMOUNT_WORDS_LEFT_OFFSET_MM = -50; // Adjust this value to move amount in words more/less to the left
+
+// Offset to move AMOUNT field to the LEFT for Dhofar Islamic Bank print preview only (in mm)
+// Negative value moves left, positive moves right
+// This ONLY affects the amount field in print preview for Dhofar Islamic Bank
+// IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
+const DHOFAR_AMOUNT_LEFT_OFFSET_MM = -60; // Adjust this value to move amount more/less to the left
 
 // Update print field positions based on ACTUAL screen positions
 // This ensures print matches exactly what's shown on screen
 function updatePrintPositions() {
     const templateImg = document.getElementById('chequeTemplate');
     if (!templateImg) return;
+    
+    // Get selected bank - needed to apply Dhofar-specific date offset
+    const bankSelect = document.getElementById('bankSelect');
+    const selectedBank = bankSelect ? bankSelect.value : 'dhofar_islamic';
     
     // Get actual displayed image dimensions
     const displayedWidth = templateImg.offsetWidth;
@@ -348,9 +380,52 @@ function updatePrintPositions() {
             const printLeft = (naturalLeft / naturalWidth) * CHEQUE_WIDTH_MM;
             const printTop = (naturalTop / naturalHeight) * CHEQUE_HEIGHT_MM;
             
+            // CRITICAL: Top position is ABSOLUTELY NEVER modified - it stays exactly as calculated
+            // This ensures vertical position stays 100% the same, no matter what
+            const finalPrintTop = printTop; // Lock the top position - never changes
+            
+            // Apply offsets based on field and bank (ONLY affects left position, NEVER top)
+            let adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM;
+            
+            // SPECIAL CASE: Move date field to the LEFT for Dhofar Islamic Bank print preview only
+            // CRITICAL: This ONLY modifies left position - top position is COMPLETELY UNTOUCHED
+            if (field === 'date' && selectedBank === 'dhofar_islamic') {
+                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + DHOFAR_DATE_LEFT_OFFSET_MM;
+                // Note: finalPrintTop remains unchanged - no vertical movement at all
+            }
+            
+            // SPECIAL CASE: Move payee field to the LEFT for Dhofar Islamic Bank print preview only
+            // CRITICAL: This ONLY modifies left position - top position is COMPLETELY UNTOUCHED
+            if (field === 'payee' && selectedBank === 'dhofar_islamic') {
+                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + DHOFAR_PAYEE_LEFT_OFFSET_MM;
+                // Note: finalPrintTop remains unchanged - no vertical movement at all
+            }
+            
+            // SPECIAL CASE: Move amount in words field to the LEFT for Dhofar Islamic Bank print preview only
+            // CRITICAL: This ONLY modifies left position - top position is COMPLETELY UNTOUCHED
+            if (field === 'amountWords' && selectedBank === 'dhofar_islamic') {
+                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + DHOFAR_AMOUNT_WORDS_LEFT_OFFSET_MM;
+                // Note: finalPrintTop remains unchanged - no vertical movement at all
+            }
+            
+            // SPECIAL CASE: Move amount field to the LEFT for Dhofar Islamic Bank print preview only
+            // CRITICAL: This ONLY modifies left position - top position is COMPLETELY UNTOUCHED
+            if (field === 'amount' && selectedBank === 'dhofar_islamic') {
+                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + DHOFAR_AMOUNT_LEFT_OFFSET_MM;
+                // CRITICAL: Ensure no rotation or tilt - explicitly set rotation to 0
+                printOverlay.style.transform = 'rotate(0deg) scale(1)';
+                printOverlay.style.webkitTransform = 'rotate(0deg) scale(1)';
+                printOverlay.style.mozTransform = 'rotate(0deg) scale(1)';
+                printOverlay.style.msTransform = 'rotate(0deg) scale(1)';
+                printOverlay.style.oTransform = 'rotate(0deg) scale(1)';
+                // Note: finalPrintTop remains unchanged - no vertical movement at all
+            }
+            
             // Set print position
-            printOverlay.style.left = printLeft.toFixed(2) + 'mm';
-            printOverlay.style.top = printTop.toFixed(2) + 'mm';
+            // Left: may be adjusted for date/payee/amountWords/amount fields in Dhofar Islamic Bank
+            // Top: ALWAYS the original calculated value, NEVER modified
+            printOverlay.style.left = adjustedPrintLeft.toFixed(2) + 'mm';
+            printOverlay.style.top = finalPrintTop.toFixed(2) + 'mm';
         }
     });
 }
@@ -469,32 +544,63 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Ensure print container is visible and properly styled
+            // CRITICAL: Fixed dimensions - will NOT scale regardless of paper size selection
+            // Using absolute positioning to prevent scaling issues
             printContainer.style.display = 'block';
             printContainer.style.visibility = 'visible';
-            printContainer.style.position = 'fixed';
+            printContainer.style.position = 'absolute';
             printContainer.style.top = '0';
             printContainer.style.left = '0';
-            printContainer.style.width = '152.4mm';
-            printContainer.style.height = '76.2mm';
+            printContainer.style.width = '190.5mm';
+            printContainer.style.height = '88.9mm';
             printContainer.style.margin = '0';
             printContainer.style.padding = '0';
             printContainer.style.zIndex = '9999';
             printContainer.style.background = 'transparent';
             printContainer.style.overflow = 'visible';
+            // CRITICAL: Force no scaling - these are absolute physical dimensions
+            printContainer.style.transform = 'scale(1)';
+            printContainer.style.zoom = '1';
+            printContainer.style.webkitTransform = 'scale(1)';
+            printContainer.style.mozTransform = 'scale(1)';
+            printContainer.style.msTransform = 'scale(1)';
+            printContainer.style.oTransform = 'scale(1)';
+            printContainer.style.boxSizing = 'border-box';
+            // Force exact dimensions - prevent any scaling
+            printContainer.style.maxWidth = '190.5mm';
+            printContainer.style.maxHeight = '88.9mm';
+            printContainer.style.minWidth = '190.5mm';
+            printContainer.style.minHeight = '88.9mm';
             
             // Ensure print overlay is properly styled
             const printOverlay = printContainer.querySelector('.cheque-print-overlay');
             if (printOverlay) {
-                printOverlay.style.position = 'relative';
-                printOverlay.style.width = '152.4mm';
-                printOverlay.style.height = '76.2mm';
+                printOverlay.style.position = 'absolute';
+                printOverlay.style.top = '0';
+                printOverlay.style.left = '0';
+                printOverlay.style.width = '190.5mm';
+                printOverlay.style.height = '88.9mm';
                 printOverlay.style.margin = '0';
                 printOverlay.style.padding = '0';
                 printOverlay.style.display = 'block';
                 printOverlay.style.visibility = 'visible';
+                // CRITICAL: Force no scaling
+                printOverlay.style.transform = 'scale(1)';
+                printOverlay.style.zoom = '1';
+                printOverlay.style.webkitTransform = 'scale(1)';
+                printOverlay.style.mozTransform = 'scale(1)';
+                printOverlay.style.msTransform = 'scale(1)';
+                printOverlay.style.oTransform = 'scale(1)';
+                printOverlay.style.boxSizing = 'border-box';
+                // Force exact dimensions
+                printOverlay.style.maxWidth = '190.5mm';
+                printOverlay.style.maxHeight = '88.9mm';
+                printOverlay.style.minWidth = '190.5mm';
+                printOverlay.style.minHeight = '88.9mm';
             }
             
             // Ensure all print fields are visible and properly styled to match screen exactly
+            // Positions are in mm and will NOT scale regardless of paper size selection
             const printFields = printContainer.querySelectorAll('.print-field-overlay');
             printFields.forEach(field => {
                 field.style.visibility = 'visible';
@@ -506,6 +612,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 field.style.fontFamily = 'Arial, sans-serif';
                 field.style.padding = '2px 4px';
                 field.style.lineHeight = '1.2';
+                field.style.fontWeight = '600'; // Make all print text bolder
+                // CRITICAL: Prevent any scaling - these are absolute physical positions in mm
+                // These positions will NOT change regardless of paper size selection
+                field.style.transform = 'scale(1)';
+                field.style.zoom = '1';
+                field.style.webkitTransform = 'scale(1)';
+                field.style.mozTransform = 'scale(1)';
+                field.style.msTransform = 'scale(1)';
+                field.style.oTransform = 'scale(1)';
+                field.style.boxSizing = 'border-box';
+                // Positions are in mm - these are physical units that maintain absolute size
                 
                 // Match screen styles for specific fields - copy exact computed styles
                 if (field.id === 'printAmountOverlay' || field.id === 'printAmountWordsOverlay') {
@@ -532,12 +649,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                 field.style.whiteSpace = 'nowrap'; // Prevent amount from wrapping
                                 field.style.lineHeight = screenStyle.lineHeight;
                                 
-                                // Convert Payee Name font size to mm for print
+                                // Convert Payee Name font size to mm for print (increased for bigger text)
                                 if (!isNaN(payeeFontSizePx)) {
                                     const scaleFactor = naturalHeight / displayedHeight;
                                     const naturalFontSize = payeeFontSizePx * scaleFactor;
                                     const fontSizeMm = (naturalFontSize / naturalHeight) * CHEQUE_HEIGHT_MM;
-                                    field.style.fontSize = fontSizeMm.toFixed(2) + 'mm';
+                                    // Increase font size by ~13% to make it bigger
+                                    const increasedFontSize = fontSizeMm * 1.13;
+                                    field.style.fontSize = increasedFontSize.toFixed(2) + 'mm';
+                                    field.style.fontWeight = '600'; // Make bolder
                                 }
                             } else if (field.id === 'printAmountWordsOverlay') {
                                 // Get the inline style line-height (which is "2.0") instead of computed (which is "28px")
@@ -586,11 +706,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (field.id === 'printAmountOverlay') {
                             field.style.whiteSpace = 'nowrap';
                             field.style.lineHeight = '1.2';
+                            field.style.fontWeight = '600'; // Make bolder
                         } else {
                             field.style.lineHeight = '2.0';
                             field.style.maxWidth = '51.2mm'; // 300px converted to mm
                             field.style.whiteSpace = 'normal';
-                            field.style.fontSize = '4.4mm'; // 16px converted (matching Payee Name)
+                            field.style.fontSize = '4.3mm'; // Increased from 4.4mm, made bigger
+                            field.style.fontWeight = '600'; // Make bolder
                         }
                     }
                 } else if (field.id === 'printCrossingOverlay') {

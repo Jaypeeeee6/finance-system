@@ -489,16 +489,55 @@
 }
 
 /* ==================== PRINT STYLES ==================== */
-/* Standard Oman cheque size: 6" × 3" = 152.4mm × 76.2mm */
+/* Cheque size: 7.5" × 3.5" = 190.5mm × 88.9mm */
 /* Template image: 893px × 418px */
 /* Conversion: 1px = 0.1707mm (width), 1px = 0.1823mm (height) */
 
 @media print {
-    /* Set exact page size for standard Oman cheque */
+    /* Set exact page size for cheque - 7.5" × 3.5" */
+    /* Using inches for better browser recognition in print dialog */
     @page {
-        size: 152.4mm 76.2mm;
+        size: 7.5in 3.5in;
         margin: 0;
         padding: 0;
+    }
+    
+    /* CRITICAL: Force 100% scale - prevent browser from scaling content */
+    /* This ensures positions stay fixed regardless of paper size selection */
+    html {
+        width: 7.5in !important;
+        height: 3.5in !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        transform: scale(1) !important;
+        zoom: 1 !important;
+        -webkit-transform: scale(1) !important;
+        -moz-transform: scale(1) !important;
+        -ms-transform: scale(1) !important;
+        -o-transform: scale(1) !important;
+        overflow: visible !important;
+    }
+    
+    body {
+        width: 7.5in !important;
+        height: 3.5in !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        transform: scale(1) !important;
+        zoom: 1 !important;
+        -webkit-transform: scale(1) !important;
+        -moz-transform: scale(1) !important;
+        -ms-transform: scale(1) !important;
+        -o-transform: scale(1) !important;
+        overflow: visible !important;
+        position: relative !important;
+    }
+    
+    /* Prevent ALL elements from scaling */
+    * {
+        transform-origin: 0 0 !important;
+        -webkit-transform-origin: 0 0 !important;
+        -moz-transform-origin: 0 0 !important;
     }
     
     /* Hide all UI elements */
@@ -528,29 +567,57 @@
     }
     
     /* Show only the cheque print container */
+    /* ABSOLUTE FIXED SIZE - will NOT scale regardless of paper size selection */
+    /* Positions are in physical mm units that maintain their size */
     .cheque-print-container {
         display: block !important;
         visibility: visible !important;
-        position: fixed !important;
+        position: absolute !important;
         top: 0 !important;
         left: 0 !important;
-        width: 152.4mm !important;
-        height: 76.2mm !important;
+        width: 190.5mm !important;
+        height: 88.9mm !important;
         margin: 0 !important;
         padding: 0 !important;
         z-index: 9999 !important;
         background: transparent !important;
         overflow: visible !important;
+        transform: scale(1) !important;
+        zoom: 1 !important;
+        -webkit-transform: scale(1) !important;
+        -moz-transform: scale(1) !important;
+        -ms-transform: scale(1) !important;
+        -o-transform: scale(1) !important;
+        box-sizing: border-box !important;
+        /* Force exact dimensions - prevent any scaling */
+        max-width: 190.5mm !important;
+        max-height: 88.9mm !important;
+        min-width: 190.5mm !important;
+        min-height: 88.9mm !important;
     }
     
     .cheque-print-overlay {
-        position: relative !important;
-        width: 152.4mm !important;
-        height: 76.2mm !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 190.5mm !important;
+        height: 88.9mm !important;
         margin: 0 !important;
         padding: 0 !important;
         display: block !important;
         visibility: visible !important;
+        transform: scale(1) !important;
+        zoom: 1 !important;
+        -webkit-transform: scale(1) !important;
+        -moz-transform: scale(1) !important;
+        -ms-transform: scale(1) !important;
+        -o-transform: scale(1) !important;
+        box-sizing: border-box !important;
+        /* Force exact dimensions */
+        max-width: 190.5mm !important;
+        max-height: 88.9mm !important;
+        min-width: 190.5mm !important;
+        min-height: 88.9mm !important;
     }
     
     /* Ensure all print container children are visible */
@@ -559,6 +626,8 @@
     }
     
     /* Print field overlays - positioned in mm for exact alignment */
+    /* CRITICAL: Positions are in physical mm units - they maintain absolute size */
+    /* These positions will NOT change regardless of paper size selection */
     .print-field-overlay {
         position: absolute !important;
         background: transparent !important;
@@ -573,36 +642,56 @@
         opacity: 1 !important;
         z-index: 10000 !important;
         line-height: 1.2 !important;
+        font-weight: 600 !important; /* Make all print text bolder */
+        /* CRITICAL: Prevent any scaling - these are absolute physical positions */
+        transform: scale(1) !important;
+        zoom: 1 !important;
+        -webkit-transform: scale(1) !important;
+        -moz-transform: scale(1) !important;
+        -ms-transform: scale(1) !important;
+        -o-transform: scale(1) !important;
+        box-sizing: border-box !important;
+        /* Positions are set in mm - these are physical units that don't scale */
+        /* The left/top values are calculated relative to 190.5mm × 88.9mm container */
     }
     
     /* Specific field styles for print - matching screen styles exactly */
     .print-date-overlay {
-        font-size: 3.8mm; /* ~14px converted */
+        font-size: 4.3mm !important; /* Increased from 3.8mm - ~14px converted, made bigger */
         line-height: 1.2 !important;
+        font-weight: 600 !important; /* Make bolder */
     }
     
     .print-payee-overlay {
-        font-size: 4.4mm; /* ~16px converted */
+        font-size: 5.0mm !important; /* Increased from 4.4mm - ~16px converted, made bigger */
         max-width: 68.3mm; /* ~400px converted */
         line-height: 1.2 !important;
+        font-weight: 600 !important; /* Make bolder */
     }
     
     .print-amount-overlay {
-        font-size: 4.4mm; /* ~16px converted */
+        font-size: 5.0mm !important; /* Increased from 4.4mm - ~16px converted, made bigger */
         line-height: 1.2 !important;
         white-space: nowrap !important; /* Prevent amount from wrapping */
+        font-weight: 600 !important; /* Make bolder */
+        transform: rotate(0deg) scale(1) !important; /* Ensure no rotation or tilt */
+        -webkit-transform: rotate(0deg) scale(1) !important;
+        -moz-transform: rotate(0deg) scale(1) !important;
+        -ms-transform: rotate(0deg) scale(1) !important;
+        -o-transform: rotate(0deg) scale(1) !important;
     }
     
     .print-amount-words-overlay {
-        font-size: 3.8mm; /* ~14px converted */
+        font-size: 4.3mm !important; /* Increased from 3.8mm - ~14px converted, made bigger */
         max-width: 51.2mm; /* ~300px converted - allow wrapping like screen */
         line-height: 2.0 !important; /* Match screen line-height: 2.0 exactly */
         white-space: normal !important; /* Allow wrapping to match screen */
+        font-weight: 600 !important; /* Make bolder */
     }
     
     .print-crossing-overlay {
-        font-size: 4.9mm; /* ~18px converted */
-        font-weight: 700 !important;
+        font-size: 5.5mm !important; /* Increased from 4.9mm - ~18px converted, made bigger */
+        font-weight: 700 !important; /* Already bold, keeping it */
         text-transform: uppercase !important;
         transform: rotate(-25deg) !important;
         color: rgba(200, 0, 0, 0.6) !important;
@@ -622,5 +711,28 @@
         page-break-inside: avoid;
         page-break-after: avoid;
         page-break-before: avoid;
+    }
+    
+    /* CRITICAL: Multiple @page rules to reinforce the size */
+    /* This ensures the page size is always 7.5" × 3.5" */
+    @page {
+        size: 7.5in 3.5in;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* Additional rules to prevent scaling */
+    /* Force the entire document to render at 100% scale */
+    html, body, .cheque-print-container, .cheque-print-overlay, .print-field-overlay {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+    }
+    
+    /* Ensure no browser scaling occurs */
+    @supports (-webkit-appearance: none) {
+        html {
+            -webkit-print-color-adjust: exact !important;
+        }
     }
 }
