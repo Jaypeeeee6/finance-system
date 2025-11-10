@@ -53,11 +53,6 @@
                         </select>
                     </div>
 
-                    <div class="form-group">
-                        <label for="chequeNumber">Cheque's number</label>
-                        <input type="text" id="chequeNumber" name="chequeNumber" class="form-control" placeholder="Enter cheque number" required>
-                    </div>
-
                     <div class="form-actions">
                         <button type="button" class="btn btn-success" id="printBtn">
                             <i class="fas fa-print"></i> Print Cheque
@@ -91,12 +86,11 @@
                         <!-- Overlay fields that will be positioned over the cheque -->
                         <div class="cheque-overlay">
                             <div class="field-overlay" id="dateOverlay" style="position: absolute; top: 50px; left: 355px; font-size: 14px;"></div>
-                            <div class="field-overlay" id="payeeOverlay" style="position: absolute; top: 127px; left: 180px; font-size: 16px; max-width: 400px;"></div>
-                            <div class="field-overlay" id="amountOverlay" style="position: absolute; top: 175px; left: 578px; font-size: 16px;"></div>
-                            <div class="field-overlay" id="amountWordsOverlay" style="position: absolute; top: 160px; left: 98px; font-size: 14px; max-width: 300px; line-height: 2.0;"></div>
+                            <div class="field-overlay" id="payeeOverlay" style="position: absolute; top: 127px; left: 280px; font-size: 16px; max-width: 400px;"></div>
+                            <div class="field-overlay" id="amountOverlay" style="position: absolute; top: 180px; left: 610px; font-size: 16px;"></div>
+                            <div class="field-overlay" id="amountWordsOverlay" style="position: absolute; top: 160px; left: 98px; font-size: 16px; max-width: 300px; line-height: 2.0;"></div>
                             <div class="field-overlay" id="crossingOverlay" style="position: absolute; top: 20px; left: 60px; font-size: 18px; font-weight: 700; text-transform: uppercase; transform: rotate(-25deg); color: rgba(200, 0, 0, 0.6);"></div>
                             <div class="field-overlay" id="purposeOverlay" style="position: absolute; top: 200px; left: 50px; font-size: 12px; max-width: 300px; line-height: 1.2;"></div>
-                            <div class="field-overlay" id="chequeNumberOverlay" style="position: absolute; top: 250px; left: 400px; font-size: 14px;"></div>
                         </div>
                     </div>
                 </div>
@@ -112,6 +106,17 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Hidden print container - only visible when printing (outside cheque-container to avoid being hidden) -->
+<div class="cheque-print-container" style="display: none;">
+    <div class="cheque-print-overlay">
+        <div class="print-field-overlay print-date-overlay" id="printDateOverlay"></div>
+        <div class="print-field-overlay print-payee-overlay" id="printPayeeOverlay"></div>
+        <div class="print-field-overlay print-amount-overlay" id="printAmountOverlay"></div>
+            <div class="print-field-overlay print-amount-words-overlay" id="printAmountWordsOverlay"></div>
+            <div class="print-field-overlay print-crossing-overlay" id="printCrossingOverlay"></div>
     </div>
 </div>
 
@@ -134,7 +139,6 @@
                         <div class="modal-field-overlay" id="modalAmountOverlay"></div>
                         <div class="modal-field-overlay" id="modalAmountWordsOverlay"></div>
                         <div class="modal-field-overlay" id="modalCrossingOverlay"></div>
-                        <div class="modal-field-overlay" id="modalChequeNumberOverlay"></div>
                     </div>
                 </div>
             </div>
@@ -157,12 +161,11 @@
 const bankFieldPositions = {
     'dhofar_islamic': {
         date: { top: '50px', left: '355px' },
-        payee: { top: '127px', left: '180px' },
-        amount: { top: '175px', left: '578px' },
+        payee: { top: '127px', left: '280px' },
+        amount: { top: '180px', left: '610px' },
         amountWords: { top: '160px', left: '98px' },
         crossing: { top: '20px', left: '60px' },
-        purpose: { top: '200px', left: '50px' },
-        chequeNumber: { top: '250px', left: '400px' }
+        purpose: { top: '200px', left: '50px' }
     },
     'oman_arab': {
         date: { top: '13px', left: '580px' },
@@ -170,8 +173,7 @@ const bankFieldPositions = {
         amount: { top: '130px', left: '617px' },
         amountWords: { top: '160px', left: '95px' },
         crossing: { top: '15px', left: '40px' },
-        purpose: { top: '210px', left: '60px' },
-        chequeNumber: { top: '260px', left: '420px' }
+        purpose: { top: '210px', left: '60px' }
     },
     'sohar': {
         date: { top: '52px', left: '555px' },
@@ -179,8 +181,7 @@ const bankFieldPositions = {
         amount: { top: '163px', left: '568px' },
         amountWords: { top: '153px', left: '80px' },
         crossing: { top: '25px', left: '70px' },
-        purpose: { top: '205px', left: '55px' },
-        chequeNumber: { top: '255px', left: '410px' }
+        purpose: { top: '205px', left: '55px' }
     }
 };
 
@@ -196,6 +197,9 @@ function updateFieldPositions(bank) {
             overlay.style.left = positions[field].left;
         }
     });
+    
+    // Print positions will be updated dynamically based on actual screen positions
+    // when print is called or bank is changed
 }
 
 // Function to update cheque template image
@@ -280,53 +284,137 @@ function amountToWords(amount) {
     return capitalizedWords + ' Omani Rials Only';
 }
 
+// Conversion constants
+// Standard Oman cheque: 152.4mm × 76.2mm
+const CHEQUE_WIDTH_MM = 152.4;
+const CHEQUE_HEIGHT_MM = 76.2;
+
+// Update print field positions based on ACTUAL screen positions
+// This ensures print matches exactly what's shown on screen
+function updatePrintPositions() {
+    const templateImg = document.getElementById('chequeTemplate');
+    if (!templateImg) return;
+    
+    // Get actual displayed image dimensions
+    const displayedWidth = templateImg.offsetWidth;
+    const displayedHeight = templateImg.offsetHeight;
+    
+    // Get natural image dimensions
+    const naturalWidth = templateImg.naturalWidth || 893;
+    const naturalHeight = templateImg.naturalHeight || 418;
+    
+    // Calculate scale factors (how much the image is scaled on screen)
+    const scaleX = displayedWidth / naturalWidth;
+    const scaleY = displayedHeight / naturalHeight;
+    
+    // Get screen overlay positions (actual positions on displayed image)
+    const screenOverlays = {
+        date: document.getElementById('dateOverlay'),
+        payee: document.getElementById('payeeOverlay'),
+        amount: document.getElementById('amountOverlay'),
+        amountWords: document.getElementById('amountWordsOverlay'),
+        crossing: document.getElementById('crossingOverlay')
+    };
+    
+    // Get print overlays
+    const printOverlays = {
+        date: document.getElementById('printDateOverlay'),
+        payee: document.getElementById('printPayeeOverlay'),
+        amount: document.getElementById('printAmountOverlay'),
+        amountWords: document.getElementById('printAmountWordsOverlay'),
+        crossing: document.getElementById('printCrossingOverlay')
+    };
+    
+    // Convert each screen position to print position
+    Object.keys(screenOverlays).forEach(field => {
+        const screenOverlay = screenOverlays[field];
+        const printOverlay = printOverlays[field];
+        
+        if (screenOverlay && printOverlay) {
+            // Get actual screen position relative to displayed image
+            const screenRect = screenOverlay.getBoundingClientRect();
+            const imageRect = templateImg.getBoundingClientRect();
+            
+            // Calculate position relative to image (0,0 is top-left of image)
+            const relativeLeft = screenRect.left - imageRect.left;
+            const relativeTop = screenRect.top - imageRect.top;
+            
+            // Convert to natural image coordinates (undo the scale)
+            const naturalLeft = relativeLeft / scaleX;
+            const naturalTop = relativeTop / scaleY;
+            
+            // Convert natural coordinates to mm for print
+            // Ratio: natural image size to cheque size
+            const printLeft = (naturalLeft / naturalWidth) * CHEQUE_WIDTH_MM;
+            const printTop = (naturalTop / naturalHeight) * CHEQUE_HEIGHT_MM;
+            
+            // Set print position
+            printOverlay.style.left = printLeft.toFixed(2) + 'mm';
+            printOverlay.style.top = printTop.toFixed(2) + 'mm';
+        }
+    });
+}
+
 // Real-time field updates
 function updateChequePreview() {
     // Update date
     const dateInput = document.getElementById('chequeDate');
     const dateOverlay = document.getElementById('dateOverlay');
+    const printDateOverlay = document.getElementById('printDateOverlay');
     if (dateInput && dateOverlay) {
-        dateOverlay.textContent = formatDate(dateInput.value);
+        const dateText = formatDate(dateInput.value);
+        dateOverlay.textContent = dateText;
+        if (printDateOverlay) printDateOverlay.textContent = dateText;
     }
     
     // Update payee
     const payeeInput = document.getElementById('payeeName');
     const payeeOverlay = document.getElementById('payeeOverlay');
+    const printPayeeOverlay = document.getElementById('printPayeeOverlay');
     if (payeeInput && payeeOverlay) {
-        payeeOverlay.textContent = payeeInput.value;
+        const payeeText = payeeInput.value;
+        payeeOverlay.textContent = payeeText;
+        if (printPayeeOverlay) printPayeeOverlay.textContent = payeeText;
     }
     
     // Update amount
     const amountInput = document.getElementById('amount');
     const currencySelect = document.getElementById('currency');
     const amountOverlay = document.getElementById('amountOverlay');
+    const printAmountOverlay = document.getElementById('printAmountOverlay');
     if (amountInput && currencySelect && amountOverlay) {
-        amountOverlay.textContent = formatAmount(amountInput.value, currencySelect.value);
+        const amountText = formatAmount(amountInput.value, currencySelect.value);
+        amountOverlay.textContent = amountText;
+        if (printAmountOverlay) printAmountOverlay.textContent = amountText;
     }
     
     // Update amount in words (overlay only)
     const amountWordsOverlay = document.getElementById('amountWordsOverlay');
+    const printAmountWordsOverlay = document.getElementById('printAmountWordsOverlay');
     if (amountInput && amountWordsOverlay) {
         const words = amountToWords(amountInput.value);
         amountWordsOverlay.textContent = words;
+        if (printAmountWordsOverlay) printAmountWordsOverlay.textContent = words;
     }
 
     // Update crossing (slanted stamp on upper-left)
     const crossingSelect = document.getElementById('crossing');
     const crossingOverlay = document.getElementById('crossingOverlay');
+    const printCrossingOverlay = document.getElementById('printCrossingOverlay');
     if (crossingSelect && crossingOverlay) {
         const text = crossingSelect.value ? crossingSelect.value.toUpperCase() : '';
         crossingOverlay.textContent = text;
+        if (printCrossingOverlay) {
+            printCrossingOverlay.textContent = text;
+            printCrossingOverlay.style.transform = 'rotate(-25deg)';
+            printCrossingOverlay.style.fontWeight = '700';
+            printCrossingOverlay.style.color = 'rgba(200, 0, 0, 0.6)';
+        }
     }
     
     // Purpose input removed; overlay is static for now
     
-    // Update cheque number
-    const chequeNumberInput = document.getElementById('chequeNumber');
-    const chequeNumberOverlay = document.getElementById('chequeNumberOverlay');
-    if (chequeNumberInput && chequeNumberOverlay) {
-        chequeNumberOverlay.textContent = chequeNumberInput.value;
-    }
+    // Print positions will be updated dynamically when print is called
 }
 
 // Initialize the page
@@ -340,8 +428,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add event listeners to all form fields
     const formFields = [
-        'chequeDate', 'payeeName', 'amount', 'currency', 'crossing',
-        'chequeNumber'
+        'chequeDate', 'payeeName', 'amount', 'currency', 'crossing'
     ];
     
     formFields.forEach(fieldId => {
@@ -361,7 +448,180 @@ document.addEventListener('DOMContentLoaded', function() {
             const selectedBank = this.value;
             updateFieldPositions(selectedBank);
             updateChequeTemplate(selectedBank);
+            // Update print positions after screen positions are updated
+            setTimeout(() => {
+                updatePrintPositions();
+            }, 100);
         });
+    }
+    
+    // Print function - shows print container and triggers print dialog
+    function printCheque() {
+        // Update all print fields before printing
+        updateChequePreview();
+        
+        // Get the print container
+        const printContainer = document.querySelector('.cheque-print-container');
+        if (printContainer) {
+            // Move print container to body level if it's not already there
+            if (printContainer.parentElement.tagName !== 'BODY') {
+                document.body.appendChild(printContainer);
+            }
+            
+            // Ensure print container is visible and properly styled
+            printContainer.style.display = 'block';
+            printContainer.style.visibility = 'visible';
+            printContainer.style.position = 'fixed';
+            printContainer.style.top = '0';
+            printContainer.style.left = '0';
+            printContainer.style.width = '152.4mm';
+            printContainer.style.height = '76.2mm';
+            printContainer.style.margin = '0';
+            printContainer.style.padding = '0';
+            printContainer.style.zIndex = '9999';
+            printContainer.style.background = 'transparent';
+            printContainer.style.overflow = 'visible';
+            
+            // Ensure print overlay is properly styled
+            const printOverlay = printContainer.querySelector('.cheque-print-overlay');
+            if (printOverlay) {
+                printOverlay.style.position = 'relative';
+                printOverlay.style.width = '152.4mm';
+                printOverlay.style.height = '76.2mm';
+                printOverlay.style.margin = '0';
+                printOverlay.style.padding = '0';
+                printOverlay.style.display = 'block';
+                printOverlay.style.visibility = 'visible';
+            }
+            
+            // Ensure all print fields are visible and properly styled to match screen exactly
+            const printFields = printContainer.querySelectorAll('.print-field-overlay');
+            printFields.forEach(field => {
+                field.style.visibility = 'visible';
+                field.style.display = 'block';
+                field.style.position = 'absolute';
+                field.style.color = '#000000';
+                field.style.opacity = '1';
+                field.style.background = 'transparent';
+                field.style.fontFamily = 'Arial, sans-serif';
+                field.style.padding = '2px 4px';
+                field.style.lineHeight = '1.2';
+                
+                // Match screen styles for specific fields - copy exact computed styles
+                if (field.id === 'printAmountOverlay' || field.id === 'printAmountWordsOverlay') {
+                    // Get Payee Name font size as reference to match
+                    const payeeOverlay = document.getElementById('payeeOverlay');
+                    const screenOverlay = field.id === 'printAmountOverlay' 
+                        ? document.getElementById('amountOverlay')
+                        : document.getElementById('amountWordsOverlay');
+                    
+                    if (screenOverlay && payeeOverlay) {
+                        const payeeStyle = window.getComputedStyle(payeeOverlay);
+                        const screenStyle = window.getComputedStyle(screenOverlay);
+                        const templateImg = document.getElementById('chequeTemplate');
+                        if (templateImg) {
+                            const naturalWidth = templateImg.naturalWidth || 893;
+                            const naturalHeight = templateImg.naturalHeight || 418;
+                            const displayedWidth = templateImg.offsetWidth;
+                            const displayedHeight = templateImg.offsetHeight;
+                            
+                            // Use Payee Name font size (16px) instead of the field's own font size
+                            const payeeFontSizePx = parseFloat(payeeStyle.fontSize);
+                            
+                            if (field.id === 'printAmountOverlay') {
+                                field.style.whiteSpace = 'nowrap'; // Prevent amount from wrapping
+                                field.style.lineHeight = screenStyle.lineHeight;
+                                
+                                // Convert Payee Name font size to mm for print
+                                if (!isNaN(payeeFontSizePx)) {
+                                    const scaleFactor = naturalHeight / displayedHeight;
+                                    const naturalFontSize = payeeFontSizePx * scaleFactor;
+                                    const fontSizeMm = (naturalFontSize / naturalHeight) * CHEQUE_HEIGHT_MM;
+                                    field.style.fontSize = fontSizeMm.toFixed(2) + 'mm';
+                                }
+                            } else if (field.id === 'printAmountWordsOverlay') {
+                                // Get the inline style line-height (which is "2.0") instead of computed (which is "28px")
+                                const inlineStyle = screenOverlay.getAttribute('style') || '';
+                                const lineHeightMatch = inlineStyle.match(/line-height:\s*([^;]+)/i);
+                                const lineHeightValue = lineHeightMatch ? lineHeightMatch[1].trim() : screenStyle.lineHeight;
+                                
+                                // Use relative line-height if available, otherwise use computed
+                                field.style.lineHeight = lineHeightValue.includes('px') ? 
+                                    ((parseFloat(lineHeightValue) / payeeFontSizePx).toFixed(1)) : 
+                                    lineHeightValue;
+                                
+                                field.style.whiteSpace = screenStyle.whiteSpace; // Match screen white-space
+                                field.style.wordWrap = screenStyle.wordWrap; // Match screen word-wrap
+                                
+                                // Convert Payee Name font size to mm for print (same as amount)
+                                if (!isNaN(payeeFontSizePx)) {
+                                    const scaleFactor = naturalHeight / displayedHeight;
+                                    const naturalFontSize = payeeFontSizePx * scaleFactor;
+                                    const fontSizeMm = (naturalFontSize / naturalHeight) * CHEQUE_HEIGHT_MM;
+                                    field.style.fontSize = fontSizeMm.toFixed(2) + 'mm';
+                                }
+                                
+                                // Convert max-width from pixels to mm for print
+                                const maxWidthPx = screenStyle.maxWidth;
+                                if (maxWidthPx && maxWidthPx !== 'none') {
+                                    const pxValue = parseFloat(maxWidthPx);
+                                    if (!isNaN(pxValue)) {
+                                        // Convert pixels to mm using the same ratio as position conversion
+                                        const scaleFactor = naturalWidth / displayedWidth;
+                                        const naturalMaxWidth = pxValue * scaleFactor;
+                                        const mmValue = (naturalMaxWidth / naturalWidth) * CHEQUE_WIDTH_MM;
+                                        field.style.maxWidth = mmValue.toFixed(2) + 'mm';
+                                    }
+                                } else {
+                                    // Convert default 300px to mm
+                                    const scaleFactor = naturalWidth / displayedWidth;
+                                    const naturalMaxWidth = 300 * scaleFactor;
+                                    const mmValue = (naturalMaxWidth / naturalWidth) * CHEQUE_WIDTH_MM;
+                                    field.style.maxWidth = mmValue.toFixed(2) + 'mm';
+                                }
+                            }
+                        }
+                    } else {
+                        // Fallback if screen overlay not found
+                        if (field.id === 'printAmountOverlay') {
+                            field.style.whiteSpace = 'nowrap';
+                            field.style.lineHeight = '1.2';
+                        } else {
+                            field.style.lineHeight = '2.0';
+                            field.style.maxWidth = '51.2mm'; // 300px converted to mm
+                            field.style.whiteSpace = 'normal';
+                            field.style.fontSize = '4.4mm'; // 16px converted (matching Payee Name)
+                        }
+                    }
+                } else if (field.id === 'printCrossingOverlay') {
+                    field.style.whiteSpace = 'nowrap'; // Prevent crossing from wrapping
+                }
+                
+                // Ensure font size is set (use px as fallback if mm doesn't work)
+                if (!field.style.fontSize || field.style.fontSize === '') {
+                    field.style.fontSize = '14px';
+                }
+            });
+        }
+        
+        // Small delay to ensure screen overlays are positioned, then update print positions
+        setTimeout(() => {
+            // Update print positions based on actual screen positions
+            updatePrintPositions();
+            
+            // Small delay to ensure DOM is updated before print
+            setTimeout(() => {
+                // Trigger print dialog
+                window.print();
+                
+                // Hide print container after printing (in case user cancels)
+                setTimeout(() => {
+                    if (printContainer) {
+                        printContainer.style.display = 'none';
+                    }
+                }, 100);
+            }, 50);
+        }, 100);
     }
     
     // Print button handlers
@@ -370,15 +630,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveChequeBtn = document.getElementById('saveChequeBtn');
     
     if (printBtn) {
-        printBtn.addEventListener('click', function() {
-            alert('Print functionality will be implemented later.');
-        });
+        printBtn.addEventListener('click', printCheque);
     }
     
     if (printChequeBtn) {
-        printChequeBtn.addEventListener('click', function() {
-            alert('Print functionality will be implemented later.');
-        });
+        printChequeBtn.addEventListener('click', printCheque);
     }
     
     if (saveChequeBtn) {
@@ -441,7 +697,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const amountInput = document.getElementById('amount');
         const currencySelect = document.getElementById('currency');
         const crossingSelect = document.getElementById('crossing');
-        const chequeNumberInput = document.getElementById('chequeNumber');
         
         // Date
         const modalDateOverlay = document.getElementById('modalDateOverlay');
@@ -477,12 +732,6 @@ document.addEventListener('DOMContentLoaded', function() {
             modalCrossingOverlay.style.fontWeight = '700';
             modalCrossingOverlay.style.color = 'rgba(200, 0, 0, 0.6)';
         }
-        
-        // Cheque number
-        const modalChequeNumberOverlay = document.getElementById('modalChequeNumberOverlay');
-        if (chequeNumberInput && modalChequeNumberOverlay) {
-            modalChequeNumberOverlay.textContent = chequeNumberInput.value;
-        }
     }
     
     // Modal event listeners
@@ -496,7 +745,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (printFromModalBtn) {
         printFromModalBtn.addEventListener('click', function() {
-            alert('Print functionality will be implemented later.');
+            closeChequeModal();
+            // Small delay to ensure modal is closed before printing
+            setTimeout(printCheque, 100);
         });
     }
     
@@ -521,6 +772,16 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initial preview update
     updateChequePreview();
+    
+    // Initial print positions - wait for image to load
+    const templateImg = document.getElementById('chequeTemplate');
+    if (templateImg.complete) {
+        setTimeout(() => updatePrintPositions(), 100);
+    } else {
+        templateImg.addEventListener('load', () => {
+            setTimeout(() => updatePrintPositions(), 100);
+        });
+    }
 });
 </script>
 {% endblock %}
