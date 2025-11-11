@@ -18,6 +18,7 @@ class Config:
     
     # File upload configuration
     UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads', 'receipts')
+    CHEQUE_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads', 'cheque')
     MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB max total request size (all files + form data)
     MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB max per file
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf', 'doc', 'docx', 'xls', 'xlsx'}

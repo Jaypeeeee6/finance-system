@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Reserve Cheque Serial Numbers{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-bookmark"></i> Reserve Cheque Serial Numbers</h1>
+        <a href="{{ url_for('cheque_register') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Cheque Register
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <h2><i class="fas fa-list"></i> Available Serial Numbers</h2>
+                <div class="filter-controls" style="display: flex; gap: 1rem; align-items: center;">
+                    <label for="bookFilter" style="margin: 0; font-weight: 600;">Filter by Book:</label>
+                    <select id="bookFilter" onchange="filterByBook()" class="form-select" style="min-width: 150px;">
+                        <option value="">All Books</option>
+                        {% for book_no in book_numbers %}
+                        <option value="{{ book_no }}" {% if book_filter == book_no|string %}selected{% endif %}>Book {{ book_no }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if available_serials %}
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+                    <label style="margin: 0;">
+                        <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()" title="Select All">
+                        <span style="margin-left: 0.5rem; font-weight: 600;">Select All Serial Numbers</span>
+                    </label>
+                </div>
+
+                <div id="bulkActions" style="display: none; margin-bottom: 1rem; padding: 1rem; background-color: #f8f9fa; border-radius: 5px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span>
+                            <strong id="selectedCount">0</strong> serial number(s) selected
+                        </span>
+                        <button type="button" class="btn btn-warning" id="reserveSelectedBtn" onclick="reserveSelected()">
+                            <i class="fas fa-bookmark"></i> Reserve Selected
+                        </button>
+                    </div>
+                </div>
+
+                {% for group in available_serials | groupby('book.book_no') %}
+                <div class="book-section" style="margin-bottom: 2rem;">
+                    <h3 style="margin-bottom: 1rem;">Book No. {{ group.grouper }}</h3>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;"></th>
+                                    <th>Serial No.</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for serial in group.list %}
+                                <tr>
+                                    <td>
+                                        <input type="checkbox" 
+                                               class="serial-checkbox" 
+                                               value="{{ serial.id }}"
+                                               onchange="updateBulkActions()">
+                                    </td>
+                                    <td>{{ serial.serial_no }}</td>
+                                    <td>
+                                        <span class="badge badge-success">{{ serial.status }}</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-book"></i>
+                    <p>No available serial numbers found. All serial numbers are already reserved or used.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleSelectAll() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const serialCheckboxes = document.querySelectorAll('.serial-checkbox');
+    
+    serialCheckboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+    
+    updateBulkActions();
+}
+
+function updateBulkActions() {
+    const checkboxes = document.querySelectorAll('.serial-checkbox');
+    const checkedBoxes = document.querySelectorAll('.serial-checkbox:checked');
+    const selectedCount = checkedBoxes.length;
+    const bulkActions = document.getElementById('bulkActions');
+    const selectedCountSpan = document.getElementById('selectedCount');
+    const reserveBtn = document.getElementById('reserveSelectedBtn');
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    
+    // Update selected count
+    if (selectedCountSpan) {
+        selectedCountSpan.textContent = selectedCount;
+    }
+    
+    // Show/hide bulk actions
+    if (bulkActions) {
+        if (selectedCount > 0) {
+            bulkActions.style.display = 'block';
+            if (reserveBtn) reserveBtn.disabled = false;
+        } else {
+            bulkActions.style.display = 'none';
+            if (reserveBtn) reserveBtn.disabled = true;
+        }
+    }
+    
+    // Update select all checkbox state
+    if (selectAllCheckbox) {
+        if (selectedCount === 0) {
+            selectAllCheckbox.indeterminate = false;
+            selectAllCheckbox.checked = false;
+        } else if (selectedCount === checkboxes.length) {
+            selectAllCheckbox.indeterminate = false;
+            selectAllCheckbox.checked = true;
+        } else {
+            selectAllCheckbox.indeterminate = true;
+        }
+    }
+}
+
+function reserveSelected() {
+    const checkedBoxes = document.querySelectorAll('.serial-checkbox:checked');
+    const serialIds = Array.from(checkedBoxes).map(checkbox => checkbox.value);
+    
+    if (serialIds.length === 0) {
+        alert('Please select at least one serial number to reserve.');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to reserve ${serialIds.length} serial number(s)?`)) {
+        return;
+    }
+    
+    // Disable button during processing
+    const reserveBtn = document.getElementById('reserveSelectedBtn');
+    const originalText = reserveBtn.innerHTML;
+    reserveBtn.disabled = true;
+    reserveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Reserving...';
+    
+    // Send request to reserve
+    fetch('/cheque-register/reserve', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            serial_ids: serialIds
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`Successfully reserved ${data.reserved_count} serial number(s).`);
+            window.location.href = '{{ url_for("cheque_register") }}';
+        } else {
+            alert(data.error || 'Failed to reserve serial numbers. Please try again.');
+            reserveBtn.disabled = false;
+            reserveBtn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while reserving serial numbers. Please try again.');
+        reserveBtn.disabled = false;
+        reserveBtn.innerHTML = originalText;
+    });
+}
+
+function filterByBook() {
+    const bookFilter = document.getElementById('bookFilter');
+    const bookValue = bookFilter.value;
+    
+    const url = new URL(window.location);
+    if (bookValue) {
+        url.searchParams.set('book', bookValue);
+    } else {
+        url.searchParams.delete('book');
+    }
+    window.location.href = url.toString();
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateBulkActions();
+});
+</script>
+{% endblock %}
+

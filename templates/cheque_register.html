@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}Cheque Register{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-book"></i> Cheque Register</h1>
+        <div>
+            <a href="{{ url_for('reserve_cheque') }}" class="btn btn-primary">
+                <i class="fas fa-bookmark"></i> Reserve
+            </a>
+            <a href="{{ url_for('new_book') }}" class="btn btn-success">
+                <i class="fas fa-plus-circle"></i> New Book
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <h2><i class="fas fa-table"></i> Cheque Records</h2>
+                <div class="filter-controls" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                    <label for="bookFilter" style="margin: 0; font-weight: 600;">Filter by Book:</label>
+                    <select id="bookFilter" onchange="applyFilters()" class="form-select" style="min-width: 150px;">
+                        <option value="">All Books</option>
+                        {% for book_no in book_numbers %}
+                        <option value="{{ book_no }}" {% if book_filter == book_no|string %}selected{% endif %}>Book {{ book_no }}</option>
+                        {% endfor %}
+                    </select>
+                    <label for="statusFilter" style="margin: 0; font-weight: 600;">Filter by Status:</label>
+                    <select id="statusFilter" onchange="applyFilters()" class="form-select" style="min-width: 150px;">
+                        <option value="">All Statuses</option>
+                        <option value="Available" {% if status_filter == 'Available' %}selected{% endif %}>Available</option>
+                        <option value="Reserved" {% if status_filter == 'Reserved' %}selected{% endif %}>Reserved</option>
+                        <option value="Used" {% if status_filter == 'Used' %}selected{% endif %}>Used</option>
+                        <option value="Cancelled" {% if status_filter == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if cheque_serials %}
+                {% for group in cheque_serials | groupby('book.book_no') %}
+                <div class="book-section" style="margin-bottom: 2rem;">
+                    <h3 style="margin-bottom: 1rem;">Book No. {{ group.grouper }}</h3>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Book No.</th>
+                                    <th>Serial No.</th>
+                                    <th>Status</th>
+                                    <th>Payee Name</th>
+                                    <th>Cheque's Date</th>
+                                    <th>Amount</th>
+                                    <th>Upload</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for serial in group.list %}
+                                <tr>
+                                    <td>{{ serial.book.book_no }}</td>
+                                    <td>{{ serial.serial_no }}</td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if serial.status == 'Available' %}badge-success
+                                            {% elif serial.status == 'Reserved' %}badge-warning
+                                            {% elif serial.status == 'Used' %}badge-info
+                                            {% elif serial.status == 'Cancelled' %}badge-danger
+                                            {% else %}badge-secondary{% endif %}">
+                                            {{ serial.status }}
+                                        </span>
+                                    </td>
+                                    <td>{{ serial.payee_name or '-' }}</td>
+                                    <td>{{ serial.cheque_date.strftime('%Y-%m-%d') if serial.cheque_date else '-' }}</td>
+                                    <td>{{ "%.3f"|format(serial.amount) if serial.amount else '-' }}</td>
+                                    <td style="text-align: center;">
+                                        <div class="upload-cell" data-serial-id="{{ serial.id }}" style="display: inline-block;">
+                                            {% if serial.upload_path %}
+                                                <a href="/uploads/cheque/{{ serial.upload_path.split('/')[-1] if '/' in serial.upload_path else serial.upload_path }}" target="_blank" class="btn btn-sm btn-info upload-view-btn" title="View uploaded file" style="text-decoration: none; border: none; padding: 0.25rem 0.5rem;">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                            {% else %}
+                                                <input type="file" 
+                                                       id="upload_{{ serial.id }}" 
+                                                       class="cheque-upload-input" 
+                                                       accept="image/*,.pdf" 
+                                                       style="display: none;"
+                                                       data-serial-id="{{ serial.id }}">
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-primary upload-btn" 
+                                                        onclick="document.getElementById('upload_{{ serial.id }}').click()"
+                                                        title="Upload image"
+                                                        style="text-decoration: none; border: none; padding: 0.25rem 0.5rem;">
+                                                    <i class="fas fa-upload"></i>
+                                                </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-book"></i>
+                    <p>No cheque records found. Create a new book to get started.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle file upload for cheque serials
+    const uploadInputs = document.querySelectorAll('.cheque-upload-input');
+    
+    uploadInputs.forEach(input => {
+        input.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const serialId = this.getAttribute('data-serial-id');
+            const uploadCell = this.closest('.upload-cell');
+            const uploadBtn = uploadCell.querySelector('.upload-btn');
+            
+            // Validate file type
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('Please upload an image file (JPG, PNG, GIF) or PDF.');
+                this.value = '';
+                return;
+            }
+            
+            // Validate file size (50MB max)
+            const maxSize = 50 * 1024 * 1024; // 50MB
+            if (file.size > maxSize) {
+                alert('File size exceeds 50MB limit. Please choose a smaller file.');
+                this.value = '';
+                return;
+            }
+            
+            // Show loading state
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('serial_id', serialId);
+            
+            // Upload file
+            fetch('/cheque-register/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Replace upload button with view button
+                    uploadBtn.remove();
+                    this.remove();
+                    
+                    const viewBtn = document.createElement('a');
+                    viewBtn.href = '/uploads/cheque/' + data.filename;
+                    viewBtn.target = '_blank';
+                    viewBtn.className = 'btn btn-sm btn-info upload-view-btn';
+                    viewBtn.title = 'View uploaded file';
+                    viewBtn.innerHTML = '<i class="fas fa-eye"></i>';
+                    
+                    uploadCell.appendChild(viewBtn);
+                } else {
+                    alert(data.error || 'Upload failed. Please try again.');
+                    uploadBtn.disabled = false;
+                    uploadBtn.innerHTML = '<i class="fas fa-upload"></i>';
+                    this.value = '';
+                }
+            })
+            .catch(error => {
+                console.error('Upload error:', error);
+                alert('An error occurred during upload. Please try again.');
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<i class="fas fa-upload"></i>';
+                this.value = '';
+            });
+        });
+    });
+});
+
+function applyFilters() {
+    const bookFilter = document.getElementById('bookFilter');
+    const statusFilter = document.getElementById('statusFilter');
+    const bookValue = bookFilter.value;
+    const statusValue = statusFilter.value;
+    
+    const url = new URL(window.location);
+    
+    // Update book filter
+    if (bookValue) {
+        url.searchParams.set('book', bookValue);
+    } else {
+        url.searchParams.delete('book');
+    }
+    
+    // Update status filter
+    if (statusValue) {
+        url.searchParams.set('status', statusValue);
+    } else {
+        url.searchParams.delete('status');
+    }
+    
+    window.location.href = url.toString();
+}
+</script>
+{% endblock %}
+

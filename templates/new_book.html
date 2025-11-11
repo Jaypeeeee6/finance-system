@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Add New Book{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-book"></i> Add New Book</h1>
+        <a href="{{ url_for('cheque_register') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Cheque Register
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Create New Cheque Book</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info" style="margin-bottom: 1.5rem;">
+                <strong>Note:</strong> Enter the book number and serial number range. The system will automatically generate all serial numbers between the starting and ending serial numbers.
+            </div>
+
+            <form method="POST" action="{{ url_for('new_book') }}" id="newBookForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="book_no">Book No. *</label>
+                        <input type="number" name="book_no" id="book_no" required min="1" placeholder="e.g., 1">
+                        <small>Enter the book number</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="start_serial_no">Starting Serial No. *</label>
+                        <input type="number" name="start_serial_no" id="start_serial_no" required min="1" placeholder="e.g., 100">
+                        <small>First serial number in the range</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="last_serial_no">Last Serial No. *</label>
+                        <input type="number" name="last_serial_no" id="last_serial_no" required min="1" placeholder="e.g., 150">
+                        <small>Last serial number in the range (inclusive)</small>
+                    </div>
+                </div>
+
+                <div class="form-group" id="previewSection" style="display: none; margin-top: 1.5rem; padding: 1rem; background-color: #f8f9fa; border-radius: 5px;">
+                    <label><strong>Preview:</strong></label>
+                    <p id="previewText" style="margin: 0.5rem 0;"></p>
+                </div>
+
+                <div class="form-actions" style="margin-top: 2rem;">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i> Create Book
+                    </button>
+                    <a href="{{ url_for('cheque_register') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const startSerialInput = document.getElementById('start_serial_no');
+    const lastSerialInput = document.getElementById('last_serial_no');
+    const previewSection = document.getElementById('previewSection');
+    const previewText = document.getElementById('previewText');
+
+    function updatePreview() {
+        const start = parseInt(startSerialInput.value);
+        const last = parseInt(lastSerialInput.value);
+
+        if (start && last && start <= last) {
+            const count = last - start + 1;
+            previewSection.style.display = 'block';
+            previewText.textContent = `This will generate ${count} serial number(s): ${start} to ${last} (inclusive)`;
+        } else if (start && last && start > last) {
+            previewSection.style.display = 'block';
+            previewText.textContent = '⚠️ Starting serial number must be less than or equal to last serial number';
+            previewText.style.color = '#dc3545';
+        } else {
+            previewSection.style.display = 'none';
+        }
+    }
+
+    startSerialInput.addEventListener('input', updatePreview);
+    lastSerialInput.addEventListener('input', updatePreview);
+
+    // Form validation
+    document.getElementById('newBookForm').addEventListener('submit', function(e) {
+        const start = parseInt(startSerialInput.value);
+        const last = parseInt(lastSerialInput.value);
+
+        if (start > last) {
+            e.preventDefault();
+            alert('Starting serial number must be less than or equal to last serial number');
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}
+

@@ -494,3 +494,46 @@ class FinanceAdminNote(db.Model):
     
     def __repr__(self):
         return f'<FinanceAdminNote {self.id} - Request {self.request_id} by {self.added_by}>'
+
+
+class ChequeBook(db.Model):
+    """Cheque book model"""
+    __tablename__ = 'cheque_books'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    book_no = db.Column(db.Integer, nullable=False, unique=True)
+    start_serial_no = db.Column(db.Integer, nullable=False)
+    last_serial_no = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    
+    # Relationship to User who created this book
+    created_by = db.relationship('User', backref='created_cheque_books')
+    
+    # Relationship to serial numbers
+    serials = db.relationship('ChequeSerial', backref='book', cascade='all, delete-orphan', lazy='dynamic')
+    
+    def __repr__(self):
+        return f'<ChequeBook {self.id} - Book No. {self.book_no} ({self.start_serial_no}-{self.last_serial_no})>'
+
+
+class ChequeSerial(db.Model):
+    """Cheque serial number model"""
+    __tablename__ = 'cheque_serials'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    book_id = db.Column(db.Integer, db.ForeignKey('cheque_books.id'), nullable=False)
+    serial_no = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(50), default='Available')  # Available, Reserved, Used, Cancelled
+    payee_name = db.Column(db.String(200), nullable=True)
+    cheque_date = db.Column(db.Date, nullable=True)
+    amount = db.Column(db.Numeric(12, 3), nullable=True)
+    upload_path = db.Column(db.String(500), nullable=True)  # Path to uploaded file
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Unique constraint: same serial number cannot exist in the same book
+    __table_args__ = (db.UniqueConstraint('book_id', 'serial_no', name='unique_book_serial'),)
+    
+    def __repr__(self):
+        return f'<ChequeSerial {self.id} - Book {self.book_id} Serial {self.serial_no} ({self.status})>'

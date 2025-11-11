@@ -11,7 +11,7 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType, Branch, BranchAlias, FinanceAdminNote
+from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial
 from config import Config
 import json
 
@@ -254,6 +254,7 @@ login_manager.login_view = 'login'
 
 # Create upload folder if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['CHEQUE_UPLOAD_FOLDER'], exist_ok=True)
 
 
 @login_manager.user_loader
@@ -8599,6 +8600,179 @@ def reports():
                          user=current_user)
 
 
+@app.route('/cheque-register')
+@login_required
+def cheque_register():
+    """View cheque register page"""
+    # Get filters from query parameters
+    book_filter = request.args.get('book', '')
+    status_filter = request.args.get('status', '')
+    
+    # Get all unique book numbers for the filter dropdown
+    book_numbers = db.session.query(ChequeBook.book_no).distinct().order_by(ChequeBook.book_no).all()
+    book_numbers = [book[0] for book in book_numbers]
+    
+    # Build query
+    query = db.session.query(ChequeSerial).join(ChequeBook)
+    
+    # Apply book filter if provided
+    if book_filter:
+        try:
+            book_no = int(book_filter)
+            query = query.filter(ChequeBook.book_no == book_no)
+        except ValueError:
+            pass  # Invalid book number, ignore filter
+    
+    # Apply status filter if provided
+    if status_filter:
+        valid_statuses = ['Available', 'Reserved', 'Used', 'Cancelled']
+        if status_filter in valid_statuses:
+            query = query.filter(ChequeSerial.status == status_filter)
+    
+    # Fetch all cheque serials with their book information, ordered by book_no and serial_no
+    cheque_serials = query.order_by(
+        ChequeBook.book_no, ChequeSerial.serial_no
+    ).all()
+    
+    return render_template('cheque_register.html', 
+                          cheque_serials=cheque_serials, 
+                          book_numbers=book_numbers,
+                          book_filter=book_filter,
+                          status_filter=status_filter)
+
+
+@app.route('/cheque-register/reserve', methods=['GET', 'POST'])
+@login_required
+def reserve_cheque():
+    """Reserve cheque serial numbers"""
+    if request.method == 'GET':
+        # Get book filter from query parameters
+        book_filter = request.args.get('book', '')
+        
+        # Get all unique book numbers for the filter dropdown
+        book_numbers = db.session.query(ChequeBook.book_no).distinct().order_by(ChequeBook.book_no).all()
+        book_numbers = [book[0] for book in book_numbers]
+        
+        # Build query for available serials
+        query = db.session.query(ChequeSerial).join(ChequeBook).filter(
+            ChequeSerial.status == 'Available'
+        )
+        
+        # Apply book filter if provided
+        if book_filter:
+            try:
+                book_no = int(book_filter)
+                query = query.filter(ChequeBook.book_no == book_no)
+            except ValueError:
+                pass  # Invalid book number, ignore filter
+        
+        # Fetch all available serial numbers
+        available_serials = query.order_by(
+            ChequeBook.book_no, ChequeSerial.serial_no
+        ).all()
+        
+        return render_template('reserve_cheque.html', 
+                             available_serials=available_serials,
+                             book_numbers=book_numbers,
+                             book_filter=book_filter)
+    
+    elif request.method == 'POST':
+        # Handle reservation
+        try:
+            data = request.get_json()
+            serial_ids = data.get('serial_ids', [])
+            
+            if not serial_ids:
+                return jsonify({'success': False, 'error': 'No serial numbers selected'}), 400
+            
+            # Validate that all serials exist and are available
+            serials = ChequeSerial.query.filter(
+                ChequeSerial.id.in_(serial_ids),
+                ChequeSerial.status == 'Available'
+            ).all()
+            
+            if len(serials) != len(serial_ids):
+                return jsonify({'success': False, 'error': 'Some selected serial numbers are not available'}), 400
+            
+            # Update status to Reserved
+            reserved_count = 0
+            for serial in serials:
+                serial.status = 'Reserved'
+                reserved_count += 1
+            
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'reserved_count': reserved_count,
+                'message': f'Successfully reserved {reserved_count} serial number(s)'
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/cheque-register/new-book', methods=['GET', 'POST'])
+@login_required
+def new_book():
+    """Add new cheque book"""
+    if request.method == 'POST':
+        book_no = request.form.get('book_no')
+        start_serial_no = request.form.get('start_serial_no')
+        last_serial_no = request.form.get('last_serial_no')
+        
+        # Validation
+        try:
+            book_no = int(book_no)
+            start_serial_no = int(start_serial_no)
+            last_serial_no = int(last_serial_no)
+            
+            if start_serial_no > last_serial_no:
+                flash('Starting serial number must be less than or equal to last serial number', 'error')
+                return render_template('new_book.html')
+            
+            # Check if book number already exists
+            existing_book = ChequeBook.query.filter_by(book_no=book_no).first()
+            if existing_book:
+                flash(f'Book number {book_no} already exists. Please use a different book number.', 'error')
+                return render_template('new_book.html')
+            
+            # Create the cheque book
+            cheque_book = ChequeBook(
+                book_no=book_no,
+                start_serial_no=start_serial_no,
+                last_serial_no=last_serial_no,
+                created_by_user_id=current_user.user_id
+            )
+            db.session.add(cheque_book)
+            db.session.flush()  # Get the book ID
+            
+            # Generate all serial numbers from start to last (inclusive)
+            serial_numbers = []
+            for serial_no in range(start_serial_no, last_serial_no + 1):
+                cheque_serial = ChequeSerial(
+                    book_id=cheque_book.id,
+                    serial_no=serial_no,
+                    status='Available'
+                )
+                serial_numbers.append(cheque_serial)
+            
+            db.session.add_all(serial_numbers)
+            db.session.commit()
+            
+            flash(f'Book {book_no} created successfully with {len(serial_numbers)} serial numbers ({start_serial_no} to {last_serial_no})', 'success')
+            return redirect(url_for('cheque_register'))
+        except ValueError:
+            flash('Please enter valid numbers for all fields', 'error')
+            return render_template('new_book.html')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating book: {str(e)}', 'error')
+            return render_template('new_book.html')
+    
+    return render_template('new_book.html')
+
 
 @app.route('/api/request-types')
 @login_required
@@ -9896,6 +10070,76 @@ def api_it_dashboard():
 def uploaded_file(filename):
     """Serve uploaded receipt files"""
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
+@app.route('/uploads/cheque/<filename>')
+@login_required
+def uploaded_cheque_file(filename):
+    """Serve uploaded cheque files"""
+    return send_from_directory(app.config['CHEQUE_UPLOAD_FOLDER'], filename)
+
+
+@app.route('/cheque-register/upload', methods=['POST'])
+@login_required
+def upload_cheque_file():
+    """Upload a file for a cheque serial"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        serial_id = request.form.get('serial_id')
+        
+        if not serial_id:
+            return jsonify({'success': False, 'error': 'Serial ID not provided'}), 400
+        
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+        
+        # Get the cheque serial
+        cheque_serial = ChequeSerial.query.get(serial_id)
+        if not cheque_serial:
+            return jsonify({'success': False, 'error': 'Cheque serial not found'}), 404
+        
+        # Validate file extension
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'pdf'}
+        file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        if file_extension not in allowed_extensions:
+            return jsonify({'success': False, 'error': 'Invalid file type. Allowed: JPG, PNG, GIF, PDF'}), 400
+        
+        # Validate file size (50MB max)
+        max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+        file.seek(0, 2)  # Seek to end
+        file_size = file.tell()
+        file.seek(0)  # Reset to beginning
+        
+        if file_size > max_file_size:
+            return jsonify({'success': False, 'error': f'File too large. Maximum size is {max_file_size // (1024 * 1024)}MB'}), 400
+        
+        # Generate unique filename
+        import uuid
+        
+        unique_id = str(uuid.uuid4())[:8]
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = secure_filename(f"cheque_{serial_id}_{timestamp}_{unique_id}_{file.filename}")
+        filepath = os.path.join(app.config['CHEQUE_UPLOAD_FOLDER'], filename)
+        
+        # Save file
+        file.save(filepath)
+        
+        # Update database
+        cheque_serial.upload_path = filename
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'message': 'File uploaded successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # ==================== ERROR HANDLERS ====================
