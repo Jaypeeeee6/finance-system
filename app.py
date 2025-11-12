@@ -5577,24 +5577,24 @@ def generate_cheque_pdf():
         else:
             formatted_date = ''
         
-        # Format amount
+        # Format amount (do not show currency in cheque overlay)
         formatted_amount = ''
         if amount:
             try:
                 numeric = float(amount)
                 formatted_amount = f"{numeric:,.3f}".replace(',', '')
-                if currency and currency != 'OMR':
-                    formatted_amount = f"{formatted_amount} {currency}"
             except:
                 formatted_amount = amount
         
-        # Convert amount to words (simplified - you may want to use the same function from JS)
+        # Get language for amount in words
+        amount_words_language = data.get('amountWordsLanguage', 'english')
+        
+        # Convert amount to words
         amount_words = ''
         if amount:
             try:
                 numeric = float(amount)
-                # Simple conversion (you can enhance this)
-                amount_words = convert_amount_to_words(numeric)
+                amount_words = convert_amount_to_words(numeric, currency, amount_words_language)
             except:
                 pass
         
@@ -5702,7 +5702,21 @@ def generate_cheque_pdf():
         return jsonify({'error': str(e)}), 500
 
 
-def convert_amount_to_words(amount):
+def get_currency_name(currency, language='english'):
+    """Get currency name in words based on currency code"""
+    if language == 'arabic':
+        # For Arabic, keep OMR as is for now (can be extended later)
+        return 'ريالاً عمانياً'
+    else:
+        # English currency names
+        if currency == 'USD':
+            return 'US Dollar'
+        elif currency == 'EUR':
+            return 'Euro'
+        else:  # OMR or default
+            return 'Rial Omani'
+
+def convert_amount_to_words(amount, currency='OMR', language='english'):
     """Convert numeric amount to words"""
     ones = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 
             'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 
@@ -5736,6 +5750,8 @@ def convert_amount_to_words(amount):
         return ''
     
     try:
+        currency_name = get_currency_name(currency, language)
+        
         fixed = f"{amount:.3f}"
         int_str, dec_str = fixed.split('.')
         int_num = int(int_str)
@@ -5744,16 +5760,20 @@ def convert_amount_to_words(amount):
         if int_num == 0:
             words = 'zero'
         
-        if dec_str and int(dec_str) > 0:
-            dec_words = ' '.join([number_to_words(int(d)) for d in dec_str])
-            words = f"{words} point {dec_words}"
-        
         if amount < 0:
             words = f"minus {words}"
         
-        # Capitalize and add "Omani Rials Only"
+        # Capitalize first letter of each word (including words with dashes)
         capitalized = ' '.join([word.capitalize() for word in words.split()])
-        return f"{capitalized} Omani Rials Only"
+        
+        # Format with currency name (matching frontend format)
+        if dec_str and int(dec_str) > 0:
+            if currency == 'OMR':
+                return f"{capitalized} {currency_name} & #{dec_str}# Baisa Only"
+            else:
+                return f"{capitalized} {currency_name} & #{dec_str}# Cents Only"
+        else:
+            return f"{capitalized} {currency_name} Only"
     except:
         return ''
 

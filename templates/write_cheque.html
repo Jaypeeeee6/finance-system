@@ -298,8 +298,8 @@ function formatAmount(amount, currency) {
     const formatted = isNaN(numeric)
         ? ''
         : numeric.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-    // Show currency only when it's not OMR per requirements
-    return currency && currency !== 'OMR' ? `${formatted} ${currency}` : formatted;
+    // Do not show currency in cheque overlay
+    return formatted;
 }
 
 // Convert integers to Arabic words (supports up to trillions)
@@ -388,8 +388,27 @@ function numberToWords(n) {
     return '';
 }
 
+// Get currency name in words based on currency code
+function getCurrencyName(currency, language = 'english') {
+    if (language === 'arabic') {
+        // For Arabic, keep OMR as is for now (can be extended later)
+        return 'ريالاً عمانياً';
+    } else {
+        // English currency names
+        switch(currency) {
+            case 'USD':
+                return 'US Dollar';
+            case 'EUR':
+                return 'Euro';
+            case 'OMR':
+            default:
+                return 'Rial Omani';
+        }
+    }
+}
+
 // Convert numeric amount to words (simple generic format)
-function amountToWords(amount, language = 'english') {
+function amountToWords(amount, language = 'english', currency = 'OMR') {
     if (!amount && amount !== 0) return '';
     const numeric = Number(amount);
     if (!isFinite(numeric)) return '';
@@ -397,16 +416,18 @@ function amountToWords(amount, language = 'english') {
     const [intStr, decStr] = fixed.split('.');
     const intNum = parseInt(intStr, 10);
     
+    const currencyName = getCurrencyName(currency, language);
+    
     if (language === 'arabic') {
         let words = numberToWordsArabic(Math.abs(intNum));
         if (intNum === 0) words = 'صفر';
         if (numeric < 0) words = `ناقص ${words}`;
         
-        // Format: "فقط [amount in words] ريالاً عمانياً و #[decimal digits]# بيسة لاغير"
+        // Format: "فقط [amount in words] [currency] و #[decimal digits]# بيسة لاغير"
         if (decStr && Number(decStr) > 0) {
-            return `فقط ${words} ريالاً عمانياً و #${decStr}# بيسة لاغير`;
+            return `فقط ${words} ${currencyName} و #${decStr}# بيسة لاغير`;
         } else {
-            return `فقط ${words} ريالاً عمانياً لاغير`;
+            return `فقط ${words} ${currencyName} لاغير`;
         }
     } else {
         // English format
@@ -423,11 +444,17 @@ function amountToWords(amount, language = 'english') {
             ).join('-');
         }).join(' ');
         
-        // Format: if there's a decimal, use "Rial Omani & #[decimal digits]# Baisa Only", otherwise "Rial Omani Only"
+        // Format: if there's a decimal, use "[currency] & #[decimal digits]# Baisa Only", otherwise "[currency] Only"
+        // Note: For non-OMR currencies, we might want to change "Baisa" to "Cents" or similar
         if (decStr && Number(decStr) > 0) {
-            return capitalizedWords + ' Rial Omani & #' + decStr + '# Baisa Only';
+            if (currency === 'OMR') {
+                return capitalizedWords + ' ' + currencyName + ' & #' + decStr + '# Baisa Only';
+            } else {
+                // For other currencies, use "Cents" instead of "Baisa"
+                return capitalizedWords + ' ' + currencyName + ' & #' + decStr + '# Cents Only';
+            }
         } else {
-            return capitalizedWords + ' Rial Omani Only';
+            return capitalizedWords + ' ' + currencyName + ' Only';
         }
     }
 }
@@ -820,7 +847,8 @@ function updateChequePreview() {
     const languageSelect = document.getElementById('amountWordsLanguage');
     if (amountInput && amountWordsOverlay) {
         const language = languageSelect ? languageSelect.value : 'english';
-        const words = amountToWords(amountInput.value, language);
+        const currency = currencySelect ? currencySelect.value : 'OMR';
+        const words = amountToWords(amountInput.value, language, currency);
         amountWordsOverlay.textContent = words;
         if (printAmountWordsOverlay) {
             printAmountWordsOverlay.textContent = words;
@@ -1350,7 +1378,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const languageSelect = document.getElementById('amountWordsLanguage');
         if (amountInput && modalAmountWordsOverlay) {
             const language = languageSelect ? languageSelect.value : 'english';
-            const words = amountToWords(amountInput.value, language);
+            const currency = currencySelect ? currencySelect.value : 'OMR';
+            const words = amountToWords(amountInput.value, language, currency);
             modalAmountWordsOverlay.textContent = words;
             // Set RTL for Arabic
             if (language === 'arabic') {
