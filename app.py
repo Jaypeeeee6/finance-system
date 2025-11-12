@@ -1001,14 +1001,56 @@ def get_payment_schedule(request_id):
     schedules = RecurringPaymentSchedule.query.filter_by(request_id=request_id).order_by(RecurringPaymentSchedule.payment_order).all()
     return [schedule.to_dict() for schedule in schedules]
 
+def get_authorized_users_for_recurring_due(request):
+    """Get all authorized users who should receive recurring payment due notifications"""
+    authorized_user_ids = set()
+    
+    # Finance Admin (all)
+    finance_admins = User.query.filter_by(role='Finance Admin').all()
+    for user in finance_admins:
+        authorized_user_ids.add(user.user_id)
+    
+    # Finance Staff (all)
+    finance_staff = User.query.filter_by(role='Finance Staff').all()
+    for user in finance_staff:
+        authorized_user_ids.add(user.user_id)
+    
+    # Project Staff (on their own requests only)
+    if request.user.role == 'Project Staff':
+        authorized_user_ids.add(request.user_id)
+    
+    # Department Managers (for their department's requests)
+    dept_managers = User.query.filter_by(
+        role='Department Manager',
+        department=request.department
+    ).all()
+    for user in dept_managers:
+        authorized_user_ids.add(user.user_id)
+    
+    # Department Staff (on their own requests only)
+    # Check if requestor is a department staff member (not Project Staff, not Finance, not GM, etc.)
+    if request.user.role not in ['Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'Department Manager']:
+        authorized_user_ids.add(request.user_id)
+    
+    return list(authorized_user_ids)
+
+
 def check_recurring_payments_due():
     """Check for recurring payments due today and create notifications"""
     today = date.today()
     
-    # Get all recurring payment requests with Recurring status
-    recurring_requests = PaymentRequest.query.filter_by(
-        recurring='Recurring',
-        status='Recurring'
+    # Get all recurring payment requests with Payment Type "Recurring" and status in allowed list
+    recurring_requests = PaymentRequest.query.filter(
+        PaymentRequest.recurring == 'Recurring',  # Payment Type must be "Recurring"
+        PaymentRequest.status.in_([
+            'Pending Finance Approval',
+            'Proof Pending',
+            'Proof Sent',
+            'Proof Rejected',
+            'Completed',
+            'Recurring'
+        ]),
+        PaymentRequest.is_archived == False
     ).all()
     
     for request in recurring_requests:
@@ -1044,11 +1086,13 @@ def check_recurring_payments_due():
                     ).first()
                     
                     if not existing_notification:
-                        # Create notifications for all admin and project users
-                        admin_users = User.query.filter(User.role.in_(['Finance Admin', 'Project Staff'])).all()
-                        for user in admin_users:
+                        # Get all authorized users for this request
+                        authorized_user_ids = get_authorized_users_for_recurring_due(request)
+                        
+                        # Create notifications for all authorized users
+                        for user_id in authorized_user_ids:
                             create_notification(
-                                user_id=user.user_id,
+                                user_id=user_id,
                                 title="Recurring Payment Due",
                                 message=f'Recurring payment due today for {request.request_type} - {request.purpose} (Amount: {schedule.amount} OMR)',
                                 notification_type='recurring_due',
@@ -1056,7 +1100,7 @@ def check_recurring_payments_due():
                             )
                         
                         # Log the action
-                        log_action(f"Recurring payment due notification created for request #{request.request_id} - Payment {schedule.payment_order}")
+                        log_action(f"Recurring payment due notification created for request #{request.request_id} - Payment {schedule.payment_order} - Notified {len(authorized_user_ids)} users")
         else:
             # Handle traditional recurring payments (single amount)
             if is_payment_due_today(request, today):
@@ -1082,11 +1126,13 @@ def check_recurring_payments_due():
                 ).first()
                 
                 if not existing_notification:
-                    # Create notification for all admin and project users
-                    admin_users = User.query.filter(User.role.in_(['Finance Admin', 'Project Staff'])).all()
-                    for user in admin_users:
+                    # Get all authorized users for this request
+                    authorized_user_ids = get_authorized_users_for_recurring_due(request)
+                    
+                    # Create notifications for all authorized users
+                    for user_id in authorized_user_ids:
                         create_notification(
-                            user_id=user.user_id,
+                            user_id=user_id,
                             title="Recurring Payment Due",
                             message=f'Recurring payment due today for {request.request_type} - {request.purpose}',
                             notification_type='recurring_due',
@@ -1094,7 +1140,7 @@ def check_recurring_payments_due():
                         )
                     
                     # Log the action
-                    log_action(f"Recurring payment due notification created for request #{request.request_id}")
+                    log_action(f"Recurring payment due notification created for request #{request.request_id} - Notified {len(authorized_user_ids)} users")
 
 
 def get_overdue_requests_count():
@@ -8561,11 +8607,11 @@ def edit_installment(request_id):
         
         # If the new date is today, create immediate notifications
         if payment_date == date.today():
-            # Create notifications for Finance Admin and Finance Staff about the payment due today
-            finance_users = User.query.filter(User.role.in_(['Finance Admin', 'Finance Staff'])).all()
-            for user in finance_users:
+            # Get all authorized users for this request and create notifications
+            authorized_user_ids = get_authorized_users_for_recurring_due(req)
+            for user_id in authorized_user_ids:
                 create_notification(
-                    user_id=user.user_id,
+                    user_id=user_id,
                     title="Recurring Payment Due",
                     message=f'Recurring payment due today for {req.request_type} - {req.purpose} (Amount: {schedule_entry.amount} OMR) - Date was recently edited',
                     notification_type='recurring_due',
