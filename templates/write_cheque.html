@@ -53,6 +53,14 @@
                         </select>
                     </div>
 
+                    <div class="form-group">
+                        <label for="amountWordsLanguage">Amount in Words Language</label>
+                        <select id="amountWordsLanguage" name="amountWordsLanguage" class="form-control">
+                            <option value="english">English</option>
+                            <option value="arabic">Arabic (العربية)</option>
+                        </select>
+                    </div>
+
                     <div class="form-actions">
                         <button type="button" class="btn btn-success" id="printBtn">
                             <i class="fas fa-print"></i> Print Cheque
@@ -87,7 +95,7 @@
                         <div class="cheque-overlay">
                             <div class="field-overlay" id="dateOverlay" style="position: absolute; top: 53px; left: 363px; font-size: 17px;"></div>
                             <div class="field-overlay" id="payeeOverlay" style="position: absolute; top: 127px; left: 250px; font-size: 16px; max-width: 400px; text-align: center;"></div>
-                            <div class="field-overlay" id="amountOverlay" style="position: absolute; top: 183px; left: 613px; font-size: 17px;"></div>
+                            <div class="field-overlay" id="amountOverlay" style="position: absolute; top: 183px; left: 613px; font-size: 17px; text-align: center;"></div>
                             <div class="field-overlay" id="amountWordsOverlay" style="position: absolute; top: 160px; left: 98px; font-size: 16px; max-width: 300px; line-height: 2.0; text-align: center;"></div>
                             <div class="field-overlay" id="crossingOverlay" style="position: absolute; top: 20px; left: 60px; font-size: 18px; font-weight: 700; text-transform: uppercase; transform: rotate(-25deg); color: rgba(200, 0, 0, 0.6);"></div>
                             <div class="field-overlay" id="purposeOverlay" style="position: absolute; top: 200px; left: 50px; font-size: 12px; max-width: 300px; line-height: 1.2;"></div>
@@ -185,9 +193,9 @@ const bankFieldPositions = {
         purpose: { top: '210px', left: '60px' }
     },
     'sohar': {
-        date: { top: '52px', left: '555px' },
+        date: { top: '52px', left: '560px' },
         payee: { top: '116px', left: '115px' },
-        amount: { top: '163px', left: '568px' },
+        amount: { top: '172px', left: '605px' },
         amountWords: { top: '153px', left: '80px' },
         crossing: { top: '25px', left: '70px' },
         purpose: { top: '205px', left: '55px' }
@@ -224,6 +232,9 @@ function updateFieldPositions(bank) {
         } else if (bank === 'oman_arab') {
             amountWordsOverlay.style.maxWidth = '420px';
             amountWordsOverlay.style.width = '420px';
+        } else if (bank === 'sohar') {
+            amountWordsOverlay.style.maxWidth = '400px';
+            amountWordsOverlay.style.width = '400px';
         } else {
             amountWordsOverlay.style.maxWidth = '300px';
             amountWordsOverlay.style.width = '300px';
@@ -237,6 +248,24 @@ function updateFieldPositions(bank) {
             payeeOverlay.style.fontSize = '18px'; // Bigger font size for Dhofar
         } else {
             payeeOverlay.style.fontSize = '16px'; // Default font size for other banks
+        }
+    }
+    
+    // Set text alignment for amount field (centered for all banks)
+    const amountOverlay = document.getElementById('amountOverlay');
+    if (amountOverlay) {
+        amountOverlay.style.textAlign = 'center';
+        amountOverlay.style.display = 'block';
+        // Set width for proper centering
+        if (bank === 'dhofar_islamic') {
+            amountOverlay.style.maxWidth = '120px';
+            amountOverlay.style.width = '120px';
+        } else if (bank === 'oman_arab') {
+            amountOverlay.style.maxWidth = '120px';
+            amountOverlay.style.width = '120px';
+        } else {
+            amountOverlay.style.maxWidth = '120px';
+            amountOverlay.style.width = '120px';
         }
     }
     
@@ -273,6 +302,60 @@ function formatAmount(amount, currency) {
     return currency && currency !== 'OMR' ? `${formatted} ${currency}` : formatted;
 }
 
+// Convert integers to Arabic words (supports up to trillions)
+function numberToWordsArabic(n) {
+    const ones = ['صفر', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة', 
+                  'عشرة', 'أحد عشر', 'اثنى عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر', 'ستة عشر', 
+                  'سبعة عشر', 'ثمانية عشر', 'تسعة عشر'];
+    const tens = ['', '', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون'];
+    
+    if (n < 20) return ones[n];
+    if (n < 100) {
+        const t = Math.floor(n / 10);
+        const r = n % 10;
+        if (r === 0) return tens[t];
+        if (r === 1) return 'واحد وعشرون';
+        if (r === 2) return 'اثنان وعشرون';
+        return `${ones[r]} و${tens[t]}`;
+    }
+    if (n < 1000) {
+        const h = Math.floor(n / 100);
+        const r = n % 100;
+        if (h === 1) {
+            return r ? `مائة و${numberToWordsArabic(r)}` : 'مائة';
+        } else if (h === 2) {
+            return r ? `مائتان و${numberToWordsArabic(r)}` : 'مائتان';
+        } else {
+            return r ? `${ones[h]}مائة و${numberToWordsArabic(r)}` : `${ones[h]}مائة`;
+        }
+    }
+    const units = [
+        { v: 1_000_000_000_000, w: 'تريليون', wAccusative: 'تريليونًا', wPlural: 'تريليونات' },
+        { v: 1_000_000_000, w: 'مليار', wAccusative: 'مليارًا', wPlural: 'مليارات' },
+        { v: 1_000_000, w: 'مليون', wAccusative: 'مليونًا', wPlural: 'ملايين' },
+        { v: 1_000, w: 'ألف', wAccusative: 'ألفًا', wPlural: 'آلاف' }
+    ];
+    for (const u of units) {
+        if (n >= u.v) {
+            const q = Math.floor(n / u.v);
+            const r = n % u.v;
+            if (r === 0) {
+                // When remainder is 0, if q is 1, return just the unit word (e.g., "ألف" not "واحد ألف")
+                return q === 1 ? u.w : `${numberToWordsArabic(q)} ${u.wPlural}`;
+            } else {
+                // When there's a remainder, if q is 1, use accusative form with tanween (e.g., "ألفًا")
+                if (q === 1) {
+                    return `${u.wAccusative} و${numberToWordsArabic(r)}`;
+                } else {
+                    const unitWord = (q === 2) ? u.wAccusative : (q < 11) ? u.wPlural : u.wAccusative;
+                    return `${numberToWordsArabic(q)} ${unitWord} و${numberToWordsArabic(r)}`;
+                }
+            }
+        }
+    }
+    return '';
+}
+
 // Convert integers to English words (supports up to trillions)
 function numberToWords(n) {
     const ones = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
@@ -298,32 +381,55 @@ function numberToWords(n) {
         if (n >= u.v) {
             const q = Math.floor(n / u.v);
             const r = n % u.v;
-            return r ? `${numberToWords(q)} ${u.w} ${numberToWords(r)}` : `${numberToWords(q)} ${u.w}`;
+            // Add comma after unit word if there's a remainder
+            return r ? `${numberToWords(q)} ${u.w}, ${numberToWords(r)}` : `${numberToWords(q)} ${u.w}`;
         }
     }
     return '';
 }
 
 // Convert numeric amount to words (simple generic format)
-function amountToWords(amount) {
+function amountToWords(amount, language = 'english') {
     if (!amount && amount !== 0) return '';
     const numeric = Number(amount);
     if (!isFinite(numeric)) return '';
     const fixed = numeric.toFixed(3); // keep three decimals to match input precision
     const [intStr, decStr] = fixed.split('.');
     const intNum = parseInt(intStr, 10);
-    let words = numberToWords(Math.abs(intNum));
-    if (intNum === 0) words = 'zero';
-    if (decStr && Number(decStr) > 0) {
-        const decWords = decStr.split('').map(d => numberToWords(parseInt(d, 10))).join(' ');
-        words = `${words} point ${decWords}`;
+    
+    if (language === 'arabic') {
+        let words = numberToWordsArabic(Math.abs(intNum));
+        if (intNum === 0) words = 'صفر';
+        if (numeric < 0) words = `ناقص ${words}`;
+        
+        // Format: "فقط [amount in words] ريالاً عمانياً و #[decimal digits]# بيسة لاغير"
+        if (decStr && Number(decStr) > 0) {
+            return `فقط ${words} ريالاً عمانياً و #${decStr}# بيسة لاغير`;
+        } else {
+            return `فقط ${words} ريالاً عمانياً لاغير`;
+        }
+    } else {
+        // English format
+        let words = numberToWords(Math.abs(intNum));
+        if (intNum === 0) words = 'zero';
+        if (numeric < 0) words = `minus ${words}`;
+        // Capitalize first letter of each word (including words with dashes)
+        const capitalizedWords = words.split(' ').map(word => {
+            // Skip commas, just capitalize the word parts
+            if (word === ',') return ',';
+            // Split by dash and capitalize each part, then join back with dash
+            return word.split('-').map(part => 
+                part.charAt(0).toUpperCase() + part.slice(1)
+            ).join('-');
+        }).join(' ');
+        
+        // Format: if there's a decimal, use "Rial Omani & #[decimal digits]# Baisa Only", otherwise "Rial Omani Only"
+        if (decStr && Number(decStr) > 0) {
+            return capitalizedWords + ' Rial Omani & #' + decStr + '# Baisa Only';
+        } else {
+            return capitalizedWords + ' Rial Omani Only';
+        }
     }
-    if (numeric < 0) words = `minus ${words}`;
-    // Capitalize first letter of each word and append "Omani Rials Only"
-    const capitalizedWords = words.split(' ').map(word => 
-        word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
-    return capitalizedWords + ' Omani Rials Only';
 }
 
 // Conversion constants
@@ -423,6 +529,48 @@ const OMAN_ARAB_AMOUNT_LEFT_OFFSET_MM = -138.6; // +3px right (≈+0.8mm): -139.
 // This ONLY affects the amount field in print preview for Oman Arab Bank
 const OMAN_ARAB_AMOUNT_TOP_OFFSET_MM = -11.3; // 8px down (≈+2.1mm): -13.4 + 2.1 = -11.3
 
+// Offset to move DATE field to the LEFT for Sohar Bank print preview only (in mm)
+// Negative value moves left, positive moves right
+// This ONLY affects the date field in print preview for Sohar Bank
+const SOHAR_DATE_LEFT_OFFSET_MM = -157.8; // Moved 30px left (≈-7.8mm): -149.6 - 7.8 = -157.8
+
+// Offset to move DATE field LOWER (down) for Sohar Bank print preview only (in mm)
+// Positive value moves down, negative moves up
+// This ONLY affects the date field in print preview for Sohar Bank
+const SOHAR_DATE_TOP_OFFSET_MM = 9.4; // Moved 28px lower (≈+7.5mm): 1.9 + 7.5 = 9.4
+
+// Offset to move PAYEE NAME field to the LEFT for Sohar Bank print preview only (in mm)
+// Negative value moves left, positive moves right
+// This ONLY affects the payee field in print preview for Sohar Bank
+const SOHAR_PAYEE_LEFT_OFFSET_MM = -222.1; // Same as Oman Arab Bank
+
+// Offset to move PAYEE NAME field LOWER (down) for Sohar Bank print preview only (in mm)
+// Positive value moves down, negative moves up
+// This ONLY affects the payee field in print preview for Sohar Bank
+const SOHAR_PAYEE_TOP_OFFSET_MM = 0.8; // Same as Oman Arab Bank
+
+// Offset to move AMOUNT IN WORDS field to the LEFT for Sohar Bank print preview only (in mm)
+// Negative value moves left, positive moves right
+// This ONLY affects the amountWords field in print preview for Sohar Bank
+// IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
+// ADDED 25mm SAFETY MARGIN to prevent printer from cutting off text on the left edge
+const SOHAR_AMOUNT_WORDS_LEFT_OFFSET_MM = -62.5; // Moved 20px left (≈-5.3mm): -57.2 - 5.3 = -62.5
+
+// Offset to move AMOUNT IN WORDS field HIGHER (up) for Sohar Bank print preview only (in mm)
+// Negative value moves up, positive moves down
+// This ONLY affects the amountWords field in print preview for Sohar Bank
+const SOHAR_AMOUNT_WORDS_TOP_OFFSET_MM = -1.4; // Moved 5px higher (≈-1.2mm): -0.2 - 1.2 = -1.4
+
+// Offset to move AMOUNT field to the LEFT for Sohar Bank print preview only (in mm)
+// Negative value moves left, positive moves right
+// This ONLY affects the amount field in print preview for Sohar Bank
+const SOHAR_AMOUNT_LEFT_OFFSET_MM = -151.3; // Moved 48px left (≈-12.7mm): -138.6 - 12.7 = -151.3
+
+// Offset to move AMOUNT field HIGHER (up) for Sohar Bank print preview only (in mm)
+// Negative value moves up, positive moves down
+// This ONLY affects the amount field in print preview for Sohar Bank
+const SOHAR_AMOUNT_TOP_OFFSET_MM = -4.2; // Moved 3px higher (≈-0.8mm): -3.4 - 0.8 = -4.2
+
 // Update print field positions based on ACTUAL screen positions
 // This ensures print matches exactly what's shown on screen
 function updatePrintPositions() {
@@ -502,6 +650,12 @@ function updatePrintPositions() {
                 finalPrintTop = printTop + OMAN_ARAB_DATE_TOP_OFFSET_MM; // Move date lower (down)
             }
             
+            // SPECIAL CASE: Move date field to the LEFT and LOWER for Sohar Bank print preview only
+            if (field === 'date' && selectedBank === 'sohar') {
+                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + SOHAR_DATE_LEFT_OFFSET_MM;
+                finalPrintTop = printTop + SOHAR_DATE_TOP_OFFSET_MM; // Move date lower (down)
+            }
+            
             // SPECIAL CASE: Move payee field to the LEFT and LOWER for Dhofar Islamic Bank print preview only
             if (field === 'payee' && selectedBank === 'dhofar_islamic') {
                 adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + DHOFAR_PAYEE_LEFT_OFFSET_MM;
@@ -514,6 +668,12 @@ function updatePrintPositions() {
                 finalPrintTop = printTop + OMAN_ARAB_PAYEE_TOP_OFFSET_MM; // Move payee lower (down)
             }
             
+            // SPECIAL CASE: Move payee field to the LEFT and LOWER for Sohar Bank print preview only
+            if (field === 'payee' && selectedBank === 'sohar') {
+                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + SOHAR_PAYEE_LEFT_OFFSET_MM;
+                finalPrintTop = printTop + SOHAR_PAYEE_TOP_OFFSET_MM; // Move payee lower (down)
+            }
+            
             // SPECIAL CASE: Move amount in words field to the LEFT and HIGHER for Dhofar Islamic Bank print preview only
             if (field === 'amountWords' && selectedBank === 'dhofar_islamic') {
                 adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + DHOFAR_AMOUNT_WORDS_LEFT_OFFSET_MM;
@@ -524,6 +684,12 @@ function updatePrintPositions() {
             if (field === 'amountWords' && selectedBank === 'oman_arab') {
                 adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + OMAN_ARAB_AMOUNT_WORDS_LEFT_OFFSET_MM;
                 finalPrintTop = printTop + OMAN_ARAB_AMOUNT_WORDS_TOP_OFFSET_MM; // Move amount in words higher (up)
+            }
+            
+            // SPECIAL CASE: Move amount in words field to the LEFT and HIGHER for Sohar Bank print preview only
+            if (field === 'amountWords' && selectedBank === 'sohar') {
+                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + SOHAR_AMOUNT_WORDS_LEFT_OFFSET_MM;
+                finalPrintTop = printTop + SOHAR_AMOUNT_WORDS_TOP_OFFSET_MM; // Move amount in words higher (up)
             }
             
             // SPECIAL CASE: Move amount field to the LEFT and HIGHER for Dhofar Islamic Bank print preview only
@@ -550,6 +716,18 @@ function updatePrintPositions() {
                 printOverlay.style.oTransform = 'rotate(0deg) scale(1)';
             }
             
+            // SPECIAL CASE: Move amount field to the LEFT and HIGHER for Sohar Bank print preview only
+            if (field === 'amount' && selectedBank === 'sohar') {
+                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + SOHAR_AMOUNT_LEFT_OFFSET_MM;
+                finalPrintTop = printTop + SOHAR_AMOUNT_TOP_OFFSET_MM; // Move amount higher (up)
+                // CRITICAL: Ensure no rotation or tilt - explicitly set rotation to 0
+                printOverlay.style.transform = 'rotate(0deg) scale(1)';
+                printOverlay.style.webkitTransform = 'rotate(0deg) scale(1)';
+                printOverlay.style.mozTransform = 'rotate(0deg) scale(1)';
+                printOverlay.style.msTransform = 'rotate(0deg) scale(1)';
+                printOverlay.style.oTransform = 'rotate(0deg) scale(1)';
+            }
+            
             // Bank-specific font sizes (Oman Arab only - slightly smaller)
             if (selectedBank === 'oman_arab') {
                 if (field === 'date') {
@@ -560,6 +738,7 @@ function updatePrintPositions() {
                 }
                 if (field === 'amount') {
                     printOverlay.style.fontSize = '4.0mm';
+                    printOverlay.style.textAlign = 'center';
                 }
                 if (field === 'amountWords') {
                     // Reduce width slightly for Oman Arab amount in words
@@ -570,7 +749,29 @@ function updatePrintPositions() {
                     printOverlay.style.textAlign = 'center';
                 }
             }
-
+            
+            // Bank-specific font sizes (Sohar Bank - same as Oman Arab Bank)
+            if (selectedBank === 'sohar') {
+                if (field === 'date') {
+                    printOverlay.style.fontSize = '3.4mm';
+                }
+                if (field === 'payee') {
+                    printOverlay.style.fontSize = '4.0mm';
+                }
+                if (field === 'amount') {
+                    printOverlay.style.fontSize = '4.0mm';
+                    printOverlay.style.textAlign = 'center';
+                }
+                if (field === 'amountWords') {
+                    // Reduce width slightly for Sohar Bank amount in words
+                    printOverlay.style.maxWidth = '39.0mm'; // ~230px
+                    printOverlay.style.width = '39.0mm';
+                    // Line-height slightly smaller
+                    printOverlay.style.lineHeight = '2.3';
+                    printOverlay.style.textAlign = 'center';
+                }
+            }
+            
             // Set print position
             // Left: may be adjusted for date/payee/amountWords/amount fields in Dhofar Islamic Bank
             // Top: ALWAYS the original calculated value, NEVER modified
@@ -616,10 +817,35 @@ function updateChequePreview() {
     // Update amount in words (overlay only)
     const amountWordsOverlay = document.getElementById('amountWordsOverlay');
     const printAmountWordsOverlay = document.getElementById('printAmountWordsOverlay');
+    const languageSelect = document.getElementById('amountWordsLanguage');
     if (amountInput && amountWordsOverlay) {
-        const words = amountToWords(amountInput.value);
+        const language = languageSelect ? languageSelect.value : 'english';
+        const words = amountToWords(amountInput.value, language);
         amountWordsOverlay.textContent = words;
-        if (printAmountWordsOverlay) printAmountWordsOverlay.textContent = words;
+        if (printAmountWordsOverlay) {
+            printAmountWordsOverlay.textContent = words;
+            // Set RTL for Arabic
+            if (language === 'arabic') {
+                printAmountWordsOverlay.setAttribute('dir', 'rtl');
+                printAmountWordsOverlay.style.direction = 'rtl';
+                printAmountWordsOverlay.style.textAlign = 'center';
+                printAmountWordsOverlay.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
+            } else {
+                printAmountWordsOverlay.setAttribute('dir', 'ltr');
+                printAmountWordsOverlay.style.direction = 'ltr';
+                printAmountWordsOverlay.style.textAlign = 'center';
+            }
+        }
+        // Set RTL for Arabic in overlay
+        // Container stays centered (via absolute positioning), text flows RTL but is centered
+        if (language === 'arabic') {
+            amountWordsOverlay.style.direction = 'rtl';
+            amountWordsOverlay.style.textAlign = 'center';
+            amountWordsOverlay.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
+        } else {
+            amountWordsOverlay.style.direction = 'ltr';
+            amountWordsOverlay.style.textAlign = 'center';
+        }
     }
 
     // Update crossing (slanted stamp on upper-left)
@@ -653,7 +879,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add event listeners to all form fields
     const formFields = [
-        'chequeDate', 'payeeName', 'amount', 'currency', 'crossing'
+        'chequeDate', 'payeeName', 'amount', 'currency', 'crossing', 'amountWordsLanguage'
     ];
     
     formFields.forEach(fieldId => {
@@ -689,6 +915,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const currency = document.getElementById('currency').value;
         const crossing = document.getElementById('crossing').value;
         const bankSelect = document.getElementById('bankSelect').value;
+        const languageSelect = document.getElementById('amountWordsLanguage');
+        const amountWordsLanguage = languageSelect ? languageSelect.value : 'english';
         
         // Prepare data to send
         const chequeData = {
@@ -697,7 +925,8 @@ document.addEventListener('DOMContentLoaded', function() {
             amount: amount,
             currency: currency,
             crossing: crossing,
-            bank: bankSelect
+            bank: bankSelect,
+            amountWordsLanguage: amountWordsLanguage
         };
         
         // Show loading indicator (optional)
@@ -1118,9 +1347,20 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Amount in words
         const modalAmountWordsOverlay = document.getElementById('modalAmountWordsOverlay');
+        const languageSelect = document.getElementById('amountWordsLanguage');
         if (amountInput && modalAmountWordsOverlay) {
-            const words = amountToWords(amountInput.value);
+            const language = languageSelect ? languageSelect.value : 'english';
+            const words = amountToWords(amountInput.value, language);
             modalAmountWordsOverlay.textContent = words;
+            // Set RTL for Arabic
+            if (language === 'arabic') {
+                modalAmountWordsOverlay.style.direction = 'rtl';
+                modalAmountWordsOverlay.style.textAlign = 'center';
+                modalAmountWordsOverlay.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
+            } else {
+                modalAmountWordsOverlay.style.direction = 'ltr';
+                modalAmountWordsOverlay.style.textAlign = 'center';
+            }
         }
         
         // Crossing
