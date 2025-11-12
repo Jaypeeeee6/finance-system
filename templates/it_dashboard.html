@@ -181,6 +181,8 @@
                                     <td>
                                         {% if req.recurring == 'Recurring' %}
                                             <span class="badge" style="background: #ffc107; color: #212529;">↻ Recurring</span>
+                                        {% elif req.payment_date or req.recurring == 'Scheduled One-Time' %}
+                                            <span class="badge" style="background: #fd7e14; color: white;">Scheduled One-Time</span>
                                         {% else %}
                                             <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
                                         {% endif %}

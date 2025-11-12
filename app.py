@@ -6153,8 +6153,11 @@ def schedule_one_time_payment(request_id):
         flash('Invalid payment date format.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
 
-    # Persist
+    # Persist - automatically change payment type to "Scheduled One-Time" when payment date is set
     req.payment_date = payment_date_val
+    # Automatically update payment type to "Scheduled One-Time" if it's currently "One-Time" or None
+    if req.recurring != 'Recurring':
+        req.recurring = 'Scheduled One-Time'
     req.updated_at = datetime.utcnow()
     db.session.commit()
 
@@ -8698,6 +8701,13 @@ def reports():
     if payment_type_filter:
         if payment_type_filter == 'Recurring':
             query = query.filter(PaymentRequest.recurring == 'Recurring')
+        elif payment_type_filter == 'Scheduled One-Time':
+            query = query.filter(
+                db.or_(
+                    PaymentRequest.recurring == 'Scheduled One-Time',
+                    PaymentRequest.payment_date.isnot(None)
+                )
+            ).filter(PaymentRequest.recurring != 'Recurring')
         elif payment_type_filter == 'One-Time':
             query = query.filter(
                 db.or_(
@@ -8705,7 +8715,7 @@ def reports():
                     PaymentRequest.recurring == '',
                     PaymentRequest.recurring == 'One-Time'
                 )
-            )
+            ).filter(PaymentRequest.payment_date.is_(None))
     
     # Date filtering - use submission date (date field) which exists for all requests
     if date_from:
@@ -10427,11 +10437,20 @@ def admin_calendar():
 def api_admin_recurring_events():
     """API endpoint for calendar events (recurring + one-time scheduled)."""
     try:
-        # Build query for recurring payment requests with Recurring status (exclude archived)
+        # Build query for recurring payment requests (exclude archived)
+        # Include requests with Payment Type "Recurring" and status in allowed list
         query = PaymentRequest.query.filter(
+            PaymentRequest.recurring == 'Recurring',  # Payment Type must be "Recurring"
             PaymentRequest.recurring_interval.isnot(None),
             PaymentRequest.recurring_interval != '',
-            PaymentRequest.status == 'Recurring',
+            PaymentRequest.status.in_([
+                'Pending Finance Approval',
+                'Proof Pending',
+                'Proof Sent',
+                'Proof Rejected',
+                'Completed',
+                'Recurring'
+            ]),
             PaymentRequest.is_archived == False
         )
         
@@ -10601,6 +10620,14 @@ def api_admin_recurring_events():
         one_time_query = PaymentRequest.query.filter(
             (PaymentRequest.recurring.is_(None)) | (PaymentRequest.recurring != 'Recurring'),
             PaymentRequest.payment_date.isnot(None),
+            PaymentRequest.status.in_([
+                'Pending Finance Approval',
+                'Proof Pending',
+                'Proof Sent',
+                'Proof Rejected',
+                'Completed',
+                'Recurring'
+            ]),
             PaymentRequest.is_archived == False
         )
         # Project Staff can only see their department's one-time requests as well

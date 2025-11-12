@@ -81,6 +81,7 @@
                         <select name="payment_type" id="payment_type">
                             <option value="" {% if not payment_type_filter %}selected{% endif %}>All Payment Types</option>
                             <option value="One-Time" {% if payment_type_filter == 'One-Time' %}selected{% endif %}>One-Time</option>
+                            <option value="Scheduled One-Time" {% if payment_type_filter == 'Scheduled One-Time' %}selected{% endif %}>Scheduled One-Time</option>
                             <option value="Recurring" {% if payment_type_filter == 'Recurring' %}selected{% endif %}>Recurring</option>
                         </select>
                     </div>
@@ -233,7 +234,15 @@
                                 <td><span class="badge badge-info">{{ req.request_type }}</span></td>
                                 <td>{{ req.requestor_name }}</td>
                                 <td>{{ req.department }}</td>
-                                <td>{{ req.recurring or 'One-Time' }}</td>
+                                <td>
+                                    {% if req.recurring == 'Recurring' %}
+                                        Recurring
+                                    {% elif req.payment_date or req.recurring == 'Scheduled One-Time' %}
+                                        Scheduled One-Time
+                                    {% else %}
+                                        {{ req.recurring or 'One-Time' }}
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if (not req.recurring or req.recurring != 'Recurring') and req.payment_date %}
                                         {{ req.payment_date.strftime('%Y-%m-%d') }}
