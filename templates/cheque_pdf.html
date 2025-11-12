@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            size: 7.5in 3.5in;
+            margin: 0;
+            padding: 0;
+        }
+        
+        @media print {
+            @page {
+                size: 7.5in 3.5in;
+                margin: 0;
+            }
+            * {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            width: 7.5in;
+            height: 3.5in;
+            position: relative;
+            font-family: Arial, sans-serif;
+        }
+        
+        .cheque-container {
+            position: relative;
+            width: 7.5in;
+            height: 3.5in;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .cheque-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .field-overlay {
+            position: absolute;
+            background: transparent;
+            color: #000;
+            font-weight: normal;
+        }
+        
+        .date-overlay {
+            font-size: 12px;
+            line-height: 1.2;
+        }
+        
+        .payee-overlay {
+            font-size: 14px;
+            line-height: 1.2;
+            max-width: 400px;
+            width: 400px;
+            text-align: center;
+        }
+        
+        .amount-overlay {
+            font-size: 13px;
+            line-height: 1.2;
+            white-space: nowrap;
+            transform: none; /* ensure no tilt */
+            transform-origin: left center;
+            font-style: normal;
+        }
+        
+        .amount-words-overlay {
+            font-size: 10px;
+            line-height: 2.0;
+            max-width: 250px;
+            text-align: center;
+            transform: none;
+            transform-origin: left top;
+            font-style: normal;
+        }
+        
+        .crossing-overlay {
+            font-size: 16px;
+            font-weight: normal;
+            text-transform: uppercase;
+            transform: rotate(-25deg);
+            color: rgba(200, 0, 0, 0.6);
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="cheque-container">
+        <div class="cheque-overlay">
+            {% if cheque_date %}
+            <div class="field-overlay date-overlay" style="top: {{ positions.date.top }}; left: {{ positions.date.left }}; {{ positions.date.extra|default('') }}">
+                {{ cheque_date }}
+            </div>
+            {% endif %}
+            
+            {% if payee_name %}
+            <div class="field-overlay payee-overlay" style="top: {{ positions.payee.top }}; left: {{ positions.payee.left }}; {{ positions.payee.extra|default('') }}">
+                {{ payee_name }}
+            </div>
+            {% endif %}
+            
+            {% if amount %}
+            <div class="field-overlay amount-overlay" style="top: {{ positions.amount.top }}; left: {{ positions.amount.left }}; {{ positions.amount.extra|default('') }}">
+                {{ amount }}
+            </div>
+            {% endif %}
+            
+            {% if amount_words %}
+            <div class="field-overlay amount-words-overlay" style="top: {{ positions.amountWords.top }}; left: {{ positions.amountWords.left }}; {{ positions.amountWords.extra|default('') }}">
+                {{ amount_words }}
+            </div>
+            {% endif %}
+            
+            {% if crossing %}
+            <div class="field-overlay crossing-overlay" style="top: {{ positions.crossing.top }}; left: {{ positions.crossing.left }};">
+                {{ crossing }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
+

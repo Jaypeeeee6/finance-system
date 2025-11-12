@@ -85,10 +85,10 @@
                         
                         <!-- Overlay fields that will be positioned over the cheque -->
                         <div class="cheque-overlay">
-                            <div class="field-overlay" id="dateOverlay" style="position: absolute; top: 50px; left: 355px; font-size: 14px;"></div>
-                            <div class="field-overlay" id="payeeOverlay" style="position: absolute; top: 127px; left: 280px; font-size: 16px; max-width: 400px;"></div>
-                            <div class="field-overlay" id="amountOverlay" style="position: absolute; top: 180px; left: 610px; font-size: 16px;"></div>
-                            <div class="field-overlay" id="amountWordsOverlay" style="position: absolute; top: 160px; left: 98px; font-size: 16px; max-width: 300px; line-height: 2.0;"></div>
+                            <div class="field-overlay" id="dateOverlay" style="position: absolute; top: 53px; left: 363px; font-size: 17px;"></div>
+                            <div class="field-overlay" id="payeeOverlay" style="position: absolute; top: 127px; left: 250px; font-size: 16px; max-width: 400px; text-align: center;"></div>
+                            <div class="field-overlay" id="amountOverlay" style="position: absolute; top: 183px; left: 613px; font-size: 17px;"></div>
+                            <div class="field-overlay" id="amountWordsOverlay" style="position: absolute; top: 160px; left: 98px; font-size: 16px; max-width: 300px; line-height: 2.0; text-align: center;"></div>
                             <div class="field-overlay" id="crossingOverlay" style="position: absolute; top: 20px; left: 60px; font-size: 18px; font-weight: 700; text-transform: uppercase; transform: rotate(-25deg); color: rgba(200, 0, 0, 0.6);"></div>
                             <div class="field-overlay" id="purposeOverlay" style="position: absolute; top: 200px; left: 50px; font-size: 12px; max-width: 300px; line-height: 1.2;"></div>
                         </div>
@@ -157,21 +157,30 @@
 
 {% block extra_js %}
 <script>
+// Ensure on-screen amount overlay is never tilted
+(function() {
+    const el = document.getElementById('amountOverlay');
+    if (el) {
+        el.style.transform = 'none';
+        el.style.transformOrigin = 'left center';
+        el.style.fontStyle = 'normal';
+    }
+})();
 // Cheque field mapping for different banks
 const bankFieldPositions = {
     'dhofar_islamic': {
-        date: { top: '50px', left: '355px' },
-        payee: { top: '127px', left: '280px' },
-        amount: { top: '180px', left: '610px' },
-        amountWords: { top: '160px', left: '98px' },
+        date: { top: '53px', left: '363px' }, // Moved slightly more to the right
+        payee: { top: '127px', left: '185px' }, // Moved 15px to the left (200->185)
+        amount: { top: '183px', left: '613px' }, // Moved 3px lower and 3px right
+        amountWords: { top: '160px', left: '95px' }, // Moved 3px left (98->95)
         crossing: { top: '20px', left: '60px' },
         purpose: { top: '200px', left: '50px' }
     },
     'oman_arab': {
-        date: { top: '13px', left: '580px' },
-        payee: { top: '120px', left: '150px' },
-        amount: { top: '130px', left: '617px' },
-        amountWords: { top: '160px', left: '95px' },
+        date: { top: '13px', left: '610px' },  // Moved 10px to the right (580->590)
+        payee: { top: '125px', left: '90px' },  // Moved 5px lower (120->125) and 30px to the right (150->180)
+        amount: { top: '135px', left: '645px' },  // Moved 10px to the right (617->627)
+        amountWords: { top: '165px', left: '82px' },  // Moved 7px to the right (95->102)
         crossing: { top: '15px', left: '40px' },
         purpose: { top: '210px', left: '60px' }
     },
@@ -197,6 +206,39 @@ function updateFieldPositions(bank) {
             overlay.style.left = positions[field].left;
         }
     });
+    
+    // Set line-height for amount in words based on bank
+    const amountWordsOverlay = document.getElementById('amountWordsOverlay');
+    if (amountWordsOverlay) {
+        if (bank === 'oman_arab') {
+            amountWordsOverlay.style.lineHeight = '2.3'; // Bigger line height for Oman Arab Bank
+        } else {
+            amountWordsOverlay.style.lineHeight = '2.0'; // Default line height for other banks
+        }
+        // Bank-specific width for on-screen overlay (cheque overlay only)
+        amountWordsOverlay.style.display = 'block';
+        amountWordsOverlay.style.textAlign = 'center';
+        if (bank === 'dhofar_islamic') {
+            amountWordsOverlay.style.maxWidth = '400px';
+            amountWordsOverlay.style.width = '400px';
+        } else if (bank === 'oman_arab') {
+            amountWordsOverlay.style.maxWidth = '420px';
+            amountWordsOverlay.style.width = '420px';
+        } else {
+            amountWordsOverlay.style.maxWidth = '300px';
+            amountWordsOverlay.style.width = '300px';
+        }
+    }
+    
+    // Set font size for payee name based on bank (Dhofar only - bigger)
+    const payeeOverlay = document.getElementById('payeeOverlay');
+    if (payeeOverlay) {
+        if (bank === 'dhofar_islamic') {
+            payeeOverlay.style.fontSize = '18px'; // Bigger font size for Dhofar
+        } else {
+            payeeOverlay.style.fontSize = '16px'; // Default font size for other banks
+        }
+    }
     
     // Print positions will be updated dynamically based on actual screen positions
     // when print is called or bank is changed
@@ -297,26 +339,89 @@ const PRINT_RIGHT_OFFSET_MM = 5; // Adjust this value to move text more/less to 
 // Negative value moves left, positive moves right
 // This ONLY affects the date field in print preview for Dhofar Islamic Bank
 // IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
-const DHOFAR_DATE_LEFT_OFFSET_MM = -53; // Adjust this value to move date more/less to the left
+const DHOFAR_DATE_LEFT_OFFSET_MM = -188; // Adjusted to move date much more to the left (was -88, now -128 for additional 40mm left)
+
+// Offset to move DATE field LOWER (down) for Dhofar Islamic Bank print preview only (in mm)
+// Positive value moves down, negative moves up
+// This ONLY affects the date field in print preview for Dhofar Islamic Bank
+const DHOFAR_DATE_TOP_OFFSET_MM = 9.3; // Moved slightly higher (was 9.8mm)
 
 // Offset to move PAYEE NAME field to the LEFT for Dhofar Islamic Bank print preview only (in mm)
 // Negative value moves left, positive moves right
 // This ONLY affects the payee field in print preview for Dhofar Islamic Bank
-// IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
-const DHOFAR_PAYEE_LEFT_OFFSET_MM = -45; // Adjust this value to move payee more/less to the left
+const DHOFAR_PAYEE_LEFT_OFFSET_MM = -205; // Adjust this value to move payee more/less to the left
+
+// Offset to move PAYEE NAME field LOWER (down) for Dhofar Islamic Bank print preview only (in mm)
+// Positive value moves down, negative moves up
+// This ONLY affects the payee field in print preview for Dhofar Islamic Bank
+const DHOFAR_PAYEE_TOP_OFFSET_MM = 1.3; // Move payee 5px (≈1.3mm) lower (down)
 
 // Offset to move AMOUNT IN WORDS field to the LEFT for Dhofar Islamic Bank print preview only (in mm)
 // Negative value moves left, positive moves right
 // This ONLY affects the amountWords field in print preview for Dhofar Islamic Bank
 // IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
 // ADDED 25mm SAFETY MARGIN to prevent printer from cutting off text on the left edge
-const DHOFAR_AMOUNT_WORDS_LEFT_OFFSET_MM = -25; // Adjusted from -50 to -25 (moved 25mm right to avoid printer margin cutting the beginning of words)
+const DHOFAR_AMOUNT_WORDS_LEFT_OFFSET_MM = -61.2; // Shifted ~3px right (≈0.8mm): -62 -> -61.2
+
+// Offset to move AMOUNT IN WORDS field HIGHER (up) for Dhofar Islamic Bank print preview only (in mm)
+// Negative value moves up, positive moves down
+// This ONLY affects the amountWords field in print preview for Dhofar Islamic Bank
+const DHOFAR_AMOUNT_WORDS_TOP_OFFSET_MM = -0.8; // Adjusted to move amount in words 5px (≈1.3mm) lower (was -2.1mm, now -0.8mm)
 
 // Offset to move AMOUNT field to the LEFT for Dhofar Islamic Bank print preview only (in mm)
 // Negative value moves left, positive moves right
 // This ONLY affects the amount field in print preview for Dhofar Islamic Bank
+const DHOFAR_AMOUNT_LEFT_OFFSET_MM = -142.8; // Moved additional ~3px left (≈0.8mm): -142 -> -142.8
+
+// Offset to move AMOUNT field HIGHER (up) for Dhofar Islamic Bank print preview only (in mm)
+// Negative value moves up, positive moves down
+// This ONLY affects the amount field in print preview for Dhofar Islamic Bank
+const DHOFAR_AMOUNT_TOP_OFFSET_MM = -3.3; // Moved slightly higher (was -2.8mm)
+
+// ========== OMAN ARAB BANK OFFSETS (Same values as Dhofar for testing) ==========
+
+// Offset to move DATE field to the LEFT for Oman Arab Bank print preview only (in mm)
+// Negative value moves left, positive moves right
+// This ONLY affects the date field in print preview for Oman Arab Bank
 // IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
-const DHOFAR_AMOUNT_LEFT_OFFSET_MM = -60; // Adjust this value to move amount more/less to the left
+const OMAN_ARAB_DATE_LEFT_OFFSET_MM = -149.6; // +20px right (≈+5.3mm): -154.9 + 5.3 = -149.6
+
+// Offset to move DATE field LOWER (down) for Oman Arab Bank print preview only (in mm)
+// Positive value moves down, negative moves up
+// This ONLY affects the date field in print preview for Oman Arab Bank
+const OMAN_ARAB_DATE_TOP_OFFSET_MM = 1.9; // Additional 10px up (≈-2.6mm): 4.5 - 2.6 = 1.9
+
+// Offset to move PAYEE NAME field to the LEFT for Oman Arab Bank print preview only (in mm)
+// Negative value moves left, positive moves right
+// This ONLY affects the payee field in print preview for Oman Arab Bank
+const OMAN_ARAB_PAYEE_LEFT_OFFSET_MM = -222.1; // Moved 5px more to the left (≈-1.3mm): -220.8 - 1.3 = -222.1
+
+// Offset to move PAYEE NAME field LOWER (down) for Oman Arab Bank print preview only (in mm)
+// Positive value moves down, negative moves up
+// This ONLY affects the payee field in print preview for Oman Arab Bank
+const OMAN_ARAB_PAYEE_TOP_OFFSET_MM = 0.8; // Slightly lower (~+0.3mm more)
+
+// Offset to move AMOUNT IN WORDS field to the LEFT for Oman Arab Bank print preview only (in mm)
+// Negative value moves left, positive moves right
+// This ONLY affects the amountWords field in print preview for Oman Arab Bank
+// IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
+// ADDED 25mm SAFETY MARGIN to prevent printer from cutting off text on the left edge
+const OMAN_ARAB_AMOUNT_WORDS_LEFT_OFFSET_MM = -57.2; // Move a little more right (~+3px ≈ +0.8mm)
+
+// Offset to move AMOUNT IN WORDS field HIGHER (up) for Oman Arab Bank print preview only (in mm)
+// Negative value moves up, positive moves down
+// This ONLY affects the amountWords field in print preview for Oman Arab Bank
+const OMAN_ARAB_AMOUNT_WORDS_TOP_OFFSET_MM = -0.2; // 5px up (≈-1.3mm): 1.1 - 1.3 = -0.2
+
+// Offset to move AMOUNT field to the LEFT for Oman Arab Bank print preview only (in mm)
+// Negative value moves left, positive moves right
+// This ONLY affects the amount field in print preview for Oman Arab Bank
+const OMAN_ARAB_AMOUNT_LEFT_OFFSET_MM = -138.6; // +3px right (≈+0.8mm): -139.4 + 0.8 = -138.6
+
+// Offset to move AMOUNT field HIGHER (up) for Oman Arab Bank print preview only (in mm)
+// Negative value moves up, positive moves down
+// This ONLY affects the amount field in print preview for Oman Arab Bank
+const OMAN_ARAB_AMOUNT_TOP_OFFSET_MM = -11.3; // 8px down (≈+2.1mm): -13.4 + 2.1 = -11.3
 
 // Update print field positions based on ACTUAL screen positions
 // This ensures print matches exactly what's shown on screen
@@ -381,47 +486,91 @@ function updatePrintPositions() {
             const printLeft = (naturalLeft / naturalWidth) * CHEQUE_WIDTH_MM;
             const printTop = (naturalTop / naturalHeight) * CHEQUE_HEIGHT_MM;
             
-            // CRITICAL: Top position is ABSOLUTELY NEVER modified - it stays exactly as calculated
-            // This ensures vertical position stays 100% the same, no matter what
-            const finalPrintTop = printTop; // Lock the top position - never changes
-            
-            // Apply offsets based on field and bank (ONLY affects left position, NEVER top)
+            // Apply offsets based on field and bank
             let adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM;
+            let finalPrintTop = printTop; // Start with calculated top position
             
-            // SPECIAL CASE: Move date field to the LEFT for Dhofar Islamic Bank print preview only
-            // CRITICAL: This ONLY modifies left position - top position is COMPLETELY UNTOUCHED
+            // SPECIAL CASE: Move date field to the LEFT and LOWER for Dhofar Islamic Bank print preview only
             if (field === 'date' && selectedBank === 'dhofar_islamic') {
                 adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + DHOFAR_DATE_LEFT_OFFSET_MM;
-                // Note: finalPrintTop remains unchanged - no vertical movement at all
+                finalPrintTop = printTop + DHOFAR_DATE_TOP_OFFSET_MM; // Move date lower (down)
             }
             
-            // SPECIAL CASE: Move payee field to the LEFT for Dhofar Islamic Bank print preview only
-            // CRITICAL: This ONLY modifies left position - top position is COMPLETELY UNTOUCHED
+            // SPECIAL CASE: Move date field to the LEFT and LOWER for Oman Arab Bank print preview only
+            if (field === 'date' && selectedBank === 'oman_arab') {
+                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + OMAN_ARAB_DATE_LEFT_OFFSET_MM;
+                finalPrintTop = printTop + OMAN_ARAB_DATE_TOP_OFFSET_MM; // Move date lower (down)
+            }
+            
+            // SPECIAL CASE: Move payee field to the LEFT and LOWER for Dhofar Islamic Bank print preview only
             if (field === 'payee' && selectedBank === 'dhofar_islamic') {
                 adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + DHOFAR_PAYEE_LEFT_OFFSET_MM;
-                // Note: finalPrintTop remains unchanged - no vertical movement at all
+                finalPrintTop = printTop + DHOFAR_PAYEE_TOP_OFFSET_MM; // Move payee lower (down)
             }
             
-            // SPECIAL CASE: Move amount in words field to the LEFT for Dhofar Islamic Bank print preview only
-            // CRITICAL: This ONLY modifies left position - top position is COMPLETELY UNTOUCHED
+            // SPECIAL CASE: Move payee field to the LEFT and LOWER for Oman Arab Bank print preview only
+            if (field === 'payee' && selectedBank === 'oman_arab') {
+                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + OMAN_ARAB_PAYEE_LEFT_OFFSET_MM;
+                finalPrintTop = printTop + OMAN_ARAB_PAYEE_TOP_OFFSET_MM; // Move payee lower (down)
+            }
+            
+            // SPECIAL CASE: Move amount in words field to the LEFT and HIGHER for Dhofar Islamic Bank print preview only
             if (field === 'amountWords' && selectedBank === 'dhofar_islamic') {
                 adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + DHOFAR_AMOUNT_WORDS_LEFT_OFFSET_MM;
-                // Note: finalPrintTop remains unchanged - no vertical movement at all
+                finalPrintTop = printTop + DHOFAR_AMOUNT_WORDS_TOP_OFFSET_MM; // Move amount in words higher (up)
             }
             
-            // SPECIAL CASE: Move amount field to the LEFT for Dhofar Islamic Bank print preview only
-            // CRITICAL: This ONLY modifies left position - top position is COMPLETELY UNTOUCHED
+            // SPECIAL CASE: Move amount in words field to the LEFT and HIGHER for Oman Arab Bank print preview only
+            if (field === 'amountWords' && selectedBank === 'oman_arab') {
+                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + OMAN_ARAB_AMOUNT_WORDS_LEFT_OFFSET_MM;
+                finalPrintTop = printTop + OMAN_ARAB_AMOUNT_WORDS_TOP_OFFSET_MM; // Move amount in words higher (up)
+            }
+            
+            // SPECIAL CASE: Move amount field to the LEFT and HIGHER for Dhofar Islamic Bank print preview only
             if (field === 'amount' && selectedBank === 'dhofar_islamic') {
                 adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + DHOFAR_AMOUNT_LEFT_OFFSET_MM;
+                finalPrintTop = printTop + DHOFAR_AMOUNT_TOP_OFFSET_MM; // Move amount higher (up)
                 // CRITICAL: Ensure no rotation or tilt - explicitly set rotation to 0
                 printOverlay.style.transform = 'rotate(0deg) scale(1)';
                 printOverlay.style.webkitTransform = 'rotate(0deg) scale(1)';
                 printOverlay.style.mozTransform = 'rotate(0deg) scale(1)';
                 printOverlay.style.msTransform = 'rotate(0deg) scale(1)';
                 printOverlay.style.oTransform = 'rotate(0deg) scale(1)';
-                // Note: finalPrintTop remains unchanged - no vertical movement at all
             }
             
+            // SPECIAL CASE: Move amount field to the LEFT and HIGHER for Oman Arab Bank print preview only
+            if (field === 'amount' && selectedBank === 'oman_arab') {
+                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + OMAN_ARAB_AMOUNT_LEFT_OFFSET_MM;
+                finalPrintTop = printTop + OMAN_ARAB_AMOUNT_TOP_OFFSET_MM; // Move amount higher (up)
+                // CRITICAL: Ensure no rotation or tilt - explicitly set rotation to 0
+                printOverlay.style.transform = 'rotate(0deg) scale(1)';
+                printOverlay.style.webkitTransform = 'rotate(0deg) scale(1)';
+                printOverlay.style.mozTransform = 'rotate(0deg) scale(1)';
+                printOverlay.style.msTransform = 'rotate(0deg) scale(1)';
+                printOverlay.style.oTransform = 'rotate(0deg) scale(1)';
+            }
+            
+            // Bank-specific font sizes (Oman Arab only - slightly smaller)
+            if (selectedBank === 'oman_arab') {
+                if (field === 'date') {
+                    printOverlay.style.fontSize = '3.4mm';
+                }
+                if (field === 'payee') {
+                    printOverlay.style.fontSize = '4.0mm';
+                }
+                if (field === 'amount') {
+                    printOverlay.style.fontSize = '4.0mm';
+                }
+                if (field === 'amountWords') {
+                    // Reduce width slightly for Oman Arab amount in words
+                    printOverlay.style.maxWidth = '39.0mm'; // ~230px
+                    printOverlay.style.width = '39.0mm';
+                    // Increase line-height more
+                    printOverlay.style.lineHeight = '2.5';
+                    printOverlay.style.textAlign = 'center';
+                }
+            }
+
             // Set print position
             // Left: may be adjusted for date/payee/amountWords/amount fields in Dhofar Islamic Bank
             // Top: ALWAYS the original calculated value, NEVER modified
@@ -531,8 +680,136 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Print function - shows print container and triggers print dialog
+    // Print function - generates PDF and automatically opens print dialog
     function printCheque() {
+        // Collect all cheque data
+        const chequeDate = document.getElementById('chequeDate').value;
+        const payeeName = document.getElementById('payeeName').value;
+        const amount = document.getElementById('amount').value;
+        const currency = document.getElementById('currency').value;
+        const crossing = document.getElementById('crossing').value;
+        const bankSelect = document.getElementById('bankSelect').value;
+        
+        // Prepare data to send
+        const chequeData = {
+            chequeDate: chequeDate,
+            payeeName: payeeName,
+            amount: amount,
+            currency: currency,
+            crossing: crossing,
+            bank: bankSelect
+        };
+        
+        // Show loading indicator (optional)
+        const printBtn = document.getElementById('printBtn') || document.getElementById('printChequeBtn');
+        if (printBtn) {
+            const originalText = printBtn.innerHTML;
+            printBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
+            printBtn.disabled = true;
+            
+            // Reset button after a delay (in case of error)
+            setTimeout(() => {
+                printBtn.innerHTML = originalText;
+                printBtn.disabled = false;
+            }, 5000);
+        }
+        
+        // Send data to server to generate PDF
+        fetch('/generate-cheque-pdf', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(chequeData)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to generate PDF');
+            }
+            return response.blob();
+        })
+        .then(pdfBlob => {
+            // Create blob URL
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            
+            // Create a hidden iframe to load the PDF
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '1px';
+            iframe.style.height = '1px';
+            iframe.style.border = 'none';
+            iframe.style.opacity = '0';
+            iframe.src = pdfUrl;
+            document.body.appendChild(iframe);
+            
+            // Wait for PDF to load, then trigger print
+            const attemptPrint = () => {
+                try {
+                    if (iframe.contentWindow) {
+                        iframe.contentWindow.focus();
+                        iframe.contentWindow.print();
+                        
+                        // Clean up after printing
+                        setTimeout(() => {
+                            document.body.removeChild(iframe);
+                            URL.revokeObjectURL(pdfUrl);
+                        }, 1000);
+                        
+                        // Reset button
+                        if (printBtn) {
+                            printBtn.innerHTML = originalText;
+                            printBtn.disabled = false;
+                        }
+                        return true;
+                    }
+                } catch (e) {
+                    // Cross-origin or other error, try alternative method
+                    return false;
+                }
+            };
+            
+            // Try printing after a short delay to allow PDF to load
+            setTimeout(() => {
+                if (!attemptPrint()) {
+                    // Fallback: open in new window
+                    const printWindow = window.open(pdfUrl, '_blank');
+                    if (printWindow) {
+                        setTimeout(() => {
+                            printWindow.print();
+                            setTimeout(() => {
+                                URL.revokeObjectURL(pdfUrl);
+                            }, 1000);
+                        }, 1000);
+                    }
+                    
+                    // Clean up iframe
+                    document.body.removeChild(iframe);
+                    URL.revokeObjectURL(pdfUrl);
+                    
+                    // Reset button
+                    if (printBtn) {
+                        printBtn.innerHTML = originalText;
+                        printBtn.disabled = false;
+                    }
+                }
+            }, 500);
+        })
+        .catch(error => {
+            console.error('Error generating PDF:', error);
+            alert('Error generating PDF. Please try again.');
+            
+            // Reset button
+            if (printBtn) {
+                printBtn.innerHTML = originalText;
+                printBtn.disabled = false;
+            }
+        });
+    }
+    
+    // Old print function (kept for reference but not used)
+    function printChequeOld() {
         // Update all print fields before printing
         updateChequePreview();
         
@@ -908,3 +1185,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+

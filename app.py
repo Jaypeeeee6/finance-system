@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, send_file, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, send_file, session, Response
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_socketio import SocketIO, emit, join_room
 from flask_mail import Mail, Message
@@ -14,6 +14,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial
 from config import Config
 import json
+from playwright.sync_api import sync_playwright
+from io import BytesIO
+import base64
 
 # --- Maintenance mode storage (instance file) ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -5500,6 +5503,213 @@ def write_cheque():
     return render_template('write_cheque.html', 
                          user=current_user, 
                          approved_requests=approved_requests)
+
+
+@app.route('/generate-cheque-pdf', methods=['POST'])
+@login_required
+@role_required('GM', 'CEO', 'Operation Manager')
+def generate_cheque_pdf():
+    """Generate PDF from cheque data"""
+    try:
+        data = request.get_json()
+        
+        # Extract cheque data
+        cheque_date = data.get('chequeDate', '')
+        payee_name = data.get('payeeName', '')
+        amount = data.get('amount', '')
+        currency = data.get('currency', 'OMR')
+        crossing = data.get('crossing', '')
+        bank = data.get('bank', 'dhofar_islamic')
+        
+        # Format date
+        if cheque_date:
+            try:
+                date_obj = datetime.strptime(cheque_date, '%Y-%m-%d')
+                formatted_date = date_obj.strftime('%d/%m/%Y')
+            except:
+                formatted_date = cheque_date
+        else:
+            formatted_date = ''
+        
+        # Format amount
+        formatted_amount = ''
+        if amount:
+            try:
+                numeric = float(amount)
+                formatted_amount = f"{numeric:,.3f}".replace(',', '')
+                if currency and currency != 'OMR':
+                    formatted_amount = f"{formatted_amount} {currency}"
+            except:
+                formatted_amount = amount
+        
+        # Convert amount to words (simplified - you may want to use the same function from JS)
+        amount_words = ''
+        if amount:
+            try:
+                numeric = float(amount)
+                # Simple conversion (you can enhance this)
+                amount_words = convert_amount_to_words(numeric)
+            except:
+                pass
+        
+        # Get bank-specific positions
+        bank_positions = {
+            'dhofar_islamic': {
+                'date': {'top': '90px', 'left': '220px'},  # Moved slightly higher (92->90)
+                'payee': {'top': '132px', 'left': '40px'},  # Moved 5px lower (127->132)
+                'amount': {'top': '165px', 'left': '367px'},  # Moved 3px left (370->367)
+                'amountWords': {'top': '155px', 'left': '41px'},  # Moved 3px right (38->41)
+                'crossing': {'top': '20px', 'left': '60px'}
+            },
+            'oman_arab': {
+                'date': {'top': '62px', 'left': '365px', 'extra': 'font-size: 11px;'},  # +20px right (345->365)
+                'payee': {'top': '130px', 'left': '-5px', 'extra': 'font-size: 13px;'},   # Nudge ~1px down (129->130)
+                'amount': {'top': '135px', 'left': '383px', 'extra': 'font-size: 12px;'}, # 8px down (127->135), 3px right (380->383), smaller font
+                'amountWords': {'top': '157px', 'left': '58px', 'extra': 'max-width: 230px; width: 230px; line-height: 2.5;'},  # Bigger line-height
+                'crossing': {'top': '20px', 'left': '60px'}  # Same as Dhofar Islamic Bank for testing
+            },
+            'sohar': {
+                'date': {'top': '52px', 'left': '555px'},
+                'payee': {'top': '116px', 'left': '115px'},
+                'amount': {'top': '163px', 'left': '568px'},
+                'amountWords': {'top': '153px', 'left': '80px'},
+                'crossing': {'top': '25px', 'left': '70px'}
+            }
+        }
+        
+        positions = bank_positions.get(bank, bank_positions['dhofar_islamic'])
+        
+        # Get bank image
+        bank_images = {
+            'dhofar_islamic': 'DHOFAR-ISLAMIC-BANK.png',
+            'oman_arab': 'OMAN-ARAB-BANK.png',
+            'sohar': 'SOHAR-BANK.png'
+        }
+        bank_image = bank_images.get(bank, 'DHOFAR-ISLAMIC-BANK.png')
+        
+        # Get full path to bank image
+        bank_image_path = os.path.join(app.static_folder, 'cheque_templates', bank_image)
+        bank_image_url = url_for('static', filename=f'cheque_templates/{bank_image}', _external=True)
+        
+        # Convert image to base64 for xhtml2pdf compatibility
+        bank_image_base64 = ''
+        if os.path.exists(bank_image_path):
+            with open(bank_image_path, 'rb') as img_file:
+                img_data = img_file.read()
+                bank_image_base64 = base64.b64encode(img_data).decode('utf-8')
+                bank_image_base64 = f"data:image/png;base64,{bank_image_base64}"
+        
+        # Render PDF template
+        html_content = render_template('cheque_pdf.html',
+                                     cheque_date=formatted_date,
+                                     payee_name=payee_name,
+                                     amount=formatted_amount,
+                                     amount_words=amount_words,
+                                     crossing=crossing,
+                                     bank_image_base64=bank_image_base64,
+                                     positions=positions)
+        
+        # Generate PDF using Playwright
+        pdf_buffer = BytesIO()
+        
+        with sync_playwright() as p:
+            # Launch browser
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            
+            # Set page size to cheque dimensions (7.5in x 3.5in)
+            page.set_viewport_size({"width": 720, "height": 336})  # 7.5in * 96dpi = 720px, 3.5in * 96dpi = 336px
+            
+            # Load HTML content
+            page.set_content(html_content, wait_until='networkidle')
+            
+            # Generate PDF with exact page size
+            # Using scale: 1.0 to ensure actual size (100% scale)
+            pdf_bytes = page.pdf(
+                format=None,
+                width='7.5in',
+                height='3.5in',
+                margin={'top': '0', 'right': '0', 'bottom': '0', 'left': '0'},
+                print_background=True,
+                scale=1.0  # Force 100% scale (actual size)
+            )
+            
+            browser.close()
+            
+            # Write PDF to buffer
+            pdf_buffer.write(pdf_bytes)
+            pdf_buffer.seek(0)
+        
+        # Return PDF
+        return Response(
+            pdf_buffer.getvalue(),
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': 'inline; filename=cheque.pdf'
+            }
+        )
+        
+    except Exception as e:
+        print(f"Error generating PDF: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+def convert_amount_to_words(amount):
+    """Convert numeric amount to words"""
+    ones = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 
+            'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 
+            'seventeen', 'eighteen', 'nineteen']
+    tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
+    
+    def number_to_words(n):
+        if n < 20:
+            return ones[int(n)]
+        if n < 100:
+            t = int(n // 10)
+            r = int(n % 10)
+            return f"{tens[t]}-{ones[r]}" if r else tens[t]
+        if n < 1000:
+            h = int(n // 100)
+            r = int(n % 100)
+            return f"{ones[h]} hundred {number_to_words(r)}" if r else f"{ones[h]} hundred"
+        
+        units = [
+            (1_000_000_000_000, 'trillion'),
+            (1_000_000_000, 'billion'),
+            (1_000_000, 'million'),
+            (1_000, 'thousand')
+        ]
+        
+        for unit_value, unit_name in units:
+            if n >= unit_value:
+                q = int(n // unit_value)
+                r = int(n % unit_value)
+                return f"{number_to_words(q)} {unit_name} {number_to_words(r)}" if r else f"{number_to_words(q)} {unit_name}"
+        return ''
+    
+    try:
+        fixed = f"{amount:.3f}"
+        int_str, dec_str = fixed.split('.')
+        int_num = int(int_str)
+        
+        words = number_to_words(abs(int_num))
+        if int_num == 0:
+            words = 'zero'
+        
+        if dec_str and int(dec_str) > 0:
+            dec_words = ' '.join([number_to_words(int(d)) for d in dec_str])
+            words = f"{words} point {dec_words}"
+        
+        if amount < 0:
+            words = f"minus {words}"
+        
+        # Capitalize and add "Omani Rials Only"
+        capitalized = ' '.join([word.capitalize() for word in words.split()])
+        return f"{capitalized} Omani Rials Only"
+    except:
+        return ''
 
 
 @app.route('/request/<int:request_id>')
