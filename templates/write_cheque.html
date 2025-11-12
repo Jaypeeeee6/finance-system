@@ -21,8 +21,14 @@
                 
                 <form id="chequeForm">
                     <div class="form-group">
-                        <label for="chequeDate">Cheque's date</label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <label for="chequeDate">Cheque's date</label>
+                            <button type="button" id="toggleDateBtn" class="btn btn-sm" style="padding: 5px 8px; min-width: auto; width: auto;">
+                                <i class="fas fa-eye" id="toggleDateIcon"></i>
+                            </button>
+                        </div>
                         <input type="date" id="chequeDate" name="chequeDate" class="form-control" required>
+                        <input type="checkbox" id="showDate" checked style="display: none;">
                     </div>
 
                     <div class="form-group">
@@ -812,12 +818,37 @@ function updatePrintPositions() {
 function updateChequePreview() {
     // Update date
     const dateInput = document.getElementById('chequeDate');
+    const showDateCheckbox = document.getElementById('showDate');
     const dateOverlay = document.getElementById('dateOverlay');
     const printDateOverlay = document.getElementById('printDateOverlay');
+    const modalDateOverlay = document.getElementById('modalDateOverlay');
+    const isDateVisible = showDateCheckbox ? showDateCheckbox.checked : true;
+    
     if (dateInput && dateOverlay) {
-        const dateText = formatDate(dateInput.value);
-        dateOverlay.textContent = dateText;
-        if (printDateOverlay) printDateOverlay.textContent = dateText;
+        if (isDateVisible) {
+            const dateText = formatDate(dateInput.value);
+            dateOverlay.textContent = dateText;
+            dateOverlay.style.display = 'block';
+            if (printDateOverlay) {
+                printDateOverlay.textContent = dateText;
+                printDateOverlay.style.display = 'block';
+            }
+            if (modalDateOverlay) {
+                modalDateOverlay.textContent = dateText;
+                modalDateOverlay.style.display = 'block';
+            }
+        } else {
+            dateOverlay.textContent = '';
+            dateOverlay.style.display = 'none';
+            if (printDateOverlay) {
+                printDateOverlay.textContent = '';
+                printDateOverlay.style.display = 'none';
+            }
+            if (modalDateOverlay) {
+                modalDateOverlay.textContent = '';
+                modalDateOverlay.style.display = 'none';
+            }
+        }
     }
     
     // Update payee
@@ -920,6 +951,41 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // No amount-in-words input; overlay is auto-generated from amount
     
+    // Date visibility toggle button
+    const toggleDateBtn = document.getElementById('toggleDateBtn');
+    const toggleDateIcon = document.getElementById('toggleDateIcon');
+    const showDateCheckbox = document.getElementById('showDate');
+    
+    if (toggleDateBtn && showDateCheckbox) {
+        toggleDateBtn.addEventListener('click', function() {
+            const isCurrentlyVisible = showDateCheckbox.checked;
+            showDateCheckbox.checked = !isCurrentlyVisible;
+            
+            // Update button appearance
+            if (showDateCheckbox.checked) {
+                toggleDateIcon.className = 'fas fa-eye';
+                toggleDateBtn.classList.remove('btn-secondary');
+                toggleDateBtn.classList.add('btn-primary');
+            } else {
+                toggleDateIcon.className = 'fas fa-eye-slash';
+                toggleDateBtn.classList.remove('btn-primary');
+                toggleDateBtn.classList.add('btn-secondary');
+            }
+            
+            // Update cheque preview
+            updateChequePreview();
+        });
+        
+        // Initialize button state
+        if (showDateCheckbox.checked) {
+            toggleDateIcon.className = 'fas fa-eye';
+            toggleDateBtn.classList.add('btn-primary');
+        } else {
+            toggleDateIcon.className = 'fas fa-eye-slash';
+            toggleDateBtn.classList.add('btn-secondary');
+        }
+    }
+    
     // Bank selection handler
     const bankSelect = document.getElementById('bankSelect');
     if (bankSelect) {
@@ -945,6 +1011,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const bankSelect = document.getElementById('bankSelect').value;
         const languageSelect = document.getElementById('amountWordsLanguage');
         const amountWordsLanguage = languageSelect ? languageSelect.value : 'english';
+        const showDateCheckbox = document.getElementById('showDate');
+        const showDate = showDateCheckbox ? showDateCheckbox.checked : true;
         
         // Prepare data to send
         const chequeData = {
@@ -954,7 +1022,8 @@ document.addEventListener('DOMContentLoaded', function() {
             currency: currency,
             crossing: crossing,
             bank: bankSelect,
-            amountWordsLanguage: amountWordsLanguage
+            amountWordsLanguage: amountWordsLanguage,
+            showDate: showDate
         };
         
         // Show loading indicator (optional)
@@ -1356,9 +1425,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const crossingSelect = document.getElementById('crossing');
         
         // Date
+        const showDateCheckbox = document.getElementById('showDate');
+        const isDateVisible = showDateCheckbox ? showDateCheckbox.checked : true;
         const modalDateOverlay = document.getElementById('modalDateOverlay');
         if (dateInput && modalDateOverlay) {
-            modalDateOverlay.textContent = formatDate(dateInput.value);
+            if (isDateVisible) {
+                modalDateOverlay.textContent = formatDate(dateInput.value);
+                modalDateOverlay.style.display = 'block';
+            } else {
+                modalDateOverlay.textContent = '';
+                modalDateOverlay.style.display = 'none';
+            }
         }
         
         // Payee

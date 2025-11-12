@@ -5566,16 +5566,16 @@ def generate_cheque_pdf():
         currency = data.get('currency', 'OMR')
         crossing = data.get('crossing', '')
         bank = data.get('bank', 'dhofar_islamic')
+        show_date = data.get('showDate', True)  # Default to True if not provided
         
-        # Format date
-        if cheque_date:
+        # Format date (only if show_date is True)
+        formatted_date = ''
+        if show_date and cheque_date:
             try:
                 date_obj = datetime.strptime(cheque_date, '%Y-%m-%d')
                 formatted_date = date_obj.strftime('%d/%m/%Y')
             except:
                 formatted_date = cheque_date
-        else:
-            formatted_date = ''
         
         # Format amount (do not show currency in cheque overlay)
         formatted_amount = ''
@@ -5648,6 +5648,7 @@ def generate_cheque_pdf():
         # Render PDF template
         html_content = render_template('cheque_pdf.html',
                                      cheque_date=formatted_date,
+                                     show_date=show_date,
                                      payee_name=payee_name,
                                      amount=formatted_amount,
                                      amount_words=amount_words,

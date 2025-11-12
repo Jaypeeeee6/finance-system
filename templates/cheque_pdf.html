@@ -97,7 +97,7 @@
 <body>
     <div class="cheque-container">
         <div class="cheque-overlay">
-            {% if cheque_date %}
+            {% if show_date and cheque_date %}
             <div class="field-overlay date-overlay" style="top: {{ positions.date.top }}; left: {{ positions.date.left }}; {{ positions.date.extra|default('') }}">
                 {{ cheque_date }}
             </div>
