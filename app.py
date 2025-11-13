@@ -5615,11 +5615,11 @@ def generate_cheque_pdf():
                 'crossing': {'top': '20px', 'left': '60px'}  # Same as Dhofar Islamic Bank for testing
             },
             'sohar': {
-                'date': {'top': '52px', 'left': '555px'},
-                'payee': {'top': '116px', 'left': '115px'},
-                'amount': {'top': '163px', 'left': '568px'},
-                'amountWords': {'top': '153px', 'left': '80px'},
-                'crossing': {'top': '25px', 'left': '70px'}
+                'date': {'top': '52px', 'left': '365px'},  # Moved 50px more left: 415 - 50 = 365
+                'payee': {'top': '116px', 'left': '55px'},  # Moved 60px left: 115 - 60 = 55
+                'amount': {'top': '163px', 'left': '378px'},  # Moved 50px more left: 428 - 50 = 378
+                'amountWords': {'top': '153px', 'left': '20px'},  # Moved 60px left: 80 - 60 = 20
+                'crossing': {'top': '25px', 'left': '10px'}  # Moved 60px left: 70 - 60 = 10
             }
         }
         
