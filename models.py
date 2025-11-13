@@ -138,8 +138,9 @@ class PaymentRequest(db.Model):
     department = db.Column(db.String(100), nullable=False)
     date = db.Column(db.Date, nullable=False)
     purpose = db.Column(db.Text, nullable=False)
+    payment_method = db.Column(db.String(20), default='Card')  # Card or Cheque
     account_name = db.Column(db.String(100), nullable=False)
-    account_number = db.Column(db.String(50), nullable=False)
+    account_number = db.Column(db.String(50), nullable=True)  # Nullable when payment method is Cheque
     bank_name = db.Column(db.String(100), nullable=False)
     amount = db.Column(db.Numeric(12, 3), nullable=False)  # OMR supports 3 decimal places
     recurring = db.Column(db.String(20))  # One-Time, Recurring

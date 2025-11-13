@@ -4969,6 +4969,7 @@ def new_request():
         branch_name = request.form.get('branch_name')
         date = datetime.utcnow().date()  # Automatically use today's date
         purpose = request.form.get('purpose')
+        payment_method = request.form.get('payment_method', 'Card')  # Default to Card
         
         # Validate required fields
         if not branch_name:
@@ -4988,13 +4989,33 @@ def new_request():
             return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         account_name = request.form.get('account_name')
         account_number = request.form.get('account_number')
+        # Clear account_number if payment method is Cheque
+        if payment_method == 'Cheque':
+            account_number = ''
         bank_name = request.form.get('bank_name')
         amount = request.form.get('amount')
         recurring = request.form.get('recurring', 'One-Time')
         recurring_interval = request.form.get('recurring_interval')
         
-        # Validate account number length (maximum 16 digits)
-        if account_number and len(account_number) > 16:
+        # Validate account number only if payment method is Card
+        if payment_method == 'Card':
+            if not account_number:
+                flash('Account number is required when payment method is Card.', 'error')
+                available_request_types = get_available_request_types()
+                from sqlalchemy import case
+                location_order = case(
+                    (Branch.restaurant == 'Office', 1),
+                    (Branch.restaurant == 'Kucu', 2),
+                    (Branch.restaurant == 'Boom', 3),
+                    (Branch.restaurant == 'Thoum', 4),
+                    (Branch.restaurant == 'Kitchen', 5),
+                    else_=6
+                )
+                available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+                return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
+        
+        # Validate account number length (maximum 16 digits) - only if payment method is Card
+        if payment_method == 'Card' and account_number and len(account_number) > 16:
             flash('Account number cannot exceed 16 digits.', 'error')
             available_request_types = get_available_request_types()
             # Custom order: Office, Kucu, Boom, Thoum, Kitchen
@@ -5010,8 +5031,8 @@ def new_request():
             available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
             return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         
-        # Validate account number contains only digits
-        if account_number and not account_number.isdigit():
+        # Validate account number contains only digits - only if payment method is Card
+        if payment_method == 'Card' and account_number and not account_number.isdigit():
             flash('Account number must contain only numbers.', 'error')
             available_request_types = get_available_request_types()
             # Custom order: Office, Kucu, Boom, Thoum, Kitchen
@@ -5151,8 +5172,9 @@ def new_request():
             department=current_user.department,
             date=date,
             purpose=purpose,
+            payment_method=payment_method,
             account_name=account_name,
-            account_number=account_number,
+            account_number=account_number if payment_method == 'Card' else '',
             bank_name=bank_name,
             amount=amount_clean if amount else amount,  # Use cleaned amount without commas
             recurring=recurring,
@@ -9413,6 +9435,26 @@ def export_reports_pdf():
             query = query.filter(PaymentRequest.branch_name.in_(names))
         else:
             query = query.filter(PaymentRequest.branch_name == branch_filter)
+    
+    # Payment type filter
+    if payment_type_filter:
+        if payment_type_filter == 'Recurring':
+            query = query.filter(PaymentRequest.recurring == 'Recurring')
+        elif payment_type_filter == 'Scheduled One-Time':
+            query = query.filter(
+                db.or_(
+                    PaymentRequest.recurring == 'Scheduled One-Time',
+                    PaymentRequest.payment_date.isnot(None)
+                )
+            ).filter(PaymentRequest.recurring != 'Recurring')
+        elif payment_type_filter == 'One-Time':
+            query = query.filter(
+                db.or_(
+                    PaymentRequest.recurring == None,
+                    PaymentRequest.recurring == '',
+                    PaymentRequest.recurring == 'One-Time'
+                )
+            ).filter(PaymentRequest.payment_date.is_(None))
 
     # Date filtering - use submission date (date field) which exists for all requests
     if date_from:

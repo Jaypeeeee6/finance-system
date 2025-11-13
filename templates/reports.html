@@ -14,6 +14,219 @@
     .data-table td:nth-child(7) {
         text-align: left;
     }
+
+    /* Filter Button and Active Filters */
+    .filters-container {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .filters-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 28px;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 500;
+        color: #495057;
+        transition: all 0.2s;
+    }
+
+    .filters-btn:hover {
+        background: #f8f9fa;
+        border-color: #adb5bd;
+    }
+
+    .filters-btn i {
+        font-size: 18px;
+    }
+
+    .active-filters {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        flex: 1;
+    }
+
+    .filter-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        background: #000;
+        color: white;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .filter-pill .remove-filter {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        border-radius: 50%;
+        color: white;
+        cursor: pointer;
+        font-size: 12px;
+        padding: 0;
+        transition: background 0.2s;
+    }
+
+    .filter-pill .remove-filter:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .clear-all-btn {
+        color: #007bff;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        padding: 0;
+        text-decoration: underline;
+        transition: color 0.2s;
+    }
+
+    .clear-all-btn:hover {
+        color: #0056b3;
+    }
+
+    /* Side Panel */
+    .filter-side-panel {
+        position: fixed;
+        top: 0;
+        right: -450px;
+        width: 450px;
+        height: 100vh;
+        background: white;
+        box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        transition: right 0.3s ease;
+        overflow-y: auto;
+    }
+
+    .filter-side-panel.open {
+        right: 0;
+    }
+
+    .filter-panel-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .filter-panel-overlay.show {
+        display: block;
+        opacity: 1;
+    }
+
+    .filter-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px;
+        border-bottom: 1px solid #dee2e6;
+        background: #f8f9fa;
+    }
+
+    .filter-panel-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #212529;
+    }
+
+    .filter-panel-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: #6c757d;
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        transition: background 0.2s;
+    }
+
+    .filter-panel-close:hover {
+        background: #e9ecef;
+    }
+
+    .filter-panel-body {
+        padding: 20px;
+    }
+
+    .filter-panel-body .form-group {
+        margin-bottom: 20px;
+    }
+
+    .filter-panel-body label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: #495057;
+        font-size: 14px;
+    }
+
+    .filter-panel-body select,
+    .filter-panel-body input[type="date"] {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .filter-panel-body small {
+        display: block;
+        margin-top: 4px;
+        color: #6c757d;
+        font-size: 12px;
+    }
+
+    .filter-panel-actions {
+        padding: 20px;
+        border-top: 1px solid #dee2e6;
+        background: #f8f9fa;
+        display: flex;
+        gap: 10px;
+        position: sticky;
+        bottom: 0;
+    }
+
+    .filter-panel-actions .btn {
+        flex: 1;
+        padding: 10px;
+        font-size: 14px;
+        font-weight: 500;
+    }
 </style>
 <div class="dashboard-container">
     <div class="dashboard-header">
@@ -21,109 +234,177 @@
         <p>Filter and analyze payment requests</p>
     </div>
 
-    <div class="card">
-        <div class="card-header">
-            <h2><i class="fas fa-filter"></i> Filters</h2>
+    <!-- Filters Button and Active Filters -->
+    <div class="filters-container">
+        <button type="button" class="filters-btn" onclick="openFilterPanel()">
+            <i class="fas fa-filter"></i>
+            Filters
+        </button>
+        <div class="active-filters" id="active-filters">
+            {% set has_filters = False %}
+            {% if request.args.get('department') %}
+                <span class="filter-pill">
+                    Department: {{ request.args.get('department') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('department')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if request.args.get('request_type') %}
+                <span class="filter-pill">
+                    Type: {{ request.args.get('request_type') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('request_type')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if request.args.get('company') %}
+                <span class="filter-pill">
+                    Company: {{ request.args.get('company') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('company')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if request.args.get('branch') %}
+                <span class="filter-pill">
+                    Branch: {{ request.args.get('branch') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('branch')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if request.args.get('payment_type') %}
+                <span class="filter-pill">
+                    Payment Type: {{ request.args.get('payment_type') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('payment_type')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if request.args.get('status') %}
+                <span class="filter-pill">
+                    Status: {{ request.args.get('status') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('status')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if request.args.get('date_from') %}
+                <span class="filter-pill">
+                    From: {{ request.args.get('date_from') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('date_from')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if request.args.get('date_to') %}
+                <span class="filter-pill">
+                    To: {{ request.args.get('date_to') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('date_to')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if has_filters %}
+                <button type="button" class="clear-all-btn" onclick="clearAllFilters()">Clear all</button>
+            {% endif %}
         </div>
-        <div class="card-body">
-            <form method="GET" action="{{ url_for('reports') }}" class="filter-form">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="department">Department</label>
-                        <select name="department" id="department">
-                            <option value="">All Departments</option>
-                            {% for dept in departments %}
-                            <option value="{{ dept }}" {% if request.args.get('department') == dept %}selected{% endif %}>{{ dept }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+    </div>
 
-                    <div class="form-group">
-                        <label for="request_type">Request Type</label>
-                        <select name="request_type" id="request_type">
-                            <option value="">All Types</option>
-                            {# Non-"Others" first #}
-                            {% for request_type in request_types | reject('equalto', 'Others') %}
-                            <option value="{{ request_type }}" {% if request.args.get('request_type') == request_type %}selected{% endif %}>{{ request_type }}</option>
-                            {% endfor %}
-                            {# Ensure "Others" is always last if present #}
-                            {% for request_type in request_types | select('equalto', 'Others') %}
-                            <option value="{{ request_type }}" {% if request.args.get('request_type') == request_type %}selected{% endif %}>{{ request_type }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="company">Company Name</label>
-                        <select name="company" id="company">
-                            <option value="">All Companies</option>
-                            {% for company in companies %}
-                            <option value="{{ company }}" {% if company_filter == company %}selected{% endif %}>{{ company }}</option>
-                            {% endfor %}
-                        </select>
-                        <small class="form-text text-muted">Only available for approved requests</small>
-                    </div>
+    <!-- Filter Side Panel -->
+    <div class="filter-panel-overlay" id="filter-overlay" onclick="closeFilterPanel()"></div>
+    <div class="filter-side-panel" id="filter-panel">
+        <div class="filter-panel-header">
+            <h3><i class="fas fa-filter"></i> Filters</h3>
+            <button type="button" class="filter-panel-close" onclick="closeFilterPanel()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="filter-panel-body">
+            <form method="GET" action="{{ url_for('reports') }}" id="filter-form">
+                <div class="form-group">
+                    <label for="department">Department</label>
+                    <select name="department" id="department">
+                        <option value="">All Departments</option>
+                        {% for dept in departments %}
+                        <option value="{{ dept }}" {% if request.args.get('department') == dept %}selected{% endif %}>{{ dept }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="branch">Branch Name</label>
-                        <select name="branch" id="branch">
-                            <option value="">All Branches</option>
-                            {% for branch in branches %}
-                            <option value="{{ branch.name }}" {% if branch_filter == branch.name %}selected{% endif %}>{{ branch.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="payment_type">Payment Type</label>
-                        <select name="payment_type" id="payment_type">
-                            <option value="" {% if not payment_type_filter %}selected{% endif %}>All Payment Types</option>
-                            <option value="One-Time" {% if payment_type_filter == 'One-Time' %}selected{% endif %}>One-Time</option>
-                            <option value="Scheduled One-Time" {% if payment_type_filter == 'Scheduled One-Time' %}selected{% endif %}>Scheduled One-Time</option>
-                            <option value="Recurring" {% if payment_type_filter == 'Recurring' %}selected{% endif %}>Recurring</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="status">Status</label>
-                        <select name="status" id="status">
-                            <option value="">All Statuses</option>
-                            <option value="All Pending" {% if status_filter == 'All Pending' %}selected{% endif %}>All Pending</option>
-                            <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
-                            <option value="Pending Finance Approval" {% if status_filter == 'Pending Finance Approval' %}selected{% endif %}>Pending Finance Approval</option>
-                            <option value="Rejected by Manager" {% if status_filter == 'Rejected by Manager' %}selected{% endif %}>Rejected by Manager</option>
-                            <option value="Proof Pending" {% if status_filter == 'Proof Pending' %}selected{% endif %}>Proof Pending</option>
-                            <option value="Proof Sent" {% if status_filter == 'Proof Sent' %}selected{% endif %}>Proof Sent</option>
-                            <option value="Proof Rejected" {% if status_filter == 'Proof Rejected' %}selected{% endif %}>Proof Rejected</option>
-                            <option value="Recurring" {% if status_filter == 'Recurring' %}selected{% endif %}>Recurring</option>
-                            <option value="Completed" {% if status_filter == 'Completed' %}selected{% endif %}>Completed</option>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label for="request_type">Request Type</label>
+                    <select name="request_type" id="request_type">
+                        <option value="">All Types</option>
+                        {# Non-"Others" first #}
+                        {% for request_type in request_types | reject('equalto', 'Others') %}
+                        <option value="{{ request_type }}" {% if request.args.get('request_type') == request_type %}selected{% endif %}>{{ request_type }}</option>
+                        {% endfor %}
+                        {# Ensure "Others" is always last if present #}
+                        {% for request_type in request_types | select('equalto', 'Others') %}
+                        <option value="{{ request_type }}" {% if request.args.get('request_type') == request_type %}selected{% endif %}>{{ request_type }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="date_from">Date From</label>
-                        <input type="date" name="date_from" id="date_from" value="{{ request.args.get('date_from', '') }}">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="date_to">Date To</label>
-                        <input type="date" name="date_to" id="date_to" value="{{ request.args.get('date_to', '') }}">
-                    </div>
+                <div class="form-group">
+                    <label for="company">Company Name</label>
+                    <select name="company" id="company">
+                        <option value="">All Companies</option>
+                        {% for company in companies %}
+                        <option value="{{ company }}" {% if company_filter == company %}selected{% endif %}>{{ company }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">Only available for approved requests</small>
                 </div>
 
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-search"></i> Apply Filters
-                    </button>
-                    <a href="{{ url_for('reports') }}" class="btn btn-secondary">
-                        <i class="fas fa-redo"></i> Clear Filters
-                    </a>
+                <div class="form-group">
+                    <label for="branch">Branch Name</label>
+                    <select name="branch" id="branch">
+                        <option value="">All Branches</option>
+                        {% for branch in branches %}
+                        <option value="{{ branch.name }}" {% if branch_filter == branch.name %}selected{% endif %}>{{ branch.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="payment_type">Payment Type</label>
+                    <select name="payment_type" id="payment_type">
+                        <option value="" {% if not payment_type_filter %}selected{% endif %}>All Payment Types</option>
+                        <option value="One-Time" {% if payment_type_filter == 'One-Time' %}selected{% endif %}>One-Time</option>
+                        <option value="Scheduled One-Time" {% if payment_type_filter == 'Scheduled One-Time' %}selected{% endif %}>Scheduled One-Time</option>
+                        <option value="Recurring" {% if payment_type_filter == 'Recurring' %}selected{% endif %}>Recurring</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select name="status" id="status">
+                        <option value="">All Statuses</option>
+                        <option value="All Pending" {% if status_filter == 'All Pending' %}selected{% endif %}>All Pending</option>
+                        <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
+                        <option value="Pending Finance Approval" {% if status_filter == 'Pending Finance Approval' %}selected{% endif %}>Pending Finance Approval</option>
+                        <option value="Rejected by Manager" {% if status_filter == 'Rejected by Manager' %}selected{% endif %}>Rejected by Manager</option>
+                        <option value="Proof Pending" {% if status_filter == 'Proof Pending' %}selected{% endif %}>Proof Pending</option>
+                        <option value="Proof Sent" {% if status_filter == 'Proof Sent' %}selected{% endif %}>Proof Sent</option>
+                        <option value="Proof Rejected" {% if status_filter == 'Proof Rejected' %}selected{% endif %}>Proof Rejected</option>
+                        <option value="Recurring" {% if status_filter == 'Recurring' %}selected{% endif %}>Recurring</option>
+                        <option value="Completed" {% if status_filter == 'Completed' %}selected{% endif %}>Completed</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="date_from">Date From</label>
+                    <input type="date" name="date_from" id="date_from" value="{{ request.args.get('date_from', '') }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="date_to">Date To</label>
+                    <input type="date" name="date_to" id="date_to" value="{{ request.args.get('date_to', '') }}">
                 </div>
             </form>
+        </div>
+        <div class="filter-panel-actions">
+            <button type="button" class="btn btn-primary" onclick="applyFilters()">
+                <i class="fas fa-search"></i> Apply Filters
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="clearAllFilters()">
+                <i class="fas fa-redo"></i> Clear All
+            </button>
         </div>
     </div>
 
@@ -200,6 +481,7 @@
                                 <th>Requestor</th>
                                 <th>Department</th>
                                 <th>Payment Type</th>
+                                <th>Payment Method</th>
                                 <th>Scheduled Date</th>
                                 <th>Branch Name</th>
                                 <th>Person/Company</th>
@@ -243,6 +525,7 @@
                                         {{ req.recurring or 'One-Time' }}
                                     {% endif %}
                                 </td>
+                                <td>{{ req.payment_method or 'Card' }}</td>
                                 <td>
                                     {% if (not req.recurring or req.recurring != 'Recurring') and req.payment_date %}
                                         {{ req.payment_date.strftime('%Y-%m-%d') }}
@@ -604,8 +887,15 @@ document.addEventListener('click', function(e) {
 
 // Reset button state when user presses Escape key
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && isExporting) {
-        resetExportButtons();
+    if (e.key === 'Escape') {
+        if (isExporting) {
+            resetExportButtons();
+        }
+        // Also close filter panel if open
+        const panel = document.getElementById('filter-panel');
+        if (panel && panel.classList.contains('open')) {
+            closeFilterPanel();
+        }
     }
 });
 
@@ -632,27 +922,34 @@ document.addEventListener('mousemove', function() {
 });
 
 // Update request types when department changes
-document.getElementById('department').addEventListener('change', function() {
-    const department = this.value;
-    const requestTypeSelect = document.getElementById('request_type');
-    
-    // Clear existing options except "All Types"
-    requestTypeSelect.innerHTML = '<option value="">All Types</option>';
-    
-    // Fetch request types for selected department
-    fetch(`/api/request-types?department=${encodeURIComponent(department)}`)
-        .then(response => response.json())
-        .then(data => {
-            data.request_types.forEach(requestType => {
-                const option = document.createElement('option');
-                option.value = requestType;
-                option.textContent = requestType;
-                requestTypeSelect.appendChild(option);
-            });
-        })
-        .catch(error => {
-            console.error('Error fetching request types:', error);
+document.addEventListener('DOMContentLoaded', function() {
+    const departmentSelect = document.getElementById('department');
+    if (departmentSelect) {
+        departmentSelect.addEventListener('change', function() {
+            const department = this.value;
+            const requestTypeSelect = document.getElementById('request_type');
+            
+            if (!requestTypeSelect) return;
+            
+            // Clear existing options except "All Types"
+            requestTypeSelect.innerHTML = '<option value="">All Types</option>';
+            
+            // Fetch request types for selected department
+            fetch(`/api/request-types?department=${encodeURIComponent(department)}`)
+                .then(response => response.json())
+                .then(data => {
+                    data.request_types.forEach(requestType => {
+                        const option = document.createElement('option');
+                        option.value = requestType;
+                        option.textContent = requestType;
+                        requestTypeSelect.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching request types:', error);
+                });
         });
+    }
 });
 
 function changeItemsPerPage(perPage) {
@@ -662,6 +959,65 @@ function changeItemsPerPage(perPage) {
     url.searchParams.set('page', '1');
     window.location.href = url.toString();
 }
+
+// Filter Panel Functions
+function openFilterPanel() {
+    const panel = document.getElementById('filter-panel');
+    const overlay = document.getElementById('filter-overlay');
+    if (panel && overlay) {
+        panel.classList.add('open');
+        overlay.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeFilterPanel() {
+    const panel = document.getElementById('filter-panel');
+    const overlay = document.getElementById('filter-overlay');
+    if (panel && overlay) {
+        panel.classList.remove('open');
+        overlay.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+}
+
+function applyFilters() {
+    const form = document.getElementById('filter-form');
+    if (form) {
+        // Reset to page 1 when applying filters
+        const url = new URL(form.action, window.location.origin);
+        const formData = new FormData(form);
+        for (const [key, value] of formData.entries()) {
+            if (value) {
+                url.searchParams.set(key, value);
+            }
+        }
+        url.searchParams.set('page', '1');
+        window.location.href = url.toString();
+    }
+}
+
+function removeFilter(filterName) {
+    const url = new URL(window.location);
+    url.searchParams.delete(filterName);
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}
+
+function clearAllFilters() {
+    window.location.href = "{{ url_for('reports') }}";
+}
+
+
+// Prevent panel from closing when clicking inside it
+document.addEventListener('DOMContentLoaded', function() {
+    const filterPanel = document.getElementById('filter-panel');
+    if (filterPanel) {
+        filterPanel.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+    }
+});
 </script>
 {% endblock %}
 

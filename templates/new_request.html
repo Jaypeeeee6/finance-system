@@ -184,6 +184,14 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="payment_method">Payment Method *</label>
+                    <select name="payment_method" id="payment_method" required onchange="handlePaymentMethodChange()">
+                        <option value="Card" selected>Card</option>
+                        <option value="Cheque">Cheque</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
                     <label for="bank_name">Bank Name *</label>
                     <select name="bank_name" id="bank_name" required onchange="showSwiftCode()">
                         <option value="">-- Select Bank --</option>
@@ -223,7 +231,7 @@
                         <input type="text" name="account_name" id="account_name" required>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" id="account_number_group">
                         <label for="account_number">Account Number *</label>
                         <input type="text" name="account_number" id="account_number" pattern="[0-9]+" title="Please enter numbers only (maximum 16 digits)" required maxlength="16">
                         <small>Numbers only (maximum 16 digits)</small>
@@ -555,6 +563,28 @@ if (amountField) {
     });
 }
 
+// Handle payment method change - hide/show account number field
+function handlePaymentMethodChange() {
+    const paymentMethod = document.getElementById('payment_method');
+    const accountNumberGroup = document.getElementById('account_number_group');
+    const accountNumberInput = document.getElementById('account_number');
+    
+    if (paymentMethod && accountNumberGroup && accountNumberInput) {
+        if (paymentMethod.value === 'Cheque') {
+            // Hide account number field when Cheque is selected
+            accountNumberGroup.style.display = 'none';
+            accountNumberInput.removeAttribute('required');
+            accountNumberInput.removeAttribute('pattern'); // Remove pattern validation
+            accountNumberInput.value = ''; // Clear the value
+        } else {
+            // Show account number field when Card is selected
+            accountNumberGroup.style.display = 'block';
+            accountNumberInput.setAttribute('required', 'required');
+            accountNumberInput.setAttribute('pattern', '[0-9]+'); // Restore pattern validation
+        }
+    }
+}
+
 // New Recurring Modal JavaScript
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize the modal
@@ -571,6 +601,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Also call it initially in case a bank is already selected
         showSwiftCode();
     }
+    
+    // Initialize payment method handler
+    handlePaymentMethodChange();
 });
 
 function initializeBranchSearch() {
@@ -3242,17 +3275,21 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
         return false;
     }
     
-    const accountNumber = document.getElementById('account_number').value;
-    if (!/^\d+$/.test(accountNumber)) {
-        e.preventDefault();
-        alert('Account number must contain only numbers.');
-        return false;
-    }
-    
-    if (accountNumber.length > 16) {
-        e.preventDefault();
-        alert('Account number cannot exceed 16 digits.');
-        return false;
+    // Only validate account number if payment method is Card
+    const paymentMethod = document.getElementById('payment_method').value;
+    if (paymentMethod === 'Card') {
+        const accountNumber = document.getElementById('account_number').value;
+        if (!/^\d+$/.test(accountNumber)) {
+            e.preventDefault();
+            alert('Account number must contain only numbers.');
+            return false;
+        }
+        
+        if (accountNumber.length > 16) {
+            e.preventDefault();
+            alert('Account number cannot exceed 16 digits.');
+            return false;
+        }
     }
     
     // Handle comma-formatted amount
@@ -3811,6 +3848,12 @@ function removeFileFromList(fileToRemove) {
 document.getElementById('requestForm').addEventListener('submit', function(e) {
     // Create a new FormData object with all the files
     const formData = new FormData(this);
+    
+    // Clear account_number from FormData if payment method is Cheque
+    const paymentMethod = document.getElementById('payment_method').value;
+    if (paymentMethod === 'Cheque') {
+        formData.set('account_number', '');
+    }
     
     // Clear existing receipt_files from FormData
     formData.delete('receipt_files');

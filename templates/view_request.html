@@ -545,7 +545,10 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     <textarea id="purpose" name="purpose" rows="4" readonly style="background: #f5f5f5;">{{ request.purpose }}</textarea>
                 </div>
 
-                
+                <div class="form-group">
+                    <label for="payment_method">Payment Method</label>
+                    <input type="text" id="payment_method" value="{{ request.payment_method or 'Card' }}" readonly style="background: #f5f5f5;">
+                </div>
 
                 <div class="form-group">
                     <label for="bank_name">Bank Name {% if 'bank_name' in edited_fields %}<span class="edited-badge" data-field="bank_name" role="button" tabindex="0">Edited</span>{% endif %}</label>
@@ -622,6 +625,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         {% endif %}
                     </div>
 
+                    {% if request.payment_method != 'Cheque' %}
                     <div class="form-group">
                         <label for="account_number">Account Number {% if 'account_number' in edited_fields %}<span class="edited-badge" data-field="account_number" role="button" tabindex="0">Edited</span>{% endif %}</label>
                         {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
@@ -630,6 +634,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                             <input type="text" id="account_number" name="account_number" value="{{ request.account_number }}" readonly style="background: #f5f5f5;">
                         {% endif %}
                     </div>
+                    {% endif %}
                 </div>
 
                 <div class="form-group">

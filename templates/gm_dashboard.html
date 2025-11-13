@@ -211,6 +211,7 @@
                                     <th>ID</th>
                                     <th>Type</th>
                                     <th>Payment Type</th>
+                                    <th>Payment Method</th>
                                     <th>Requestor</th>
                                     <th>Department</th>
                                     <th>Submission Date</th>
@@ -239,6 +240,7 @@
                                             <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
                                         {% endif %}
                                     </td>
+                                    <td>{{ req.payment_method or 'Card' }}</td>
                                     <td>{{ req.requestor_name }}</td>
                                     <td>{{ req.department }}</td>
                                     <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
@@ -301,6 +303,7 @@
                                     <th>ID</th>
                                     <th>Type</th>
                                     <th>Payment Type</th>
+                                    <th>Payment Method</th>
                                     <th>Requestor</th>
                                     <th>Department</th>
                                     <th>Submission Date</th>
@@ -327,6 +330,7 @@
                                             <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
                                         {% endif %}
                                     </td>
+                                    <td>{{ req.payment_method or 'Card' }}</td>
                                     <td>{{ req.requestor_name }}</td>
                                     <td>{{ req.department }}</td>
                                     <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
@@ -371,6 +375,7 @@
                                     <th>ID</th>
                                     <th>Type</th>
                                     <th>Payment Type</th>
+                                    <th>Payment Method</th>
                                     <th>Requestor</th>
                                     <th>Department</th>
                                     <th>Submission Date</th>
@@ -397,6 +402,7 @@
                                             <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
                                         {% endif %}
                                     </td>
+                                    <td>{{ req.payment_method or 'Card' }}</td>
                                     <td>{{ req.requestor_name }}</td>
                                     <td>{{ req.department }}</td>
                                     <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
