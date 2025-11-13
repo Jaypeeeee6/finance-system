@@ -6,6 +6,7 @@ from werkzeug.utils import secure_filename
 from functools import wraps
 import os
 from datetime import datetime, date, timedelta
+import calendar
 import re
 import threading
 import time
@@ -1000,6 +1001,105 @@ def get_payment_schedule(request_id):
     """Get the payment schedule for a specific request"""
     schedules = RecurringPaymentSchedule.query.filter_by(request_id=request_id).order_by(RecurringPaymentSchedule.payment_order).all()
     return [schedule.to_dict() for schedule in schedules]
+
+def get_recurring_scheduled_dates(req):
+    """Get scheduled dates for a recurring payment request as a semicolon-separated string
+    For Cheque + Recurring requests, includes day calculations"""
+    if not req or req.recurring != 'Recurring':
+        return ''
+    
+    dates = []
+    date_objects = []  # Store date objects for day calculation
+    
+    # Check if it has custom dates stored in RecurringPaymentSchedule
+    schedules = RecurringPaymentSchedule.query.filter_by(request_id=req.request_id).order_by(RecurringPaymentSchedule.payment_order).all()
+    if schedules:
+        # Custom dates - get all payment dates
+        for schedule in schedules:
+            date_objects.append(schedule.payment_date)
+            dates.append(schedule.payment_date.strftime('%Y-%m-%d'))
+    elif req.recurring_interval:
+        # Monthly recurring - parse recurring_interval to extract dates
+        try:
+            parts = req.recurring_interval.split(':')
+            if len(parts) >= 2 and parts[0] == 'monthly':
+                interval = int(parts[1])
+                # Check for date format: monthly:1:date:2025-10-11:end:2025-11-11
+                if len(parts) > 2 and parts[2] == 'date':
+                    start_date_str = parts[3]
+                    start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    date_objects.append(start_date)
+                    dates.append(start_date_str)
+                    
+                    # Check if there's an end date
+                    if 'end' in parts:
+                        end_index = parts.index('end')
+                        if end_index + 1 < len(parts):
+                            end_date_str = parts[end_index + 1]
+                            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                            
+                            # Generate all dates from start to end based on interval
+                            current_date = add_months(start_date, interval)
+                            while current_date <= end_date:
+                                date_objects.append(current_date)
+                                dates.append(current_date.strftime('%Y-%m-%d'))
+                                current_date = add_months(current_date, interval)
+                                # Safety check to prevent infinite loop
+                                if len(dates) > 100:
+                                    break
+                # Check for days format: monthly:1:days:11,15:2025:10
+                elif len(parts) > 2 and parts[2] == 'days':
+                    # Extract specific days
+                    days = parts[3].split(',')
+                    year = int(parts[4]) if len(parts) > 4 else (req.date.year if req.date else date.today().year)
+                    month = int(parts[5]) if len(parts) > 5 else (req.date.month if req.date else date.today().month)
+                    
+                    for day in days:
+                        try:
+                            day_int = int(day)
+                            payment_date = date(year, month, day_int)
+                            date_objects.append(payment_date)
+                            dates.append(payment_date.strftime('%Y-%m-%d'))
+                        except (ValueError, TypeError):
+                            continue
+                # Simple monthly format: monthly:1 (use request date as start)
+                else:
+                    if req.date:
+                        date_objects.append(req.date)
+                        dates.append(req.date.strftime('%Y-%m-%d'))
+        except (ValueError, IndexError, AttributeError) as e:
+            # If parsing fails, return empty
+            pass
+    
+    # If no dates found, return empty
+    if not dates:
+        return ''
+    
+    # Check if this is a Cheque + Recurring request
+    if req.payment_method == 'Cheque' and req.recurring == 'Recurring':
+        # Calculate days for each date
+        result_parts = []
+        for i, date_obj in enumerate(date_objects):
+            if i == 0:
+                # First date: count from date to end of month (exclusive of start date)
+                last_day = calendar.monthrange(date_obj.year, date_obj.month)[1]
+                days = last_day - date_obj.day
+            else:
+                # Subsequent dates: count from first day of month to date (exclusive of start date)
+                days = date_obj.day - 1
+            
+            result_parts.append(f"{dates[i]} ({days} days)")
+        
+        return '\n'.join(result_parts)
+    else:
+        # Regular format: just return dates without day calculations
+        return '\n'.join(dates)
+
+# Add filter for getting recurring scheduled dates (must be after function definition)
+@app.template_filter('get_recurring_dates')
+def get_recurring_dates_filter(req):
+    """Get scheduled dates for recurring payment request"""
+    return get_recurring_scheduled_dates(req)
 
 def get_authorized_users_for_recurring_due(request):
     """Get all authorized users who should receive recurring payment due notifications"""
@@ -2694,7 +2794,7 @@ def department_dashboard():
     elif tab == 'rejected':
         query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     elif tab == 'recurring':
-        query = base_query.filter(PaymentRequest.status == 'Recurring')
+        query = base_query.filter(PaymentRequest.recurring == 'Recurring')
     elif tab == 'my_requests':
         # For 'my_requests' tab, show only the current user's requests
         query = base_query.filter(PaymentRequest.user_id == current_user.user_id)
@@ -2734,7 +2834,7 @@ def department_dashboard():
                     PaymentRequest.department == 'Auditing',
                     db.and_(
                         PaymentRequest.department != 'Auditing',
-                        PaymentRequest.status == 'Recurring'
+                        PaymentRequest.recurring == 'Recurring'
                     )
                 ),
                 PaymentRequest.is_archived == False
@@ -2770,7 +2870,7 @@ def department_dashboard():
                     PaymentRequest.user_id == current_user.user_id,
                     db.and_(
                         PaymentRequest.department != 'Auditing',
-                        PaymentRequest.status == 'Recurring'
+                        PaymentRequest.recurring == 'Recurring'
                     )
                 ),
                 PaymentRequest.is_archived == False
@@ -2786,7 +2886,7 @@ def department_dashboard():
     else:
         completed_query = base_query.filter(PaymentRequest.status == 'Completed')
         rejected_query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
-        recurring_query = base_query.filter(PaymentRequest.status == 'Recurring')
+        recurring_query = base_query.filter(PaymentRequest.recurring == 'Recurring')
     
     # Apply urgent filter to separate queries
     if urgent_filter == 'urgent':
@@ -2989,7 +3089,7 @@ def admin_dashboard():
             PaymentRequest.status == 'Rejected by Finance'
         ))
     elif tab == 'recurring':
-        query = query.filter(PaymentRequest.status == 'Recurring')
+        query = query.filter(PaymentRequest.recurring == 'Recurring')
     elif tab == 'my_requests':
         # For 'my_requests' tab, show only the current user's requests
         query = query.filter(PaymentRequest.user_id == current_user.user_id)
@@ -3140,7 +3240,7 @@ def finance_dashboard():
             PaymentRequest.status == 'Rejected by Finance'
         ))
     elif tab == 'recurring':
-        query = query.filter(PaymentRequest.status == 'Recurring')
+        query = query.filter(PaymentRequest.recurring == 'Recurring')
     elif tab == 'my_requests':
         # For 'my_requests' tab, show only the current user's requests
         query = query.filter(PaymentRequest.user_id == current_user.user_id)
@@ -3244,7 +3344,7 @@ def gm_dashboard():
     elif tab == 'rejected':
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     elif tab == 'recurring':
-        query = query.filter(PaymentRequest.status == 'Recurring')
+        query = query.filter(PaymentRequest.recurring == 'Recurring')
     elif tab == 'my_requests':
         # For 'my_requests' tab, show only the current user's requests
         query = query.filter(PaymentRequest.user_id == current_user.user_id)
@@ -3303,7 +3403,7 @@ def gm_dashboard():
     
     completed_query = completed_query.filter(PaymentRequest.status == 'Completed')
     rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
-    recurring_query = recurring_query.filter(PaymentRequest.status == 'Recurring')
+    recurring_query = recurring_query.filter(PaymentRequest.recurring == 'Recurring')
     
     completed_requests = completed_query.order_by(get_completed_datetime_order()).all()
     rejected_requests = rejected_query.order_by(get_rejected_datetime_order()).all()
@@ -3378,7 +3478,7 @@ def ceo_dashboard():
     elif tab == 'rejected':
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     elif tab == 'recurring':
-        query = query.filter(PaymentRequest.status == 'Recurring')
+        query = query.filter(PaymentRequest.recurring == 'Recurring')
     elif tab == 'my_requests':
         query = query.filter(PaymentRequest.user_id == current_user.user_id)
     elif tab == 'all':
@@ -3426,7 +3526,7 @@ def ceo_dashboard():
 
     completed_query = completed_query.filter(PaymentRequest.status == 'Completed')
     rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
-    recurring_query = recurring_query.filter(PaymentRequest.status == 'Recurring')
+    recurring_query = recurring_query.filter(PaymentRequest.recurring == 'Recurring')
 
     completed_requests = completed_query.order_by(get_completed_datetime_order()).all()
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
@@ -3523,7 +3623,7 @@ def it_dashboard():
     elif tab == 'rejected':
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     elif tab == 'recurring':
-        query = query.filter(PaymentRequest.status == 'Recurring')
+        query = query.filter(PaymentRequest.recurring == 'Recurring')
     elif tab == 'all':
         # 'all' tab (All Requests) shows all requests
         # Apply status filter if provided (excludes Completed, Rejected, Recurring from dropdown)
@@ -3575,7 +3675,7 @@ def it_dashboard():
     
     completed_query = completed_query.filter(PaymentRequest.status == 'Completed')
     rejected_query = rejected_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
-    recurring_query = recurring_query.filter(PaymentRequest.status == 'Recurring')
+    recurring_query = recurring_query.filter(PaymentRequest.recurring == 'Recurring')
     
     completed_requests = completed_query.order_by(get_completed_datetime_order()).all()
     rejected_requests = rejected_query.order_by(PaymentRequest.created_at.desc()).all()
@@ -4835,7 +4935,7 @@ def operation_dashboard():
     elif tab == 'rejected':
         query = query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
     elif tab == 'recurring':
-        query = query.filter(PaymentRequest.status == 'Recurring')
+        query = query.filter(PaymentRequest.recurring == 'Recurring')
     elif tab == 'my_requests':
         # For 'my_requests' tab, show only the current user's requests
         query = query.filter(PaymentRequest.user_id == current_user.user_id)
@@ -8727,11 +8827,7 @@ def reports():
     date_to = request.args.get('date_to', '')
     status_filter = request.args.get('status', '')
     payment_type_filter = request.args.get('payment_type', '')
-    payment_type_filter = request.args.get('payment_type', '')
-    payment_type_filter = request.args.get('payment_type', '')
-    payment_type_filter = request.args.get('payment_type', '')
-    payment_type_filter = request.args.get('payment_type', '')
-    payment_type_filter = request.args.get('payment_type', '')  # 'One-Time' or 'Recurring'
+    payment_method_filter = request.args.get('payment_method', '')  # 'Card' or 'Cheque'
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -8805,6 +8901,10 @@ def reports():
                     PaymentRequest.recurring == 'One-Time'
                 )
             ).filter(PaymentRequest.payment_date.is_(None))
+    
+    # Payment method filter
+    if payment_method_filter:
+        query = query.filter(PaymentRequest.payment_method == payment_method_filter)
     
     # Date filtering - use submission date (date field) which exists for all requests
     if date_from:
@@ -9135,6 +9235,7 @@ def export_reports_excel():
     date_to = request.args.get('date_to', '')
     status_filter = request.args.get('status', '')
     payment_type_filter = request.args.get('payment_type', '')
+    payment_method_filter = request.args.get('payment_method', '')
 
     # Show ALL statuses by default (consistent with reports() view), but exclude archived requests
     query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
@@ -9196,6 +9297,8 @@ def export_reports_excel():
                     PaymentRequest.recurring == 'One-Time'
                 )
             )
+    if payment_method_filter:
+        query = query.filter(PaymentRequest.payment_method == payment_method_filter)
     if date_from:
         query = query.filter(PaymentRequest.date >= datetime.strptime(date_from, '%Y-%m-%d').date())
     if date_to:
@@ -9226,7 +9329,16 @@ def export_reports_excel():
         generation_date = datetime.now().strftime('%Y-%m-%d %H:%M')
         ws['A2'] = f"Report Generated: {generation_date}"
         
-        filters_line = f"Dept: {department_filter or 'All'} | Type: {request_type_filter or 'All'} | Branch: {branch_filter or 'All'} | Payment: {payment_type_filter or 'All'}"
+        # Build comprehensive filters line
+        filter_parts = []
+        filter_parts.append(f"Dept: {department_filter or 'All'}")
+        filter_parts.append(f"Type: {request_type_filter or 'All'}")
+        filter_parts.append(f"Branch: {branch_filter or 'All'}")
+        filter_parts.append(f"Company: {company_filter or 'All'}")
+        filter_parts.append(f"Payment Type: {payment_type_filter or 'All'}")
+        filter_parts.append(f"Payment Method: {payment_method_filter or 'All'}")
+        filter_parts.append(f"Status: {status_filter or 'All'}")
+        filters_line = " | ".join(filter_parts)
         ws['A3'] = filters_line
         
         # Date scope
@@ -9243,7 +9355,7 @@ def export_reports_excel():
         ws['A5'].font = Font(size=12, bold=True)
 
         # Add headers starting from row 7
-        headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment', 'Scheduled', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver', 'Manager Duration', 'Finance Duration']
+        headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment Type', 'Payment Method', 'Scheduled', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver', 'Manager Duration', 'Finance Duration']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=7, column=col, value=header)
             cell.font = Font(bold=True)
@@ -9275,18 +9387,30 @@ def export_reports_excel():
             finance_duration = format_duration(r.finance_approval_duration_minutes)
             
             scheduled_date = ''
-            if (not getattr(r, 'recurring', None) or getattr(r, 'recurring', None) != 'Recurring') and getattr(r, 'payment_date', None):
+            if r.recurring == 'Recurring':
+                # Get scheduled dates for recurring payments
+                scheduled_date = get_recurring_scheduled_dates(r)
+            elif (not getattr(r, 'recurring', None) or getattr(r, 'recurring', None) != 'Recurring') and getattr(r, 'payment_date', None):
                 try:
                     scheduled_date = r.payment_date.strftime('%Y-%m-%d')
                 except Exception:
                     scheduled_date = str(r.payment_date)
 
+            # Determine payment type display
+            if r.recurring == 'Recurring':
+                payment_type_display = 'Recurring'
+            elif r.payment_date or r.recurring == 'Scheduled One-Time':
+                payment_type_display = 'Scheduled One-Time'
+            else:
+                payment_type_display = r.recurring or 'One-Time'
+            
             row_data = [
                 f"#{r.request_id}",
                 str(r.request_type or ''),
                 str(r.requestor_name or ''),
                 str(r.department or ''),
-                str(r.recurring or 'One-Time'),
+                payment_type_display,
+                str(r.payment_method or 'Card'),
                 scheduled_date,
                 f"OMR {to_float(r.amount):.3f}",
                 str(r.branch_name or ''),
@@ -9299,7 +9423,10 @@ def export_reports_excel():
             ]
             
             for col, data in enumerate(row_data, 1):
-                ws.cell(row=row_idx, column=col, value=data)
+                cell = ws.cell(row=row_idx, column=col, value=data)
+                # Enable text wrapping for Scheduled Date column (column G = 7)
+                if col == 7:
+                    cell.alignment = Alignment(wrap_text=True, vertical='top')
 
         # Auto-adjust column widths
         for column in ws.columns:
@@ -9317,6 +9444,8 @@ def export_reports_excel():
                 adjusted_width = min(max_length + 2, 12)  # Cap ID column at 12 characters
             elif column_letter == 'D':  # Department column - make it wider
                 adjusted_width = min(max_length + 2, 25)  # Cap Department column at 25 characters
+            elif column_letter == 'G':  # Scheduled Date column - make it wider
+                adjusted_width = min(max_length + 2, 60)  # Cap Scheduled Date column at 60 characters
             elif column_letter in ['L', 'M']:  # Duration columns - make them narrower
                 adjusted_width = min(max_length + 2, 15)  # Cap duration columns at 15 characters
             else:
@@ -9385,6 +9514,7 @@ def export_reports_pdf():
     date_to = request.args.get('date_to', '')
     status_filter = request.args.get('status', '')
     payment_type_filter = request.args.get('payment_type', '')
+    payment_method_filter = request.args.get('payment_method', '')
 
     # Show ALL statuses by default (consistent with reports() view), but exclude archived requests
     query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
@@ -9455,6 +9585,10 @@ def export_reports_pdf():
                     PaymentRequest.recurring == 'One-Time'
                 )
             ).filter(PaymentRequest.payment_date.is_(None))
+    
+    # Payment method filter
+    if payment_method_filter:
+        query = query.filter(PaymentRequest.payment_method == payment_method_filter)
 
     # Date filtering - use submission date (date field) which exists for all requests
     if date_from:
@@ -9590,15 +9724,12 @@ def export_reports_pdf():
 
         # Helper function to wrap text manually
         def wrap_text(text, max_width, font_name=body_font, font_size=9):
-            """Wrap text to fit within specified width using actual font metrics."""
+            """Wrap text to fit within specified width using actual font metrics.
+            First splits by newlines, then wraps each line if needed."""
             s = '' if text is None else str(text)
             s = prepare_text(s)
             if not s:
                 return ['']
-
-            words = s.split()
-            lines = []
-            current = ''
 
             def string_width(t: str) -> float:
                 try:
@@ -9609,41 +9740,56 @@ def export_reports_pdf():
 
             # Use a slightly smaller width to keep text away from column border
             effective_width = max(0, max_width - (1.5 * mm))
-            for word in words:
-                candidate = (current + ' ' + word).strip()
-                if current and string_width(candidate) > effective_width:
-                    lines.append(current)
-                    current = word
-                else:
-                    current = candidate
-
-            if current:
-                lines.append(current)
-
-            # Hard-break extremely long tokens that exceed width
-            fixed_lines = []
-            for line in lines:
-                if string_width(line) <= effective_width:
-                    fixed_lines.append(line)
+            
+            # First, split by newlines to preserve intentional line breaks
+            newline_split = s.split('\n')
+            all_lines = []
+            
+            for line in newline_split:
+                if not line.strip():
+                    all_lines.append('')
                     continue
-                # Break by characters
-                buf = ''
-                for ch in line:
-                    if string_width(buf + ch) > effective_width and buf:
-                        fixed_lines.append(buf)
-                        buf = ch
+                
+                # Wrap this line if it's too long
+                words = line.split()
+                wrapped_lines = []
+                current = ''
+
+                for word in words:
+                    candidate = (current + ' ' + word).strip()
+                    if current and string_width(candidate) > effective_width:
+                        wrapped_lines.append(current)
+                        current = word
                     else:
-                        buf += ch
-                if buf:
-                    fixed_lines.append(buf)
-            return fixed_lines or ['']
+                        current = candidate
+
+                if current:
+                    wrapped_lines.append(current)
+
+                # Hard-break extremely long tokens that exceed width
+                for wrapped_line in wrapped_lines:
+                    if string_width(wrapped_line) <= effective_width:
+                        all_lines.append(wrapped_line)
+                    else:
+                        # Break by characters
+                        buf = ''
+                        for ch in wrapped_line:
+                            if string_width(buf + ch) > effective_width and buf:
+                                all_lines.append(buf)
+                                buf = ch
+                            else:
+                                buf += ch
+                        if buf:
+                            all_lines.append(buf)
+            
+            return all_lines or ['']
         
         # Table header
         c.setFont(body_font if arabic_font_name else 'Helvetica-Bold', 9)
         headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment', 'Scheduled', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver']
         # Column widths optimized for landscape A4 with proper spacing
         # [ID, Type, Requestor, Department, Payment, Scheduled, Amount, Branch, Company, Submitted, Approved, Approver]
-        col_widths = [14*mm, 30*mm, 22*mm, 18*mm, 16*mm, 18*mm, 18*mm, 26*mm, 26*mm, 16*mm, 16*mm, 28*mm]
+        col_widths = [14*mm, 30*mm, 22*mm, 18*mm, 16*mm, 40*mm, 18*mm, 26*mm, 26*mm, 16*mm, 16*mm, 28*mm]
         # Calculate column positions based on widths to prevent overlapping
         column_gap = 4 * mm  # slightly larger inter-column gap
         col_x = [left]
@@ -9682,7 +9828,10 @@ def export_reports_pdf():
                 finance_end_time_str = f" {local_end.strftime('%H:%M:%S')}"
 
             scheduled_date = ''
-            if (not getattr(r, 'recurring', None) or getattr(r, 'recurring', None) != 'Recurring') and getattr(r, 'payment_date', None):
+            if r.recurring == 'Recurring':
+                # Get scheduled dates for recurring payments
+                scheduled_date = get_recurring_scheduled_dates(r)
+            elif (not getattr(r, 'recurring', None) or getattr(r, 'recurring', None) != 'Recurring') and getattr(r, 'payment_date', None):
                 try:
                     scheduled_date = r.payment_date.strftime('%Y-%m-%d')
                 except Exception:

@@ -338,7 +338,25 @@
                                     <td>{{ req.next_due_date.strftime('%Y-%m-%d') if req.next_due_date else 'N/A' }}</td>
                                     <td>OMR {{ "%.3f"|format(req.amount) }}</td>
                                     <td>
-                                        <span class="badge" style="background: #ffc107; color: #212529;">↻ {{ req.status }}</span>
+                                        {% if req.status == 'Approved' %}
+                                            <span class="badge badge-success">✓ {{ req.status }}</span>
+                                        {% elif req.status == 'Completed' %}
+                                            <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
+                                        {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
+                                            <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
+                                        {% elif req.status == 'Payment Pending' %}
+                                            <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
+                                        {% elif req.status in ['Proof Pending', 'Proof Sent'] %}
+                                            <span class="badge" style="background: #2196F3; color: white;">📄 {{ req.status }}</span>
+                                        {% elif req.status == 'Paid' %}
+                                            <span class="badge" style="background: #6f42c1; color: white;">💰 {{ req.status }}</span>
+                                        {% elif req.status == 'Recurring' %}
+                                            <span class="badge" style="background: #ffc107; color: #212529;">↻ {{ req.status }}</span>
+                                        {% elif req.status in ['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected'] or 'Rejected' in req.status %}
+                                            <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
+                                        {% else %}
+                                            <span class="badge badge-warning">⏳ {{ req.status }}</span>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">

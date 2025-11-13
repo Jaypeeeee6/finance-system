@@ -13,6 +13,18 @@
     .data-table th:nth-child(7),
     .data-table td:nth-child(7) {
         text-align: left;
+        width: 300px;
+        min-width: 300px;
+    }
+    
+    .data-table td:nth-child(7) {
+        padding: 8px !important;
+        line-height: 1.4 !important;
+        vertical-align: middle !important;
+    }
+    
+    .data-table td:nth-child(7) br {
+        line-height: 1.4;
     }
 
     /* Filter Button and Active Filters */
@@ -227,6 +239,42 @@
         font-size: 14px;
         font-weight: 500;
     }
+
+    /* Payment Method Selectable Boxes */
+    .payment-method-options {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+    }
+
+    .payment-method-option {
+        padding: 10px 20px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        background: white;
+        color: #495057;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s;
+        user-select: none;
+    }
+
+    .payment-method-option:hover {
+        border-color: #adb5bd;
+        background: #f8f9fa;
+    }
+
+    .payment-method-option.selected {
+        background: #000;
+        color: white;
+        border-color: #000;
+    }
+
+    .payment-method-option input[type="radio"] {
+        display: none;
+    }
 </style>
 <div class="dashboard-container">
     <div class="dashboard-header">
@@ -274,6 +322,13 @@
                 <span class="filter-pill">
                     Payment Type: {{ request.args.get('payment_type') }}
                     <button type="button" class="remove-filter" onclick="removeFilter('payment_type')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if request.args.get('payment_method') %}
+                <span class="filter-pill">
+                    Payment Method: {{ request.args.get('payment_method') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('payment_method')" title="Remove filter">×</button>
                 </span>
                 {% set has_filters = True %}
             {% endif %}
@@ -372,6 +427,20 @@
                 </div>
 
                 <div class="form-group">
+                    <label>Payment Method</label>
+                    <div class="payment-method-options">
+                        <label class="payment-method-option {% if request.args.get('payment_method') == 'Card' %}selected{% endif %}" onclick="selectPaymentMethod(event, 'Card')">
+                            <input type="radio" name="payment_method" value="Card" {% if request.args.get('payment_method') == 'Card' %}checked{% endif %}>
+                            Card
+                        </label>
+                        <label class="payment-method-option {% if request.args.get('payment_method') == 'Cheque' %}selected{% endif %}" onclick="selectPaymentMethod(event, 'Cheque')">
+                            <input type="radio" name="payment_method" value="Cheque" {% if request.args.get('payment_method') == 'Cheque' %}checked{% endif %}>
+                            Cheque
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
                     <label for="status">Status</label>
                     <select name="status" id="status">
                         <option value="">All Statuses</option>
@@ -461,10 +530,10 @@
             <h2><i class="fas fa-table"></i> Report Results</h2>
             {% if requests and requests|length > 0 %}
             <div class="header-actions">
-                <a class="btn btn-success" id="export-excel-btn" href="{{ url_for('export_reports_excel', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to',''), status=request.args.get('status',''), payment_type=request.args.get('payment_type','')) }}" onclick="return showExportLoading(event)">
+                <a class="btn btn-success" id="export-excel-btn" href="{{ url_for('export_reports_excel', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to',''), status=request.args.get('status',''), payment_type=request.args.get('payment_type',''), payment_method=request.args.get('payment_method','')) }}" onclick="return showExportLoading(event)">
                     <i class="fas fa-file-excel"></i> <span id="export-excel-text">Export Excel</span>
                 </a>
-                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to',''), status=request.args.get('status',''), payment_type=request.args.get('payment_type','')) }}" onclick="return showExportLoading(event)">
+                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to',''), status=request.args.get('status',''), payment_type=request.args.get('payment_type',''), payment_method=request.args.get('payment_method','')) }}" onclick="return showExportLoading(event)">
                     <i class="fas fa-file-pdf"></i> <span id="export-text">Export PDF</span>
                 </a>
             </div>
@@ -527,7 +596,18 @@
                                 </td>
                                 <td>{{ req.payment_method or 'Card' }}</td>
                                 <td>
-                                    {% if (not req.recurring or req.recurring != 'Recurring') and req.payment_date %}
+                                    {% if req.recurring == 'Recurring' %}
+                                        {% set recurring_dates = req|get_recurring_dates %}
+                                        {% if recurring_dates %}
+                                            {% for date_line in recurring_dates.strip().split('\n') %}
+                                                {% if date_line.strip() %}
+                                                    {{ date_line.strip() }}{% if not loop.last %}<br>{% endif %}
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% else %}
+                                            <span style="color: #999;">-</span>
+                                        {% endif %}
+                                    {% elif req.payment_date %}
                                         {{ req.payment_date.strftime('%Y-%m-%d') }}
                                     {% else %}
                                         <span style="color: #999;">-</span>
@@ -632,7 +712,7 @@
                     {% if pagination.pages > 1 %}
                     <div class="pagination">
                         {% if pagination.has_prev %}
-                            <a href="{{ url_for('reports', page=pagination.prev_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter, payment_type=payment_type_filter) }}" class="btn btn-sm btn-secondary">
+                            <a href="{{ url_for('reports', page=pagination.prev_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter, payment_type=payment_type_filter, payment_method=request.args.get('payment_method','')) }}" class="btn btn-sm btn-secondary">
                                 <i class="fas fa-chevron-left"></i> Previous
                             </a>
                         {% endif %}
@@ -640,7 +720,7 @@
                         {% for page_num in pagination.iter_pages() %}
                             {% if page_num %}
                                 {% if page_num != pagination.page %}
-                                    <a href="{{ url_for('reports', page=page_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter, payment_type=payment_type_filter) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
+                                    <a href="{{ url_for('reports', page=page_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter, payment_type=payment_type_filter, payment_method=request.args.get('payment_method','')) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
                                 {% else %}
                                     <span class="btn btn-sm btn-primary">{{ page_num }}</span>
                                 {% endif %}
@@ -650,7 +730,7 @@
                         {% endfor %}
                         
                         {% if pagination.has_next %}
-                            <a href="{{ url_for('reports', page=pagination.next_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter, payment_type=payment_type_filter) }}" class="btn btn-sm btn-secondary">
+                            <a href="{{ url_for('reports', page=pagination.next_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter, payment_type=payment_type_filter, payment_method=request.args.get('payment_method','')) }}" class="btn btn-sm btn-secondary">
                                 Next <i class="fas fa-chevron-right"></i>
                             </a>
                         {% endif %}
@@ -1018,6 +1098,36 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Payment Method Selection
+function selectPaymentMethod(event, value) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const clickedOption = event.currentTarget;
+    if (!clickedOption) return;
+    
+    const radio = clickedOption.querySelector('input[type="radio"]');
+    const isCurrentlySelected = clickedOption.classList.contains('selected');
+    
+    // Remove selected class from all options
+    const options = document.querySelectorAll('.payment-method-option');
+    options.forEach(option => {
+        option.classList.remove('selected');
+        const optRadio = option.querySelector('input[type="radio"]');
+        if (optRadio) {
+            optRadio.checked = false;
+        }
+    });
+    
+    // If clicking the same option, deselect it; otherwise select the new one
+    if (!isCurrentlySelected) {
+        clickedOption.classList.add('selected');
+        if (radio) {
+            radio.checked = true;
+        }
+    }
+}
 </script>
 {% endblock %}
 
