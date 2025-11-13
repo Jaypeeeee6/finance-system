@@ -10708,10 +10708,27 @@ def api_admin_recurring_events():
             date_key = req.payment_date.isoformat()
             if date_key not in events_by_date:
                 events_by_date[date_key] = []
+            
+            # Determine color based on payment status
+            # Check if request is completed
+            is_completed = req.status == 'Completed'
+            
+            # Check if there's a paid notification for this payment date
+            paid_notification = PaidNotification.query.filter_by(
+                request_id=req.request_id,
+                paid_date=req.payment_date
+            ).first()
+            
+            # Determine event color: green if completed/paid, purple if due
+            if is_completed or paid_notification:
+                event_color = '#2e7d32'  # green for paid/completed
+            else:
+                event_color = '#8e24aa'  # purple for due (matches recurring payment color scheme)
+            
             events_by_date[date_key].append({
                 'title': f'OMR {float(req.amount):.3f}',
                 'start': req.payment_date.isoformat(),
-                'color': '#0d6efd',  # blue for scheduled one-time
+                'color': event_color,
                 'url': f'/request/{req.request_id}',
                 'extendedProps': {
                     'requestId': req.request_id,
