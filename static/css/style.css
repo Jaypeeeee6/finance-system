@@ -1381,6 +1381,20 @@ body {
     width: 140px;
 }
 
+/* Make ID column wider for all dashboards */
+/* For dashboards without checkbox (ID is 1st column) - exclude IT dashboard */
+.dashboard-container:not(:has(> .dashboard-tabs)) .card-body .table-responsive .data-table th:nth-child(1),
+.dashboard-container:not(:has(> .dashboard-tabs)) .card-body .table-responsive .data-table td:nth-child(1) {
+    min-width: 80px;
+    width: 80px;
+}
+/* For IT dashboard with checkbox (ID is 2nd column) */
+.dashboard-container:has(> .dashboard-tabs) .tab-content-container .data-table th:nth-child(2),
+.dashboard-container:has(> .dashboard-tabs) .tab-content-container .data-table td:nth-child(2) {
+    min-width: 80px;
+    width: 80px;
+}
+
 .data-table th.scheduled-date-col,
 .data-table td.scheduled-date-col {
     max-width: 120px;
