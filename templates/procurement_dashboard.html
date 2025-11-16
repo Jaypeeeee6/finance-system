@@ -1,0 +1,732 @@
+{% extends "base.html" %}
+
+{% block title %}Procurement Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-tachometer-alt"></i> Procurement Dashboard</h1>
+        <p>Welcome, <strong>{{ user.name }}</strong> from <strong>{{ user.department }}</strong></p>
+    </div>
+
+    <div class="dashboard-actions">
+        <a href="{{ url_for('new_request') }}" class="btn btn-primary">
+            <i class="fas fa-plus-circle"></i> New Payment Request
+        </a>
+        {% if current_user.role in ['Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager'] %}
+        <a href="{{ url_for('reports') }}" class="btn btn-secondary">
+            <i class="fas fa-chart-bar"></i> Reports
+        </a>
+        {% endif %}
+        {% if current_user.role == 'Department Manager' and current_user.department == 'Procurement' %}
+        <a href="{{ url_for('procurement_bank_money') }}" class="btn btn-success">
+            <i class="fas fa-university"></i> Bank Money
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Current Money Summary -->
+    <div class="card" style="margin-bottom: 30px; background: #f8f9fa;">
+        <div class="card-body" style="padding: 25px;">
+            <h3 style="margin-top: 0; color: #333;">
+                <i class="fas fa-wallet"></i> Current Money Status
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 20px;">
+                <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 2px solid #43e97b;">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Available Balance</div>
+                    {% set available = completed_amount %}
+                    <div style="font-size: 24px; font-weight: bold; color: #43e97b;">OMR {{ "%.3f"|format(available) }}</div>
+                    <div style="font-size: 12px; color: #999; margin-top: 5px;">(Completed Requests)</div>
+                </div>
+                <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Money Spent</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #f5576c;">OMR {{ "%.3f"|format(completed_amount) }}</div>
+                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Completed Requests</div>
+                </div>
+                <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Total Allocated</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #667eea;">OMR {{ "%.3f"|format(total_amount) }}</div>
+                    <div style="font-size: 12px; color: #999; margin-top: 5px;">All Bank Money Requests</div>
+                </div>
+                <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Money Pending</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #4facfe;">OMR {{ "%.3f"|format(pending_amount) }}</div>
+                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Pending Approval</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="tab-navigation">
+        <button class="tab-button {% if active_tab == 'all' %}active{% endif %}" onclick="switchTab('all')" id="tab-all">
+            <i class="fas fa-list"></i> All Requests
+        </button>
+        <button class="tab-button {% if active_tab == 'my_requests' %}active{% endif %}" onclick="switchTab('my_requests')" id="tab-my_requests">
+            <i class="fas fa-user"></i> My Requests
+        </button>
+        <button class="tab-button {% if active_tab == 'completed' %}active{% endif %}" onclick="switchTab('completed')" id="tab-completed">
+            <i class="fas fa-check-circle"></i> Completed
+        </button>
+        <button class="tab-button {% if active_tab == 'rejected' %}active{% endif %}" onclick="switchTab('rejected')" id="tab-rejected">
+            <i class="fas fa-times-circle"></i> Rejected
+        </button>
+        <button class="tab-button {% if active_tab == 'recurring' %}active{% endif %}" onclick="switchTab('recurring')" id="tab-recurring">
+            <i class="fas fa-sync-alt"></i> Recurring
+        </button>
+        <div class="tab-search">
+            <input type="text" id="tabSearchInput" placeholder="Search by request # or requestor name..." class="tab-search-input" value="{{ search_query or '' }}">
+            <button type="button" class="tab-search-btn" onclick="performSearch()">
+                <i class="fas fa-search"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="header-top">
+                <div class="filter-controls">
+                    {% if active_tab == 'all' %}
+                    <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
+                        <option value="">All Statuses</option>
+                        <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
+                        <option value="Pending Finance Approval" {% if status_filter == 'Pending Finance Approval' %}selected{% endif %}>Pending Finance Approval</option>
+                        <option value="Proof Pending" {% if status_filter == 'Proof Pending' %}selected{% endif %}>Proof Pending</option>
+                        <option value="Proof Sent" {% if status_filter == 'Proof Sent' %}selected{% endif %}>Proof Sent</option>
+                        <option value="Proof Rejected" {% if status_filter == 'Proof Rejected' %}selected{% endif %}>Proof Rejected</option>
+                    </select>
+                    {% endif %}
+                    <select id="urgentFilter" onchange="filterTable()" class="form-select">
+                        <option value="">All Requests</option>
+                        <option value="urgent" {% if urgent_filter == 'urgent' %}selected{% endif %}>🔴 Urgent Only</option>
+                        <option value="not_urgent" {% if urgent_filter == 'not_urgent' %}selected{% endif %}>⚪ Not Urgent</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-header-actions">
+                {% if search_query or urgent_filter %}
+                <div class="filter-indicator">
+                    <span class="badge" style="background: #f57c00; color: white;">
+                        <i class="fas fa-filter"></i> 
+                        {% set filters = [] %}
+                        {% if urgent_filter %}{{ filters.append(urgent_filter) or '' }}{% endif %}
+                        {% if search_query %}{{ filters.append('Search: ' + search_query) or '' }}{% endif %}
+                        {{ filters|join(' | ') }}
+                    </span>
+                    <a href="{{ url_for('procurement_dashboard') }}" class="btn btn-sm btn-outline">
+                        <i class="fas fa-times"></i> Clear All
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card-body">
+            <h4 class="card-title mb-4">Payment Requests</h4>
+            <!-- All Requests Tab -->
+            <div id="tab-content-all" class="tab-content {% if active_tab == 'all' %}active{% endif %}">
+                {% if requests %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Type</th>
+                                <th>Payment Type</th>
+                                <th>Payment Method</th>
+                                <th>Requestor</th>
+                                <th>Submission Date</th>
+                                <th>Completed Date</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in requests %}
+                            <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
+                                <td>
+                                    <span>#{{ req.request_id }}</span>
+                                    {% if req.is_urgent %}
+                                        <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
+                                    {% endif %}
+                                </td>
+                                <td><span class="badge badge-info">{{ req.request_type }}</span></td>
+                                <td>
+                                    {% if req.recurring == 'Recurring' %}
+                                        <span class="badge" style="background: #ffc107; color: #212529;">↻ Recurring</span>
+                                    {% elif req.payment_date or req.recurring == 'Scheduled One-Time' %}
+                                        <span class="badge" style="background: #fd7e14; color: white;">Scheduled One-Time</span>
+                                    {% else %}
+                                        <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ req.payment_method or 'Card' }}</td>
+                                <td>{{ req.requestor_name }}</td>
+                                <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    {% if req.status == 'Completed' and req.completion_date %}
+                                        {{ req.completion_date.strftime('%Y-%m-%d') }}
+                                    {% elif req.approval_date %}
+                                        {{ req.approval_date.strftime('%Y-%m-%d') }}
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                <td>
+                                    {% if req.status == 'Approved' %}
+                                        <span class="badge badge-success">✓ {{ req.status }}</span>
+                                    {% elif req.status == 'Completed' %}
+                                        <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
+                                    {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
+                                        <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
+                                    {% elif req.status == 'Payment Pending' %}
+                                        <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
+                                    {% elif req.status in ['Proof Pending', 'Proof Sent'] %}
+                                        <span class="badge" style="background: #2196F3; color: white;">📄 {{ req.status }}</span>
+                                    {% elif req.status == 'Paid' %}
+                                        <span class="badge" style="background: #6f42c1; color: white;">💰 {{ req.status }}</span>
+                                    {% elif req.status == 'Recurring' %}
+                                        <span class="badge" style="background: #ffc107; color: #212529;">↻ {{ req.status }}</span>
+                                    {% elif req.status in ['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected'] or 'Rejected' in req.status %}
+                                        <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
+                                    {% else %}
+                                        <span class="badge badge-warning">⏳ {{ req.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                    {% if req.status == 'Proof Pending' and req.user_id == user.user_id %}
+                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}?tab=finance" class="btn btn-sm btn-success">
+                                        <i class="fas fa-upload"></i> Upload Proof
+                                    </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <p>No payment requests found.</p>
+                </div>
+            {% endif %}
+            
+            <!-- Pagination Controls -->
+            {% if active_tab == 'all' and pagination %}
+            <div class="pagination-container">
+                <div class="pagination-left">
+                    <div class="pagination-info">
+                        Showing {{ pagination.per_page * (pagination.page - 1) + 1 }} to 
+                        {{ pagination.per_page * (pagination.page - 1) + pagination.items|length }} 
+                        of {{ pagination.total }} requests
+                    </div>
+                    <div class="items-per-page">
+                        <label for="per_page">Show:</label>
+                        <select id="per_page" onchange="changeItemsPerPage(this.value)">
+                            <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10</option>
+                            <option value="20" {% if pagination.per_page == 20 %}selected{% endif %}>20</option>
+                            <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50</option>
+                            <option value="100" {% if pagination.per_page == 100 %}selected{% endif %}>100</option>
+                        </select>
+                        <span>per page</span>
+                    </div>
+                </div>
+                {% if pagination.pages > 1 %}
+                <div class="pagination">
+                    {% if pagination.has_prev %}
+                        <a href="{{ url_for('procurement_dashboard', page=pagination.prev_num, per_page=pagination.per_page, tab=active_tab, status=status_filter, urgent=urgent_filter, search=search_query) }}" class="btn btn-sm btn-secondary">
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </a>
+                    {% endif %}
+                    
+                    {% for page_num in pagination.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != pagination.page %}
+                                <a href="{{ url_for('procurement_dashboard', page=page_num, per_page=pagination.per_page, tab=active_tab, status=status_filter, urgent=urgent_filter, search=search_query) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
+                            {% else %}
+                                <span class="btn btn-sm btn-primary">{{ page_num }}</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="pagination-ellipsis">...</span>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if pagination.has_next %}
+                        <a href="{{ url_for('procurement_dashboard', page=pagination.next_num, per_page=pagination.per_page, tab=active_tab, status=status_filter, urgent=urgent_filter, search=search_query) }}" class="btn btn-sm btn-secondary">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+            </div>
+
+            <!-- My Requests Tab -->
+            <div id="tab-content-my_requests" class="tab-content {% if active_tab == 'my_requests' %}active{% endif %}">
+                {% if my_requests %}
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Type</th>
+                                    <th>Payment Type</th>
+                                    <th>Payment Method</th>
+                                    <th>Requestor</th>
+                                    <th>Submission Date</th>
+                                    <th>Completed Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for req in my_requests %}
+                                <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
+                                    <td>
+                                        <span>#{{ req.request_id }}</span>
+                                        {% if req.is_urgent %}
+                                            <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-info">{{ req.request_type }}</span>
+                                    </td>
+                                    <td>
+                                        {% if req.recurring == 'Recurring' %}
+                                            <span class="badge" style="background: #ffc107; color: #212529;">↻ Recurring</span>
+                                        {% elif req.payment_date or req.recurring == 'Scheduled One-Time' %}
+                                            <span class="badge" style="background: #fd7e14; color: white;">Scheduled One-Time</span>
+                                        {% else %}
+                                            <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ req.payment_method or 'Card' }}</td>
+                                    <td>{{ req.requestor_name }}</td>
+                                    <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        {% if req.status == 'Completed' and req.completion_date %}
+                                            {{ req.completion_date.strftime('%Y-%m-%d') }}
+                                        {% elif req.approval_date %}
+                                            {{ req.approval_date.strftime('%Y-%m-%d') }}
+                                        {% else %}
+                                            <span style="color: #999;">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                    <td>
+                                        {% if req.status == 'Approved' %}
+                                            <span class="badge badge-success">✓ {{ req.status }}</span>
+                                        {% elif req.status == 'Completed' %}
+                                            <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
+                                        {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
+                                            <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
+                                        {% elif req.status == 'Payment Pending' %}
+                                            <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
+                                        {% elif req.status in ['Proof Pending', 'Proof Sent'] %}
+                                            <span class="badge" style="background: #2196F3; color: white;">📄 {{ req.status }}</span>
+                                        {% elif req.status == 'Paid' %}
+                                            <span class="badge" style="background: #6f42c1; color: white;">💰 {{ req.status }}</span>
+                                        {% elif req.status == 'Recurring' %}
+                                            <span class="badge" style="background: #ffc107; color: #212529;">↻ {{ req.status }}</span>
+                                        {% elif req.status in ['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected'] or 'Rejected' in req.status %}
+                                            <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
+                                        {% else %}
+                                            <span class="badge badge-warning">⏳ {{ req.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                        {% if req.status == 'Proof Pending' and req.user_id == user.user_id %}
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}?tab=finance" class="btn btn-sm btn-success">
+                                            <i class="fas fa-upload"></i> Upload Proof
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>No payment requests found.</p>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- Completed Tab -->
+            <div id="tab-content-completed" class="tab-content {% if active_tab == 'completed' %}active{% endif %}">
+                {% if completed_requests %}
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Type</th>
+                                    <th>Payment Type</th>
+                                    <th>Payment Method</th>
+                                    <th>Requestor</th>
+                                    <th>Submission Date</th>
+                                    <th>Completed Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for req in completed_requests %}
+                                <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
+                                    <td>
+                                    <span>#{{ req.request_id }}</span>
+                                    {% if req.is_urgent %}
+                                        <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
+                                    {% endif %}
+                                </td>
+                                    <td><span class="badge badge-info">{{ req.request_type }}</span></td>
+                                    <td>
+                                        {% if req.recurring == 'Recurring' %}
+                                            <span class="badge" style="background: #ffc107; color: #212529;">↻ Recurring</span>
+                                        {% else %}
+                                            <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ req.requestor_name }}</td>
+                                    <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        {% if req.completion_date %}
+                                            {{ req.completion_date.strftime('%Y-%m-%d') }}
+                                        {% elif req.approval_date %}
+                                            {{ req.approval_date.strftime('%Y-%m-%d') }}
+                                        {% else %}
+                                            <span style="color: #999;">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                    <td>
+                                        <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>No payment requests found.</p>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- Rejected Tab -->
+            <div id="tab-content-rejected" class="tab-content {% if active_tab == 'rejected' %}active{% endif %}">
+                {% if rejected_requests %}
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Type</th>
+                                    <th>Payment Type</th>
+                                    <th>Payment Method</th>
+                                    <th>Requestor</th>
+                                    <th>Submission Date</th>
+                                    <th>Rejection Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for req in rejected_requests %}
+                                <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
+                                    <td>
+                                    <span>#{{ req.request_id }}</span>
+                                    {% if req.is_urgent %}
+                                        <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
+                                    {% endif %}
+                                </td>
+                                    <td><span class="badge badge-info">{{ req.request_type }}</span></td>
+                                    <td>
+                                        {% if req.recurring == 'Recurring' %}
+                                            <span class="badge" style="background: #ffc107; color: #212529;">↻ Recurring</span>
+                                        {% else %}
+                                            <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ req.requestor_name }}</td>
+                                    <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        {% if req.manager_rejection_date %}
+                                            {{ req.manager_rejection_date.strftime('%Y-%m-%d') }}
+                                        {% elif req.finance_rejection_date %}
+                                            {{ req.finance_rejection_date.strftime('%Y-%m-%d') }}
+                                        {% else %}
+                                            <span style="color: #999;">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                    <td>
+                                        <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>No payment requests found.</p>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- Recurring Tab -->
+            <div id="tab-content-recurring" class="tab-content {% if active_tab == 'recurring' %}active{% endif %}">
+                {% if recurring_requests %}
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Type</th>
+                                    <th>Payment Type</th>
+                                    <th>Payment Method</th>
+                                    <th>Requestor</th>
+                                    <th>Submission Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for req in recurring_requests %}
+                                <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
+                                    <td>
+                                        <span>#{{ req.request_id }}</span>
+                                        {% if req.is_urgent %}
+                                            <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-info">{{ req.request_type }}</span>
+                                    </td>
+                                    <td>
+                                        {% if req.recurring == 'Recurring' %}
+                                            <span class="badge" style="background: #ffc107; color: #212529;">↻ Recurring</span>
+                                        {% else %}
+                                            <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ req.requestor_name }}</td>
+                                    <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                    <td>
+                                        {% if req.status == 'Approved' %}
+                                            <span class="badge badge-success">✓ {{ req.status }}</span>
+                                        {% elif req.status == 'Completed' %}
+                                            <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
+                                        {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
+                                            <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
+                                        {% elif req.status == 'Payment Pending' %}
+                                            <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
+                                        {% elif req.status in ['Proof Pending', 'Proof Sent'] %}
+                                            <span class="badge" style="background: #2196F3; color: white;">📄 {{ req.status }}</span>
+                                        {% elif req.status == 'Paid' %}
+                                            <span class="badge" style="background: #6f42c1; color: white;">💰 {{ req.status }}</span>
+                                        {% elif req.status == 'Recurring' %}
+                                            <span class="badge" style="background: #ffc107; color: #212529;">↻ {{ req.status }}</span>
+                                        {% elif req.status in ['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected'] or 'Rejected' in req.status %}
+                                            <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
+                                        {% else %}
+                                            <span class="badge badge-warning">⏳ {{ req.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>No payment requests found.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function changeItemsPerPage(perPage) {
+    // Redirect to page 1 with new per_page value
+    const url = new URL(window.location);
+    url.searchParams.set('per_page', perPage);
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}
+
+
+function applyStatusFilter() {
+    const statusFilter = document.getElementById('statusFilter');
+    const statusValue = statusFilter.value;
+    
+    const url = new URL(window.location);
+    if (statusValue) {
+        url.searchParams.set('status', statusValue);
+    } else {
+        url.searchParams.delete('status');
+    }
+    url.searchParams.set('page', '1'); // Reset to page 1 when filtering
+    window.location.href = url.toString();
+}
+
+// Debounce timer for search
+let searchDebounceTimer = null;
+
+function performSearch(commit) {
+    const searchInput = document.getElementById('tabSearchInput');
+    const searchValue = searchInput.value.trim();
+    const url = new URL(window.location);
+    
+    if (searchValue) {
+        url.searchParams.set('search', searchValue);
+    } else {
+        url.searchParams.delete('search');
+    }
+    url.searchParams.set('page', '1');
+    
+    if (commit) {
+        window.location.href = url.toString();
+        return;
+    }
+    
+    // Live update without navigation: fetch HTML, swap the entire card-body content
+    fetch(url.toString(), { headers: { 'X-Requested-With': 'fetch' } })
+        .then(res => res.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newBody = doc.querySelector('.card-body');
+            const curBody = document.querySelector('.card-body');
+            if (newBody && curBody) {
+                curBody.innerHTML = newBody.innerHTML;
+            }
+        })
+        .catch(() => { /* ignore transient errors */ });
+}
+
+function filterTable() {
+    // This function is kept for urgent filter (client-side filtering for urgent status)
+    const urgentFilter = document.getElementById('urgentFilter');
+    const urgentValue = urgentFilter.value;
+    
+    const table = document.querySelector('.data-table');
+    if (!table) return;
+    
+    const rows = table.getElementsByTagName('tr');
+    
+    // Skip header row (index 0)
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const urgentBadge = row.querySelector('[style*="background: #dc3545"]'); // URGENT badge
+        
+        let showRow = true;
+        
+        // Filter by urgent status (client-side only)
+        if (urgentValue) {
+            const isUrgent = urgentBadge !== null;
+            if (urgentValue === 'urgent' && !isUrgent) {
+                showRow = false;
+            } else if (urgentValue === 'not_urgent' && isUrgent) {
+                showRow = false;
+            }
+        }
+        
+        // Show or hide row
+        row.style.display = showRow ? '' : 'none';
+    }
+}
+
+function clearSearch() {
+    document.getElementById('tabSearchInput').value = '';
+    performSearch();
+}
+
+function switchTab(tabName) {
+    // Redirect to the same page with the tab parameter so server sets active_tab
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tabName);
+    // Clear status filter when switching tabs (status filter is only for All Requests)
+    if (tabName !== 'all') {
+        url.searchParams.delete('status');
+    }
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}
+
+// Initialize tab search functionality when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up tab search functionality with debouncing
+    const tabSearchInput = document.getElementById('tabSearchInput');
+    if (tabSearchInput) {
+        // Clear any existing debounce timer
+        tabSearchInput.addEventListener('input', function() {
+            clearTimeout(searchDebounceTimer);
+            // Wait 500ms after user stops typing before performing search
+            searchDebounceTimer = setTimeout(function() {
+                performSearch(false);
+            }, 500);
+        });
+        
+        // Also trigger search on Enter key
+        tabSearchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                clearTimeout(searchDebounceTimer);
+                performSearch(true);
+            }
+        });
+    }
+    
+    // Set up tab search button
+    const tabSearchBtn = document.querySelector('.tab-search-btn');
+    if (tabSearchBtn) {
+        tabSearchBtn.addEventListener('click', function() {
+            clearTimeout(searchDebounceTimer);
+            performSearch(true);
+        });
+    }
+});
+</script>
+{% endblock %}
+

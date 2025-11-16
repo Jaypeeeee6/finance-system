@@ -2662,29 +2662,34 @@ def dashboard():
         return redirect(url_for('it_dashboard'))
     elif role == 'Department Manager':
         # Route department managers to their specific dashboards
-        # Debug: Print the actual department value
-        print(f"DEBUG: Department Manager department = '{current_user.department}'")
-        print(f"DEBUG: Department type = {type(current_user.department)}")
-        print(f"DEBUG: Department length = {len(current_user.department) if current_user.department else 'None'}")
+        # Normalize department value (strip whitespace and handle case)
+        dept = current_user.department.strip() if current_user.department else ''
         
-        if current_user.department == 'IT':
+        if dept == 'IT':
             return redirect(url_for('it_dashboard'))
-        elif current_user.department in ['Project', 'project', 'PROJECT']:
-            print("DEBUG: Redirecting to project dashboard")
+        elif dept.lower() == 'procurement':
+            return redirect(url_for('procurement_dashboard'))
+        elif dept.lower() in ['project', 'projects']:
             return redirect(url_for('project_dashboard'))
         else:
-            print(f"DEBUG: Department '{current_user.department}' not matched, going to department dashboard")
             return redirect(url_for('department_dashboard'))
     elif role == 'Project Staff':
         return redirect(url_for('project_dashboard'))
     elif role == 'Operation Manager':
         return redirect(url_for('operation_dashboard'))
+    elif role == 'Procurement Staff':
+        return redirect(url_for('procurement_dashboard'))
     elif role in ['HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 
                   'Customer Service Staff', 'Marketing Staff', 'Operation Staff', 
                   'Quality Control Staff', 'Research and Development Staff', 
-                  'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff']:
+                  'Office Staff', 'Maintenance Staff', 'Logistic Staff']:
         return redirect(url_for('department_dashboard'))
     else:
+        # Check if user has Procurement department - route all Procurement users to their dashboard
+        # Normalize department value (strip whitespace and handle case)
+        dept = current_user.department.strip() if current_user.department else ''
+        if dept.lower() == 'procurement':
+            return redirect(url_for('procurement_dashboard'))
         # Fallback for any unrecognized roles
         flash('Your role is not properly configured. Please contact IT.', 'warning')
         return redirect(url_for('department_dashboard'))
@@ -2693,15 +2698,19 @@ def dashboard():
 @app.route('/department/dashboard')
 @login_required
 @role_required(
-    # Department-specific Staff roles (excluding Finance Staff, Project Staff, and IT Staff who have their own dashboards)
+    # Department-specific Staff roles (excluding Finance Staff, Project Staff, IT Staff, and Procurement Staff who have their own dashboards)
     'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff',
     'Customer Service Staff', 'Marketing Staff', 'Operation Staff', 'Quality Control Staff',
-    'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff',
+    'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Logistic Staff',
     # Other roles that can access this dashboard
     'Department Manager', 'Operation Manager'
 )
 def department_dashboard():
     """Dashboard for department users, finance, and project users"""
+    # Redirect Procurement Department Managers to their dedicated dashboard
+    dept = current_user.department.strip() if current_user.department else ''
+    if current_user.role == 'Department Manager' and dept.lower() == 'procurement':
+        return redirect(url_for('procurement_dashboard'))
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     search_query = request.args.get('search', None)
@@ -2989,6 +2998,208 @@ def department_dashboard():
                          urgent_filter=urgent_filter,
                          my_requests=my_requests_pagination.items,
                          active_tab=tab)
+
+
+@app.route('/procurement/dashboard')
+@login_required
+def procurement_dashboard():
+    """Dashboard for Procurement department users"""
+    # Allow ALL users with Procurement department to access this dashboard
+    # Normalize department value (strip whitespace and handle case)
+    dept = current_user.department.strip() if current_user.department else ''
+    if dept.lower() != 'procurement':
+        flash('You do not have permission to access this page. This dashboard is only for Procurement department users.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    search_query = request.args.get('search', None)
+    status_filter = request.args.get('status', None)
+    tab = request.args.get('tab', 'all')
+    urgent_filter = request.args.get('urgent', None)
+    
+    # Validate per_page to prevent abuse
+    if per_page not in [10, 20, 50, 100]:
+        per_page = 10
+    
+    # For Department Managers, show requests from their departments
+    if current_user.role == 'Department Manager':
+        # Procurement Department Managers can see ALL their department's requests
+        # plus any request where they are the temporary manager
+        # Exclude archived requests
+        # Use normalized department for comparison
+        user_dept = current_user.department.strip() if current_user.department else ''
+        base_query = PaymentRequest.query.filter(
+            db.or_(
+                PaymentRequest.department == current_user.department,
+                PaymentRequest.temporary_manager_id == current_user.user_id
+            ),
+            PaymentRequest.is_archived == False
+        )
+    else:
+        # For regular Procurement Staff users, show their own requests (exclude archived)
+        base_query = PaymentRequest.query.filter(
+            PaymentRequest.user_id == current_user.user_id,
+            PaymentRequest.is_archived == False
+        )
+    
+    # Exclude CEO-submitted requests for non-authorized roles (visibility hardening)
+    if current_user.role not in ['Finance Admin', 'GM', 'Operation Manager']:
+        base_query = base_query.filter(~PaymentRequest.user.has(User.role == 'CEO'))
+
+    # Apply urgent filter if provided (before tab filtering)
+    if urgent_filter == 'urgent':
+        base_query = base_query.filter(PaymentRequest.is_urgent == True)
+    elif urgent_filter == 'not_urgent':
+        base_query = base_query.filter(PaymentRequest.is_urgent == False)
+    
+    # Apply search filter if provided (before tab filtering)
+    if search_query:
+        try:
+            # Try to convert to integer for exact match
+            search_id = int(search_query)
+            base_query = base_query.filter(PaymentRequest.request_id == search_id)
+        except ValueError:
+            # If not a number, search ONLY by requestor name
+            search_term = f'%{search_query}%'
+            base_query = base_query.filter(
+                PaymentRequest.requestor_name.ilike(search_term)
+            )
+    
+    # Apply tab-based filtering
+    if tab == 'completed':
+        query = base_query.filter(PaymentRequest.status == 'Completed')
+    elif tab == 'rejected':
+        query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
+    elif tab == 'recurring':
+        query = base_query.filter(PaymentRequest.recurring == 'Recurring')
+    elif tab == 'my_requests':
+        # For 'my_requests' tab, show only the current user's requests
+        query = base_query.filter(PaymentRequest.user_id == current_user.user_id)
+    elif tab == 'all':
+        # 'all' tab - show ALL requests, but apply status filter if provided
+        query = base_query
+        if status_filter:
+            query = query.filter(PaymentRequest.status == status_filter)
+    else:  # default - show ALL requests
+        query = base_query
+        if status_filter:
+            query = query.filter(PaymentRequest.status == status_filter)
+    
+    # Get separate queries for each tab content
+    completed_query = base_query.filter(PaymentRequest.status == 'Completed')
+    rejected_query = base_query.filter(PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']))
+    recurring_query = base_query.filter(PaymentRequest.recurring == 'Recurring')
+    
+    # Apply urgent filter to separate queries
+    if urgent_filter == 'urgent':
+        completed_query = completed_query.filter(PaymentRequest.is_urgent == True)
+        rejected_query = rejected_query.filter(PaymentRequest.is_urgent == True)
+        recurring_query = recurring_query.filter(PaymentRequest.is_urgent == True)
+    elif urgent_filter == 'not_urgent':
+        completed_query = completed_query.filter(PaymentRequest.is_urgent == False)
+        rejected_query = rejected_query.filter(PaymentRequest.is_urgent == False)
+        recurring_query = recurring_query.filter(PaymentRequest.is_urgent == False)
+    
+    # Apply search filter to separate queries
+    if search_query:
+        try:
+            search_id = int(search_query)
+            completed_query = completed_query.filter(PaymentRequest.request_id == search_id)
+            rejected_query = rejected_query.filter(PaymentRequest.request_id == search_id)
+            recurring_query = recurring_query.filter(PaymentRequest.request_id == search_id)
+        except ValueError:
+            search_term = f'%{search_query}%'
+            completed_query = completed_query.filter(
+                db.or_(
+                    PaymentRequest.requestor_name.ilike(search_term),
+                    PaymentRequest.purpose.ilike(search_term),
+                    PaymentRequest.account_name.ilike(search_term)
+                )
+            )
+            rejected_query = rejected_query.filter(
+                db.or_(
+                    PaymentRequest.requestor_name.ilike(search_term),
+                    PaymentRequest.purpose.ilike(search_term),
+                    PaymentRequest.account_name.ilike(search_term)
+                )
+            )
+            recurring_query = recurring_query.filter(
+                db.or_(
+                    PaymentRequest.requestor_name.ilike(search_term),
+                    PaymentRequest.purpose.ilike(search_term),
+                    PaymentRequest.account_name.ilike(search_term)
+                )
+            )
+    
+    # Get data for each tab
+    completed_requests = completed_query.order_by(get_completed_datetime_order()).all()
+    rejected_requests = rejected_query.order_by(get_rejected_datetime_order()).all()
+    recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
+    
+    # Paginate the main query
+    # For 'all' tab, sort by status priority then by date (Completed by completion_date, others by created_at)
+    if tab == 'all':
+        requests_pagination = query.order_by(
+            get_status_priority_order(),
+            get_all_tab_datetime_order()
+        ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    elif tab == 'completed':
+        # Completed tab sorted by approval_date (most recent first)
+        requests_pagination = query.order_by(get_completed_datetime_order()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    else:
+        requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    
+    # Get notifications for department managers and regular users
+    notifications = get_notifications_for_user(current_user)
+    unread_count = get_unread_count_for_user(current_user)
+    
+    # Get user's own requests for the My Requests tab (exclude archived)
+    my_requests_query = PaymentRequest.query.filter(
+        PaymentRequest.user_id == current_user.user_id,
+        PaymentRequest.is_archived == False
+    )
+    my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    # Calculate Bank Money statistics for Current Money Status section
+    bank_money_requests = PaymentRequest.query.filter(
+        PaymentRequest.department == 'Procurement',
+        PaymentRequest.request_type == 'Bank money',
+        PaymentRequest.is_archived == False
+    ).all()
+    
+    # Calculate statistics
+    total_amount = sum(float(r.amount) for r in bank_money_requests)
+    completed_requests_bm = [r for r in bank_money_requests if r.status == 'Completed']
+    pending_requests_bm = [r for r in bank_money_requests if r.status in ['Pending Manager Approval', 'Pending Finance Approval', 'Proof Pending', 'Proof Sent']]
+    completed_amount = sum(float(r.amount) for r in completed_requests_bm)
+    pending_amount = sum(float(r.amount) for r in pending_requests_bm)
+    
+    return render_template('procurement_dashboard.html', 
+                         requests=requests_pagination.items, 
+                         pagination=requests_pagination,
+                         user=current_user,
+                         notifications=notifications,
+                         unread_count=unread_count,
+                         status_filter=status_filter,
+                         search_query=search_query,
+                         completed_requests=completed_requests,
+                         rejected_requests=rejected_requests,
+                         recurring_requests=recurring_requests,
+                         urgent_filter=urgent_filter,
+                         my_requests=my_requests_pagination.items,
+                         active_tab=tab,
+                         total_amount=total_amount,
+                         completed_amount=completed_amount,
+                         pending_amount=pending_amount)
 
 
 @app.route('/procurement/bank-money')
