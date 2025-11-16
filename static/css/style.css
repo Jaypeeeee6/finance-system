@@ -1352,6 +1352,35 @@ body {
     background: var(--light-color);
 }
 
+/* Make payment requests table wider in dashboard tabs by reducing side spacing */
+.dashboard-container .card-body .table-responsive {
+    margin-left: -0.75rem;
+    margin-right: -0.75rem;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+}
+
+.dashboard-container .card-body .table-responsive .data-table {
+    width: 100%;
+}
+
+/* Make checkbox column narrower in dashboard tables */
+.dashboard-container .card-body .table-responsive .data-table th:first-child,
+.dashboard-container .card-body .table-responsive .data-table td:first-child {
+    width: 40px;
+    min-width: 40px;
+    max-width: 40px;
+    padding: 0.5rem;
+    text-align: center;
+}
+
+/* IT Dashboard: Make Department column wider in All Requests tab */
+.dashboard-container:has(> .dashboard-tabs) .tab-content-container .data-table th:nth-child(7),
+.dashboard-container:has(> .dashboard-tabs) .tab-content-container .data-table td:nth-child(7) {
+    min-width: 140px;
+    width: 140px;
+}
+
 .data-table th.scheduled-date-col,
 .data-table td.scheduled-date-col {
     max-width: 120px;
@@ -1603,6 +1632,13 @@ body {
     display: flex;
     gap: 0.5rem;
     margin-bottom: 2rem;
+}
+
+/* IT Dashboard: Align tab-content-container with dashboard-tabs by reducing side spacing */
+.dashboard-container:has(> .dashboard-tabs) .tab-content-container {
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
+    width: calc(100% + 1rem);
 }
 
 .tab-btn {

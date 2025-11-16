@@ -5488,6 +5488,27 @@ def populate_request_types_route():
         flash(f'Error populating request types: {str(e)}', 'error')
         return redirect(url_for('it_dashboard'))
 
+@app.route('/add-finance-request-types')
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def add_finance_request_types_route():
+    """Add new Finance Department request types in bulk"""
+    try:
+        from add_finance_request_types import add_finance_request_types, verify_addition
+        
+        # Add Finance request types
+        add_finance_request_types()
+        
+        # Verify addition
+        verify_addition()
+        
+        flash('Finance Department request types added successfully!', 'success')
+        return redirect(url_for('manage_request_types', department='Finance'))
+        
+    except Exception as e:
+        flash(f'Error adding Finance request types: {str(e)}', 'error')
+        return redirect(url_for('it_dashboard'))
+
 @app.route('/test-timezone')
 def test_timezone():
     """Test timezone conversion"""

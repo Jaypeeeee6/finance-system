@@ -140,6 +140,46 @@
                     #branch_name {
                         font-size: 14px;
                     }
+                    
+                    /* Style for supplier dropdown (similar to branch dropdown) */
+                    .supplier-select-container {
+                        position: relative;
+                    }
+                    
+                    .supplier-dropdown {
+                        position: absolute;
+                        top: 100%;
+                        left: 0;
+                        right: 0;
+                        background: white;
+                        border: 1px solid #ced4da;
+                        border-top: none;
+                        border-radius: 0 0 0.375rem 0.375rem;
+                        max-height: 200px;
+                        overflow-y: auto;
+                        z-index: 1000;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    }
+                    
+                    .supplier-option {
+                        padding: 8px 20px;
+                        cursor: pointer;
+                        border-bottom: 1px solid #f1f3f4;
+                        transition: background-color 0.2s;
+                    }
+                    
+                    .supplier-option:hover {
+                        background-color: #e9ecef;
+                    }
+                    
+                    .supplier-option.selected {
+                        background-color: #007bff;
+                        color: white;
+                    }
+                    
+                    .supplier-option.hidden {
+                        display: none;
+                    }
                     </style>
                 </div>
 
@@ -157,7 +197,17 @@
 
                 <div id="personCompanyGroup" class="form-group">
                     <label for="person_company">Person/Company Name *</label>
+                    <!-- Text input for non-supplier request types -->
                     <input type="text" name="person_company" id="person_company" required>
+                    
+                    <!-- Searchable dropdown for supplier request types -->
+                    <div id="person_company_select_container" class="supplier-select-container" style="display: none;">
+                        <input type="text" id="person_company_search" class="form-control" placeholder="Search supplier..." autocomplete="off">
+                        <select name="person_company_select" id="person_company_select" class="form-control" style="display: none;">
+                            <option value="">-- Select Supplier --</option>
+                        </select>
+                        <div id="person_company_dropdown" class="supplier-dropdown" style="display: none;"></div>
+                    </div>
                 </div>
 
                 <div id="companyNameGroup" class="form-group" style="display: none;">
@@ -544,6 +594,29 @@
 
 {% block extra_js %}
 <script>
+// Supplier options mapping for each request type
+const supplierOptions = {
+    'Freshener Supplier': ['Dr. Scent'],
+    'Water Supplier': ['Tanker', 'Ain Oman'],
+    'Cleaning Supplier': ['Al-Naba', 'Creative Icon'],
+    'Furniture Supplier': ['Ultimate Furnishing'],
+    'Customer Service': ['Lubek'],
+    'Gas Supplier': ['Muscat Gas Supplier', 'Al Amerat Gas Supplier', 'Nizwa Gas Supplier', 'Rustaq Gas Supplier', 'Al-Swaiq Gas Supplier', 'Sohar Gas Supplier', 'Al Amer Sohar City Center Gas Supplier', 'Golden Quality Gas'],
+    'Food Supplier': ['Al Amer Oman Mall Supplier', 'Al-Ismaily', 'Chef Middle East', 'Al Amer Majestic', 'Bid Food', 'Al Khan (PRF)'],
+    'Spices Supplier': ['Gazal Al Khadara'],
+    'Soft Drinks Supplier': ['Adhwa Al-Billa Drinks', 'Oman Refreshment'],
+    'Pest Control': ['Al-Shuhoomi'],
+    'Bakery': ['Al-Amin', 'Bakery LLC', 'Asalat Al Duqum'],
+    'Oil Supplier': ['Areej Oil'],
+    'Maintenance': ['Al-Bashiq'],
+    'Vegetable/Fruits Supplier': ['Alsadeen (Jalapeno)', 'Sindal', 'Sohol Al-Fiha', 'Al-Sowgra'],
+    'Cheese Supplier': ['Gulf Technical'],
+    'Syrup Supplier': ['Catering Solution'],
+    'Packing/Printing': ['Oman Printer', 'Al-Madenah', 'Excellent Packing', 'Al Andalus', 'Al Khalijia Company for Converting Industries'],
+    'Plastics Supplier': ['Al-Mera', 'Hotpack'],
+    'Garbage Plastic Supplier': ['Ariq']
+};
+
 // Date is already set to today's date in the template, no need to set it here
 
 // Add event listener for amount field changes
@@ -783,7 +856,41 @@ function handleRequestTypeChange() {
     
     // Person/Company Name field is always visible and required
     document.getElementById('personCompanyGroup').style.display = 'block';
-    document.getElementById('person_company').required = true;
+    
+    // Check if this request type has supplier options
+    const hasSupplierOptions = supplierOptions.hasOwnProperty(requestType);
+    const personCompanyInput = document.getElementById('person_company');
+    const personCompanyContainer = document.getElementById('person_company_select_container');
+    const personCompanySelect = document.getElementById('person_company_select');
+    
+    if (hasSupplierOptions) {
+        // Show dropdown, hide text input
+        personCompanyInput.style.display = 'none';
+        personCompanyInput.required = false;
+        personCompanyContainer.style.display = 'block';
+        personCompanySelect.required = true;
+        
+        // Populate supplier options
+        populateSupplierOptions(requestType);
+        
+        // Initialize supplier search if not already initialized
+        if (!window.supplierSearchInitialized) {
+            initializeSupplierSearch();
+            window.supplierSearchInitialized = true;
+        }
+    } else {
+        // Show text input, hide dropdown
+        personCompanyInput.style.display = 'block';
+        personCompanyInput.required = true;
+        personCompanyContainer.style.display = 'none';
+        personCompanySelect.required = false;
+        
+        // Clear supplier dropdown
+        const searchInput = document.getElementById('person_company_search');
+        const dropdown = document.getElementById('person_company_dropdown');
+        if (searchInput) searchInput.value = '';
+        if (dropdown) dropdown.style.display = 'none';
+    }
     
     // Show appropriate field based on request type
     if (requestType === 'Others') {
@@ -794,6 +901,227 @@ function handleRequestTypeChange() {
     
     // Always show Payment Type dropdown for all request types
     recurringFields.style.display = 'block';
+}
+
+function populateSupplierOptions(requestType) {
+    const options = supplierOptions[requestType] || [];
+    const select = document.getElementById('person_company_select');
+    const searchInput = document.getElementById('person_company_search');
+    
+    // Clear existing options
+    select.innerHTML = '<option value="">-- Select Supplier --</option>';
+    
+    // Add options
+    options.forEach(option => {
+        const optionElement = document.createElement('option');
+        optionElement.value = option;
+        optionElement.textContent = option;
+        select.appendChild(optionElement);
+    });
+    
+    // Clear search input
+    if (searchInput) {
+        searchInput.value = '';
+    }
+    
+    // Rebuild dropdown if supplier search is initialized
+    if (window.supplierSearchInitialized) {
+        buildSupplierDropdown();
+    }
+}
+
+function initializeSupplierSearch() {
+    const searchInput = document.getElementById('person_company_search');
+    const hiddenSelect = document.getElementById('person_company_select');
+    const dropdown = document.getElementById('person_company_dropdown');
+    
+    if (!searchInput || !hiddenSelect || !dropdown) return;
+    
+    // Flag to track if we're clicking on an option
+    let clickingOnOption = false;
+    let blurTimeout = null;
+    
+    // Build dropdown from select options
+    function buildSupplierDropdown() {
+        dropdown.innerHTML = '';
+        const options = hiddenSelect.querySelectorAll('option');
+        
+        options.forEach(option => {
+            if (option.value === '') return; // Skip placeholder
+            
+            // Create option
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'supplier-option';
+            optionDiv.textContent = option.textContent;
+            optionDiv.setAttribute('data-value', option.value);
+            
+            // Use mousedown instead of click for better trackpad support
+            optionDiv.addEventListener('mousedown', function(e) {
+                e.preventDefault(); // Prevent blur from firing
+                clickingOnOption = true;
+                selectSupplier(option.value, option.textContent);
+            });
+            
+            // Keep click as fallback for accessibility
+            optionDiv.addEventListener('click', function(e) {
+                if (!clickingOnOption) {
+                    selectSupplier(option.value, option.textContent);
+                }
+            });
+            
+            dropdown.appendChild(optionDiv);
+        });
+    }
+    
+    function selectSupplier(value, text) {
+        // Clear any pending blur timeout
+        if (blurTimeout) {
+            clearTimeout(blurTimeout);
+            blurTimeout = null;
+        }
+        
+        // Validate that the selected value is in the allowed options
+        const allowedOptions = Array.from(hiddenSelect.querySelectorAll('option'))
+            .map(opt => opt.value)
+            .filter(val => val !== ''); // Exclude placeholder
+        
+        if (!allowedOptions.includes(value)) {
+            alert('Invalid supplier selected. Please select from the dropdown options.');
+            searchInput.value = '';
+            hiddenSelect.value = '';
+            document.getElementById('person_company').value = '';
+            return;
+        }
+        
+        searchInput.value = text;
+        hiddenSelect.value = value;
+        
+        // Update the hidden person_company input for form submission
+        document.getElementById('person_company').value = value;
+        
+        dropdown.style.display = 'none';
+        searchInput.blur();
+        
+        // Reset flag after a short delay
+        setTimeout(() => {
+            clickingOnOption = false;
+        }, 100);
+    }
+    
+    function filterSuppliers(searchTerm) {
+        const options = dropdown.querySelectorAll('.supplier-option');
+        
+        let hasVisibleOptions = false;
+        
+        options.forEach(option => {
+            const text = option.textContent.toLowerCase();
+            const matches = text.includes(searchTerm.toLowerCase());
+            
+            if (matches) {
+                option.classList.remove('hidden');
+                hasVisibleOptions = true;
+            } else {
+                option.classList.add('hidden');
+            }
+        });
+        
+        dropdown.style.display = hasVisibleOptions ? 'block' : 'none';
+    }
+    
+    // Event listeners
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.trim();
+        if (searchTerm.length > 0) {
+            filterSuppliers(searchTerm);
+        } else {
+            // Show all options when search is empty
+            dropdown.querySelectorAll('.supplier-option').forEach(option => {
+                option.classList.remove('hidden');
+            });
+            dropdown.style.display = 'block';
+        }
+    });
+    
+    searchInput.addEventListener('focus', function() {
+        if (this.value.trim() === '') {
+            dropdown.style.display = 'block';
+        } else {
+            filterSuppliers(this.value.trim());
+        }
+    });
+    
+    searchInput.addEventListener('blur', function() {
+        // Delay hiding to allow clicks on options
+        // Clear any existing timeout first
+        if (blurTimeout) {
+            clearTimeout(blurTimeout);
+        }
+        blurTimeout = setTimeout(() => {
+            // Only hide if not clicking on an option
+            if (!clickingOnOption) {
+                // Validate that the current value matches a valid option
+                const currentValue = this.value.trim();
+                const hiddenSelectValue = hiddenSelect.value;
+                
+                // If there's a value but it doesn't match the selected option, clear it
+                if (currentValue && !hiddenSelectValue) {
+                    // User typed something but didn't select from dropdown - clear it
+                    this.value = '';
+                    document.getElementById('person_company').value = '';
+                } else if (currentValue && hiddenSelectValue) {
+                    // Ensure the displayed value matches the selected option
+                    const selectedOption = hiddenSelect.querySelector(`option[value="${hiddenSelectValue}"]`);
+                    if (selectedOption && selectedOption.textContent !== currentValue) {
+                        // Value doesn't match - reset to selected option text
+                        this.value = selectedOption.textContent;
+                    }
+                }
+                
+                dropdown.style.display = 'none';
+            }
+            blurTimeout = null;
+        }, 200);
+    });
+    
+    // Prevent form submission if search input has a value that doesn't match a valid option
+    searchInput.addEventListener('keydown', function(e) {
+        // Prevent Enter key from submitting if value doesn't match an option
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const typedValue = this.value.trim();
+            const options = Array.from(hiddenSelect.querySelectorAll('option'))
+                .filter(opt => opt.value !== '')
+                .map(opt => ({ value: opt.value, text: opt.textContent.toLowerCase() }));
+            
+            // Check if typed value matches any option (case-insensitive)
+            const matchingOption = options.find(opt => opt.text === typedValue.toLowerCase());
+            
+            if (matchingOption) {
+                // Select the matching option
+                selectSupplier(matchingOption.value, matchingOption.text);
+            } else {
+                // No match - clear and show error
+                alert('Please select a supplier from the dropdown. You cannot enter a custom value.');
+                this.value = '';
+                hiddenSelect.value = '';
+                document.getElementById('person_company').value = '';
+                this.focus();
+            }
+        }
+    });
+    
+    // Hide dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+    
+    // Initialize dropdown
+    buildSupplierDropdown();
+    
+    // Store function globally so it can be called when options change
+    window.buildSupplierDropdown = buildSupplierDropdown;
 }
 
 function handleRecurringChange() {
@@ -3264,51 +3592,170 @@ document.getElementById('amount').addEventListener('keydown', function(e) {
     }
 });
 
-// Form validation
-document.getElementById('requestForm').addEventListener('submit', function(e) {
-    // Validate branch name
+// Comprehensive form validation function
+function validateRequestForm() {
+    const errors = [];
+    let firstErrorField = null;
+    
+    // Validate Request Type
+    const requestType = document.getElementById('request_type').value;
+    if (!requestType) {
+        errors.push('Please select a request type.');
+        if (!firstErrorField) firstErrorField = document.getElementById('request_type');
+    }
+    
+    // Validate Requestor Name
+    const requestorName = document.getElementById('requestor_name').value.trim();
+    if (!requestorName) {
+        errors.push('Please enter your name.');
+        if (!firstErrorField) firstErrorField = document.getElementById('requestor_name');
+    }
+    
+    // Validate Branch Name
     const branchName = document.getElementById('branch_name').value;
     if (!branchName) {
-        e.preventDefault();
-        alert('Please select a branch name.');
-        document.getElementById('branch_search').focus();
-        return false;
+        errors.push('Please select a branch name.');
+        if (!firstErrorField) firstErrorField = document.getElementById('branch_search');
     }
     
-    // Only validate account number if payment method is Card
-    const paymentMethod = document.getElementById('payment_method').value;
-    if (paymentMethod === 'Card') {
-        const accountNumber = document.getElementById('account_number').value;
-        if (!/^\d+$/.test(accountNumber)) {
-            e.preventDefault();
-            alert('Account number must contain only numbers.');
-            return false;
-        }
+    // Validate Person/Company Name - check if supplier dropdown is visible
+    const personCompanyContainer = document.getElementById('person_company_select_container');
+    if (personCompanyContainer && personCompanyContainer.style.display !== 'none') {
+        // Supplier dropdown is visible, validate it
+        const personCompanySelect = document.getElementById('person_company_select');
+        const personCompanyValue = personCompanySelect ? personCompanySelect.value : '';
         
-        if (accountNumber.length > 16) {
-            e.preventDefault();
-            alert('Account number cannot exceed 16 digits.');
-            return false;
+        if (!personCompanyValue) {
+            errors.push('Please select a supplier from the dropdown.');
+            if (!firstErrorField) firstErrorField = document.getElementById('person_company_search');
+        } else {
+            // Validate that the selected value is in the allowed options for the current request type
+            if (supplierOptions[requestType]) {
+                const allowedSuppliers = supplierOptions[requestType];
+                if (!allowedSuppliers.includes(personCompanyValue)) {
+                    errors.push('Invalid supplier selected. Please select a valid supplier from the dropdown.');
+                    if (!firstErrorField) firstErrorField = document.getElementById('person_company_search');
+                }
+            }
+        }
+    } else {
+        // Text input is visible, validate it
+        const personCompanyInput = document.getElementById('person_company');
+        if (personCompanyInput && !personCompanyInput.value.trim()) {
+            errors.push('Please enter a person/company name.');
+            if (!firstErrorField) firstErrorField = personCompanyInput;
         }
     }
     
-    // Handle comma-formatted amount
+    // Validate dynamic fields based on request type
+    if (requestType === 'Others') {
+        const othersDescription = document.getElementById('others_description').value.trim();
+        if (!othersDescription) {
+            errors.push('Please specify the type of request.');
+            if (!firstErrorField) firstErrorField = document.getElementById('others_description');
+        }
+    }
+    
+    // Validate Purpose/Description
+    const purpose = document.getElementById('purpose').value.trim();
+    if (!purpose) {
+        errors.push('Please enter a purpose/description for this request.');
+        if (!firstErrorField) firstErrorField = document.getElementById('purpose');
+    }
+    
+    // Validate Payment Method
+    const paymentMethod = document.getElementById('payment_method').value;
+    if (!paymentMethod) {
+        errors.push('Please select a payment method.');
+        if (!firstErrorField) firstErrorField = document.getElementById('payment_method');
+    }
+    
+    // Validate Bank Name
+    const bankName = document.getElementById('bank_name').value;
+    if (!bankName) {
+        errors.push('Please select a bank name.');
+        if (!firstErrorField) firstErrorField = document.getElementById('bank_name');
+    }
+    
+    // Validate Account Name
+    const accountName = document.getElementById('account_name').value.trim();
+    if (!accountName) {
+        errors.push('Please enter an account name.');
+        if (!firstErrorField) firstErrorField = document.getElementById('account_name');
+    }
+    
+    // Validate Account Number (only if payment method is Card)
+    if (paymentMethod === 'Card') {
+        const accountNumber = document.getElementById('account_number').value.trim();
+        if (!accountNumber) {
+            errors.push('Please enter an account number.');
+            if (!firstErrorField) firstErrorField = document.getElementById('account_number');
+        } else {
+            if (!/^\d+$/.test(accountNumber)) {
+                errors.push('Account number must contain only numbers.');
+                if (!firstErrorField) firstErrorField = document.getElementById('account_number');
+            } else if (accountNumber.length > 16) {
+                errors.push('Account number cannot exceed 16 digits.');
+                if (!firstErrorField) firstErrorField = document.getElementById('account_number');
+            }
+        }
+    }
+    
+    // Validate Amount
     const amountValue = document.getElementById('amount').value.replace(/,/g, '');
     const amount = parseFloat(amountValue);
-    if (isNaN(amount) || amount <= 0) {
-        e.preventDefault();
-        alert('Amount must be a valid number greater than 0.');
-        return false;
+    if (!amountValue || isNaN(amount) || amount <= 0) {
+        errors.push('Please enter a valid amount greater than 0.');
+        if (!firstErrorField) firstErrorField = document.getElementById('amount');
     }
     
-    // Check if recurring is selected but no interval is set
+    // Validate Recurring Payment Schedule (if Recurring is selected)
     const recurring = document.getElementById('recurring').value;
     const recurringInterval = document.getElementById('recurring_interval').value;
     if (recurring === 'Recurring' && !recurringInterval) {
-    e.preventDefault();
-    alert('Please configure the recurring payment schedule.');
-    return false;
+        errors.push('Please configure the recurring payment schedule by clicking "Edit Payment Schedule".');
+        if (!firstErrorField) firstErrorField = document.getElementById('recurring');
+    }
+    
+    // Return validation result
+    return {
+        isValid: errors.length === 0,
+        errors: errors,
+        firstErrorField: firstErrorField
+    };
 }
+
+// Form validation
+document.getElementById('requestForm').addEventListener('submit', function(e) {
+    const validation = validateRequestForm();
+    
+    if (!validation.isValid) {
+        e.preventDefault();
+        
+        // Show all errors in a single alert
+        let errorMessage = 'Please fix the following errors before submitting:\n\n';
+        errorMessage += validation.errors.map((error, index) => `${index + 1}. ${error}`).join('\n');
+        
+        alert(errorMessage);
+        
+        // Focus on the first error field
+        if (validation.firstErrorField) {
+            validation.firstErrorField.focus();
+            validation.firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        return false;
+    }
+    
+    // If supplier dropdown is used, ensure the value is set in the hidden person_company field
+    const personCompanyContainer = document.getElementById('person_company_select_container');
+    if (personCompanyContainer && personCompanyContainer.style.display !== 'none') {
+        const personCompanySelect = document.getElementById('person_company_select');
+        const personCompanyInput = document.getElementById('person_company');
+        if (personCompanySelect && personCompanySelect.value) {
+            personCompanyInput.value = personCompanySelect.value;
+        }
+    }
 });
 
 // Function to show SWIFT code when bank is selected
@@ -3846,6 +4293,27 @@ function removeFileFromList(fileToRemove) {
 
 // Form submission handler to ensure files are properly submitted
 document.getElementById('requestForm').addEventListener('submit', function(e) {
+    // First, run comprehensive validation
+    const validation = validateRequestForm();
+    
+    if (!validation.isValid) {
+        e.preventDefault();
+        
+        // Show all errors in a single alert
+        let errorMessage = 'Please fix the following errors before submitting:\n\n';
+        errorMessage += validation.errors.map((error, index) => `${index + 1}. ${error}`).join('\n');
+        
+        alert(errorMessage);
+        
+        // Focus on the first error field
+        if (validation.firstErrorField) {
+            validation.firstErrorField.focus();
+            validation.firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        return false;
+    }
+    
     // Create a new FormData object with all the files
     const formData = new FormData(this);
     
@@ -3853,6 +4321,30 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
     const paymentMethod = document.getElementById('payment_method').value;
     if (paymentMethod === 'Cheque') {
         formData.set('account_number', '');
+    }
+    
+    // Ensure person_company value is set correctly if supplier dropdown is used
+    const personCompanyContainer = document.getElementById('person_company_select_container');
+    if (personCompanyContainer && personCompanyContainer.style.display !== 'none') {
+        const personCompanySelect = document.getElementById('person_company_select');
+        const requestType = document.getElementById('request_type').value;
+        
+        if (personCompanySelect && personCompanySelect.value) {
+            // Final validation: ensure the value is in the allowed suppliers list
+            if (supplierOptions[requestType]) {
+                const allowedSuppliers = supplierOptions[requestType];
+                if (!allowedSuppliers.includes(personCompanySelect.value)) {
+                    e.preventDefault();
+                    alert('Invalid supplier selected. Please select a valid supplier from the dropdown.');
+                    return false;
+                }
+            }
+            formData.set('person_company', personCompanySelect.value);
+        } else {
+            e.preventDefault();
+            alert('Please select a supplier from the dropdown.');
+            return false;
+        }
     }
     
     // Clear existing receipt_files from FormData
@@ -3924,4 +4416,5 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
 </script>
 
 {% endblock %}
+
 

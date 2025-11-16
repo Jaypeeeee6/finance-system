@@ -22,6 +22,25 @@
 
     /* Payment Requests table: widen only the Actions column so buttons fit */
     .table-responsive { overflow-x: auto; padding-right: 6px; }
+    /* Make payment requests table wider in dashboard tabs by reducing side spacing */
+    .dashboard-container .card-body .table-responsive {
+        margin-left: -0.75rem;
+        margin-right: -0.75rem;
+        padding-left: 0.25rem;
+        padding-right: 0.25rem;
+    }
+    .dashboard-container .card-body .table-responsive .data-table {
+        width: 100%;
+    }
+    /* Make checkbox column narrower in dashboard tables */
+    .dashboard-container .card-body .table-responsive .data-table th:first-child,
+    .dashboard-container .card-body .table-responsive .data-table td:first-child {
+        width: 40px;
+        min-width: 40px;
+        max-width: 40px;
+        padding: 0.5rem;
+        text-align: center;
+    }
     .data-table th:last-child,
     .data-table td:last-child { min-width: 240px; text-align: center; white-space: nowrap; padding-right: 12px; }
     /* Strong specificity to ensure Actions column expands on dashboards */
@@ -412,6 +431,25 @@
 
     /* Ensure action column wide enough on small screens */
     .table-responsive { overflow-x: auto; padding-right: 6px; }
+    /* Make payment requests table wider in dashboard tabs by reducing side spacing */
+    .dashboard-container .card-body .table-responsive {
+        margin-left: -0.75rem;
+        margin-right: -0.75rem;
+        padding-left: 0.25rem;
+        padding-right: 0.25rem;
+    }
+    .dashboard-container .card-body .table-responsive .data-table {
+        width: 100%;
+    }
+    /* Make checkbox column narrower in dashboard tables */
+    .dashboard-container .card-body .table-responsive .data-table th:first-child,
+    .dashboard-container .card-body .table-responsive .data-table td:first-child {
+        width: 40px;
+        min-width: 40px;
+        max-width: 40px;
+        padding: 0.5rem;
+        text-align: center;
+    }
     .data-table th:last-child,
     .data-table td:last-child { min-width: 220px; text-align: center; white-space: nowrap; padding-right: 10px; }
     .dashboard-container .card-body .table-responsive .data-table th:last-child,
@@ -644,6 +682,25 @@
 
     /* Tightest sizing but keep buttons inside */
     .table-responsive { overflow-x: auto; padding-right: 6px; }
+    /* Make payment requests table wider in dashboard tabs by reducing side spacing */
+    .dashboard-container .card-body .table-responsive {
+        margin-left: -0.75rem;
+        margin-right: -0.75rem;
+        padding-left: 0.25rem;
+        padding-right: 0.25rem;
+    }
+    .dashboard-container .card-body .table-responsive .data-table {
+        width: 100%;
+    }
+    /* Make checkbox column narrower in dashboard tables */
+    .dashboard-container .card-body .table-responsive .data-table th:first-child,
+    .dashboard-container .card-body .table-responsive .data-table td:first-child {
+        width: 40px;
+        min-width: 40px;
+        max-width: 40px;
+        padding: 0.5rem;
+        text-align: center;
+    }
     .data-table th:last-child,
     .data-table td:last-child { min-width: 200px; text-align: center; white-space: nowrap; padding-right: 8px; }
     .dashboard-container .card-body .table-responsive .data-table th:last-child,
