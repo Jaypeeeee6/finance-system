@@ -477,35 +477,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 
                 <div class="form-group">
                     <label for="branch_name">Branch Name {% if 'branch_name' in edited_fields %}<span class="edited-badge" data-field="branch_name" role="button" tabindex="0">Edited</span>{% endif %}</label>
-                    {% if user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status == 'Pending Manager Approval' %}
-                    <div class="branch-select-container">
-                        <input type="text" id="branch_search" class="form-control" placeholder="Search branches..." autocomplete="off" value="{{ request.branch_name }}">
-                        <select id="branch_name" name="branch_name" class="form-control" style="display: none;">
-                            <option value="">-- Select Branch --</option>
-                            {% if available_branches %}
-                                {% set current_restaurant = "" %}
-                                {% for branch in available_branches %}
-                                    {% set restaurant = branch.restaurant %}
-                                    {% if restaurant != current_restaurant %}
-                                        {% if current_restaurant != "" %}
-                                            </optgroup>
-                                        {% endif %}
-                                        <optgroup label="{{ restaurant }} (Location)" data-restaurant="{{ restaurant }}">
-                                        {% set current_restaurant = restaurant %}
-                                    {% endif %}
-                                    <option value="{{ branch.name }}" data-restaurant="{{ restaurant }}" {% if request.branch_name == branch.name %}selected{% endif %}>{{ branch.name }}</option>
-                                {% endfor %}
-                                {% if current_restaurant != "" %}
-                                    </optgroup>
-                                {% endif %}
-                            {% endif %}
-                        </select>
-                        <div id="branch_dropdown" class="branch-dropdown" style="display: none;"></div>
-                    </div>
-                    <small class="form-text text-muted">Type to search or select the branch location for this request</small>
-                    {% else %}
-                    <input type="text" id="branch_name" value="{{ request.branch_name }}" readonly style="background: #f5f5f5;">
-                    {% endif %}
+                    <input type="text" id="branch_name" value="{{ request.branch_name|replace(',', ', ') }}" readonly style="background: #f5f5f5; cursor: not-allowed;">
                 </div>
 
                 <!-- Dynamic fields based on request type -->
@@ -2352,7 +2324,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (isItUser) {
         const form = document.querySelector('#step-submit form');
         if (form) {
-            const excludedIds = new Set(['requestor_name', 'department', 'date', 'amount', 'payment_type']);
+            const excludedIds = new Set(['requestor_name', 'department', 'date', 'amount', 'payment_type', 'branch_name']);
             const fields = form.querySelectorAll('input, textarea, select');
             const saveContainer = document.getElementById('save-edits-container');
 
@@ -2380,7 +2352,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // When IT user is editing, initialize branch search and SWIFT code behavior to match New Request
+    // When IT user is editing, initialize SWIFT code behavior to match New Request
     if (isItUser) {
         // Toggle Others description visibility when request type changes
         const requestTypeSelect = document.getElementById('request_type');
@@ -2409,7 +2381,6 @@ document.addEventListener('DOMContentLoaded', function() {
             bankSelect.addEventListener('change', showSwiftCode);
             showSwiftCode();
         }
-        initializeBranchSearch();
     }
 
     // Edited badge click -> fetch field history
@@ -2481,101 +2452,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function escapeHtml(s) {
         return String(s).replace(/[&<>"]/g, function(c) {
             return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]);
-        });
-    }
-    function initializeBranchSearch() {
-        const searchInput = document.getElementById('branch_search');
-        const hiddenSelect = document.getElementById('branch_name');
-        const dropdown = document.getElementById('branch_dropdown');
-        if (!searchInput || !hiddenSelect || !dropdown) return;
-
-        let clickingOnOption = false;
-        let blurTimeout = null;
-
-        function buildDropdown() {
-            dropdown.innerHTML = '';
-            const options = hiddenSelect.querySelectorAll('option');
-            let currentGroup = null;
-            options.forEach(opt => {
-                if (!opt.value) return;
-                const restaurant = opt.getAttribute('data-restaurant') || 'Other';
-                if (!currentGroup || currentGroup.getAttribute('data-restaurant') !== restaurant) {
-                    currentGroup = document.createElement('div');
-                    currentGroup.className = 'branch-group';
-                    currentGroup.setAttribute('data-restaurant', restaurant);
-                    currentGroup.textContent = restaurant + ' (Location)';
-                    dropdown.appendChild(currentGroup);
-                }
-                const item = document.createElement('div');
-                item.className = 'branch-option';
-                item.textContent = opt.textContent;
-                item.setAttribute('data-value', opt.value);
-                item.setAttribute('data-restaurant', restaurant);
-                if (opt.selected) {
-                    item.classList.add('selected');
-                    searchInput.value = opt.value;
-                }
-                item.addEventListener('mousedown', function() {
-                    clickingOnOption = true;
-                });
-                item.addEventListener('click', function() {
-                    const value = this.getAttribute('data-value');
-                    hiddenSelect.value = value;
-                    searchInput.value = value;
-                    dropdown.style.display = 'none';
-                    clickingOnOption = false;
-                    // Reveal Save Edits when a branch is selected from dropdown
-                    const saveContainerLocal = document.getElementById('save-edits-container');
-                    if (saveContainerLocal && saveContainerLocal.style.display !== 'block') {
-                        saveContainerLocal.style.display = 'block';
-                    }
-                });
-                dropdown.appendChild(item);
-            });
-        }
-
-        buildDropdown();
-
-        searchInput.addEventListener('focus', function() {
-            dropdown.style.display = 'block';
-        });
-
-        searchInput.addEventListener('blur', function() {
-            if (blurTimeout) clearTimeout(blurTimeout);
-            blurTimeout = setTimeout(function() {
-                if (!clickingOnOption) {
-                    dropdown.style.display = 'none';
-                }
-                clickingOnOption = false;
-            }, 150);
-        });
-
-        searchInput.addEventListener('input', function() {
-            const query = this.value.toLowerCase();
-            const options = dropdown.querySelectorAll('.branch-option');
-            options.forEach(opt => {
-                const text = opt.textContent.toLowerCase();
-                if (text.includes(query)) {
-                    opt.classList.remove('hidden');
-                } else {
-                    opt.classList.add('hidden');
-                }
-            });
-
-            // Hide group headers that have no visible options
-            const groups = dropdown.querySelectorAll('.branch-group');
-            groups.forEach(group => {
-                const restaurant = group.getAttribute('data-restaurant');
-                const anyVisible = Array.from(dropdown.querySelectorAll(`.branch-option[data-restaurant="${restaurant}"]`))
-                    .some(opt => !opt.classList.contains('hidden'));
-                if (anyVisible) {
-                    group.style.display = '';
-                } else {
-                    group.style.display = 'none';
-                }
-            });
-
-            dropdown.style.display = 'block';
         });
     }
 

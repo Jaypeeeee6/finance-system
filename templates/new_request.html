@@ -47,8 +47,9 @@
                     <div class="form-group">
                         <label for="branch_name">Branch Name *</label>
                         <div class="branch-select-container">
+                            <div id="branch_chips_container" class="branch-chips-container"></div>
                             <input type="text" id="branch_search" class="form-control" placeholder="Search branches..." autocomplete="off">
-                            <select name="branch_name" id="branch_name" class="form-control" required style="display: none;">
+                            <select name="branch_name" id="branch_name" class="form-control" style="display: none;">
                                 <option value="">-- Select Branch --</option>
                                 {% if available_branches %}
                                     {% set current_restaurant = "" %}
@@ -68,6 +69,7 @@
                                     {% endif %}
                                 {% endif %}
                             </select>
+                            <input type="hidden" name="branch_names" id="branch_names" value="">
                             <div id="branch_dropdown" class="branch-dropdown" style="display: none;"></div>
                         </div>
                         <small class="form-text text-muted">Type to search or select the branch location for this request</small>
@@ -77,6 +79,51 @@
                     /* Style for grouped dropdown */
                     .branch-select-container {
                         position: relative;
+                    }
+                    
+                    .branch-chips-container {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 8px;
+                        margin-bottom: 0;
+                        min-height: 0;
+                    }
+                    
+                    .branch-chips-container:not(:empty) {
+                        margin-bottom: 8px;
+                    }
+                    
+                    .branch-chip {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                        padding: 6px 12px;
+                        background: #000;
+                        color: white;
+                        border-radius: 20px;
+                        font-size: 13px;
+                        font-weight: 500;
+                    }
+                    
+                    .branch-chip .remove-chip {
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 18px;
+                        height: 18px;
+                        background: rgba(255, 255, 255, 0.2);
+                        border: none;
+                        border-radius: 50%;
+                        color: white;
+                        cursor: pointer;
+                        font-size: 12px;
+                        padding: 0;
+                        transition: background 0.2s;
+                        line-height: 1;
+                    }
+                    
+                    .branch-chip .remove-chip:hover {
+                        background: rgba(255, 255, 255, 0.3);
                     }
                     
                     .branch-dropdown {
@@ -683,12 +730,55 @@ function initializeBranchSearch() {
     const searchInput = document.getElementById('branch_search');
     const hiddenSelect = document.getElementById('branch_name');
     const dropdown = document.getElementById('branch_dropdown');
+    const chipsContainer = document.getElementById('branch_chips_container');
+    const hiddenInput = document.getElementById('branch_names');
     
-    if (!searchInput || !hiddenSelect || !dropdown) return;
+    if (!searchInput || !hiddenSelect || !dropdown || !chipsContainer || !hiddenInput) return;
+    
+    // Array to store selected branches {value: string, text: string}
+    let selectedBranches = [];
     
     // Flag to track if we're clicking on an option
     let clickingOnOption = false;
     let blurTimeout = null;
+    
+    // Function to update chips display
+    function updateChips() {
+        chipsContainer.innerHTML = '';
+        selectedBranches.forEach((branch, index) => {
+            const chip = document.createElement('div');
+            chip.className = 'branch-chip';
+            chip.innerHTML = `
+                <span>${branch.text}</span>
+                <button type="button" class="remove-chip" onclick="removeBranchChip(${index})" title="Remove branch">×</button>
+            `;
+            chipsContainer.appendChild(chip);
+        });
+        
+        // Update hidden input with comma-separated values
+        hiddenInput.value = selectedBranches.map(b => b.value).join(',');
+    }
+    
+    // Function to remove a branch chip
+    window.removeBranchChip = function(index) {
+        selectedBranches.splice(index, 1);
+        updateChips();
+        updateDropdownSelection();
+    };
+    
+    // Function to update dropdown to show selected branches
+    function updateDropdownSelection() {
+        const options = dropdown.querySelectorAll('.branch-option');
+        options.forEach(option => {
+            const value = option.getAttribute('data-value');
+            const isSelected = selectedBranches.some(b => b.value === value);
+            if (isSelected) {
+                option.classList.add('selected');
+            } else {
+                option.classList.remove('selected');
+            }
+        });
+    }
     
     // Build dropdown from select options
     function buildDropdown() {
@@ -735,19 +825,45 @@ function initializeBranchSearch() {
             
             dropdown.appendChild(optionDiv);
         });
+        
+        updateDropdownSelection();
     }
     
     function selectBranch(value, text) {
+        // Check if branch is already selected - if so, remove it (toggle behavior)
+        const existingIndex = selectedBranches.findIndex(b => b.value === value);
+        if (existingIndex !== -1) {
+            // Branch already selected, remove it
+            selectedBranches.splice(existingIndex, 1);
+            updateChips();
+            updateDropdownSelection();
+            
+            // Clear search input but keep dropdown open so user can continue selecting
+            searchInput.value = '';
+            dropdown.style.display = 'block';
+            searchInput.focus();
+            
+            setTimeout(() => {
+                clickingOnOption = false;
+            }, 100);
+            return;
+        }
+        
         // Clear any pending blur timeout
         if (blurTimeout) {
             clearTimeout(blurTimeout);
             blurTimeout = null;
         }
         
-        searchInput.value = text;
-        hiddenSelect.value = value;
-        dropdown.style.display = 'none';
-        searchInput.blur();
+        // Add to selected branches
+        selectedBranches.push({ value: value, text: text });
+        updateChips();
+        updateDropdownSelection();
+        
+        // Clear search input but keep dropdown open so user can continue selecting
+        searchInput.value = '';
+        dropdown.style.display = 'block';
+        searchInput.focus(); // Keep focus so user can continue typing
         
         // Reset flag after a short delay
         setTimeout(() => {
@@ -831,13 +947,14 @@ function initializeBranchSearch() {
     
     // Hide dropdown when clicking outside
     document.addEventListener('click', function(e) {
-        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target) && !chipsContainer.contains(e.target)) {
             dropdown.style.display = 'none';
         }
     });
     
     // Initialize dropdown
     buildDropdown();
+    updateChips();
 }
 
 function handleRequestTypeChange() {
@@ -3611,10 +3728,10 @@ function validateRequestForm() {
         if (!firstErrorField) firstErrorField = document.getElementById('requestor_name');
     }
     
-    // Validate Branch Name
-    const branchName = document.getElementById('branch_name').value;
-    if (!branchName) {
-        errors.push('Please select a branch name.');
+    // Validate Branch Name - check for at least one branch selected
+    const branchNames = document.getElementById('branch_names').value;
+    if (!branchNames || branchNames.trim() === '') {
+        errors.push('Please select at least one branch name.');
         if (!firstErrorField) firstErrorField = document.getElementById('branch_search');
     }
     

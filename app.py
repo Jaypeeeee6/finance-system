@@ -5170,14 +5170,19 @@ def new_request():
     if request.method == 'POST':
         request_type = request.form.get('request_type')
         requestor_name = request.form.get('requestor_name')
-        branch_name = request.form.get('branch_name')
+        # Check for multiple branch names first (new format), then fall back to single branch_name (backward compatibility)
+        branch_names = request.form.get('branch_names', '').strip()
+        branch_name = request.form.get('branch_name', '').strip()
+        # Use branch_names if available, otherwise use branch_name
+        if branch_names:
+            branch_name = branch_names
         date = datetime.utcnow().date()  # Automatically use today's date
         purpose = request.form.get('purpose')
         payment_method = request.form.get('payment_method', 'Card')  # Default to Card
         
         # Validate required fields
         if not branch_name:
-            flash('Branch name is required.', 'error')
+            flash('At least one branch name is required.', 'error')
             available_request_types = get_available_request_types()
             # Custom order: Office, Kucu, Boom, Thoum, Kitchen
             from sqlalchemy import case
@@ -9000,13 +9005,33 @@ def reports():
         query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
     if branch_filter:
         # Alias-aware branch filtering: include canonical name and any aliases
+        # Also handle multiple branch names (comma-separated) in branch_name field
         selected_branch = Branch.query.filter_by(name=branch_filter).first()
         if selected_branch:
             alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
             names = [selected_branch.name] + alias_names
-            query = query.filter(PaymentRequest.branch_name.in_(names))
+            # Build OR conditions to match if any name appears in the comma-separated branch_name
+            conditions = []
+            for name in names:
+                # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
+                conditions.append(PaymentRequest.branch_name == name)  # Exact match
+                conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
+                conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
+                conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
+                conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
+                conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
+            query = query.filter(db.or_(*conditions))
         else:
-            query = query.filter(PaymentRequest.branch_name == branch_filter)
+            # For non-alias branches, check if branch name appears in comma-separated list
+            conditions = [
+                PaymentRequest.branch_name == branch_filter,  # Exact match
+                PaymentRequest.branch_name.like(f'{branch_filter},%'),  # At start
+                PaymentRequest.branch_name.like(f'%, {branch_filter}'),  # At end (with space)
+                PaymentRequest.branch_name.like(f'%,{branch_filter}'),  # At end (no space)
+                PaymentRequest.branch_name.like(f'%, {branch_filter},%'),  # In middle (with spaces)
+                PaymentRequest.branch_name.like(f'%,{branch_filter},%')  # In middle (no spaces)
+            ]
+            query = query.filter(db.or_(*conditions))
     # Payment type filter
     if payment_type_filter:
         if payment_type_filter == 'Recurring':
@@ -9404,13 +9429,33 @@ def export_reports_excel():
         query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
     if branch_filter:
         # Alias-aware branch filtering for Excel export
+        # Also handle multiple branch names (comma-separated) in branch_name field
         selected_branch = Branch.query.filter_by(name=branch_filter).first()
         if selected_branch:
             alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
             names = [selected_branch.name] + alias_names
-            query = query.filter(PaymentRequest.branch_name.in_(names))
+            # Build OR conditions to match if any name appears in the comma-separated branch_name
+            conditions = []
+            for name in names:
+                # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
+                conditions.append(PaymentRequest.branch_name == name)  # Exact match
+                conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
+                conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
+                conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
+                conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
+                conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
+            query = query.filter(db.or_(*conditions))
         else:
-            query = query.filter_by(branch_name=branch_filter)
+            # For non-alias branches, check if branch name appears in comma-separated list
+            conditions = [
+                PaymentRequest.branch_name == branch_filter,  # Exact match
+                PaymentRequest.branch_name.like(f'{branch_filter},%'),  # At start
+                PaymentRequest.branch_name.like(f'%, {branch_filter}'),  # At end (with space)
+                PaymentRequest.branch_name.like(f'%,{branch_filter}'),  # At end (no space)
+                PaymentRequest.branch_name.like(f'%, {branch_filter},%'),  # In middle (with spaces)
+                PaymentRequest.branch_name.like(f'%,{branch_filter},%')  # In middle (no spaces)
+            ]
+            query = query.filter(db.or_(*conditions))
     if payment_type_filter:
         if payment_type_filter == 'Recurring':
             query = query.filter(PaymentRequest.recurring == 'Recurring')
@@ -9538,7 +9583,7 @@ def export_reports_excel():
                 str(r.payment_method or 'Card'),
                 scheduled_date,
                 f"OMR {to_float(r.amount):.3f}",
-                str(r.branch_name or ''),
+                str(r.branch_name or '').replace(',', ', '),
                 str(company_display or ''),
                 r.date.strftime('%Y-%m-%d') if getattr(r, 'date', None) else '',
                 approved_date,
@@ -9551,6 +9596,12 @@ def export_reports_excel():
                 cell = ws.cell(row=row_idx, column=col, value=data)
                 # Enable text wrapping for Scheduled Date column (column G = 7)
                 if col == 7:
+                    cell.alignment = Alignment(wrap_text=True, vertical='top')
+                # Enable text wrapping for Branch Name column (column I = 9)
+                if col == 9:
+                    cell.alignment = Alignment(wrap_text=True, vertical='top')
+                # Enable text wrapping for Company column (column J = 10)
+                if col == 10:
                     cell.alignment = Alignment(wrap_text=True, vertical='top')
 
         # Auto-adjust column widths
@@ -9571,7 +9622,9 @@ def export_reports_excel():
                 adjusted_width = min(max_length + 2, 25)  # Cap Department column at 25 characters
             elif column_letter == 'G':  # Scheduled Date column - make it wider
                 adjusted_width = min(max_length + 2, 60)  # Cap Scheduled Date column at 60 characters
-            elif column_letter in ['L', 'M']:  # Duration columns - make them narrower
+            elif column_letter == 'M':  # Approver column - make it wider
+                adjusted_width = min(max_length + 2, 35)  # Cap Approver column at 35 characters
+            elif column_letter in ['L']:  # Duration columns - make them narrower
                 adjusted_width = min(max_length + 2, 15)  # Cap duration columns at 15 characters
             else:
                 adjusted_width = min(max_length + 2, 50)  # Cap other columns at 50 characters
@@ -9683,13 +9736,33 @@ def export_reports_pdf():
         query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
     if branch_filter:
         # Alias-aware branch filtering for PDF export
+        # Also handle multiple branch names (comma-separated) in branch_name field
         selected_branch = Branch.query.filter_by(name=branch_filter).first()
         if selected_branch:
             alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
             names = [selected_branch.name] + alias_names
-            query = query.filter(PaymentRequest.branch_name.in_(names))
+            # Build OR conditions to match if any name appears in the comma-separated branch_name
+            conditions = []
+            for name in names:
+                # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
+                conditions.append(PaymentRequest.branch_name == name)  # Exact match
+                conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
+                conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
+                conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
+                conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
+                conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
+            query = query.filter(db.or_(*conditions))
         else:
-            query = query.filter(PaymentRequest.branch_name == branch_filter)
+            # For non-alias branches, check if branch name appears in comma-separated list
+            conditions = [
+                PaymentRequest.branch_name == branch_filter,  # Exact match
+                PaymentRequest.branch_name.like(f'{branch_filter},%'),  # At start
+                PaymentRequest.branch_name.like(f'%, {branch_filter}'),  # At end (with space)
+                PaymentRequest.branch_name.like(f'%,{branch_filter}'),  # At end (no space)
+                PaymentRequest.branch_name.like(f'%, {branch_filter},%'),  # In middle (with spaces)
+                PaymentRequest.branch_name.like(f'%,{branch_filter},%')  # In middle (no spaces)
+            ]
+            query = query.filter(db.or_(*conditions))
     
     # Payment type filter
     if payment_type_filter:
@@ -9808,6 +9881,23 @@ def export_reports_pdf():
                     # If shaping fails, return original text
                     pass
             return s
+        
+        def draw_text_rtl_aware(canvas, x, y, text, font_name, font_size, column_width):
+            """Draw text with RTL alignment for Arabic text, LTR for others"""
+            prepared = prepare_text(text)
+            if contains_arabic(prepared):
+                # Calculate text width
+                try:
+                    text_width = pdfmetrics.stringWidth(prepared, font_name, font_size)
+                except Exception:
+                    # Fallback estimate if metrics unavailable
+                    text_width = len(prepared) * font_size * 0.5
+                # Align from right: start position = column_start + column_width - text_width
+                rtl_x = x + column_width - text_width
+                canvas.drawString(rtl_x, y, prepared)
+            else:
+                # Regular left-to-right alignment
+                canvas.drawString(x, y, prepared)
 
         # Margins (reduced for more space)
         left = 8 * mm
@@ -9911,17 +10001,17 @@ def export_reports_pdf():
         
         # Table header
         c.setFont(body_font if arabic_font_name else 'Helvetica-Bold', 9)
-        headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment', 'Scheduled', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver']
+        headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment', 'Scheduled', 'Amount', 'Branch', 'Company', 'Approver']
         # Column widths optimized for landscape A4 with proper spacing
-        # [ID, Type, Requestor, Department, Payment, Scheduled, Amount, Branch, Company, Submitted, Approved, Approver]
-        col_widths = [14*mm, 30*mm, 22*mm, 18*mm, 16*mm, 40*mm, 18*mm, 26*mm, 26*mm, 16*mm, 16*mm, 28*mm]
+        # [ID, Type, Requestor, Department, Payment, Scheduled, Amount, Branch, Company, Approver]
+        col_widths = [14*mm, 30*mm, 22*mm, 18*mm, 16*mm, 40*mm, 18*mm, 26*mm, 26*mm, 28*mm]
         # Calculate column positions based on widths to prevent overlapping
         column_gap = 4 * mm  # slightly larger inter-column gap
         col_x = [left]
         for i in range(1, len(col_widths)):
             col_x.append(col_x[i-1] + col_widths[i-1] + column_gap)
-        for hx, text in zip(col_x, headers):
-            c.drawString(hx, y, prepare_text(text))
+        for i, (hx, text) in enumerate(zip(col_x, headers)):
+            draw_text_rtl_aware(c, hx, y, text, body_font if arabic_font_name else 'Helvetica-Bold', 9, col_widths[i])
         y -= 10
         c.line(left, y, right, y)
         y -= 8
@@ -9937,20 +10027,6 @@ def export_reports_pdf():
             
             # For Person/Company column, show person_company field only
             company_display = r.person_company
-            
-            # Build Submitted (date + manager approval START time if available)
-            submitted_date = r.date.strftime('%Y-%m-%d') if getattr(r, 'date', None) else ''
-            manager_start_time_str = ''
-            if getattr(r, 'manager_approval_start_time', None):
-                local_start = utc_to_local(r.manager_approval_start_time)
-                manager_start_time_str = f" {local_start.strftime('%H:%M:%S')}"
-
-            # Build Approved (date + finance approval END time if available)
-            approved_date = r.approval_date.strftime('%Y-%m-%d') if getattr(r, 'approval_date', None) else ''
-            finance_end_time_str = ''
-            if getattr(r, 'finance_approval_end_time', None):
-                local_end = utc_to_local(r.finance_approval_end_time)
-                finance_end_time_str = f" {local_end.strftime('%H:%M:%S')}"
 
             scheduled_date = ''
             if r.recurring == 'Recurring':
@@ -9970,10 +10046,8 @@ def export_reports_pdf():
                 str(r.recurring or 'One-Time'),
                 scheduled_date,
                 f"OMR {to_float(r.amount):.3f}",
-                str(r.branch_name or ''),
+                str(r.branch_name or '').replace(',', ', '),
                 str(company_display or ''),
-                f"{submitted_date}{manager_start_time_str}",
-                f"{approved_date}{finance_end_time_str}",
                 str(r.approver or '')
             ]
             
@@ -9991,8 +10065,8 @@ def export_reports_pdf():
                 c.showPage()
                 y = top
                 c.setFont(body_font if arabic_font_name else 'Helvetica-Bold', 9)
-                for hx, text in zip(col_x, headers):
-                    c.drawString(hx, y, prepare_text(text))
+                for i, (hx, text) in enumerate(zip(col_x, headers)):
+                    draw_text_rtl_aware(c, hx, y, text, body_font if arabic_font_name else 'Helvetica-Bold', 9, col_widths[i])
                 y -= 10
                 c.line(left, y, right, y)
                 y -= 8
@@ -10001,7 +10075,7 @@ def export_reports_pdf():
             # Draw each column with the precomputed wrapping
             for i, lines in enumerate(wrapped_lines_per_col):
                 for j, line in enumerate(lines):
-                    c.drawString(col_x[i], y - (j * 10), line)
+                    draw_text_rtl_aware(c, col_x[i], y - (j * 10), line, body_font, 9, col_widths[i])
             
             y -= max_height + 3  # Reduced spacing between rows for more content
 

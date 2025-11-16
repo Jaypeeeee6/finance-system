@@ -13,18 +13,26 @@
     .data-table th:nth-child(7),
     .data-table td:nth-child(7) {
         text-align: left;
-        width: 300px;
-        min-width: 300px;
+        width: 180px;
+        min-width: 180px;
+        max-width: 180px;
     }
     
     .data-table td:nth-child(7) {
-        padding: 8px !important;
+        padding: 4px 8px !important;
         line-height: 1.4 !important;
         vertical-align: middle !important;
     }
     
     .data-table td:nth-child(7) br {
         line-height: 1.4;
+    }
+    
+    .scheduled-date-col {
+        width: 180px !important;
+        min-width: 180px !important;
+        max-width: 180px !important;
+        padding: 4px 8px !important;
     }
 
     /* Filter Button and Active Filters */
@@ -615,7 +623,13 @@
                                 </td>
                                 <td>
                                     {% if req.branch_name %}
-                                        <span class="badge badge-primary">{{ req.branch_name }}</span>
+                                        {% set branch_list = req.branch_name.split(',') %}
+                                        {% for branch in branch_list %}
+                                            {% set branch_trimmed = branch.strip() %}
+                                            {% if branch_trimmed %}
+                                                <span class="filter-pill" style="margin-right: 4px; margin-bottom: 4px; display: inline-block;">{{ branch_trimmed }}</span>
+                                            {% endif %}
+                                        {% endfor %}
                                     {% else %}
                                         <span style="color: #999;">-</span>
                                     {% endif %}
