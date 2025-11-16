@@ -75,6 +75,15 @@ def from_json_filter(value):
     except (json.JSONDecodeError, TypeError):
         return value if value else []
 
+@app.template_filter('format_currency')
+def format_currency_filter(value):
+    """Format number with commas and 3 decimal places"""
+    try:
+        num = float(value)
+        return f"{num:,.3f}"
+    except (ValueError, TypeError):
+        return str(value) if value else "0.000"
+
 def format_recurring_schedule(interval, payment_schedule=None):
     """Format recurring interval into human-readable text"""
     try:

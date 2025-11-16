@@ -512,13 +512,13 @@
             <div class="stat-info">
                 {% if user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT') %}
                     {% if it_amount is not none and it_amount > 0 %}
-                        <h3>OMR {{ "%.3f"|format(it_amount) }}</h3>
+                        <h3>OMR {{ it_amount|format_currency }}</h3>
                         <small style="color: #666;">(IT Department Only)</small>
                     {% else %}
                         <h3 style="color: #999;">OMR 0.000</h3>
                     {% endif %}
                 {% else %}
-                    <h3>OMR {{ "%.3f"|format(total_amount) }}</h3>
+                    <h3>OMR {{ total_amount|format_currency }}</h3>
                 {% endif %}
                 <p>Total Amount</p>
             </div>
@@ -551,7 +551,7 @@
                                 <th>Department</th>
                                 <th>Payment Type</th>
                                 <th>Payment Method</th>
-                                <th>Scheduled Date</th>
+                                <th class="scheduled-date-col">Scheduled Date</th>
                                 <th>Branch Name</th>
                                 <th>Person/Company</th>
                                 <th>Submitted</th>
@@ -595,7 +595,7 @@
                                     {% endif %}
                                 </td>
                                 <td>{{ req.payment_method or 'Card' }}</td>
-                                <td>
+                                <td class="scheduled-date-col">
                                     {% if req.recurring == 'Recurring' %}
                                         {% set recurring_dates = req|get_recurring_dates %}
                                         {% if recurring_dates %}
