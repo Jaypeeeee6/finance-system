@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Request Item from Procurement{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-shopping-cart"></i> Request Item from Procurement</h1>
+        <p>Submit a request for items needed from the Procurement department</p>
+    </div>
+
+    <div style="background: #e7f3ff; border-left: 4px solid #2196F3; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+        <i class="fas fa-info-circle" style="color: #2196F3; margin-right: 8px;"></i>
+        <strong>Note:</strong> This form is for requesting items/materials from Procurement. <strong>This is different from payment requests.</strong> For payment requests, please use the "New Payment Request" option.
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('procurement_request_item') }}" id="itemRequestForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="requestor_name">Requestor Name *</label>
+                        <input type="text" name="requestor_name" id="requestor_name" 
+                               value="{{ user.name if user else '' }}" required 
+                               placeholder="Enter your name">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="department">Department *</label>
+                        <input type="text" name="department" id="department" 
+                               value="{{ user.department if user else '' }}" 
+                               readonly style="background-color: #e9ecef;">
+                        <small class="form-text text-muted">Auto-filled from your profile</small>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="item_name">Item Name/Description *</label>
+                        <input type="text" name="item_name" id="item_name" required 
+                               placeholder="e.g., Office Supplies, Equipment, Materials">
+                        <small class="form-text text-muted">Describe the item(s) you need</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="quantity">Quantity</label>
+                        <input type="text" name="quantity" id="quantity" 
+                               placeholder="e.g., 10 units, 5 boxes, 1 set">
+                        <small class="form-text text-muted">Optional: Specify quantity if applicable</small>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="branch_name">Branch Name *</label>
+                        <select name="branch_name" id="branch_name" required>
+                            <option value="">-- Select Branch --</option>
+                            {% if available_branches %}
+                                {% set current_restaurant = "" %}
+                                {% for branch in available_branches %}
+                                    {% set restaurant = branch.restaurant %}
+                                    {% if restaurant != current_restaurant %}
+                                        {% if current_restaurant != "" %}
+                                            </optgroup>
+                                        {% endif %}
+                                        <optgroup label="{{ restaurant }}">
+                                        {% set current_restaurant = restaurant %}
+                                    {% endif %}
+                                    <option value="{{ branch.name }}">{{ branch.name }}</option>
+                                {% endfor %}
+                                {% if current_restaurant != "" %}
+                                    </optgroup>
+                                {% endif %}
+                            {% endif %}
+                        </select>
+                        <small class="form-text text-muted">Select the branch where the item is needed</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="date">Request Date *</label>
+                        <input type="date" name="date" id="date" value="{{ today }}" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="purpose">Purpose/Description *</label>
+                        <textarea name="purpose" id="purpose" rows="4" required 
+                                  placeholder="Describe why you need this item and how it will be used"></textarea>
+                        <small class="form-text text-muted">Provide details about the purpose and usage of the requested item</small>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="notes">Additional Notes</label>
+                        <textarea name="notes" id="notes" rows="3" 
+                                  placeholder="Any additional information, specifications, or special requirements"></textarea>
+                        <small class="form-text text-muted">Optional: Add any additional details or specifications</small>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" name="is_urgent" id="is_urgent" style="margin-right: 8px; width: auto;">
+                            <span>Mark as Urgent</span>
+                        </label>
+                        <small class="form-text text-muted">Check this if the item is needed urgently</small>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane"></i> Submit Request
+                    </button>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.form-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #333;
+}
+
+.form-group input[type="text"],
+.form-group input[type="date"],
+.form-group select,
+.form-group textarea {
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 100%;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.form-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #e9ecef;
+}
+
+.form-actions .btn {
+    padding: 10px 20px;
+}
+
+@media (max-width: 768px) {
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+}
+</style>
+
+{% endblock %}
+

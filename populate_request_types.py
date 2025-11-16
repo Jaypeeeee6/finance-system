@@ -68,6 +68,7 @@ def populate_request_types():
         
         # Procurement Department
         ('Procurement', 'Purchasing Expenses'),
+        ('Procurement', 'Bank money'),
         ('Procurement', 'Others'),
         
         # IT Department

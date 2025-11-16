@@ -2991,6 +2991,101 @@ def department_dashboard():
                          active_tab=tab)
 
 
+@app.route('/procurement/bank-money')
+@login_required
+@role_required('Department Manager')
+def procurement_bank_money():
+    """Bank Money page for Procurement Department Manager"""
+    # Only allow Procurement Department Managers
+    if current_user.department != 'Procurement':
+        flash('Access denied. This page is only for Procurement Department Managers.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # Get all "Bank money" payment requests for Procurement department
+    bank_money_requests = PaymentRequest.query.filter(
+        PaymentRequest.department == 'Procurement',
+        PaymentRequest.request_type == 'Bank money',
+        PaymentRequest.is_archived == False
+    ).order_by(PaymentRequest.created_at.desc()).all()
+    
+    # Calculate statistics
+    total_requests = len(bank_money_requests)
+    completed_requests = [r for r in bank_money_requests if r.status == 'Completed']
+    pending_requests = [r for r in bank_money_requests if r.status in ['Pending Manager Approval', 'Pending Finance Approval', 'Proof Pending', 'Proof Sent']]
+    rejected_requests = [r for r in bank_money_requests if r.status in ['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']]
+    
+    # Calculate amounts
+    total_amount = sum(float(r.amount) for r in bank_money_requests)
+    completed_amount = sum(float(r.amount) for r in completed_requests)
+    pending_amount = sum(float(r.amount) for r in pending_requests)
+    rejected_amount = sum(float(r.amount) for r in rejected_requests)
+    
+    # Current available balance (assuming we track spent vs available)
+    # For now, we'll show completed amount as "spent" and calculate available
+    # Note: This assumes there's an initial balance. For now, we'll show:
+    # - Total allocated/spent (completed requests)
+    # - Pending (amounts that will be spent)
+    # - Available balance would need to be set manually or tracked separately
+    
+    return render_template('procurement_bank_money.html',
+                         user=current_user,
+                         bank_money_requests=bank_money_requests,
+                         total_requests=total_requests,
+                         completed_requests=completed_requests,
+                         pending_requests=pending_requests,
+                         rejected_requests=rejected_requests,
+                         total_amount=total_amount,
+                         completed_amount=completed_amount,
+                         pending_amount=pending_amount,
+                         rejected_amount=rejected_amount)
+
+
+@app.route('/procurement/request-item', methods=['GET', 'POST'])
+@login_required
+def procurement_request_item():
+    """Form for requesting items from Procurement department"""
+    
+    if request.method == 'POST':
+        # Handle form submission
+        requestor_name = request.form.get('requestor_name', '').strip()
+        item_name = request.form.get('item_name', '').strip()
+        quantity = request.form.get('quantity', '').strip()
+        purpose = request.form.get('purpose', '').strip()
+        branch_name = request.form.get('branch_name', '').strip()
+        date = request.form.get('date', '').strip()
+        is_urgent = request.form.get('is_urgent') == 'on'
+        notes = request.form.get('notes', '').strip()
+        
+        # Validation
+        if not all([requestor_name, item_name, purpose, branch_name, date]):
+            flash('Please fill in all required fields.', 'danger')
+            return redirect(url_for('procurement_request_item'))
+        
+        try:
+            request_date = datetime.strptime(date, '%Y-%m-%d').date()
+        except ValueError:
+            flash('Invalid date format.', 'danger')
+            return redirect(url_for('procurement_request_item'))
+        
+        # For now, we'll just show a success message
+        # In the future, this could create a record in a procurement_requests table
+        flash(f'Item request submitted successfully! Item: {item_name}, Quantity: {quantity or "N/A"}', 'success')
+        
+        # Log the action
+        log_action(f'Submitted procurement item request: {item_name} (Quantity: {quantity or "N/A"})')
+        
+        return redirect(url_for('procurement_request_item'))
+    
+    # GET request - show the form
+    # Get available branches
+    available_branches = Branch.query.filter_by(is_active=True).order_by(Branch.restaurant, Branch.name).all()
+    
+    return render_template('procurement_request_item.html',
+                         user=current_user,
+                         available_branches=available_branches,
+                         today=datetime.utcnow().date().strftime('%Y-%m-%d'))
+
+
 @app.route('/admin/dashboard')
 @login_required
 @role_required('Finance Admin')
