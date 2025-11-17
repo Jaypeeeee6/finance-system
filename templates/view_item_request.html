@@ -1,0 +1,813 @@
+{% extends "base.html" %}
+
+{% block title %}View Item Request #{{ item_request.id }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* View Request Page Specific Tab Styles */
+.view-request-page .step-tab.rejected .step-tab-content {
+    background: #dc3545 !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+.view-request-page .step-tab.rejected .step-tab-content::before {
+    content: "✗" !important;
+    margin-right: 0.5rem !important;
+    font-weight: bold !important;
+    font-size: 1.1rem !important;
+}
+
+.view-request-page .step-tab.warning .step-tab-content::before {
+    content: "⏳" !important;
+    margin-right: 0.5rem !important;
+    font-weight: bold !important;
+    font-size: 1.1rem !important;
+}
+
+.view-request-page .step-tab.rejected:hover .step-tab-content {
+    background: #c82333 !important;
+}
+
+.view-request-page .step-tab.warning .step-tab-content {
+    background: #ffc107 !important;
+    color: #212529 !important;
+    font-weight: 600 !important;
+}
+
+.view-request-page .step-tab.warning:hover .step-tab-content {
+    background: #e0a800 !important;
+}
+
+.view-request-page .step-tab.completed .step-tab-content {
+    background: #28a745 !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+.view-request-page .step-tab.completed .step-tab-content::before {
+    content: "✓" !important;
+    margin-right: 0.5rem !important;
+    font-weight: bold !important;
+    font-size: 1.1rem !important;
+}
+
+/* Manager Approval Required section */
+.dashboard-container .card.manager-approval-required .card-header {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+    border-left: 4px solid #2196f3 !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.manager-approval-required .card-header h4 {
+    color: #1976d2 !important;
+    margin: 0 !important;
+}
+
+/* Your Approval Required section */
+.dashboard-container .card.your-approval-required .card-header {
+    background: #4caf50 !important;
+    color: white !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.your-approval-required .card-header h4 {
+    color: white !important;
+    margin: 0 !important;
+}
+
+.dashboard-container .card.your-approval-required .card-header p {
+    color: white !important;
+    margin: 0 !important;
+    opacity: 0.9 !important;
+}
+
+/* Procurement Manager Approval Required section */
+.dashboard-container .card.procurement-approval-required .card-header {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+    border-left: 4px solid #2196f3 !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.procurement-approval-required .card-header h4 {
+    color: #1976d2 !important;
+    margin: 0 !important;
+}
+
+/* Procurement Manager Approval form section */
+.dashboard-container .card.procurement-approval-form .card-header {
+    background: #4caf50 !important;
+    color: white !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.procurement-approval-form .card-header h4 {
+    color: white !important;
+    margin: 0 !important;
+}
+
+/* Manager Decision section */
+.dashboard-container .card.manager-decision .card-header {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+    border-left: 4px solid #2196f3 !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.manager-decision .card-header h4 {
+    color: #1976d2 !important;
+    margin: 0 !important;
+}
+
+/* Procurement Manager Decision section */
+.dashboard-container .card.procurement-manager-decision .card-header {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+    border-left: 4px solid #2196f3 !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.procurement-manager-decision .card-header h4 {
+    color: #1976d2 !important;
+    margin: 0 !important;
+}
+
+/* Assigned to Procurement section */
+.dashboard-container .card.assigned-section .card-header {
+    background: #17a2b8 !important;
+    color: white !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.assigned-section .card-header h4 {
+    color: white !important;
+    margin: 0 !important;
+}
+
+/* Completed section */
+.dashboard-container .card.completed-section .card-header {
+    background: #28a745 !important;
+    color: white !important;
+    border-top: none !important;
+}
+
+.dashboard-container .card.completed-section .card-header h4 {
+    color: white !important;
+    margin: 0 !important;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container view-request-page">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-shopping-cart"></i> Item Request #{{ item_request.id }}
+            {% if item_request.is_urgent %}
+                <span style="margin-left: 12px; font-size: 0.9rem; background: #dc3545; color: white; padding: 6px 10px; border-radius: 18px; font-weight: 600;">
+                    URGENT
+                </span>
+            {% endif %}
+        </h1>
+        <a href="{{ url_for('procurement_item_requests') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Item Requests
+        </a>
+    </div>
+
+    <!-- Step Tabs Container -->
+    <div class="step-tabs-container">
+        <ul class="step-tabs">
+            <li class="step-tab completed" data-step="submit">
+                <div class="step-tab-content">
+                    Submit Request
+                </div>
+            </li>
+            <li class="step-tab {% if item_request.status == 'Rejected by Manager' %}rejected{% elif item_request.status == 'Pending Manager Approval' %}warning{% elif item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed'] %}completed{% else %}disabled{% endif %}" data-step="manager">
+                <div class="step-tab-content">
+                    Manager Approval
+                </div>
+            </li>
+            <li class="step-tab {% if item_request.status == 'Rejected by Procurement Manager' %}rejected{% elif item_request.status == 'Pending Procurement Manager Approval' %}warning{% elif item_request.status in ['Assigned to Procurement', 'Completed'] %}completed{% else %}disabled{% endif %}" data-step="procurement">
+                <div class="step-tab-content">
+                    Procurement Manager Approval
+                </div>
+            </li>
+            <li class="step-tab {% if item_request.status == 'Assigned to Procurement' %}warning{% elif item_request.status == 'Completed' %}completed{% else %}disabled{% endif %}" data-step="assigned">
+                <div class="step-tab-content">
+                    Assigned to Procurement
+                </div>
+            </li>
+            <li class="step-tab {% if item_request.status == 'Completed' %}completed{% else %}disabled{% endif %}" data-step="completed">
+                <div class="step-tab-content">
+                    Completed
+                </div>
+            </li>
+        </ul>
+
+        <!-- Step 1: Submit Request -->
+        <div class="step-content active request-details-section" id="step-submit">
+            <h3 style="margin: 0;"><i class="fas fa-paper-plane"></i> Request Details</h3>
+            <div class="admin-mode-warning">
+                <i class="fas fa-info-circle"></i>
+                <span>Request submitted successfully. This step is always completed.</span>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Requestor Name</label>
+                    <input type="text" value="{{ item_request.requestor_name }}" readonly style="background: #f5f5f5;">
+                </div>
+                <div class="form-group">
+                    <label>Department</label>
+                    <input type="text" value="{{ item_request.department }}" readonly style="background: #f5f5f5;">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Item Name</label>
+                    <input type="text" value="{{ item_request.item_name }}" readonly style="background: #f5f5f5;">
+                </div>
+                <div class="form-group">
+                    <label>Quantity</label>
+                    <input type="text" value="{{ item_request.quantity or 'Not specified' }}" readonly style="background: #f5f5f5;">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Branch Name</label>
+                    <input type="text" value="{{ item_request.branch_name }}" readonly style="background: #f5f5f5;">
+                </div>
+                <div class="form-group">
+                    <label>Request Date</label>
+                    <input type="text" value="{{ item_request.request_date.strftime('%Y-%m-%d') if item_request.request_date else 'N/A' }}" readonly style="background: #f5f5f5;">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Purpose/Description</label>
+                <textarea rows="4" readonly style="background: #f5f5f5;">{{ item_request.purpose }}</textarea>
+            </div>
+
+            {% if item_request.notes %}
+            <div class="form-group">
+                <label>Additional Notes</label>
+                <textarea rows="3" readonly style="background: #f5f5f5;">{{ item_request.notes }}</textarea>
+            </div>
+            {% endif %}
+
+            <div class="form-group">
+                <label>Status</label>
+                <div>
+                    {% if item_request.status == 'Completed' %}
+                        <span class="badge" style="background: #28a745; color: white; padding: 8px 16px; font-size: 0.9rem;">✓ {{ item_request.status }}</span>
+                    {% elif item_request.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval', 'Assigned to Procurement'] %}
+                        <span class="badge" style="background: #2196F3; color: white; padding: 8px 16px; font-size: 0.9rem;">⏳ {{ item_request.status }}</span>
+                    {% elif item_request.status in ['Rejected by Manager', 'Rejected by Procurement Manager'] %}
+                        <span class="badge" style="background: #dc3545; color: white; padding: 8px 16px; font-size: 0.9rem;">✗ {{ item_request.status }}</span>
+                    {% else %}
+                        <span class="badge badge-warning" style="padding: 8px 16px; font-size: 0.9rem;">{{ item_request.status }}</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Created At</label>
+                <input type="text" value="{{ item_request.created_at.strftime('%Y-%m-%d %H:%M:%S') if item_request.created_at else 'N/A' }}" readonly style="background: #f5f5f5;">
+            </div>
+        </div>
+
+        <!-- Step 2: Manager Approval -->
+        <div class="step-content" id="step-manager">
+            <h3><i class="fas fa-user-tie"></i> Manager Approval</h3>
+            
+            {% if item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed', 'Rejected by Manager'] %}
+                <div class="admin-mode-warning" style="background: #28a745; color: white;">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Manager Approval: {% if item_request.status == 'Rejected by Manager' %}Rejected{% else %}Completed{% endif %}</span>
+                </div>
+                
+                <!-- Show manager approval details -->
+                <div class="card manager-decision" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h4>Manager Decision</h4>
+                    </div>
+                    <div class="card-body">
+                        <!-- Status Display -->
+                        <div class="status-display" style="margin-bottom: 1.5rem;">
+                            <div style="font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 0.5rem;">Status</div>
+                            {% if item_request.status == 'Rejected by Manager' %}
+                                <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
+                                    <span style="color: #721c24; font-weight: bold; font-size: 1.1rem;">REJECTED BY MANAGER</span>
+                                </div>
+                            {% else %}
+                                <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
+                                    <span style="color: #155724; font-weight: bold; font-size: 1.1rem;">APPROVED BY MANAGER</span>
+                                    {% if item_request.is_urgent %}
+                                        <span style="background-color: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; margin-left: 8px; font-size: 0.9rem;">URGENT</span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            <div style="text-align: center; margin-top: 0.5rem; color: #666; font-size: 0.9rem;">
+                                <strong>{% if item_request.status == 'Rejected by Manager' %}Rejected by:{% else %}Approved by:{% endif %}</strong>
+                                {% if item_request.status == 'Rejected by Manager' %}
+                                    {{ manager_rejector_name or item_request.manager_rejector or 'Manager' }}
+                                {% else %}
+                                    {{ manager_approver_name or item_request.manager_approver or 'Manager' }}
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        {% if item_request.status == 'Rejected by Manager' %}
+                            {% if item_request.manager_rejection_reason %}
+                            <div class="form-group">
+                                <label>Rejection Reason</label>
+                                <textarea readonly style="background: #f8f9fa;">{{ item_request.manager_rejection_reason }}</textarea>
+                            </div>
+                            {% endif %}
+                            {% if item_request.manager_rejection_date %}
+                            <div class="form-group">
+                                <label>Rejection Date</label>
+                                <input type="text" value="{{ item_request.manager_rejection_date.strftime('%Y-%m-%d') }}" readonly style="background: #f5f5f5;">
+                            </div>
+                            {% endif %}
+                        {% else %}
+                            {% if item_request.manager_approval_reason %}
+                            <div class="form-group">
+                                <label>Manager Notes</label>
+                                <textarea readonly style="background: #f8f9fa;">{{ item_request.manager_approval_reason }}</textarea>
+                            </div>
+                            {% endif %}
+                            {% if item_request.manager_approval_date %}
+                            <div class="form-group">
+                                <label>Manager Approval Date</label>
+                                <input type="text" value="{{ item_request.manager_approval_date.strftime('%Y-%m-%d') }}" readonly style="background: #f5f5f5;">
+                            </div>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            {% elif item_request.status == 'Pending Manager Approval' %}
+                <!-- Manager approval required -->
+                <div class="card manager-approval-required" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h4><i class="fas fa-user-tie"></i> Manager Approval Required</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <p style="margin-bottom: 0.5rem; font-size: 1.1rem;">
+                                    <strong>Status:</strong> Waiting for Manager Approval
+                                </p>
+                                
+                                <p style="margin-bottom: 0.5rem; color: #666;">
+                                    <strong>Assigned Manager:</strong> 
+                                    {% if temporary_manager_name %}
+                                        <span style="color: #ff9800; font-weight: 600;">{{ temporary_manager_name }}</span>
+                                        <span style="font-style: italic; color: #666;">(Temporary Assignment)</span>
+                                        <span style="margin-left: 10px; color: #999;">|</span>
+                                        <span style="margin-left: 10px;">Original: 
+                                            {% if requestor_user and requestor_user.role == 'Department Manager' %}
+                                                <strong>{{ gm_name }}, {{ op_manager_name }}</strong>
+                                            {% else %}
+                                                <strong>{{ manager_name if manager_name else ('Department Manager for ' + item_request.department) }}</strong>
+                                            {% endif %}
+                                        </span>
+                                    {% elif requestor_user and requestor_user.role == 'Department Manager' %}
+                                        {{ gm_name }}, {{ op_manager_name }}
+                                    {% elif requestor_user and requestor_user.role in ['Finance Admin', 'Finance Staff', 'GM', 'Operation Manager'] and user.user_id == item_request.user_id %}
+                                        {{ gm_name }}, {{ op_manager_name }}
+                                    {% elif user.role == 'Operation Manager' and item_request.department == 'Operation' %}
+                                        {{ user.name }} (You)
+                                    {% elif user.role == 'Operation Manager' and item_request.department == 'Project' %}
+                                        {{ user.name }} (You)
+                                    {% elif item_request.department == 'Project' %}
+                                        {{ manager_name if manager_name else 'Operation Manager' }}
+                                    {% else %}
+                                        {{ manager_name if manager_name else 'Department Manager for ' + item_request.department }}
+                                    {% endif %}
+                                </p>
+                                <p style="margin-bottom: 0; color: #666;">
+                                    <strong>Department:</strong> {{ item_request.department }}
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-right">
+                                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 1rem; text-align: center;">
+                                    <i class="fas fa-clock" style="font-size: 2rem; color: #f57c00; margin-bottom: 0.5rem;"></i>
+                                    <p style="margin: 0; font-weight: 600; color: #856404;">Pending Review</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Manager approval form (visible to authorized managers) -->
+                {% if can_approve_manager or can_reject_manager %}
+                    <div class="card your-approval-required">
+                        <div class="card-header">
+                            <h4><i class="fas fa-check-circle"></i> Your Approval Required</h4>
+                            <p>As the manager, please review and approve this request.</p>
+                        </div>
+                        <div class="card-body">
+                            <!-- Approve Form -->
+                            <form method="POST" action="{{ url_for('item_request_manager_approve', request_id=item_request.id) }}" style="margin-bottom: 1rem;">
+                                <div class="form-group">
+                                    <label for="manager_approval_reason">Approval Notes (Optional)</label>
+                                    <textarea name="approval_reason" id="manager_approval_reason" rows="3" placeholder="Add any notes about this approval..."></textarea>
+                                </div>
+                                <div class="step-actions">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-check"></i> Approve
+                                    </button>
+                                </div>
+                            </form>
+                            
+                            <!-- Reject Form -->
+                            <form method="POST" action="{{ url_for('item_request_manager_reject', request_id=item_request.id) }}" style="border-top: 1px solid #e9ecef; padding-top: 1rem;">
+                                <div class="form-group">
+                                    <label for="manager_rejection_reason">Reason for Rejection *</label>
+                                    <textarea name="rejection_reason" id="manager_rejection_reason" rows="3" placeholder="Please provide a clear reason for rejecting this request..." required></textarea>
+                                </div>
+                                <div class="step-actions">
+                                    <button type="submit" class="btn btn-danger">
+                                        <i class="fas fa-times"></i> Reject
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endif %}
+        </div>
+
+        <!-- Step 3: Procurement Manager Approval -->
+        <div class="step-content" id="step-procurement">
+            <h3><i class="fas fa-shopping-cart"></i> Procurement Manager Approval</h3>
+            
+            {% if item_request.status in ['Assigned to Procurement', 'Completed', 'Rejected by Procurement Manager'] %}
+                <div class="admin-mode-warning" style="background: #28a745; color: white;">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Procurement Manager Approval: {% if item_request.status == 'Rejected by Procurement Manager' %}Rejected{% else %}Completed{% endif %}</span>
+                </div>
+                
+                <!-- Show procurement manager approval details -->
+                <div class="card procurement-manager-decision" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h4>Procurement Manager Decision</h4>
+                    </div>
+                    <div class="card-body">
+                        <!-- Status Display -->
+                        <div class="status-display" style="margin-bottom: 1.5rem;">
+                            <div style="font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 0.5rem;">Status</div>
+                            {% if item_request.status == 'Rejected by Procurement Manager' %}
+                                <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
+                                    <span style="color: #721c24; font-weight: bold; font-size: 1.1rem;">REJECTED</span>
+                                </div>
+                            {% else %}
+                                <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
+                                    <span style="color: #155724; font-weight: bold; font-size: 1.1rem;">APPROVED BY PROCUREMENT MANAGER</span>
+                                </div>
+                            {% endif %}
+                            <div style="text-align: center; margin-top: 0.5rem; color: #666; font-size: 0.9rem;">
+                                <strong>{% if item_request.status == 'Rejected by Procurement Manager' %}Rejected by:{% else %}Approved by:{% endif %}</strong>
+                                {{ procurement_manager_approver_name or item_request.procurement_manager_approver or 'Procurement Manager' }}
+                            </div>
+                        </div>
+                        
+                        {% if item_request.status == 'Rejected by Procurement Manager' %}
+                            {% if item_request.procurement_manager_rejection_reason %}
+                            <div class="form-group">
+                                <label>Rejection Reason</label>
+                                <textarea readonly style="background: #f8f9fa;">{{ item_request.procurement_manager_rejection_reason }}</textarea>
+                            </div>
+                            {% endif %}
+                            {% if item_request.procurement_manager_rejection_date %}
+                            <div class="form-group">
+                                <label>Rejection Date</label>
+                                <input type="text" value="{{ item_request.procurement_manager_rejection_date.strftime('%Y-%m-%d') }}" readonly style="background: #f5f5f5;">
+                            </div>
+                            {% endif %}
+                        {% else %}
+                            {% if item_request.procurement_manager_approval_reason %}
+                            <div class="form-group">
+                                <label>Procurement Manager Notes</label>
+                                <textarea readonly style="background: #f8f9fa;">{{ item_request.procurement_manager_approval_reason }}</textarea>
+                            </div>
+                            {% endif %}
+                            {% if item_request.procurement_manager_approval_date %}
+                            <div class="form-group">
+                                <label>Procurement Manager Approval Date</label>
+                                <input type="text" value="{{ item_request.procurement_manager_approval_date.strftime('%Y-%m-%d') }}" readonly style="background: #f5f5f5;">
+                            </div>
+                            {% endif %}
+                            {% if item_request.amount %}
+                            <div class="form-group">
+                                <label>Amount</label>
+                                <div style="position: relative;">
+                                    <span style="position: absolute; left: 12px; top: 12px; color: #666; font-weight: 600;">OMR</span>
+                                    <input type="text" value="{{ "%.3f"|format(item_request.amount) }}" readonly style="background: #f5f5f5; padding-left: 55px; font-weight: bold;">
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if assigned_to_name %}
+                            <div class="form-group">
+                                <label>Assigned To</label>
+                                <input type="text" value="{{ assigned_to_name }}" readonly style="background: #f5f5f5;">
+                            </div>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            {% elif item_request.status == 'Pending Procurement Manager Approval' %}
+                <!-- Procurement Manager approval required -->
+                <div class="card procurement-approval-required" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h4><i class="fas fa-shopping-cart"></i> Procurement Manager Approval Required</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <p style="margin-bottom: 0.5rem; font-size: 1.1rem;">
+                                    <strong>Status:</strong> Waiting for Procurement Manager Approval
+                                </p>
+                                <p style="margin-bottom: 0.5rem; color: #666;">
+                                    <strong>Department:</strong> {{ item_request.department }}
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-right">
+                                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 1rem; text-align: center;">
+                                    <i class="fas fa-clock" style="font-size: 2rem; color: #f57c00; margin-bottom: 0.5rem;"></i>
+                                    <p style="margin: 0; font-weight: 600; color: #856404;">Pending Review</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Procurement Manager approval form (visible to Procurement Manager) -->
+                {% if can_approve_procurement_manager or can_reject_procurement_manager %}
+                    <div class="card procurement-approval-form">
+                        <div class="card-header">
+                            <h4><i class="fas fa-check-circle"></i> Your Approval Required</h4>
+                            <p>As the Procurement Manager, please review, approve, and assign this request.</p>
+                        </div>
+                        <div class="card-body">
+                            <!-- Approve Form -->
+                            <form method="POST" action="{{ url_for('item_request_procurement_manager_approve', request_id=item_request.id) }}" style="margin-bottom: 1rem;">
+                                <div class="form-group">
+                                    <label for="amount">Amount (OMR) *</label>
+                                    <div style="position: relative;">
+                                        <span style="position: absolute; left: 12px; top: 12px; color: #666; font-weight: 600;">OMR</span>
+                                        <input type="number" name="amount" id="amount" step="0.001" min="0" required style="padding-left: 55px; width: 100%;" placeholder="0.000">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="assigned_to_user_id">Assign to Procurement Member *</label>
+                                    <select name="assigned_to_user_id" id="assigned_to_user_id" required>
+                                        <option value="">-- Select Procurement Member --</option>
+                                        {% for member in procurement_members %}
+                                            <option value="{{ member.user_id }}">{{ member.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="procurement_approval_reason">Approval Notes (Optional)</label>
+                                    <textarea name="approval_reason" id="procurement_approval_reason" rows="3" placeholder="Add any notes about this approval..."></textarea>
+                                </div>
+                                <div class="step-actions">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-check"></i> Approve & Assign
+                                    </button>
+                                </div>
+                            </form>
+                            
+                            <!-- Reject Form -->
+                            <form method="POST" action="{{ url_for('item_request_procurement_manager_reject', request_id=item_request.id) }}" style="border-top: 1px solid #e9ecef; padding-top: 1rem;">
+                                <div class="form-group">
+                                    <label for="procurement_rejection_reason">Reason for Rejection *</label>
+                                    <textarea name="rejection_reason" id="procurement_rejection_reason" rows="3" placeholder="Please provide a clear reason for rejecting this request..." required></textarea>
+                                </div>
+                                <div class="step-actions">
+                                    <button type="submit" class="btn btn-danger">
+                                        <i class="fas fa-times"></i> Reject
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endif %}
+        </div>
+
+        <!-- Step 4: Assigned to Procurement -->
+        <div class="step-content" id="step-assigned">
+            <h3><i class="fas fa-user-check"></i> Assigned to Procurement</h3>
+            
+            {% if item_request.status == 'Assigned to Procurement' %}
+                <div class="admin-mode-warning" style="background: #17a2b8; color: white;">
+                    <i class="fas fa-user-check"></i>
+                    <span>Request has been assigned to a procurement member for processing</span>
+                </div>
+                
+                <div class="card assigned-section" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h4>Assignment Details</h4>
+                    </div>
+                    <div class="card-body">
+                        {% if assigned_to_name %}
+                        <div class="form-group">
+                            <label>Assigned To</label>
+                            <input type="text" value="{{ assigned_to_name }}" readonly style="background: #f5f5f5; font-weight: bold;">
+                        </div>
+                        {% endif %}
+                        {% if item_request.assignment_date %}
+                        <div class="form-group">
+                            <label>Assignment Date</label>
+                            <input type="text" value="{{ item_request.assignment_date.strftime('%Y-%m-%d %H:%M:%S') }}" readonly style="background: #f5f5f5;">
+                        </div>
+                        {% endif %}
+                        {% if assigned_by_name %}
+                        <div class="form-group">
+                            <label>Assigned By</label>
+                            <input type="text" value="{{ assigned_by_name }}" readonly style="background: #f5f5f5;">
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Completion form (visible to Procurement department members) -->
+                {% if can_complete %}
+                    <div class="card your-approval-required">
+                        <div class="card-header">
+                            <h4><i class="fas fa-check-circle"></i> Mark Request as Completed</h4>
+                            <p>Complete this item request once the item has been procured and delivered.</p>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('item_request_complete', request_id=item_request.id) }}" enctype="multipart/form-data">
+                                <div class="form-group">
+                                    <label for="receipt_files">Upload Receipt *</label>
+                                    <input type="file" name="receipt_files" id="receipt_files" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" multiple required>
+                                    <small style="color: #666; display: block; margin-top: 5px;">Allowed formats: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX (Max 50MB each)</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="completion_notes">Completion Notes (Optional)</label>
+                                    <textarea name="completion_notes" id="completion_notes" rows="3" placeholder="Add any notes about the completion..."></textarea>
+                                </div>
+                                
+                                <div class="step-actions">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-check"></i> Mark as Completed
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                {% endif %}
+            {% elif item_request.status == 'Completed' %}
+                <div class="admin-mode-warning" style="background: #28a745; color: white;">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Request has been completed</span>
+                </div>
+                
+                <div class="card assigned-section" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h4>Assignment Details</h4>
+                    </div>
+                    <div class="card-body">
+                        {% if assigned_to_name %}
+                        <div class="form-group">
+                            <label>Assigned To</label>
+                            <input type="text" value="{{ assigned_to_name }}" readonly style="background: #f5f5f5;">
+                        </div>
+                        {% endif %}
+                        {% if item_request.assignment_date %}
+                        <div class="form-group">
+                            <label>Assignment Date</label>
+                            <input type="text" value="{{ item_request.assignment_date.strftime('%Y-%m-%d %H:%M:%S') }}" readonly style="background: #f5f5f5;">
+                        </div>
+                        {% endif %}
+                        {% if receipt_files %}
+                        <div class="form-group">
+                            <label>Upload Receipt</label>
+                            <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
+                                {% for file in receipt_files %}
+                                <li style="margin-bottom: 6px;">
+                                    <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                        <i class="fas fa-file"></i> {{ file }}
+                                    </a>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="admin-mode-warning">
+                    <i class="fas fa-info-circle"></i>
+                    <span>This step will be available after Procurement Manager approval and assignment.</span>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Step 5: Completed -->
+        <div class="step-content" id="step-completed">
+            <h3><i class="fas fa-check-circle"></i> Completed</h3>
+            
+            {% if item_request.status == 'Completed' %}
+                <div class="admin-mode-warning" style="background: #28a745; color: white;">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Request has been completed successfully</span>
+                </div>
+                
+                <div class="card completed-section" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h4>Completion Details</h4>
+                    </div>
+                    <div class="card-body">
+                        {% if completed_by_name %}
+                        <div class="form-group">
+                            <label>Completed By</label>
+                            <input type="text" value="{{ completed_by_name }}" readonly style="background: #f5f5f5; font-weight: bold;">
+                        </div>
+                        {% endif %}
+                        {% if item_request.completion_date %}
+                        <div class="form-group">
+                            <label>Completion Date</label>
+                            <input type="text" value="{{ item_request.completion_date.strftime('%Y-%m-%d %H:%M:%S') }}" readonly style="background: #f5f5f5;">
+                        </div>
+                        {% endif %}
+                        {% if item_request.completion_notes %}
+                        <div class="form-group">
+                            <label>Completion Notes</label>
+                            <textarea readonly style="background: #f8f9fa;">{{ item_request.completion_notes }}</textarea>
+                        </div>
+                        {% endif %}
+                        {% if receipt_files %}
+                        <div class="form-group">
+                            <label>Upload Receipt</label>
+                            <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
+                                {% for file in receipt_files %}
+                                <li style="margin-bottom: 6px;">
+                                    <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                        <i class="fas fa-file"></i> {{ file }}
+                                    </a>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="admin-mode-warning">
+                    <i class="fas fa-info-circle"></i>
+                    <span>This request has not been completed yet.</span>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// Step tabs functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const stepTabs = document.querySelectorAll('.step-tab');
+    const stepContents = document.querySelectorAll('.step-content');
+    
+    // Add click event listeners to tabs
+    stepTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            const step = this.getAttribute('data-step');
+            
+            // Don't allow clicking on disabled tabs
+            if (this.classList.contains('disabled')) {
+                return;
+            }
+            
+            // Remove active class from all tabs and contents
+            stepTabs.forEach(t => t.classList.remove('active'));
+            stepContents.forEach(c => c.classList.remove('active'));
+            
+            // Add active class to clicked tab and corresponding content
+            this.classList.add('active');
+            document.getElementById(`step-${step}`).classList.add('active');
+            
+            // Show/hide request details section based on active tab
+            const requestDetailsSection = document.querySelector('.request-details-section');
+            if (requestDetailsSection) {
+                if (step === 'submit') {
+                    requestDetailsSection.style.display = 'block';
+                } else {
+                    requestDetailsSection.style.display = 'none';
+                }
+            }
+        });
+    });
+});
+
+</script>
+{% endblock %}
+

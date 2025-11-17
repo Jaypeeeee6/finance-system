@@ -127,10 +127,8 @@
                 {% endif %}
                 
                 {% if current_user.role == 'Department Manager' and current_user.department == 'Procurement' %}
-                <li><a href="{{ url_for('procurement_bank_money') }}" class="nav-link"><i class="fas fa-shopping-cart"></i> Item Requests</a></li>
+                <li><a href="{{ url_for('procurement_item_requests') }}" class="nav-link"><i class="fas fa-shopping-cart"></i> Item Requests</a></li>
                 {% endif %}
-                
-                <li><a href="{{ url_for('procurement_request_item') }}" class="nav-link"><i class="fas fa-shopping-cart"></i> Request Item</a></li>
                 
                 {% if current_user.role in ['Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'IT Department Manager'] %}
                 <li><a href="{{ url_for('admin_calendar') }}" class="nav-link"><i class="fas fa-calendar-alt"></i> Calendar</a></li>

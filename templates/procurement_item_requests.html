@@ -10,12 +10,13 @@
     </div>
 
     <div class="dashboard-actions">
-        <a href="{{ url_for('department_dashboard') }}" class="btn btn-secondary">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Back to Dashboard
         </a>
     </div>
 
-    <!-- Statistics Summary -->
+    <!-- Statistics Summary (only for Procurement users) -->
+    {% if is_procurement_user %}
     <div class="card" style="margin-bottom: 30px; background: #f8f9fa;">
         <div class="card-body" style="padding: 25px;">
             <h3 style="margin-top: 0; color: #333;">
@@ -45,6 +46,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Item Requests Table -->
     <div class="card">
@@ -63,6 +65,7 @@
                             <th>Item Name</th>
                             <th>Quantity</th>
                             <th>Branch</th>
+                            <th>Amount</th>
                             <th>Status</th>
                             <th>Request Date</th>
                             <th>Created At</th>
@@ -86,14 +89,23 @@
                             <td>{{ req.quantity or '-' }}</td>
                             <td>{{ req.branch_name }}</td>
                             <td>
-                                {% if req.status == 'Completed' %}
-                                    <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
-                                {% elif req.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval', 'Assigned'] %}
-                                    <span class="badge" style="background: #2196F3; color: white;">⏳ {{ req.status }}</span>
-                                {% elif req.status in ['Rejected by Manager', 'Rejected by Procurement Manager'] %}
-                                    <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
+                                {% if req.amount %}
+                                    OMR {{ "%.3f"|format(req.amount) }}
                                 {% else %}
-                                    <span class="badge badge-warning">{{ req.status }}</span>
+                                    <span style="color: #999;">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if req.status == 'Completed' %}
+                                    <span class="badge" style="background: #28a745; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">✓ {{ req.status }}</span>
+                                {% elif req.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval'] %}
+                                    <span class="badge" style="background: #6c757d; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">⏳ {{ req.status }}</span>
+                                {% elif req.status == 'Assigned to Procurement' %}
+                                    <span class="badge" style="background: #2196F3; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">⏳ {{ req.status }}</span>
+                                {% elif req.status in ['Rejected by Manager', 'Rejected by Procurement Manager'] %}
+                                    <span class="badge" style="background: #dc3545; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">✗ {{ req.status }}</span>
+                                {% else %}
+                                    <span class="badge badge-warning" style="display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">{{ req.status }}</span>
                                 {% endif %}
                             </td>
                             <td>{{ req.request_date.strftime('%Y-%m-%d') }}</td>
@@ -129,117 +141,8 @@
 
 <script>
 function viewRequest(requestId) {
-    // Fetch request details via AJAX
-    fetch(`/procurement/item-request/${requestId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                const req = data.request;
-                const perms = data.permissions;
-                
-                // Get status badge color
-                let statusColor = '#6c757d';
-                if (req.status === 'Completed') statusColor = '#28a745';
-                else if (['Pending Manager Approval', 'Pending Procurement Manager Approval', 'Assigned'].includes(req.status)) statusColor = '#2196F3';
-                else if (['Rejected by Manager', 'Rejected by Procurement Manager'].includes(req.status)) statusColor = '#dc3545';
-                
-                const detailsHtml = `
-                    <div style="padding: 20px;">
-                        <div style="margin-bottom: 15px;">
-                            <strong>Request ID:</strong> #${req.id}
-                            ${req.is_urgent ? '<span class="badge" style="background: #dc3545; color: white; margin-left: 10px;">URGENT</span>' : ''}
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <strong>Requestor:</strong> ${req.requestor_name}
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <strong>Department:</strong> ${req.department}
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <strong>Item Name:</strong> ${req.item_name}
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <strong>Quantity:</strong> ${req.quantity || 'Not specified'}
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <strong>Branch:</strong> ${req.branch_name}
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <strong>Request Date:</strong> ${req.request_date}
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <strong>Status:</strong> 
-                            <span class="badge" style="background: ${statusColor}; color: white;">
-                                ${req.status}
-                            </span>
-                        </div>
-                        ${req.manager_approver ? `
-                        <div style="margin-bottom: 15px;">
-                            <strong>Approved by Manager:</strong> ${req.manager_approver} ${req.manager_approval_date ? 'on ' + req.manager_approval_date : ''}
-                        </div>
-                        ` : ''}
-                        ${req.procurement_manager_approver ? `
-                        <div style="margin-bottom: 15px;">
-                            <strong>Approved by Procurement Manager:</strong> ${req.procurement_manager_approver}
-                        </div>
-                        ` : ''}
-                        ${req.assigned_to ? `
-                        <div style="margin-bottom: 15px;">
-                            <strong>Assigned to:</strong> ${req.assigned_to}
-                        </div>
-                        ` : ''}
-                        ${req.completed_by ? `
-                        <div style="margin-bottom: 15px;">
-                            <strong>Completed by:</strong> ${req.completed_by} ${req.completion_date ? 'on ' + req.completion_date : ''}
-                        </div>
-                        ` : ''}
-                        <div style="margin-bottom: 15px;">
-                            <strong>Purpose:</strong>
-                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; margin-top: 5px;">
-                                ${req.purpose}
-                            </div>
-                        </div>
-                        ${req.notes ? `
-                        <div style="margin-bottom: 15px;">
-                            <strong>Additional Notes:</strong>
-                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; margin-top: 5px;">
-                                ${req.notes}
-                            </div>
-                        </div>
-                        ` : ''}
-                        ${req.completion_notes ? `
-                        <div style="margin-bottom: 15px;">
-                            <strong>Completion Notes:</strong>
-                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; margin-top: 5px;">
-                                ${req.completion_notes}
-                            </div>
-                        </div>
-                        ` : ''}
-                        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e9ecef;" id="actionButtons">
-                            ${perms.can_approve_manager ? `
-                                <button type="button" class="btn btn-success" onclick="showManagerApprovalForm(${req.id})">Approve</button>
-                                <button type="button" class="btn btn-danger" onclick="showManagerRejectionForm(${req.id})">Reject</button>
-                            ` : ''}
-                            ${perms.can_approve_procurement_manager ? `
-                                <button type="button" class="btn btn-success" onclick="showProcurementManagerApprovalForm(${req.id})">Approve & Assign</button>
-                                <button type="button" class="btn btn-danger" onclick="showProcurementManagerRejectionForm(${req.id})">Reject</button>
-                            ` : ''}
-                            ${perms.can_complete ? `
-                                <button type="button" class="btn btn-success" onclick="showCompletionForm(${req.id})">Mark Completed</button>
-                            ` : ''}
-                        </div>
-                    </div>
-                `;
-                document.getElementById('requestDetails').innerHTML = detailsHtml;
-                document.getElementById('viewRequestModal').style.display = 'block';
-            } else {
-                alert('Error loading request details.');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error loading request details.');
-        });
+    // Redirect to the full view page
+    window.location.href = `/procurement/item-request/${requestId}/view`;
 }
 
 function closeModal() {

@@ -554,7 +554,7 @@ class ProcurementItemRequest(db.Model):
     request_date = db.Column(db.Date, nullable=False)
     is_urgent = db.Column(db.Boolean, default=False)
     notes = db.Column(db.Text, nullable=True)
-    status = db.Column(db.String(50), default='Pending Manager Approval')  # Pending Manager Approval, Pending Procurement Manager Approval, Assigned, Completed, Rejected by Manager, Rejected by Procurement Manager
+    status = db.Column(db.String(50), default='Pending Manager Approval')  # Pending Manager Approval, Pending Procurement Manager Approval, Assigned to Procurement, Completed, Rejected by Manager, Rejected by Procurement Manager
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -583,6 +583,7 @@ class ProcurementItemRequest(db.Model):
     procurement_manager_rejector_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
     procurement_manager_rejection_reason = db.Column(db.Text, nullable=True)
     procurement_manager_approval_reason = db.Column(db.Text, nullable=True)
+    amount = db.Column(db.Numeric(10, 3), nullable=True)  # Amount set by Procurement Manager when approving
     
     # Assignment fields
     assigned_to_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
@@ -593,6 +594,7 @@ class ProcurementItemRequest(db.Model):
     completed_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
     completion_date = db.Column(db.DateTime, nullable=True)
     completion_notes = db.Column(db.Text, nullable=True)
+    receipt_path = db.Column(db.String(255), nullable=True)  # Receipt file path for completed item requests
     
     # Relationships
     manager_approver_user = db.relationship('User', foreign_keys=[manager_approver_user_id], backref='approved_item_requests_as_manager')

@@ -585,6 +585,68 @@ def get_recurring_datetime_order():
     ).desc()
 
 
+def get_item_request_status_priority(req):
+    """
+    Returns priority number for item request status ordering.
+    Priority order:
+    1. Pending Manager Approval
+    2. Pending Procurement Manager Approval
+    3. Assigned to Procurement
+    4. Completed
+    5. Rejected (Rejected by Manager, Rejected by Procurement Manager)
+    """
+    status_priority = {
+        'Pending Manager Approval': 1,
+        'Pending Procurement Manager Approval': 2,
+        'Assigned to Procurement': 3,
+        'Completed': 4,
+        'Rejected by Manager': 5,
+        'Rejected by Procurement Manager': 5,
+    }
+    return status_priority.get(req.status, 99)
+
+
+def get_item_request_datetime_for_sorting(req):
+    """
+    Returns datetime for sorting item requests by recency (most recent first).
+    For each status, the request with the most recent update (most recently had that status) should be at the top.
+    We prioritize updated_at since it's automatically updated whenever the status changes.
+    """
+    # Always prioritize updated_at first, as it reflects when the request last changed to this status
+    # Fallback to status-specific dates, then created_at
+    if req.updated_at:
+        return req.updated_at
+    
+    # Fallback to status-specific dates if updated_at is not available
+    if req.status == 'Completed':
+        dt = req.completion_date
+        if dt:
+            return dt if isinstance(dt, datetime) else datetime.combine(dt, datetime.min.time())
+        dt = req.procurement_manager_approval_date
+        if dt:
+            return datetime.combine(dt, datetime.min.time()) if isinstance(dt, date) else dt
+    elif req.status == 'Pending Procurement Manager Approval':
+        if req.manager_approval_end_time:
+            return req.manager_approval_end_time
+    elif req.status == 'Pending Manager Approval':
+        if req.manager_approval_start_time:
+            return req.manager_approval_start_time
+    elif req.status == 'Assigned to Procurement':
+        if req.assignment_date:
+            return req.assignment_date
+    elif req.status == 'Rejected by Manager':
+        dt = req.manager_rejection_date
+        if dt:
+            return datetime.combine(dt, datetime.min.time()) if isinstance(dt, date) else dt
+    elif req.status == 'Rejected by Procurement Manager':
+        dt = req.procurement_manager_rejection_date
+        if dt:
+            return datetime.combine(dt, datetime.min.time()) if isinstance(dt, date) else dt
+    
+    # Final fallback to created_at
+    return req.created_at
+
+
 def send_pin_email(user_email, user_name, pin):
     """Send PIN to user's email"""
     try:
@@ -842,10 +904,17 @@ def get_authorized_manager_approvers_for_item_request(item_request):
     """Get all users who are authorized to approve this item request at the manager stage."""
     authorized_users = []
     
-    # Get the requestor user
-    requestor = item_request.user if item_request.user_id else None
-    if not requestor:
+    # Get the requestor user - explicitly load from database if needed
+    if not item_request.user_id:
         return authorized_users
+    
+    requestor = User.query.get(item_request.user_id)
+    if not requestor:
+        log_action(f"WARNING: User not found for item request #{item_request.id} with user_id {item_request.user_id}")
+        return authorized_users
+    
+    # Debug logging
+    log_action(f"DEBUG: get_authorized_manager_approvers_for_item_request - Requestor: {requestor.name}, Role: {requestor.role}, Department: {requestor.department}, Manager ID: {requestor.manager_id}")
     
     # Hard rule: Requests submitted by GM/CEO/Operation Manager can ONLY be approved by Abdalaziz
     if requestor.role in ['GM', 'CEO', 'Operation Manager']:
@@ -905,14 +974,28 @@ def get_authorized_manager_approvers_for_item_request(item_request):
                 if user.user_id != requestor.user_id and user not in authorized_users:
                     authorized_users.append(user)
         
+        # Special case: IT Department Manager can approve IT department requests
+        if requestor.department == 'IT' and requestor.role != 'Department Manager':
+            it_managers = User.query.filter_by(
+                role='Department Manager',
+                department='IT'
+            ).all()
+            log_action(f"DEBUG: Found {len(it_managers)} IT Department Managers for IT Staff request")
+            for user in it_managers:
+                if user.user_id != requestor.user_id and user not in authorized_users:
+                    authorized_users.append(user)
+                    log_action(f"DEBUG: Added IT Department Manager: {user.name} (ID: {user.user_id})")
+        
         # Special case: Department Manager can approve same department requests
         dept_managers = User.query.filter_by(
             role='Department Manager',
             department=requestor.department
         ).all()
+        log_action(f"DEBUG: Found {len(dept_managers)} Department Managers for department '{requestor.department}'")
         for user in dept_managers:
             if user.user_id != requestor.user_id and user not in authorized_users:
                 authorized_users.append(user)
+                log_action(f"DEBUG: Added Department Manager: {user.name} (ID: {user.user_id}, Dept: {user.department})")
     
     # Remove duplicates
     seen = set()
@@ -922,6 +1005,7 @@ def get_authorized_manager_approvers_for_item_request(item_request):
             seen.add(user.user_id)
             unique_authorized.append(user)
     
+    log_action(f"DEBUG: get_authorized_manager_approvers_for_item_request returning {len(unique_authorized)} unique authorized users")
     return unique_authorized
 
 def notify_users_by_role(request, notification_type, title, message, request_id=None):
@@ -1884,11 +1968,12 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
             ).order_by(Notification.created_at.desc())
 
     elif user.role in ['GM', 'CEO']:
-        # GM: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide + temporary manager assignments
+        # GM: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide + temporary manager assignments + item requests
         query = Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
+                    Notification.notification_type == 'item_request_submission',
                     Notification.notification_type == 'new_submission',
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
@@ -1905,11 +1990,12 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
         ).order_by(Notification.created_at.desc())
 
     elif user.role == 'Operation Manager':
-        # Operation Manager: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide
+        # Operation Manager: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide + item requests
         query = Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
+                    Notification.notification_type == 'item_request_submission',
                     Notification.notification_type == 'new_submission',
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
@@ -1931,6 +2017,8 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
+                    # Item request submissions (for procurement item requests)
+                    Notification.notification_type == 'item_request_submission',
                     # new_submission only if it's from IT Staff (join with PaymentRequest to check)
                     db.and_(
                         Notification.notification_type == 'new_submission',
@@ -1985,7 +2073,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
         ).order_by(Notification.created_at.desc())
 
     elif user.role == 'Department Manager':
-        # Other Department Managers: New submissions from their own department staff only + recurring payment due for their department + updates on their own requests + temporary manager assignments
+        # Other Department Managers: New submissions from their own department staff only + recurring payment due for their department + updates on their own requests + temporary manager assignments + item requests
         print(f"DEBUG: Getting notifications for Department Manager {user.username} from {user.department}")
 
         # Get all notifications for this user first
@@ -1998,6 +2086,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
             db.and_(
                 Notification.user_id == user.user_id,
                 db.or_(
+                    Notification.notification_type == 'item_request_submission',
                     Notification.notification_type == 'new_submission',
                     Notification.notification_type == 'recurring_due',
                     Notification.notification_type.in_([
@@ -2011,14 +2100,15 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
         ).order_by(Notification.created_at.desc())
 
     else:
-        # Department Staff: Updates on their own requests only + recurring payment due for their own requests
+        # Department Staff: Updates on their own requests only + recurring payment due for their own requests + item request assignments
         query = Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.notification_type.in_([
                     'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                     'status_changed', 'recurring_due', 'proof_required', 'recurring_approved',
-                    'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled'
+                    'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled',
+                    'item_request_assigned'
                 ])
             )
         ).order_by(Notification.created_at.desc())
@@ -2097,12 +2187,13 @@ def get_unread_count_for_user(user):
             ).count()
     
     elif user.role in ['GM', 'CEO']:
-        # GM: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide
+        # GM: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide + item requests
         return Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
                 db.or_(
+                    Notification.notification_type == 'item_request_submission',
                     Notification.notification_type == 'new_submission',
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
@@ -2112,12 +2203,13 @@ def get_unread_count_for_user(user):
         ).count()
     
     elif user.role == 'Operation Manager':
-        # Operation Manager: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide
+        # Operation Manager: New submissions from ALL requests (all roles/departments) + updates on their own requests + system-wide + item requests
         return Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
                 db.or_(
+                    Notification.notification_type == 'item_request_submission',
                     Notification.notification_type == 'new_submission',
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
@@ -2127,12 +2219,14 @@ def get_unread_count_for_user(user):
         ).count()
     
     elif user.role == 'Department Manager' and user.department == 'IT':
-        # IT Department Manager: New submissions from IT Staff only + updates on their own requests + system-wide + user management + temporary manager assignments
+        # IT Department Manager: New submissions from IT Staff only + updates on their own requests + system-wide + user management + temporary manager assignments + item requests
         return Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
                 db.or_(
+                    # Item request submissions (for procurement item requests)
+                    Notification.notification_type == 'item_request_submission',
                     # new_submission only if it's from IT Staff (join with PaymentRequest to check)
                     db.and_(
                         Notification.notification_type == 'new_submission',
@@ -2172,12 +2266,13 @@ def get_unread_count_for_user(user):
         ).count()
     
     elif user.role == 'Department Manager':
-        # Other Department Managers: New submissions from their own department staff only + recurring payment due for their department + updates on their own requests
+        # Other Department Managers: New submissions from their own department staff only + recurring payment due for their department + updates on their own requests + item requests
         return Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
                 db.or_(
+                    Notification.notification_type == 'item_request_submission',
                     Notification.notification_type == 'new_submission',  # Simplified - same as get_notifications_for_user
                     Notification.notification_type == 'recurring_due',
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
@@ -2187,12 +2282,12 @@ def get_unread_count_for_user(user):
         ).count()
     
     else:
-        # Department Staff: Updates on their own requests only + recurring payment due for their own requests
+        # Department Staff: Updates on their own requests only + recurring payment due for their own requests + item request assignments
         return Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
-                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled'])
+                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned'])
             )
         ).count()
 
@@ -3090,6 +3185,34 @@ def department_dashboard():
 @login_required
 def procurement_dashboard():
     """Dashboard for Procurement department users"""
+    # Migrate: Add amount and receipt_path columns to procurement_item_requests if they don't exist
+    try:
+        import sqlite3
+        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+        if os.name == 'nt':  # Windows
+            db_path = db_path.replace('/', '\\')
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Check if columns exist
+        cursor.execute("PRAGMA table_info(procurement_item_requests)")
+        existing_columns = [row[1] for row in cursor.fetchall()]
+        
+        if 'amount' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN amount NUMERIC(10, 3)")
+            conn.commit()
+            print("✓ Added 'amount' column to procurement_item_requests table")
+        
+        if 'receipt_path' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN receipt_path VARCHAR(255)")
+            conn.commit()
+            print("✓ Added 'receipt_path' column to procurement_item_requests table")
+        
+        conn.close()
+    except Exception as e:
+        print(f"Warning: Could not migrate columns: {e}")
+    
     # Allow ALL users with Procurement department to access this dashboard
     # Normalize department value (strip whitespace and handle case)
     dept = current_user.department.strip() if current_user.department else ''
@@ -3269,6 +3392,16 @@ def procurement_dashboard():
     completed_amount = sum(float(r.amount) for r in completed_requests_bm)
     pending_amount = sum(float(r.amount) for r in pending_requests_bm)
     
+    # Get item requests with status "Assigned to Procurement" and their amounts
+    assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
+    item_requests_amount = sum(float(r.amount) for r in assigned_item_requests if r.amount is not None)
+    
+    # Adjust calculations: deduct from available balance, add to money spent
+    # Money Spent = Completed payment requests + Assigned item requests
+    money_spent = completed_amount + item_requests_amount
+    # Available Balance = Completed payment requests - Assigned item requests
+    available_balance = completed_amount - item_requests_amount
+    
     return render_template('procurement_dashboard.html', 
                          requests=requests_pagination.items, 
                          pagination=requests_pagination,
@@ -3284,14 +3417,45 @@ def procurement_dashboard():
                          my_requests=my_requests_pagination.items,
                          active_tab=tab,
                          total_amount=total_amount,
-                         completed_amount=completed_amount,
+                         completed_amount=money_spent,
+                         available_balance=available_balance,
                          pending_amount=pending_amount)
 
 
-@app.route('/procurement/bank-money')
+@app.route('/procurement/item-requests')
 @login_required
-def procurement_bank_money():
+def procurement_item_requests():
     """Item Requests page - shows requests based on user role"""
+    
+    # Migrate: Add amount column to procurement_item_requests if it doesn't exist
+    try:
+        import sqlite3
+        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+        if os.name == 'nt':  # Windows
+            db_path = db_path.replace('/', '\\')
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Check if amount column exists
+        cursor.execute("PRAGMA table_info(procurement_item_requests)")
+        existing_columns = [row[1] for row in cursor.fetchall()]
+        
+        if 'amount' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN amount NUMERIC(10, 3)")
+            conn.commit()
+            print("✓ Added 'amount' column to procurement_item_requests table")
+        
+        conn.close()
+    except Exception as e:
+        print(f"Warning: Could not migrate amount column: {e}")
+    
+    # Update any old "Assigned" status to "Assigned to Procurement" (one-time migration)
+    old_assigned = ProcurementItemRequest.query.filter_by(status='Assigned').all()
+    if old_assigned:
+        for req in old_assigned:
+            req.status = 'Assigned to Procurement'
+        db.session.commit()
     
     # Get all procurement item requests
     all_requests = ProcurementItemRequest.query.order_by(ProcurementItemRequest.created_at.desc()).all()
@@ -3302,7 +3466,7 @@ def procurement_bank_money():
         item_requests = all_requests
     elif current_user.department == 'Procurement' and current_user.role != 'Department Manager':
         # Procurement Staff sees all assigned requests (any Procurement member can complete them)
-        item_requests = [r for r in all_requests if r.status == 'Assigned' or r.assigned_to_user_id == current_user.user_id]
+        item_requests = [r for r in all_requests if r.status == 'Assigned to Procurement' or r.assigned_to_user_id == current_user.user_id]
     else:
         # Managers see requests from their department
         authorized_approvers_ids = set()
@@ -3317,9 +3481,21 @@ def procurement_bank_money():
         visible_request_ids = authorized_approvers_ids.union(my_requests)
         item_requests = [r for r in all_requests if r.id in visible_request_ids]
     
+    # Sort item requests: first by status priority, then by datetime (most recent first)
+    # This matches the sorting logic used in payment requests dashboard
+    # Use a tuple key: (status_priority, -timestamp) where timestamp is negated for descending order
+    def sort_key(req):
+        status_priority = get_item_request_status_priority(req)
+        dt = get_item_request_datetime_for_sorting(req)
+        # Convert datetime to timestamp for negation (most recent = higher timestamp, so negate for descending)
+        timestamp = dt.timestamp() if dt else 0
+        return (status_priority, -timestamp)
+    
+    item_requests.sort(key=sort_key, reverse=False)
+    
     # Calculate statistics
     total_requests = len(item_requests)
-    pending_requests = [r for r in item_requests if r.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval', 'Assigned']]
+    pending_requests = [r for r in item_requests if r.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval', 'Assigned to Procurement']]
     completed_requests = [r for r in item_requests if r.status == 'Completed']
     rejected_requests = [r for r in item_requests if r.status in ['Rejected by Manager', 'Rejected by Procurement Manager']]
     urgent_requests = [r for r in item_requests if r.is_urgent]
@@ -3327,11 +3503,15 @@ def procurement_bank_money():
     # Get procurement members for assignment dropdown (only for Procurement Manager)
     # Convert to dictionaries for JSON serialization
     procurement_members = []
+    is_procurement_user = False
     if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
         members = User.query.filter_by(department='Procurement').all()
         procurement_members = [{'user_id': m.user_id, 'name': m.name} for m in members]
+        is_procurement_user = True
+    elif current_user.department == 'Procurement':
+        is_procurement_user = True
     
-    return render_template('procurement_bank_money.html',
+    return render_template('procurement_item_requests.html',
                          user=current_user,
                          item_requests=item_requests,
                          total_requests=total_requests,
@@ -3339,7 +3519,8 @@ def procurement_bank_money():
                          completed_requests=completed_requests,
                          rejected_requests=rejected_requests,
                          urgent_requests=urgent_requests,
-                         procurement_members=procurement_members)
+                         procurement_members=procurement_members,
+                         is_procurement_user=is_procurement_user)
 
 
 @app.route('/procurement/item-request/<int:request_id>')
@@ -3382,7 +3563,7 @@ def view_item_request(request_id):
             can_approve_procurement_manager = True
             can_reject_procurement_manager = True
     
-    if item_request.status == 'Assigned' and current_user.department == 'Procurement':
+    if item_request.status == 'Assigned to Procurement' and item_request.assigned_to_user_id == current_user.user_id:
         can_complete = True
     
     # Get user names safely (avoid lazy loading issues)
@@ -3395,6 +3576,17 @@ def view_item_request(request_id):
     if item_request.completed_by_user_id:
         completed_user = User.query.get(item_request.completed_by_user_id)
         completed_by_name = completed_user.name if completed_user else None
+    
+    receipt_files = []
+    if item_request.receipt_path:
+        try:
+            data = json.loads(item_request.receipt_path)
+            if isinstance(data, list):
+                receipt_files = data
+            else:
+                receipt_files = [item_request.receipt_path]
+        except (json.JSONDecodeError, TypeError):
+            receipt_files = [item_request.receipt_path]
     
     return jsonify({
         'success': True,
@@ -3417,7 +3609,8 @@ def view_item_request(request_id):
             'assigned_to': assigned_to_name,
             'completed_by': completed_by_name,
             'completion_date': item_request.completion_date.strftime('%Y-%m-%d %H:%M:%S') if item_request.completion_date else None,
-            'completion_notes': item_request.completion_notes
+            'completion_notes': item_request.completion_notes,
+            'receipt_files': receipt_files
         },
         'permissions': {
             'can_approve_manager': can_approve_manager,
@@ -3427,6 +3620,176 @@ def view_item_request(request_id):
             'can_complete': can_complete
         }
     })
+
+
+@app.route('/procurement/item-request/<int:request_id>/view')
+@login_required
+def view_item_request_page(request_id):
+    """View a specific item request in full page format"""
+    item_request = ProcurementItemRequest.query.get_or_404(request_id)
+    
+    # Check access permissions
+    can_view = False
+    if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
+        can_view = True
+    elif current_user.department == 'Procurement' and item_request.assigned_to_user_id == current_user.user_id:
+        can_view = True
+    elif item_request.user_id == current_user.user_id:
+        can_view = True
+    else:
+        approvers = get_authorized_manager_approvers_for_item_request(item_request)
+        if current_user in approvers:
+            can_view = True
+    
+    if not can_view:
+        flash('You do not have permission to view this item request.', 'danger')
+        return redirect(url_for('procurement_item_requests'))
+    
+    # Get procurement members for assignment dropdown (only for Procurement Manager)
+    procurement_members = []
+    if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
+        procurement_members = User.query.filter_by(department='Procurement').all()
+    
+    # Get user names safely
+    assigned_to_name = None
+    if item_request.assigned_to_user_id:
+        assigned_user = User.query.get(item_request.assigned_to_user_id)
+        assigned_to_name = assigned_user.name if assigned_user else None
+    
+    assigned_by_name = None
+    if item_request.assigned_by_user_id:
+        assigned_by_user = User.query.get(item_request.assigned_by_user_id)
+        assigned_by_name = assigned_by_user.name if assigned_by_user else None
+    
+    completed_by_name = None
+    if item_request.completed_by_user_id:
+        completed_user = User.query.get(item_request.completed_by_user_id)
+        completed_by_name = completed_user.name if completed_user else None
+    
+    # Get manager approver name
+    manager_approver_name = None
+    if item_request.manager_approver_user_id:
+        manager_user = User.query.get(item_request.manager_approver_user_id)
+        manager_approver_name = manager_user.name if manager_user else item_request.manager_approver
+    
+    # Get manager rejector name
+    manager_rejector_name = None
+    if item_request.manager_rejector_user_id:
+        rejector_user = User.query.get(item_request.manager_rejector_user_id)
+        manager_rejector_name = rejector_user.name if rejector_user else item_request.manager_rejector
+    elif item_request.manager_rejector:
+        manager_rejector_name = item_request.manager_rejector
+    
+    # Get procurement manager approver name
+    procurement_manager_approver_name = None
+    if item_request.procurement_manager_approver_user_id:
+        pm_user = User.query.get(item_request.procurement_manager_approver_user_id)
+        procurement_manager_approver_name = pm_user.name if pm_user else item_request.procurement_manager_approver
+    
+    # Determine the manager's name for display (same logic as payment requests)
+    manager_name = None
+    temporary_manager_name = None
+    
+    # Get the requestor user to check manager_id
+    requestor_user = None
+    if item_request.user_id:
+        requestor_user = User.query.get(item_request.user_id)
+    
+    # Check if there's a temporary manager assigned (IT Department feature)
+    # Note: ProcurementItemRequest doesn't have temporary_manager_id, but we check for consistency
+    # If it's added in the future, uncomment this:
+    # if hasattr(item_request, 'temporary_manager_id') and item_request.temporary_manager_id:
+    #     temp_manager = User.query.get(item_request.temporary_manager_id)
+    #     if temp_manager:
+    #         temporary_manager_name = temp_manager.name
+    
+    # Determine manager name for all statuses (pending and completed)
+    if requestor_user and requestor_user.manager_id:
+        # Get the manager's name from the manager_id
+        manager = User.query.get(requestor_user.manager_id)
+        if manager:
+            manager_name = manager.name
+        else:
+            # If manager_id exists but user not found, try to find Department Manager
+            dept_manager = User.query.filter_by(role='Department Manager', department=item_request.department).first()
+            if dept_manager:
+                manager_name = dept_manager.name
+    else:
+        # If no manager_id is set, find the Department Manager for the requestor's department
+        dept_manager = User.query.filter_by(role='Department Manager', department=item_request.department).first()
+        if dept_manager:
+            manager_name = dept_manager.name
+        elif item_request.department in ['Operation', 'Project']:
+            # For Operation and Project, try Operation Manager as fallback
+            operation_manager = User.query.filter_by(role='Operation Manager').first()
+            if operation_manager:
+                manager_name = operation_manager.name
+        elif item_request.department == 'Office':
+            # For Office, fallback to the General Manager
+            gm_user_fallback = User.query.filter_by(role='GM').first()
+            if gm_user_fallback:
+                manager_name = gm_user_fallback.name
+    
+    # Also resolve GM and Operation Manager names (used for Department Manager submissions)
+    gm_user = User.query.filter_by(role='GM').first()
+    gm_name = gm_user.name if gm_user else 'General Manager'
+    op_manager_user = User.query.filter_by(role='Operation Manager').first()
+    op_manager_name = op_manager_user.name if op_manager_user else 'Operation Manager'
+    
+    # Check what actions current user can perform
+    can_approve_manager = False
+    can_reject_manager = False
+    can_approve_procurement_manager = False
+    can_reject_procurement_manager = False
+    can_complete = False
+    
+    if item_request.status == 'Pending Manager Approval':
+        approvers = get_authorized_manager_approvers_for_item_request(item_request)
+        if current_user in approvers:
+            can_approve_manager = True
+            can_reject_manager = True
+    
+    if item_request.status == 'Pending Procurement Manager Approval':
+        if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
+            can_approve_procurement_manager = True
+            can_reject_procurement_manager = True
+    
+    if item_request.status == 'Assigned to Procurement' and item_request.assigned_to_user_id == current_user.user_id:
+        can_complete = True
+    
+    # Prepare receipt files list
+    receipt_files = []
+    if item_request.receipt_path:
+        try:
+            data = json.loads(item_request.receipt_path)
+            if isinstance(data, list):
+                receipt_files = data
+            else:
+                receipt_files = [item_request.receipt_path]
+        except (json.JSONDecodeError, TypeError):
+            receipt_files = [item_request.receipt_path]
+
+    return render_template('view_item_request.html',
+                         item_request=item_request,
+                         user=current_user,
+                         procurement_members=procurement_members,
+                         assigned_to_name=assigned_to_name,
+                         assigned_by_name=assigned_by_name,
+                         completed_by_name=completed_by_name,
+                         receipt_files=receipt_files,
+                         manager_approver_name=manager_approver_name,
+                         manager_rejector_name=manager_rejector_name,
+                         procurement_manager_approver_name=procurement_manager_approver_name,
+                         manager_name=manager_name,
+                         temporary_manager_name=temporary_manager_name,
+                         gm_name=gm_name,
+                         op_manager_name=op_manager_name,
+                         requestor_user=requestor_user,
+                         can_approve_manager=can_approve_manager,
+                         can_reject_manager=can_reject_manager,
+                         can_approve_procurement_manager=can_approve_procurement_manager,
+                         can_reject_procurement_manager=can_reject_procurement_manager,
+                         can_complete=can_complete)
 
 
 @app.route('/procurement/item-request/<int:request_id>/manager-approve', methods=['POST'])
@@ -3439,11 +3802,11 @@ def item_request_manager_approve(request_id):
     authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
     if current_user not in authorized_approvers:
         flash('You are not authorized to approve this request.', 'danger')
-        return redirect(url_for('procurement_bank_money'))
+        return redirect(url_for('procurement_item_requests'))
     
     if item_request.status != 'Pending Manager Approval':
         flash('This request is not pending manager approval.', 'danger')
-        return redirect(url_for('procurement_bank_money'))
+        return redirect(url_for('procurement_item_requests'))
     
     current_time = datetime.utcnow()
     
@@ -3482,8 +3845,19 @@ def item_request_manager_approve(request_id):
             notification_type="new_submission"
         )
     
+    # Notify other authorized managers (who could have approved but didn't) that the request was approved
+    authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
+    for approver in authorized_approvers:
+        if approver.user_id != current_user.user_id:  # Don't notify the approver themselves
+            create_notification(
+                user_id=approver.user_id,
+                title="Item Request Approved by Assigned Manager",
+                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been approved by {current_user.name} and sent to Procurement Manager.",
+                notification_type="request_approved"
+            )
+    
     flash('Item request approved successfully!', 'success')
-    return redirect(url_for('procurement_bank_money'))
+    return redirect(url_for('view_item_request_page', request_id=request_id))
 
 
 @app.route('/procurement/item-request/<int:request_id>/manager-reject', methods=['POST'])
@@ -3496,16 +3870,16 @@ def item_request_manager_reject(request_id):
     authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
     if current_user not in authorized_approvers:
         flash('You are not authorized to reject this request.', 'danger')
-        return redirect(url_for('procurement_bank_money'))
+        return redirect(url_for('procurement_item_requests'))
     
     if item_request.status != 'Pending Manager Approval':
         flash('This request is not pending manager approval.', 'danger')
-        return redirect(url_for('procurement_bank_money'))
+        return redirect(url_for('procurement_item_requests'))
     
     rejection_reason = request.form.get('rejection_reason', '').strip()
     if not rejection_reason:
         flash('Please provide a reason for rejection.', 'danger')
-        return redirect(url_for('procurement_bank_money'))
+        return redirect(url_for('procurement_item_requests'))
     
     current_time = datetime.utcnow()
     
@@ -3531,8 +3905,32 @@ def item_request_manager_reject(request_id):
             notification_type="request_rejected"
         )
     
+    # Notify Procurement Managers (they should know it was rejected)
+    procurement_managers = User.query.filter_by(
+        department='Procurement',
+        role='Department Manager'
+    ).all()
+    for pm in procurement_managers:
+        create_notification(
+            user_id=pm.user_id,
+            title="Item Request Rejected by Manager",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been rejected by {current_user.name}. Reason: {rejection_reason}",
+            notification_type="request_rejected"
+        )
+    
+    # Notify other authorized managers (who could have approved but didn't) that the request was rejected
+    authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
+    for approver in authorized_approvers:
+        if approver.user_id != current_user.user_id:  # Don't notify the rejector themselves
+            create_notification(
+                user_id=approver.user_id,
+                title="Item Request Rejected by Another Manager",
+                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been rejected by {current_user.name}. Reason: {rejection_reason}",
+                notification_type="request_rejected"
+            )
+    
     flash('Item request rejected.', 'info')
-    return redirect(url_for('procurement_bank_money'))
+    return redirect(url_for('view_item_request_page', request_id=request_id))
 
 
 @app.route('/procurement/item-request/<int:request_id>/procurement-manager-approve', methods=['POST'])
@@ -3542,39 +3940,55 @@ def item_request_procurement_manager_approve(request_id):
     """Procurement Manager approves and assigns an item request"""
     if current_user.department != 'Procurement' or current_user.role != 'Department Manager':
         flash('Access denied. Only Procurement Department Managers can perform this action.', 'danger')
-        return redirect(url_for('procurement_bank_money'))
+        return redirect(url_for('procurement_item_requests'))
     
     item_request = ProcurementItemRequest.query.get_or_404(request_id)
     
     if item_request.status != 'Pending Procurement Manager Approval':
         flash('This request is not pending procurement manager approval.', 'danger')
-        return redirect(url_for('procurement_bank_money'))
+        return redirect(url_for('procurement_item_requests'))
+    
+    # Get and validate amount
+    amount_str = request.form.get('amount', '').strip()
+    if not amount_str:
+        flash('Please enter an amount.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    
+    try:
+        amount = float(amount_str)
+        if amount < 0:
+            flash('Amount cannot be negative.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id))
+    except ValueError:
+        flash('Invalid amount format.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
     
     assigned_to_user_id = request.form.get('assigned_to_user_id', '').strip()
     if not assigned_to_user_id:
         flash('Please select a procurement member to assign this request to.', 'danger')
-        return redirect(url_for('procurement_bank_money'))
+        return redirect(url_for('view_item_request_page', request_id=request_id))
     
     try:
         assigned_to_user_id = int(assigned_to_user_id)
     except ValueError:
         flash('Invalid user selected.', 'danger')
-        return redirect(url_for('procurement_bank_money'))
+        return redirect(url_for('view_item_request_page', request_id=request_id))
     
     # Verify the assigned user is from Procurement department
     assigned_user = User.query.get(assigned_to_user_id)
     if not assigned_user or assigned_user.department != 'Procurement':
         flash('Selected user must be from Procurement department.', 'danger')
-        return redirect(url_for('procurement_bank_money'))
+        return redirect(url_for('view_item_request_page', request_id=request_id))
     
     current_time = datetime.utcnow()
     
     # Update request
-    item_request.status = 'Assigned'
+    item_request.status = 'Assigned to Procurement'
     item_request.procurement_manager_approval_date = current_time.date()
     item_request.procurement_manager_approver = current_user.name
     item_request.procurement_manager_approver_user_id = current_user.user_id
     item_request.procurement_manager_approval_reason = request.form.get('approval_reason', '').strip()
+    item_request.amount = amount
     item_request.assigned_to_user_id = assigned_to_user_id
     item_request.assigned_by_user_id = current_user.user_id
     item_request.assignment_date = current_time
@@ -3597,12 +4011,21 @@ def item_request_procurement_manager_approve(request_id):
     create_notification(
         user_id=assigned_to_user_id,
         title="New Item Request Assigned",
-        message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been assigned to you.",
-        notification_type="new_submission"
+        message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been assigned to you. Amount: OMR {amount:.3f}",
+        notification_type="item_request_assigned"
     )
     
+    # Notify the manager who originally approved (they should know it progressed)
+    if item_request.manager_approver_user_id:
+        create_notification(
+            user_id=item_request.manager_approver_user_id,
+            title="Item Request Approved by Procurement Manager",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} that you approved has been approved by Procurement Manager and assigned for processing.",
+            notification_type="request_approved"
+        )
+    
     flash('Item request approved and assigned successfully!', 'success')
-    return redirect(url_for('procurement_bank_money'))
+    return redirect(url_for('view_item_request_page', request_id=request_id))
 
 
 @app.route('/procurement/item-request/<int:request_id>/procurement-manager-reject', methods=['POST'])
@@ -3612,18 +4035,18 @@ def item_request_procurement_manager_reject(request_id):
     """Procurement Manager rejects an item request"""
     if current_user.department != 'Procurement' or current_user.role != 'Department Manager':
         flash('Access denied. Only Procurement Department Managers can perform this action.', 'danger')
-        return redirect(url_for('procurement_bank_money'))
+        return redirect(url_for('procurement_item_requests'))
     
     item_request = ProcurementItemRequest.query.get_or_404(request_id)
     
     if item_request.status != 'Pending Procurement Manager Approval':
         flash('This request is not pending procurement manager approval.', 'danger')
-        return redirect(url_for('procurement_bank_money'))
+        return redirect(url_for('procurement_item_requests'))
     
     rejection_reason = request.form.get('rejection_reason', '').strip()
     if not rejection_reason:
         flash('Please provide a reason for rejection.', 'danger')
-        return redirect(url_for('procurement_bank_money'))
+        return redirect(url_for('procurement_item_requests'))
     
     current_time = datetime.utcnow()
     
@@ -3648,8 +4071,17 @@ def item_request_procurement_manager_reject(request_id):
             notification_type="request_rejected"
         )
     
+    # Notify the manager who originally approved (they should know it was rejected at procurement level)
+    if item_request.manager_approver_user_id:
+        create_notification(
+            user_id=item_request.manager_approver_user_id,
+            title="Item Request Rejected by Procurement Manager",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} that you approved has been rejected by Procurement Manager. Reason: {rejection_reason}",
+            notification_type="request_rejected"
+        )
+    
     flash('Item request rejected.', 'info')
-    return redirect(url_for('procurement_bank_money'))
+    return redirect(url_for('view_item_request_page', request_id=request_id))
 
 
 @app.route('/procurement/item-request/<int:request_id>/complete', methods=['POST'])
@@ -3658,16 +4090,50 @@ def item_request_complete(request_id):
     """Procurement member completes an item request"""
     item_request = ProcurementItemRequest.query.get_or_404(request_id)
     
-    # Check if current user is from Procurement department
-    if current_user.department != 'Procurement':
-        flash('Only Procurement department members can complete requests.', 'danger')
-        return redirect(url_for('procurement_bank_money'))
+    # Check if current user is the assigned person
+    if item_request.assigned_to_user_id != current_user.user_id:
+        flash('Only the assigned person can complete this request.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
     
-    if item_request.status != 'Assigned':
+    if item_request.status != 'Assigned to Procurement':
         flash('This request is not assigned.', 'danger')
-        return redirect(url_for('procurement_bank_money'))
+        return redirect(url_for('view_item_request_page', request_id=request_id))
     
     completion_notes = request.form.get('completion_notes', '').strip()
+    
+    # Handle receipt file upload (required, allow multiple)
+    receipt_files = request.files.getlist('receipt_files')
+    if not receipt_files or not any(f.filename for f in receipt_files):
+        flash('Upload Receipt file is required.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    
+    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
+    max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+    uploaded_filenames = []
+    
+    for receipt_file in receipt_files:
+        if receipt_file and receipt_file.filename:
+            file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
+            if file_extension not in allowed_extensions:
+                flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'danger')
+                return redirect(url_for('view_item_request_page', request_id=request_id))
+            
+            file_size = len(receipt_file.read())
+            if file_size > max_file_size:
+                flash(f'File "{receipt_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'danger')
+                return redirect(url_for('view_item_request_page', request_id=request_id))
+            
+            receipt_file.seek(0)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = secure_filename(receipt_file.filename)
+            filename = f"item_receipt_{request_id}_{timestamp}_{filename}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            receipt_file.save(filepath)
+            uploaded_filenames.append(filename)
+    
+    if not uploaded_filenames:
+        flash('Upload Receipt file is required.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
     
     current_time = datetime.utcnow()
     
@@ -3676,6 +4142,7 @@ def item_request_complete(request_id):
     item_request.completed_by_user_id = current_user.user_id
     item_request.completion_date = current_time
     item_request.completion_notes = completion_notes
+    item_request.receipt_path = json.dumps(uploaded_filenames)
     item_request.updated_at = current_time
     
     db.session.commit()
@@ -3691,8 +4158,26 @@ def item_request_complete(request_id):
             notification_type="request_completed"
         )
     
+    # Notify Procurement Manager (they should know it's completed)
+    if item_request.procurement_manager_approver_user_id:
+        create_notification(
+            user_id=item_request.procurement_manager_approver_user_id,
+            title="Item Request Completed",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been completed by {current_user.name}.",
+            notification_type="request_completed"
+        )
+    
+    # Notify the manager who originally approved (they should know it's done)
+    if item_request.manager_approver_user_id:
+        create_notification(
+            user_id=item_request.manager_approver_user_id,
+            title="Item Request Completed",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} that you approved has been completed by the procurement team.",
+            notification_type="request_completed"
+        )
+    
     flash('Item request marked as completed!', 'success')
-    return redirect(url_for('procurement_bank_money'))
+    return redirect(url_for('view_item_request_page', request_id=request_id))
 
 
 @app.route('/procurement/request-item', methods=['GET', 'POST'])
@@ -3742,6 +4227,9 @@ def procurement_request_item():
         db.session.add(item_request)
         db.session.commit()
         
+        # Refresh the item_request to ensure relationships are loaded
+        db.session.refresh(item_request)
+        
         # Notify the requestor
         if current_user:
             create_notification(
@@ -3753,22 +4241,42 @@ def procurement_request_item():
         
         # Notify manager(s) - similar to payment requests
         if current_user:
-            # Get manager approvers
+            # Get manager approvers - ensure we reload the item_request with user relationship
+            item_request = ProcurementItemRequest.query.get(item_request.id)
+            
+            # Debug logging
+            log_action(f"DEBUG: Getting authorized approvers for item request #{item_request.id} from user_id {item_request.user_id}, department: {item_request.department}")
+            
             authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
+            
+            log_action(f"DEBUG: Found {len(authorized_approvers)} authorized approvers for item request #{item_request.id}")
+            
+            if not authorized_approvers:
+                # Log warning if no approvers found with more details
+                log_action(f"WARNING: No authorized approvers found for item request #{item_request.id} from {requestor_name} ({item_request.department}), user_id: {item_request.user_id}, role: {current_user.role if current_user else 'Unknown'}")
+            else:
+                # Log each approver found
+                for approver in authorized_approvers:
+                    log_action(f"DEBUG: Notifying approver: {approver.name} (ID: {approver.user_id}, Role: {approver.role}, Dept: {approver.department})")
+            
             for approver in authorized_approvers:
-                create_notification(
-                    user_id=approver.user_id,
-                    title="New Item Request for Approval",
-                    message=f"New item request submitted by {requestor_name} from {item_request.department} department for {item_name} - requires your approval",
-                    notification_type="new_submission"
-                )
+                try:
+                    create_notification(
+                        user_id=approver.user_id,
+                        title="New Item Request for Approval",
+                        message=f"New item request submitted by {requestor_name} from {item_request.department} department for {item_name} - requires your approval",
+                        notification_type="item_request_submission"
+                    )
+                    log_action(f"DEBUG: Notification created successfully for user_id {approver.user_id}")
+                except Exception as e:
+                    log_action(f"ERROR: Failed to create notification for user_id {approver.user_id}: {str(e)}")
         
         flash(f'Item request submitted successfully! Item: {item_name}, Quantity: {quantity or "N/A"}', 'success')
         
         # Log the action
         log_action(f'Submitted procurement item request: {item_name} (Quantity: {quantity or "N/A"})')
         
-        return redirect(url_for('procurement_request_item'))
+        return redirect(url_for('procurement_item_requests'))
     
     # GET request - show the form
     # Get available branches
@@ -12383,6 +12891,39 @@ def mark_installment_late():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        
+        # Migrate: Add amount and receipt_path columns to procurement_item_requests if they don't exist
+        try:
+            import sqlite3
+            db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+            if os.name == 'nt':  # Windows
+                db_path = db_path.replace('/', '\\')
+            
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            # Check if columns exist
+            cursor.execute("PRAGMA table_info(procurement_item_requests)")
+            existing_columns = [row[1] for row in cursor.fetchall()]
+            
+            if 'amount' not in existing_columns:
+                cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN amount NUMERIC(10, 3)")
+                conn.commit()
+                print("✓ Added 'amount' column to procurement_item_requests table")
+            else:
+                print("✓ 'amount' column already exists in procurement_item_requests table")
+            
+            if 'receipt_path' not in existing_columns:
+                cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN receipt_path VARCHAR(255)")
+                conn.commit()
+                print("✓ Added 'receipt_path' column to procurement_item_requests table")
+            else:
+                print("✓ 'receipt_path' column already exists in procurement_item_requests table")
+            
+            conn.close()
+        except Exception as e:
+            print(f"Warning: Could not migrate columns: {e}")
+        
         # Check for timing alerts on startup
         try:
             check_finance_approval_timing_alerts()
