@@ -127,7 +127,7 @@
                 {% endif %}
                 
                 {% if current_user.role == 'Department Manager' and current_user.department == 'Procurement' %}
-                <li><a href="{{ url_for('procurement_bank_money') }}" class="nav-link"><i class="fas fa-university"></i> Bank Money</a></li>
+                <li><a href="{{ url_for('procurement_bank_money') }}" class="nav-link"><i class="fas fa-shopping-cart"></i> Item Requests</a></li>
                 {% endif %}
                 
                 <li><a href="{{ url_for('procurement_request_item') }}" class="nav-link"><i class="fas fa-shopping-cart"></i> Request Item</a></li>

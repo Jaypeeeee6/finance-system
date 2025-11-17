@@ -538,3 +538,70 @@ class ChequeSerial(db.Model):
     
     def __repr__(self):
         return f'<ChequeSerial {self.id} - Book {self.book_id} Serial {self.serial_no} ({self.status})>'
+
+
+class ProcurementItemRequest(db.Model):
+    """Procurement item request model"""
+    __tablename__ = 'procurement_item_requests'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    requestor_name = db.Column(db.String(100), nullable=False)
+    department = db.Column(db.String(100), nullable=False)
+    item_name = db.Column(db.String(200), nullable=False)
+    quantity = db.Column(db.String(100), nullable=True)  # Can be "10 units", "5 boxes", etc.
+    purpose = db.Column(db.Text, nullable=False)
+    branch_name = db.Column(db.String(100), nullable=False)
+    request_date = db.Column(db.Date, nullable=False)
+    is_urgent = db.Column(db.Boolean, default=False)
+    notes = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(50), default='Pending Manager Approval')  # Pending Manager Approval, Pending Procurement Manager Approval, Assigned, Completed, Rejected by Manager, Rejected by Procurement Manager
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship to User who created the request
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    user = db.relationship('User', backref='procurement_item_requests', foreign_keys=[user_id])
+    
+    # Manager approval fields
+    manager_approval_date = db.Column(db.Date, nullable=True)
+    manager_approver = db.Column(db.String(100), nullable=True)
+    manager_approver_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    manager_rejection_date = db.Column(db.Date, nullable=True)
+    manager_rejector = db.Column(db.String(100), nullable=True)
+    manager_rejector_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    manager_rejection_reason = db.Column(db.Text, nullable=True)
+    manager_approval_reason = db.Column(db.Text, nullable=True)
+    manager_approval_start_time = db.Column(db.DateTime, nullable=True)
+    manager_approval_end_time = db.Column(db.DateTime, nullable=True)
+    
+    # Procurement Manager approval fields
+    procurement_manager_approval_date = db.Column(db.Date, nullable=True)
+    procurement_manager_approver = db.Column(db.String(100), nullable=True)
+    procurement_manager_approver_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    procurement_manager_rejection_date = db.Column(db.Date, nullable=True)
+    procurement_manager_rejector = db.Column(db.String(100), nullable=True)
+    procurement_manager_rejector_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    procurement_manager_rejection_reason = db.Column(db.Text, nullable=True)
+    procurement_manager_approval_reason = db.Column(db.Text, nullable=True)
+    
+    # Assignment fields
+    assigned_to_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    assigned_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    assignment_date = db.Column(db.DateTime, nullable=True)
+    
+    # Completion fields
+    completed_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    completion_date = db.Column(db.DateTime, nullable=True)
+    completion_notes = db.Column(db.Text, nullable=True)
+    
+    # Relationships
+    manager_approver_user = db.relationship('User', foreign_keys=[manager_approver_user_id], backref='approved_item_requests_as_manager')
+    manager_rejector_user = db.relationship('User', foreign_keys=[manager_rejector_user_id], backref='rejected_item_requests_as_manager')
+    procurement_manager_approver_user = db.relationship('User', foreign_keys=[procurement_manager_approver_user_id], backref='approved_item_requests_as_procurement_manager')
+    procurement_manager_rejector_user = db.relationship('User', foreign_keys=[procurement_manager_rejector_user_id], backref='rejected_item_requests_as_procurement_manager')
+    assigned_to_user = db.relationship('User', foreign_keys=[assigned_to_user_id], backref='assigned_item_requests')
+    assigned_by_user = db.relationship('User', foreign_keys=[assigned_by_user_id], backref='assigned_item_requests_by_me')
+    completed_by_user = db.relationship('User', foreign_keys=[completed_by_user_id], backref='completed_item_requests')
+    
+    def __repr__(self):
+        return f'<ProcurementItemRequest {self.id} - {self.item_name} ({self.status})>'

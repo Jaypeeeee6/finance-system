@@ -37,9 +37,22 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="item_name">Item Name/Description *</label>
-                        <input type="text" name="item_name" id="item_name" required 
-                               placeholder="e.g., Office Supplies, Equipment, Materials">
-                        <small class="form-text text-muted">Describe the item(s) you need</small>
+                        {% if user and user.department == 'Operation' %}
+                            <input type="text" name="item_name" id="item_name" required 
+                                   list="operation_items_list"
+                                   placeholder="Select from dropdown or type your own item name"
+                                   autocomplete="off">
+                            <datalist id="operation_items_list">
+                                {% for item in operation_items %}
+                                <option value="{{ item }}">{{ item }}</option>
+                                {% endfor %}
+                            </datalist>
+                            <small class="form-text text-muted">Select from predefined items or type your own</small>
+                        {% else %}
+                            <input type="text" name="item_name" id="item_name" required 
+                                   placeholder="e.g., Office Supplies, Equipment, Materials">
+                            <small class="form-text text-muted">Describe the item(s) you need</small>
+                        {% endif %}
                     </div>
 
                     <div class="form-group">

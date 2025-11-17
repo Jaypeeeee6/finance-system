@@ -1,139 +1,404 @@
 {% extends "base.html" %}
 
-{% block title %}Procurement Bank Money{% endblock %}
+{% block title %}Item Requests{% endblock %}
 
 {% block content %}
 <div class="dashboard-container">
     <div class="dashboard-header">
-        <h1><i class="fas fa-university"></i> Procurement Bank Money</h1>
-        <p>View and manage bank money balance for Procurement department</p>
+        <h1><i class="fas fa-shopping-cart"></i> Item Requests</h1>
+        <p>View and manage all item requests from requestors</p>
     </div>
 
     <div class="dashboard-actions">
         <a href="{{ url_for('department_dashboard') }}" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Back to Dashboard
         </a>
-        <a href="{{ url_for('new_request') }}" class="btn btn-primary">
-            <i class="fas fa-plus-circle"></i> New Payment Request
-        </a>
     </div>
 
-    <!-- Current Money Summary -->
+    <!-- Statistics Summary -->
     <div class="card" style="margin-bottom: 30px; background: #f8f9fa;">
         <div class="card-body" style="padding: 25px;">
             <h3 style="margin-top: 0; color: #333;">
-                <i class="fas fa-wallet"></i> Current Money Status
+                <i class="fas fa-chart-bar"></i> Request Statistics
             </h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 20px;">
-                <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 2px solid #43e97b;">
-                    <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Available Balance</div>
-                    {% set available = completed_amount %}
-                    <div style="font-size: 24px; font-weight: bold; color: #43e97b;">OMR {{ "%.3f"|format(available) }}</div>
-                    <div style="font-size: 12px; color: #999; margin-top: 5px;">(Completed Requests)</div>
+                <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 2px solid #667eea;">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Total Requests</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #667eea;">{{ total_requests }}</div>
+                    <div style="font-size: 12px; color: #999; margin-top: 5px;">All Item Requests</div>
                 </div>
-                <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Money Spent</div>
-                    <div style="font-size: 24px; font-weight: bold; color: #f5576c;">OMR {{ "%.3f"|format(completed_amount) }}</div>
-                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Completed Requests</div>
+                <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 2px solid #2196F3;">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Pending / In Progress</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #2196F3;">{{ pending_requests|length }}</div>
+                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Awaiting Processing</div>
                 </div>
-                <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Total Allocated</div>
-                    <div style="font-size: 24px; font-weight: bold; color: #667eea;">OMR {{ "%.3f"|format(total_amount) }}</div>
-                    <div style="font-size: 12px; color: #999; margin-top: 5px;">All Bank Money Requests</div>
+                <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 2px solid #28a745;">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Completed</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #28a745;">{{ completed_requests|length }}</div>
+                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Fulfilled Requests</div>
                 </div>
-                <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Money Pending</div>
-                    <div style="font-size: 24px; font-weight: bold; color: #4facfe;">OMR {{ "%.3f"|format(pending_amount) }}</div>
-                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Pending Approval</div>
+                <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 2px solid #dc3545;">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Urgent</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #dc3545;">{{ urgent_requests|length }}</div>
+                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Urgent Requests</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Bank Money Requests Table -->
+    <!-- Item Requests Table -->
     <div class="card">
         <div class="card-header">
-            <h4 class="card-title">All Bank Money Requests</h4>
+            <h4 class="card-title">All Item Requests</h4>
         </div>
         <div class="card-body">
-            {% if bank_money_requests %}
+            {% if item_requests %}
             <div class="table-responsive">
                 <table class="data-table">
                     <thead>
                         <tr>
                             <th>Request ID</th>
                             <th>Requestor</th>
-                            <th>Purpose</th>
-                            <th>Amount</th>
+                            <th>Department</th>
+                            <th>Item Name</th>
+                            <th>Quantity</th>
+                            <th>Branch</th>
                             <th>Status</th>
-                            <th>Submission Date</th>
-                            <th>Completion Date</th>
+                            <th>Request Date</th>
+                            <th>Created At</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for req in bank_money_requests %}
+                        {% for req in item_requests %}
                         <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
                             <td>
-                                <span>#{{ req.request_id }}</span>
+                                <span>#{{ req.id }}</span>
                                 {% if req.is_urgent %}
                                     <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 5px;">URGENT</span>
                                 {% endif %}
                             </td>
                             <td>{{ req.requestor_name }}</td>
-                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ req.purpose }}">
-                                {{ req.purpose[:50] }}{% if req.purpose|length > 50 %}...{% endif %}
+                            <td>{{ req.department }}</td>
+                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ req.item_name }}">
+                                {{ req.item_name }}
                             </td>
-                            <td><strong>OMR {{ "%.3f"|format(req.amount) }}</strong></td>
+                            <td>{{ req.quantity or '-' }}</td>
+                            <td>{{ req.branch_name }}</td>
                             <td>
                                 {% if req.status == 'Completed' %}
                                     <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
-                                {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
-                                    <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
-                                {% elif req.status in ['Proof Pending', 'Proof Sent'] %}
-                                    <span class="badge" style="background: #2196F3; color: white;">📄 {{ req.status }}</span>
-                                {% elif req.status in ['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected'] %}
+                                {% elif req.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval', 'Assigned'] %}
+                                    <span class="badge" style="background: #2196F3; color: white;">⏳ {{ req.status }}</span>
+                                {% elif req.status in ['Rejected by Manager', 'Rejected by Procurement Manager'] %}
                                     <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
                                 {% else %}
-                                    <span class="badge badge-warning">⏳ {{ req.status }}</span>
+                                    <span class="badge badge-warning">{{ req.status }}</span>
                                 {% endif %}
                             </td>
-                            <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ req.request_date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ req.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                             <td>
-                                {% if req.status == 'Completed' and req.completion_date %}
-                                    {{ req.completion_date.strftime('%Y-%m-%d') }}
-                                {% elif req.approval_date %}
-                                    {{ req.approval_date.strftime('%Y-%m-%d') }}
-                                {% else %}
-                                    <span style="color: #999;">-</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
+                                <button type="button" class="btn btn-sm btn-info" onclick="viewRequest({{ req.id }})">
                                     <i class="fas fa-eye"></i> View
-                                </a>
+                                </button>
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
-                    <tfoot>
-                        <tr style="background-color: #f8f9fa; font-weight: bold;">
-                            <td colspan="3" style="text-align: right;">Total:</td>
-                            <td><strong>OMR {{ "%.3f"|format(total_amount) }}</strong></td>
-                            <td colspan="4"></td>
-                        </tr>
-                    </tfoot>
                 </table>
             </div>
             {% else %}
             <div class="empty-state">
-                <i class="fas fa-university" style="font-size: 48px; color: #ccc; margin-bottom: 20px;"></i>
-                <p>No bank money requests found.</p>
+                <i class="fas fa-shopping-cart" style="font-size: 48px; color: #ccc; margin-bottom: 20px;"></i>
+                <p>No item requests found.</p>
             </div>
             {% endif %}
         </div>
     </div>
 </div>
+
+<!-- View Request Modal -->
+<div id="viewRequestModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 800px;">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h2>Item Request Details</h2>
+        <div id="requestDetails"></div>
+    </div>
+</div>
+
+<script>
+function viewRequest(requestId) {
+    // Fetch request details via AJAX
+    fetch(`/procurement/item-request/${requestId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const req = data.request;
+                const perms = data.permissions;
+                
+                // Get status badge color
+                let statusColor = '#6c757d';
+                if (req.status === 'Completed') statusColor = '#28a745';
+                else if (['Pending Manager Approval', 'Pending Procurement Manager Approval', 'Assigned'].includes(req.status)) statusColor = '#2196F3';
+                else if (['Rejected by Manager', 'Rejected by Procurement Manager'].includes(req.status)) statusColor = '#dc3545';
+                
+                const detailsHtml = `
+                    <div style="padding: 20px;">
+                        <div style="margin-bottom: 15px;">
+                            <strong>Request ID:</strong> #${req.id}
+                            ${req.is_urgent ? '<span class="badge" style="background: #dc3545; color: white; margin-left: 10px;">URGENT</span>' : ''}
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong>Requestor:</strong> ${req.requestor_name}
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong>Department:</strong> ${req.department}
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong>Item Name:</strong> ${req.item_name}
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong>Quantity:</strong> ${req.quantity || 'Not specified'}
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong>Branch:</strong> ${req.branch_name}
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong>Request Date:</strong> ${req.request_date}
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong>Status:</strong> 
+                            <span class="badge" style="background: ${statusColor}; color: white;">
+                                ${req.status}
+                            </span>
+                        </div>
+                        ${req.manager_approver ? `
+                        <div style="margin-bottom: 15px;">
+                            <strong>Approved by Manager:</strong> ${req.manager_approver} ${req.manager_approval_date ? 'on ' + req.manager_approval_date : ''}
+                        </div>
+                        ` : ''}
+                        ${req.procurement_manager_approver ? `
+                        <div style="margin-bottom: 15px;">
+                            <strong>Approved by Procurement Manager:</strong> ${req.procurement_manager_approver}
+                        </div>
+                        ` : ''}
+                        ${req.assigned_to ? `
+                        <div style="margin-bottom: 15px;">
+                            <strong>Assigned to:</strong> ${req.assigned_to}
+                        </div>
+                        ` : ''}
+                        ${req.completed_by ? `
+                        <div style="margin-bottom: 15px;">
+                            <strong>Completed by:</strong> ${req.completed_by} ${req.completion_date ? 'on ' + req.completion_date : ''}
+                        </div>
+                        ` : ''}
+                        <div style="margin-bottom: 15px;">
+                            <strong>Purpose:</strong>
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; margin-top: 5px;">
+                                ${req.purpose}
+                            </div>
+                        </div>
+                        ${req.notes ? `
+                        <div style="margin-bottom: 15px;">
+                            <strong>Additional Notes:</strong>
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; margin-top: 5px;">
+                                ${req.notes}
+                            </div>
+                        </div>
+                        ` : ''}
+                        ${req.completion_notes ? `
+                        <div style="margin-bottom: 15px;">
+                            <strong>Completion Notes:</strong>
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; margin-top: 5px;">
+                                ${req.completion_notes}
+                            </div>
+                        </div>
+                        ` : ''}
+                        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e9ecef;" id="actionButtons">
+                            ${perms.can_approve_manager ? `
+                                <button type="button" class="btn btn-success" onclick="showManagerApprovalForm(${req.id})">Approve</button>
+                                <button type="button" class="btn btn-danger" onclick="showManagerRejectionForm(${req.id})">Reject</button>
+                            ` : ''}
+                            ${perms.can_approve_procurement_manager ? `
+                                <button type="button" class="btn btn-success" onclick="showProcurementManagerApprovalForm(${req.id})">Approve & Assign</button>
+                                <button type="button" class="btn btn-danger" onclick="showProcurementManagerRejectionForm(${req.id})">Reject</button>
+                            ` : ''}
+                            ${perms.can_complete ? `
+                                <button type="button" class="btn btn-success" onclick="showCompletionForm(${req.id})">Mark Completed</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+                document.getElementById('requestDetails').innerHTML = detailsHtml;
+                document.getElementById('viewRequestModal').style.display = 'block';
+            } else {
+                alert('Error loading request details.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading request details.');
+        });
+}
+
+function closeModal() {
+    document.getElementById('viewRequestModal').style.display = 'none';
+}
+
+function showManagerApprovalForm(requestId) {
+    const reason = prompt('Optional: Enter approval reason/notes:');
+    if (reason === null) return; // User cancelled
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/procurement/item-request/${requestId}/manager-approve`;
+    if (reason) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'approval_reason';
+        input.value = reason;
+        form.appendChild(input);
+    }
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function showManagerRejectionForm(requestId) {
+    const reason = prompt('Please enter rejection reason (required):');
+    if (!reason || reason.trim() === '') {
+        alert('Rejection reason is required.');
+        return;
+    }
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/procurement/item-request/${requestId}/manager-reject`;
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'rejection_reason';
+    input.value = reason;
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function showProcurementManagerApprovalForm(requestId) {
+    {% if procurement_members %}
+    const members = {{ procurement_members | tojson }};
+    let optionsHtml = '<option value="">-- Select Procurement Member --</option>';
+    members.forEach(member => {
+        optionsHtml += `<option value="${member.user_id}">${member.name}</option>`;
+    });
+    
+    const formHtml = `
+        <div style="padding: 20px;">
+            <h3>Approve & Assign Request</h3>
+            <form id="approvalForm" method="POST" action="/procurement/item-request/${requestId}/procurement-manager-approve">
+                <div style="margin-bottom: 15px;">
+                    <label><strong>Assign to:</strong></label>
+                    <select name="assigned_to_user_id" required style="width: 100%; padding: 8px; margin-top: 5px;">
+                        ${optionsHtml}
+                    </select>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label><strong>Approval Notes (optional):</strong></label>
+                    <textarea name="approval_reason" style="width: 100%; padding: 8px; margin-top: 5px; min-height: 80px;"></textarea>
+                </div>
+                <div style="margin-top: 20px;">
+                    <button type="submit" class="btn btn-success">Approve & Assign</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.getElementById('requestDetails').innerHTML = formHtml;
+    {% else %}
+    alert('No procurement members available for assignment.');
+    {% endif %}
+}
+
+function showProcurementManagerRejectionForm(requestId) {
+    const reason = prompt('Please enter rejection reason (required):');
+    if (!reason || reason.trim() === '') {
+        alert('Rejection reason is required.');
+        return;
+    }
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/procurement/item-request/${requestId}/procurement-manager-reject`;
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'rejection_reason';
+    input.value = reason;
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function showCompletionForm(requestId) {
+    const notes = prompt('Optional: Enter completion notes:');
+    if (notes === null) return; // User cancelled
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/procurement/item-request/${requestId}/complete`;
+    if (notes && notes.trim() !== '') {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'completion_notes';
+        input.value = notes;
+        form.appendChild(input);
+    }
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('viewRequestModal');
+    if (event.target == modal) {
+        closeModal();
+    }
+}
+</script>
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 90%;
+    border-radius: 8px;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+}
+</style>
 
 {% endblock %}
 

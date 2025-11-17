@@ -12,7 +12,7 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial
+from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest
 from config import Config
 import json
 from playwright.sync_api import sync_playwright
@@ -836,6 +836,92 @@ def get_authorized_manager_approvers(request):
             unique_authorized.append(user)
     
     print(f"DEBUG: Total authorized manager approvers: {len(unique_authorized)}")
+    return unique_authorized
+
+def get_authorized_manager_approvers_for_item_request(item_request):
+    """Get all users who are authorized to approve this item request at the manager stage."""
+    authorized_users = []
+    
+    # Get the requestor user
+    requestor = item_request.user if item_request.user_id else None
+    if not requestor:
+        return authorized_users
+    
+    # Hard rule: Requests submitted by GM/CEO/Operation Manager can ONLY be approved by Abdalaziz
+    if requestor.role in ['GM', 'CEO', 'Operation Manager']:
+        abdalaziz = User.query.filter_by(name='Abdalaziz Al-Brashdi').first()
+        if abdalaziz:
+            authorized_users.append(abdalaziz)
+    else:
+        # General Manager - can approve all requests (except GM/CEO/Operation Manager)
+        gm_users = User.query.filter_by(role='GM').all()
+        for user in gm_users:
+            if user.user_id != requestor.user_id:
+                authorized_users.append(user)
+        
+        # Operation Manager - can approve all requests (except GM/CEO/Operation Manager)
+        op_manager_users = User.query.filter_by(role='Operation Manager').all()
+        for user in op_manager_users:
+            if user.user_id != requestor.user_id:
+                authorized_users.append(user)
+        
+        # Check if submitter has a manager_id (direct manager relationship)
+        if requestor.manager_id:
+            manager = User.query.get(requestor.manager_id)
+            if manager and manager.user_id != requestor.user_id:
+                if manager not in authorized_users:
+                    authorized_users.append(manager)
+        
+        # Special case: General Manager can approve Department Manager requests
+        if requestor.role == 'Department Manager':
+            gm_users = User.query.filter_by(role='GM').all()
+            for user in gm_users:
+                if user not in authorized_users:
+                    authorized_users.append(user)
+            
+            op_manager_users = User.query.filter_by(role='Operation Manager').all()
+            for user in op_manager_users:
+                if user not in authorized_users:
+                    authorized_users.append(user)
+        
+        # Special case: Abdalaziz can approve Finance Staff requests
+        if requestor.role == 'Finance Staff':
+            abdalaziz = User.query.filter_by(name='Abdalaziz Al-Brashdi').first()
+            if abdalaziz and abdalaziz not in authorized_users:
+                authorized_users.append(abdalaziz)
+        
+        # Special case: Operation Manager can approve Operation department and Project requests
+        if (requestor.department == 'Operation' or requestor.department == 'Project') and \
+           requestor.role != 'Operation Manager':
+            op_manager_users = User.query.filter_by(role='Operation Manager').all()
+            for user in op_manager_users:
+                if user.user_id != requestor.user_id and user not in authorized_users:
+                    authorized_users.append(user)
+        
+        # Special case: Finance Admin can approve Finance department requests
+        if requestor.department == 'Finance' and requestor.role != 'Finance Admin':
+            finance_admins = User.query.filter_by(role='Finance Admin').all()
+            for user in finance_admins:
+                if user.user_id != requestor.user_id and user not in authorized_users:
+                    authorized_users.append(user)
+        
+        # Special case: Department Manager can approve same department requests
+        dept_managers = User.query.filter_by(
+            role='Department Manager',
+            department=requestor.department
+        ).all()
+        for user in dept_managers:
+            if user.user_id != requestor.user_id and user not in authorized_users:
+                authorized_users.append(user)
+    
+    # Remove duplicates
+    seen = set()
+    unique_authorized = []
+    for user in authorized_users:
+        if user.user_id not in seen:
+            seen.add(user.user_id)
+            unique_authorized.append(user)
+    
     return unique_authorized
 
 def notify_users_by_role(request, notification_type, title, message, request_id=None):
@@ -3204,51 +3290,409 @@ def procurement_dashboard():
 
 @app.route('/procurement/bank-money')
 @login_required
-@role_required('Department Manager')
 def procurement_bank_money():
-    """Bank Money page for Procurement Department Manager"""
-    # Only allow Procurement Department Managers
-    if current_user.department != 'Procurement':
-        flash('Access denied. This page is only for Procurement Department Managers.', 'danger')
-        return redirect(url_for('dashboard'))
+    """Item Requests page - shows requests based on user role"""
     
-    # Get all "Bank money" payment requests for Procurement department
-    bank_money_requests = PaymentRequest.query.filter(
-        PaymentRequest.department == 'Procurement',
-        PaymentRequest.request_type == 'Bank money',
-        PaymentRequest.is_archived == False
-    ).order_by(PaymentRequest.created_at.desc()).all()
+    # Get all procurement item requests
+    all_requests = ProcurementItemRequest.query.order_by(ProcurementItemRequest.created_at.desc()).all()
+    
+    # Filter requests based on user role
+    if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
+        # Procurement Manager sees all requests
+        item_requests = all_requests
+    elif current_user.department == 'Procurement' and current_user.role != 'Department Manager':
+        # Procurement Staff sees all assigned requests (any Procurement member can complete them)
+        item_requests = [r for r in all_requests if r.status == 'Assigned' or r.assigned_to_user_id == current_user.user_id]
+    else:
+        # Managers see requests from their department
+        authorized_approvers_ids = set()
+        for req in all_requests:
+            approvers = get_authorized_manager_approvers_for_item_request(req)
+            approver_ids = [a.user_id for a in approvers]
+            if current_user.user_id in approver_ids:
+                authorized_approvers_ids.add(req.id)
+        
+        # Also show requests created by current user
+        my_requests = [r.id for r in all_requests if r.user_id == current_user.user_id]
+        visible_request_ids = authorized_approvers_ids.union(my_requests)
+        item_requests = [r for r in all_requests if r.id in visible_request_ids]
     
     # Calculate statistics
-    total_requests = len(bank_money_requests)
-    completed_requests = [r for r in bank_money_requests if r.status == 'Completed']
-    pending_requests = [r for r in bank_money_requests if r.status in ['Pending Manager Approval', 'Pending Finance Approval', 'Proof Pending', 'Proof Sent']]
-    rejected_requests = [r for r in bank_money_requests if r.status in ['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']]
+    total_requests = len(item_requests)
+    pending_requests = [r for r in item_requests if r.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval', 'Assigned']]
+    completed_requests = [r for r in item_requests if r.status == 'Completed']
+    rejected_requests = [r for r in item_requests if r.status in ['Rejected by Manager', 'Rejected by Procurement Manager']]
+    urgent_requests = [r for r in item_requests if r.is_urgent]
     
-    # Calculate amounts
-    total_amount = sum(float(r.amount) for r in bank_money_requests)
-    completed_amount = sum(float(r.amount) for r in completed_requests)
-    pending_amount = sum(float(r.amount) for r in pending_requests)
-    rejected_amount = sum(float(r.amount) for r in rejected_requests)
-    
-    # Current available balance (assuming we track spent vs available)
-    # For now, we'll show completed amount as "spent" and calculate available
-    # Note: This assumes there's an initial balance. For now, we'll show:
-    # - Total allocated/spent (completed requests)
-    # - Pending (amounts that will be spent)
-    # - Available balance would need to be set manually or tracked separately
+    # Get procurement members for assignment dropdown (only for Procurement Manager)
+    # Convert to dictionaries for JSON serialization
+    procurement_members = []
+    if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
+        members = User.query.filter_by(department='Procurement').all()
+        procurement_members = [{'user_id': m.user_id, 'name': m.name} for m in members]
     
     return render_template('procurement_bank_money.html',
                          user=current_user,
-                         bank_money_requests=bank_money_requests,
+                         item_requests=item_requests,
                          total_requests=total_requests,
-                         completed_requests=completed_requests,
                          pending_requests=pending_requests,
+                         completed_requests=completed_requests,
                          rejected_requests=rejected_requests,
-                         total_amount=total_amount,
-                         completed_amount=completed_amount,
-                         pending_amount=pending_amount,
-                         rejected_amount=rejected_amount)
+                         urgent_requests=urgent_requests,
+                         procurement_members=procurement_members)
+
+
+@app.route('/procurement/item-request/<int:request_id>')
+@login_required
+def view_item_request(request_id):
+    """View details of a specific item request"""
+    item_request = ProcurementItemRequest.query.get_or_404(request_id)
+    
+    # Check access permissions
+    can_view = False
+    if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
+        can_view = True
+    elif current_user.department == 'Procurement' and item_request.assigned_to_user_id == current_user.user_id:
+        can_view = True
+    elif item_request.user_id == current_user.user_id:
+        can_view = True
+    else:
+        approvers = get_authorized_manager_approvers_for_item_request(item_request)
+        if current_user in approvers:
+            can_view = True
+    
+    if not can_view:
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    # Check what actions current user can perform
+    can_approve_manager = False
+    can_reject_manager = False
+    can_approve_procurement_manager = False
+    can_reject_procurement_manager = False
+    can_complete = False
+    
+    if item_request.status == 'Pending Manager Approval':
+        approvers = get_authorized_manager_approvers_for_item_request(item_request)
+        if current_user in approvers:
+            can_approve_manager = True
+            can_reject_manager = True
+    
+    if item_request.status == 'Pending Procurement Manager Approval':
+        if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
+            can_approve_procurement_manager = True
+            can_reject_procurement_manager = True
+    
+    if item_request.status == 'Assigned' and current_user.department == 'Procurement':
+        can_complete = True
+    
+    # Get user names safely (avoid lazy loading issues)
+    assigned_to_name = None
+    if item_request.assigned_to_user_id:
+        assigned_user = User.query.get(item_request.assigned_to_user_id)
+        assigned_to_name = assigned_user.name if assigned_user else None
+    
+    completed_by_name = None
+    if item_request.completed_by_user_id:
+        completed_user = User.query.get(item_request.completed_by_user_id)
+        completed_by_name = completed_user.name if completed_user else None
+    
+    return jsonify({
+        'success': True,
+        'request': {
+            'id': item_request.id,
+            'requestor_name': item_request.requestor_name,
+            'department': item_request.department,
+            'item_name': item_request.item_name,
+            'quantity': item_request.quantity,
+            'purpose': item_request.purpose,
+            'branch_name': item_request.branch_name,
+            'request_date': item_request.request_date.strftime('%Y-%m-%d') if item_request.request_date else None,
+            'is_urgent': item_request.is_urgent,
+            'notes': item_request.notes,
+            'status': item_request.status,
+            'created_at': item_request.created_at.strftime('%Y-%m-%d %H:%M:%S') if item_request.created_at else None,
+            'manager_approver': item_request.manager_approver,
+            'manager_approval_date': item_request.manager_approval_date.strftime('%Y-%m-%d') if item_request.manager_approval_date else None,
+            'procurement_manager_approver': item_request.procurement_manager_approver,
+            'assigned_to': assigned_to_name,
+            'completed_by': completed_by_name,
+            'completion_date': item_request.completion_date.strftime('%Y-%m-%d %H:%M:%S') if item_request.completion_date else None,
+            'completion_notes': item_request.completion_notes
+        },
+        'permissions': {
+            'can_approve_manager': can_approve_manager,
+            'can_reject_manager': can_reject_manager,
+            'can_approve_procurement_manager': can_approve_procurement_manager,
+            'can_reject_procurement_manager': can_reject_procurement_manager,
+            'can_complete': can_complete
+        }
+    })
+
+
+@app.route('/procurement/item-request/<int:request_id>/manager-approve', methods=['POST'])
+@login_required
+def item_request_manager_approve(request_id):
+    """Manager approves an item request"""
+    item_request = ProcurementItemRequest.query.get_or_404(request_id)
+    
+    # Check authorization
+    authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
+    if current_user not in authorized_approvers:
+        flash('You are not authorized to approve this request.', 'danger')
+        return redirect(url_for('procurement_bank_money'))
+    
+    if item_request.status != 'Pending Manager Approval':
+        flash('This request is not pending manager approval.', 'danger')
+        return redirect(url_for('procurement_bank_money'))
+    
+    current_time = datetime.utcnow()
+    
+    # Update request
+    item_request.status = 'Pending Procurement Manager Approval'
+    item_request.manager_approval_date = current_time.date()
+    item_request.manager_approver = current_user.name
+    item_request.manager_approver_user_id = current_user.user_id
+    item_request.manager_approval_end_time = current_time
+    item_request.manager_approval_reason = request.form.get('approval_reason', '').strip()
+    item_request.updated_at = current_time
+    
+    db.session.commit()
+    
+    log_action(f"Manager approved item request #{request_id}")
+    
+    # Notify requestor
+    if item_request.user_id:
+        create_notification(
+            user_id=item_request.user_id,
+            title="Item Request Approved by Manager",
+            message=f"Your item request #{request_id} for {item_request.item_name} has been approved by your manager and sent to Procurement Manager.",
+            notification_type="request_approved"
+        )
+    
+    # Notify Procurement Managers
+    procurement_managers = User.query.filter_by(
+        department='Procurement',
+        role='Department Manager'
+    ).all()
+    for pm in procurement_managers:
+        create_notification(
+            user_id=pm.user_id,
+            title="New Item Request for Approval",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} requires your approval.",
+            notification_type="new_submission"
+        )
+    
+    flash('Item request approved successfully!', 'success')
+    return redirect(url_for('procurement_bank_money'))
+
+
+@app.route('/procurement/item-request/<int:request_id>/manager-reject', methods=['POST'])
+@login_required
+def item_request_manager_reject(request_id):
+    """Manager rejects an item request"""
+    item_request = ProcurementItemRequest.query.get_or_404(request_id)
+    
+    # Check authorization
+    authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
+    if current_user not in authorized_approvers:
+        flash('You are not authorized to reject this request.', 'danger')
+        return redirect(url_for('procurement_bank_money'))
+    
+    if item_request.status != 'Pending Manager Approval':
+        flash('This request is not pending manager approval.', 'danger')
+        return redirect(url_for('procurement_bank_money'))
+    
+    rejection_reason = request.form.get('rejection_reason', '').strip()
+    if not rejection_reason:
+        flash('Please provide a reason for rejection.', 'danger')
+        return redirect(url_for('procurement_bank_money'))
+    
+    current_time = datetime.utcnow()
+    
+    # Update request
+    item_request.status = 'Rejected by Manager'
+    item_request.manager_rejection_date = current_time.date()
+    item_request.manager_rejector = current_user.name
+    item_request.manager_rejector_user_id = current_user.user_id
+    item_request.manager_rejection_reason = rejection_reason
+    item_request.manager_approval_end_time = current_time
+    item_request.updated_at = current_time
+    
+    db.session.commit()
+    
+    log_action(f"Manager rejected item request #{request_id}")
+    
+    # Notify requestor
+    if item_request.user_id:
+        create_notification(
+            user_id=item_request.user_id,
+            title="Item Request Rejected by Manager",
+            message=f"Your item request #{request_id} for {item_request.item_name} has been rejected by your manager. Reason: {rejection_reason}",
+            notification_type="request_rejected"
+        )
+    
+    flash('Item request rejected.', 'info')
+    return redirect(url_for('procurement_bank_money'))
+
+
+@app.route('/procurement/item-request/<int:request_id>/procurement-manager-approve', methods=['POST'])
+@login_required
+@role_required('Department Manager')
+def item_request_procurement_manager_approve(request_id):
+    """Procurement Manager approves and assigns an item request"""
+    if current_user.department != 'Procurement' or current_user.role != 'Department Manager':
+        flash('Access denied. Only Procurement Department Managers can perform this action.', 'danger')
+        return redirect(url_for('procurement_bank_money'))
+    
+    item_request = ProcurementItemRequest.query.get_or_404(request_id)
+    
+    if item_request.status != 'Pending Procurement Manager Approval':
+        flash('This request is not pending procurement manager approval.', 'danger')
+        return redirect(url_for('procurement_bank_money'))
+    
+    assigned_to_user_id = request.form.get('assigned_to_user_id', '').strip()
+    if not assigned_to_user_id:
+        flash('Please select a procurement member to assign this request to.', 'danger')
+        return redirect(url_for('procurement_bank_money'))
+    
+    try:
+        assigned_to_user_id = int(assigned_to_user_id)
+    except ValueError:
+        flash('Invalid user selected.', 'danger')
+        return redirect(url_for('procurement_bank_money'))
+    
+    # Verify the assigned user is from Procurement department
+    assigned_user = User.query.get(assigned_to_user_id)
+    if not assigned_user or assigned_user.department != 'Procurement':
+        flash('Selected user must be from Procurement department.', 'danger')
+        return redirect(url_for('procurement_bank_money'))
+    
+    current_time = datetime.utcnow()
+    
+    # Update request
+    item_request.status = 'Assigned'
+    item_request.procurement_manager_approval_date = current_time.date()
+    item_request.procurement_manager_approver = current_user.name
+    item_request.procurement_manager_approver_user_id = current_user.user_id
+    item_request.procurement_manager_approval_reason = request.form.get('approval_reason', '').strip()
+    item_request.assigned_to_user_id = assigned_to_user_id
+    item_request.assigned_by_user_id = current_user.user_id
+    item_request.assignment_date = current_time
+    item_request.updated_at = current_time
+    
+    db.session.commit()
+    
+    log_action(f"Procurement Manager approved and assigned item request #{request_id} to {assigned_user.name}")
+    
+    # Notify requestor
+    if item_request.user_id:
+        create_notification(
+            user_id=item_request.user_id,
+            title="Item Request Approved by Procurement Manager",
+            message=f"Your item request #{request_id} for {item_request.item_name} has been approved and assigned to a procurement member.",
+            notification_type="request_approved"
+        )
+    
+    # Notify assigned procurement member
+    create_notification(
+        user_id=assigned_to_user_id,
+        title="New Item Request Assigned",
+        message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been assigned to you.",
+        notification_type="new_submission"
+    )
+    
+    flash('Item request approved and assigned successfully!', 'success')
+    return redirect(url_for('procurement_bank_money'))
+
+
+@app.route('/procurement/item-request/<int:request_id>/procurement-manager-reject', methods=['POST'])
+@login_required
+@role_required('Department Manager')
+def item_request_procurement_manager_reject(request_id):
+    """Procurement Manager rejects an item request"""
+    if current_user.department != 'Procurement' or current_user.role != 'Department Manager':
+        flash('Access denied. Only Procurement Department Managers can perform this action.', 'danger')
+        return redirect(url_for('procurement_bank_money'))
+    
+    item_request = ProcurementItemRequest.query.get_or_404(request_id)
+    
+    if item_request.status != 'Pending Procurement Manager Approval':
+        flash('This request is not pending procurement manager approval.', 'danger')
+        return redirect(url_for('procurement_bank_money'))
+    
+    rejection_reason = request.form.get('rejection_reason', '').strip()
+    if not rejection_reason:
+        flash('Please provide a reason for rejection.', 'danger')
+        return redirect(url_for('procurement_bank_money'))
+    
+    current_time = datetime.utcnow()
+    
+    # Update request
+    item_request.status = 'Rejected by Procurement Manager'
+    item_request.procurement_manager_rejection_date = current_time.date()
+    item_request.procurement_manager_rejector = current_user.name
+    item_request.procurement_manager_rejector_user_id = current_user.user_id
+    item_request.procurement_manager_rejection_reason = rejection_reason
+    item_request.updated_at = current_time
+    
+    db.session.commit()
+    
+    log_action(f"Procurement Manager rejected item request #{request_id}")
+    
+    # Notify requestor
+    if item_request.user_id:
+        create_notification(
+            user_id=item_request.user_id,
+            title="Item Request Rejected by Procurement Manager",
+            message=f"Your item request #{request_id} for {item_request.item_name} has been rejected by Procurement Manager. Reason: {rejection_reason}",
+            notification_type="request_rejected"
+        )
+    
+    flash('Item request rejected.', 'info')
+    return redirect(url_for('procurement_bank_money'))
+
+
+@app.route('/procurement/item-request/<int:request_id>/complete', methods=['POST'])
+@login_required
+def item_request_complete(request_id):
+    """Procurement member completes an item request"""
+    item_request = ProcurementItemRequest.query.get_or_404(request_id)
+    
+    # Check if current user is from Procurement department
+    if current_user.department != 'Procurement':
+        flash('Only Procurement department members can complete requests.', 'danger')
+        return redirect(url_for('procurement_bank_money'))
+    
+    if item_request.status != 'Assigned':
+        flash('This request is not assigned.', 'danger')
+        return redirect(url_for('procurement_bank_money'))
+    
+    completion_notes = request.form.get('completion_notes', '').strip()
+    
+    current_time = datetime.utcnow()
+    
+    # Update request
+    item_request.status = 'Completed'
+    item_request.completed_by_user_id = current_user.user_id
+    item_request.completion_date = current_time
+    item_request.completion_notes = completion_notes
+    item_request.updated_at = current_time
+    
+    db.session.commit()
+    
+    log_action(f"Procurement member completed item request #{request_id}")
+    
+    # Notify requestor
+    if item_request.user_id:
+        create_notification(
+            user_id=item_request.user_id,
+            title="Item Request Completed",
+            message=f"Your item request #{request_id} for {item_request.item_name} has been completed by the procurement team.",
+            notification_type="request_completed"
+        )
+    
+    flash('Item request marked as completed!', 'success')
+    return redirect(url_for('procurement_bank_money'))
 
 
 @app.route('/procurement/request-item', methods=['GET', 'POST'])
@@ -3278,8 +3722,47 @@ def procurement_request_item():
             flash('Invalid date format.', 'danger')
             return redirect(url_for('procurement_request_item'))
         
-        # For now, we'll just show a success message
-        # In the future, this could create a record in a procurement_requests table
+        # Create procurement item request record
+        current_time = datetime.utcnow()
+        item_request = ProcurementItemRequest(
+            requestor_name=requestor_name,
+            department=current_user.department if current_user else '',
+            item_name=item_name,
+            quantity=quantity if quantity else None,
+            purpose=purpose,
+            branch_name=branch_name,
+            request_date=request_date,
+            is_urgent=is_urgent,
+            notes=notes if notes else None,
+            status='Pending Manager Approval',
+            user_id=current_user.user_id if current_user else None,
+            manager_approval_start_time=current_time
+        )
+        
+        db.session.add(item_request)
+        db.session.commit()
+        
+        # Notify the requestor
+        if current_user:
+            create_notification(
+                user_id=current_user.user_id,
+                title="Item Request Submitted",
+                message=f"Your item request for {item_name} has been submitted successfully and is awaiting manager approval.",
+                notification_type="new_submission"
+            )
+        
+        # Notify manager(s) - similar to payment requests
+        if current_user:
+            # Get manager approvers
+            authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
+            for approver in authorized_approvers:
+                create_notification(
+                    user_id=approver.user_id,
+                    title="New Item Request for Approval",
+                    message=f"New item request submitted by {requestor_name} from {item_request.department} department for {item_name} - requires your approval",
+                    notification_type="new_submission"
+                )
+        
         flash(f'Item request submitted successfully! Item: {item_name}, Quantity: {quantity or "N/A"}', 'success')
         
         # Log the action
@@ -3291,9 +3774,106 @@ def procurement_request_item():
     # Get available branches
     available_branches = Branch.query.filter_by(is_active=True).order_by(Branch.restaurant, Branch.name).all()
     
+    # Predefined items for Operation department
+    operation_items = [
+        "JUICE BLENDER (500ML)",
+        "PLASTIC JAG COVER (2L)",
+        "JUICE BLENDER JUG 5000ML",
+        "BER SPOON",
+        "JUICE CUP HOLDER",
+        "MEASUREMENT CUP (SET)",
+        "MEASUREMENT MUG",
+        "MEASUREMENT SPOON (1/4) SET",
+        "TONG",
+        "FORTE SLOTTED SPATULA STAINLESS STEEL",
+        "STAINLESS STEEL SERVING SPOON BIG",
+        "SOUP LADLE 3 OZ SIZE",
+        "STAINLESS STEEL BURGER SMASHER CIRCULAR",
+        "STAINLESS STEEL FRENCH FRY SCOOP",
+        "SHARPING STONE",
+        "SPATULA WOODEN",
+        "PLASTIC SPATULA (40CM)",
+        "STAINLESS STEEL SALT SHAKER TOP FULLY HOLE",
+        "TIMER",
+        "GAS LIGHTER",
+        "BRUSH FOR BREAD POLISH",
+        "GRILL CLEANING BRUSH TRIANGLE",
+        "FRYER CLEANING BRUSH",
+        "STAINLESS STEEL ALLOY SCOOP MEDUIM SIZE",
+        "STAINLESS STEEL SPOON WITH HOLES (3OZ)",
+        "FRYING PAN FOR PASTA (20CM)",
+        "FRYING PAN FOR PASTA (30CM)",
+        "STAINLESS STEEL COOKING POT (30CM)",
+        "STAINLESS STEEL TREY 40*30",
+        "STAINLESS STEEL CONTAINERS WITH COVER (1 /1 15 CM)",
+        "STAINLESS STEEL CONTAINERS WITH HOLES WITH COVER (1/1 15CM)",
+        "STAINLES STEEL CONTAINERS WITH COVER (1/2 15CM)",
+        "STAINLESS STEEL CONTAINER WITH HOLES WITH COVER (1/2 15CM)",
+        "STAINLES STEEL CONTAINERS WITH COVER (1/3 15CM)",
+        "STAINLESS STEEL CONTAINERS WITH HOLES WITH COVER (1/3 15 CM)",
+        "STAINLESS STEEL CONTAINERS WITH COVER (1/6 15CM)",
+        "STAINLESS STEEL FOOD KIPPER (3KG)",
+        "SPICE BOX 4IN1",
+        "STAINLESS STEEL BOWL (10L)",
+        "STAINLESS STEEL COLANDER STRAINER 30CM",
+        "STAINLESS STEEL STRAINER 11 INCHES WITH HANDLE",
+        "STAINLESS STEEL STRAINER 7 INCHES WITH HANDLE",
+        "STAINLESS STEEL STRAINER SMALL 7 INCHES WITH LONG HANDLE",
+        "STAINLESS STEEL STRAINER SQUARE SHAPE 40*25CM",
+        "STAINLESS STEEL STRAINER FOR CRISPY (27*37)CM",
+        "STAINLESS STEEL STRAINER FOR DRAINAGE (10X10) INCHES",
+        "POLYCARBONATED GN CONTAINER WITH COVER 1/2 (15CM)",
+        "YELLOW CHOPPING BOARD BIG (60/40)",
+        "YELLOOW CHOPPING BOARD SMALL (40/30)",
+        "GREEN CHOPPING BOARD BIG (60/40)",
+        "GREEN CHOPPING BOARD SMALL (40/30)",
+        "RED CHOPPING BOARD BIG (60/40)",
+        "RED CHOPPING BOARD SMALL (40/30)",
+        "CHOPPING BOARD STAND",
+        "GREEN KNIFE BIG (12INCH)",
+        "YELLOW KNIFE BIG (12INCH)",
+        "RED KNIFE BIG (12INCH)",
+        "BREAD KNIFE BIG (12 INCH)",
+        "BREAD KNIFE SMALL",
+        "DINING TREY BIG",
+        "DINING TREY MEDUIM",
+        "DINING TREY SMALL",
+        "DINING PLATE FOR FRIES",
+        "DINING PLATE FOR BURGER",
+        "DINING CUP FOR EXTRA SAUCE (2OZ)",
+        "SQUEEZER BOTTLE YELLOW BIG 1000ML",
+        "SQUEEZAR BOTTLE RED BIG 1000ML",
+        "SQUEEZAR BOTTLE WHITE BIG 1000ML",
+        "DUSTBIN BIG OPEN WITH LEG 120L",
+        "DUSTBIN MEDUIM OPEN WITH LEG 60L",
+        "DUSTBIN SMALL OPEN WITH LEG 40L",
+        "DUSTBIN SMALL WITH LEG 40L FOR DINING AREA TOILET",
+        "DUSTPAN WITH STICK BRUSH",
+        "GRABBER TOOL",
+        "WHISK",
+        "BIG WHITE SCALE (30/40KG)",
+        "SMALL WEIGHT SCALE (IN TOP GLASS)",
+        "BAIN MARIE (56*35)",
+        "FRIES WARMER",
+        "CABBAGE CUTER MACHINE",
+        "GARLIC PEELER MACHINE",
+        "ONION/MUSHROOM CUTTER",
+        "PATTY PRESSER MACHINE BIG",
+        "CAN OPENER",
+        "TROLLY HEAVY BIG SIZE",
+        "LADDER",
+        "EXTENSION BOARD HEAVY DUTY",
+        "PALETTE",
+        "DRAINAGE CLEANING ACID",
+        "SAFETY GLOVES",
+        "TISSUE DISPENSER",
+        "BROOM HOLDER"
+    ]
+    
     return render_template('procurement_request_item.html',
                          user=current_user,
                          available_branches=available_branches,
+                         operation_items=operation_items,
                          today=datetime.utcnow().date().strftime('%Y-%m-%d'))
 
 
