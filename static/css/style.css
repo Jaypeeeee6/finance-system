@@ -1395,6 +1395,28 @@ body {
     width: 80px;
 }
 
+/* Make ID column wider for Recurring, My Requests, Completed, and Rejected tabs */
+/* For dashboards without checkbox (ID is 1st column) - higher specificity to override default */
+.dashboard-container:not(:has(> .dashboard-tabs)) .card-body #tab-content-recurring .data-table th:nth-child(1),
+.dashboard-container:not(:has(> .dashboard-tabs)) .card-body #tab-content-recurring .data-table td:nth-child(1),
+.dashboard-container:not(:has(> .dashboard-tabs)) .card-body #tab-content-my_requests .data-table th:nth-child(1),
+.dashboard-container:not(:has(> .dashboard-tabs)) .card-body #tab-content-my_requests .data-table td:nth-child(1),
+.dashboard-container:not(:has(> .dashboard-tabs)) .card-body #tab-content-completed .data-table th:nth-child(1),
+.dashboard-container:not(:has(> .dashboard-tabs)) .card-body #tab-content-completed .data-table td:nth-child(1),
+.dashboard-container:not(:has(> .dashboard-tabs)) .card-body #tab-content-rejected .data-table th:nth-child(1),
+.dashboard-container:not(:has(> .dashboard-tabs)) .card-body #tab-content-rejected .data-table td:nth-child(1),
+.dashboard-container:has(> .dashboard-tabs) .tab-content-container #tab-content-recurring .data-table th:nth-child(1),
+.dashboard-container:has(> .dashboard-tabs) .tab-content-container #tab-content-recurring .data-table td:nth-child(1),
+.dashboard-container:has(> .dashboard-tabs) .tab-content-container #tab-content-my_requests .data-table th:nth-child(1),
+.dashboard-container:has(> .dashboard-tabs) .tab-content-container #tab-content-my_requests .data-table td:nth-child(1),
+.dashboard-container:has(> .dashboard-tabs) .tab-content-container #tab-content-completed .data-table th:nth-child(1),
+.dashboard-container:has(> .dashboard-tabs) .tab-content-container #tab-content-completed .data-table td:nth-child(1),
+.dashboard-container:has(> .dashboard-tabs) .tab-content-container #tab-content-rejected .data-table th:nth-child(1),
+.dashboard-container:has(> .dashboard-tabs) .tab-content-container #tab-content-rejected .data-table td:nth-child(1) {
+    min-width: 120px !important;
+    width: 120px !important;
+}
+
 .data-table th.scheduled-date-col,
 .data-table td.scheduled-date-col {
     max-width: 120px;

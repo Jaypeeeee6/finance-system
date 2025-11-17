@@ -9157,18 +9157,18 @@ def get_installment_edit_history(schedule_id):
 @role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager')
 def reports():
     """View reports page"""
-    # Get filter parameters
+    # Get filter parameters (support multiple values)
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
-    department_filter = request.args.get('department', '')
-    request_type_filter = request.args.get('request_type', '')
-    company_filter = request.args.get('company', '')
-    branch_filter = request.args.get('branch', '')
+    department_filter = request.args.getlist('department')  # List of departments
+    request_type_filter = request.args.getlist('request_type')  # List of request types
+    company_filter = request.args.getlist('company')  # List of companies
+    branch_filter = request.args.getlist('branch')  # List of branches
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
-    status_filter = request.args.get('status', '')
-    payment_type_filter = request.args.get('payment_type', '')
-    payment_method_filter = request.args.get('payment_method', '')  # 'Card' or 'Cheque'
+    status_filter = request.args.getlist('status')  # List of statuses
+    payment_type_filter = request.args.getlist('payment_type')  # List of payment types
+    payment_method_filter = request.args.getlist('payment_method')  # List of payment methods
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -9198,74 +9198,103 @@ def reports():
             query = query.filter(PaymentRequest.department == current_user.department)
     
     if status_filter:
-        if status_filter == 'All Pending':
-            # Show both pending statuses
-            query = query.filter(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
-        else:
-            query = query.filter_by(status=status_filter)
+        # Handle multiple status filters
+        status_conditions = []
+        for status in status_filter:
+            if status == 'All Pending':
+                # Show both pending statuses
+                status_conditions.append(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
+            else:
+                status_conditions.append(PaymentRequest.status == status)
+        if status_conditions:
+            query = query.filter(db.or_(*status_conditions))
     if department_filter:
-        query = query.filter_by(department=department_filter)
+        # Filter by multiple departments
+        query = query.filter(PaymentRequest.department.in_(department_filter))
     if request_type_filter:
         # Special handling for "Others" to match both "Others" and "Others:..."
-        if request_type_filter == 'Others':
-            query = query.filter(PaymentRequest.request_type.like('Others%'))
-        else:
-            query = query.filter_by(request_type=request_type_filter)
+        request_type_conditions = []
+        for rt in request_type_filter:
+            if rt == 'Others':
+                request_type_conditions.append(PaymentRequest.request_type.like('Others%'))
+            else:
+                request_type_conditions.append(PaymentRequest.request_type == rt)
+        if request_type_conditions:
+            query = query.filter(db.or_(*request_type_conditions))
     if company_filter:
-        # Filter by person_company field only (company_name is no longer used)
-        query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
+        # Filter by multiple companies (person_company field only)
+        company_conditions = []
+        for company in company_filter:
+            company_conditions.append(PaymentRequest.person_company.ilike(f'%{company}%'))
+        if company_conditions:
+            query = query.filter(db.or_(*company_conditions))
     if branch_filter:
         # Alias-aware branch filtering: include canonical name and any aliases
         # Also handle multiple branch names (comma-separated) in branch_name field
-        selected_branch = Branch.query.filter_by(name=branch_filter).first()
-        if selected_branch:
-            alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
-            names = [selected_branch.name] + alias_names
-            # Build OR conditions to match if any name appears in the comma-separated branch_name
-            conditions = []
-            for name in names:
-                # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
-                conditions.append(PaymentRequest.branch_name == name)  # Exact match
-                conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
-                conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
-                conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
-                conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
-                conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
-            query = query.filter(db.or_(*conditions))
-        else:
-            # For non-alias branches, check if branch name appears in comma-separated list
-            conditions = [
-                PaymentRequest.branch_name == branch_filter,  # Exact match
-                PaymentRequest.branch_name.like(f'{branch_filter},%'),  # At start
-                PaymentRequest.branch_name.like(f'%, {branch_filter}'),  # At end (with space)
-                PaymentRequest.branch_name.like(f'%,{branch_filter}'),  # At end (no space)
-                PaymentRequest.branch_name.like(f'%, {branch_filter},%'),  # In middle (with spaces)
-                PaymentRequest.branch_name.like(f'%,{branch_filter},%')  # In middle (no spaces)
-            ]
-            query = query.filter(db.or_(*conditions))
-    # Payment type filter
+        # Handle multiple branch filters
+        all_branch_conditions = []
+        for branch_name in branch_filter:
+            selected_branch = Branch.query.filter_by(name=branch_name).first()
+            if selected_branch:
+                alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
+                names = [selected_branch.name] + alias_names
+                # Build OR conditions to match if any name appears in the comma-separated branch_name
+                conditions = []
+                for name in names:
+                    # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
+                    conditions.append(PaymentRequest.branch_name == name)  # Exact match
+                    conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
+                    conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
+                    conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
+                    conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
+                    conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
+                all_branch_conditions.append(db.or_(*conditions))
+            else:
+                # For non-alias branches, check if branch name appears in comma-separated list
+                conditions = [
+                    PaymentRequest.branch_name == branch_name,  # Exact match
+                    PaymentRequest.branch_name.like(f'{branch_name},%'),  # At start
+                    PaymentRequest.branch_name.like(f'%, {branch_name}'),  # At end (with space)
+                    PaymentRequest.branch_name.like(f'%,{branch_name}'),  # At end (no space)
+                    PaymentRequest.branch_name.like(f'%, {branch_name},%'),  # In middle (with spaces)
+                    PaymentRequest.branch_name.like(f'%,{branch_name},%')  # In middle (no spaces)
+                ]
+                all_branch_conditions.append(db.or_(*conditions))
+        if all_branch_conditions:
+            query = query.filter(db.or_(*all_branch_conditions))
+    # Payment type filter (handle multiple values)
     if payment_type_filter:
-        if payment_type_filter == 'Recurring':
-            query = query.filter(PaymentRequest.recurring == 'Recurring')
-        elif payment_type_filter == 'Scheduled One-Time':
-            query = query.filter(
-                db.or_(
-                    PaymentRequest.recurring == 'Scheduled One-Time',
-                    PaymentRequest.payment_date.isnot(None)
+        payment_type_conditions = []
+        for pt in payment_type_filter:
+            if pt == 'Recurring':
+                payment_type_conditions.append(PaymentRequest.recurring == 'Recurring')
+            elif pt == 'Scheduled One-Time':
+                payment_type_conditions.append(
+                    db.and_(
+                        db.or_(
+                            PaymentRequest.recurring == 'Scheduled One-Time',
+                            PaymentRequest.payment_date.isnot(None)
+                        ),
+                        PaymentRequest.recurring != 'Recurring'
+                    )
                 )
-            ).filter(PaymentRequest.recurring != 'Recurring')
-        elif payment_type_filter == 'One-Time':
-            query = query.filter(
-                db.or_(
-                    PaymentRequest.recurring == None,
-                    PaymentRequest.recurring == '',
-                    PaymentRequest.recurring == 'One-Time'
+            elif pt == 'One-Time':
+                payment_type_conditions.append(
+                    db.and_(
+                        db.or_(
+                            PaymentRequest.recurring == None,
+                            PaymentRequest.recurring == '',
+                            PaymentRequest.recurring == 'One-Time'
+                        ),
+                        PaymentRequest.payment_date.is_(None)
+                    )
                 )
-            ).filter(PaymentRequest.payment_date.is_(None))
+        if payment_type_conditions:
+            query = query.filter(db.or_(*payment_type_conditions))
     
-    # Payment method filter
+    # Payment method filter (handle multiple values)
     if payment_method_filter:
-        query = query.filter(PaymentRequest.payment_method == payment_method_filter)
+        query = query.filter(PaymentRequest.payment_method.in_(payment_method_filter))
     
     # Date filtering - use submission date (date field) which exists for all requests
     if date_from:
@@ -9321,10 +9350,15 @@ def reports():
         PaymentRequest.person_company != ''
     )
     if status_filter:
-        if status_filter == 'All Pending':
-            companies_query = companies_query.filter(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
-        else:
-            companies_query = companies_query.filter(PaymentRequest.status == status_filter)
+        # Handle multiple status filters
+        status_conditions = []
+        for status in status_filter:
+            if status == 'All Pending':
+                status_conditions.append(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
+            else:
+                status_conditions.append(PaymentRequest.status == status)
+        if status_conditions:
+            companies_query = companies_query.filter(db.or_(*status_conditions))
     companies = companies_query.distinct().all()
     companies = [c[0] for c in companies if c[0]]
     companies.sort()  # Sort alphabetically
@@ -9332,13 +9366,13 @@ def reports():
     # Get unique branches for filter
     branches = Branch.query.filter_by(is_active=True).order_by(Branch.name).all()
     
-    # Get request types based on selected department
+    # Get request types based on selected departments
     if department_filter:
-        # If department is selected, show only request types for that department
+        # If departments are selected, show request types for those departments
         request_types = db.session.query(RequestType.name).filter(
-            RequestType.department == department_filter,
+            RequestType.department.in_(department_filter),
             RequestType.is_active == True
-        ).order_by(RequestType.name).all()
+        ).distinct().order_by(RequestType.name).all()
         request_types = [rt[0] for rt in request_types]
     else:
         # If no department selected, show all unique request types (remove duplicates)
@@ -9587,16 +9621,16 @@ def export_reports_excel():
         flash(f'Error importing Excel library: {str(e)}', 'error')
         return redirect(url_for('reports', **request.args))
 
-    # Reuse the same filters as the reports() view
-    department_filter = request.args.get('department', '')
-    request_type_filter = request.args.get('request_type', '')
-    company_filter = request.args.get('company', '')
-    branch_filter = request.args.get('branch', '')
+    # Reuse the same filters as the reports() view (support multiple values)
+    department_filter = request.args.getlist('department')
+    request_type_filter = request.args.getlist('request_type')
+    company_filter = request.args.getlist('company')
+    branch_filter = request.args.getlist('branch')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
-    status_filter = request.args.get('status', '')
-    payment_type_filter = request.args.get('payment_type', '')
-    payment_method_filter = request.args.get('payment_method', '')
+    status_filter = request.args.getlist('status')
+    payment_type_filter = request.args.getlist('payment_type')
+    payment_method_filter = request.args.getlist('payment_method')
 
     # Show ALL statuses by default (consistent with reports() view), but exclude archived requests
     query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
@@ -9622,64 +9656,100 @@ def export_reports_excel():
             query = query.filter(PaymentRequest.department == current_user.department)
     
     if status_filter:
-        if status_filter == 'All Pending':
-            # Show both pending statuses
-            query = query.filter(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
-        else:
-            query = query.filter_by(status=status_filter)
+        # Handle multiple status filters
+        status_conditions = []
+        for status in status_filter:
+            if status == 'All Pending':
+                status_conditions.append(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
+            else:
+                status_conditions.append(PaymentRequest.status == status)
+        if status_conditions:
+            query = query.filter(db.or_(*status_conditions))
     if department_filter:
-        query = query.filter_by(department=department_filter)
+        # Filter by multiple departments
+        query = query.filter(PaymentRequest.department.in_(department_filter))
     if request_type_filter:
         # Special handling for "Others" to match both "Others" and "Others:..."
-        if request_type_filter == 'Others':
-            query = query.filter(PaymentRequest.request_type.like('Others%'))
-        else:
-            query = query.filter_by(request_type=request_type_filter)
+        request_type_conditions = []
+        for rt in request_type_filter:
+            if rt == 'Others':
+                request_type_conditions.append(PaymentRequest.request_type.like('Others%'))
+            else:
+                request_type_conditions.append(PaymentRequest.request_type == rt)
+        if request_type_conditions:
+            query = query.filter(db.or_(*request_type_conditions))
     if company_filter:
-        # Filter by person_company field only (company_name is no longer used)
-        query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
+        # Filter by multiple companies (person_company field only)
+        company_conditions = []
+        for company in company_filter:
+            company_conditions.append(PaymentRequest.person_company.ilike(f'%{company}%'))
+        if company_conditions:
+            query = query.filter(db.or_(*company_conditions))
     if branch_filter:
         # Alias-aware branch filtering for Excel export
-        # Also handle multiple branch names (comma-separated) in branch_name field
-        selected_branch = Branch.query.filter_by(name=branch_filter).first()
-        if selected_branch:
-            alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
-            names = [selected_branch.name] + alias_names
-            # Build OR conditions to match if any name appears in the comma-separated branch_name
-            conditions = []
-            for name in names:
-                # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
-                conditions.append(PaymentRequest.branch_name == name)  # Exact match
-                conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
-                conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
-                conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
-                conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
-                conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
-            query = query.filter(db.or_(*conditions))
-        else:
-            # For non-alias branches, check if branch name appears in comma-separated list
-            conditions = [
-                PaymentRequest.branch_name == branch_filter,  # Exact match
-                PaymentRequest.branch_name.like(f'{branch_filter},%'),  # At start
-                PaymentRequest.branch_name.like(f'%, {branch_filter}'),  # At end (with space)
-                PaymentRequest.branch_name.like(f'%,{branch_filter}'),  # At end (no space)
-                PaymentRequest.branch_name.like(f'%, {branch_filter},%'),  # In middle (with spaces)
-                PaymentRequest.branch_name.like(f'%,{branch_filter},%')  # In middle (no spaces)
-            ]
-            query = query.filter(db.or_(*conditions))
+        # Handle multiple branch filters
+        all_branch_conditions = []
+        for branch_name in branch_filter:
+            selected_branch = Branch.query.filter_by(name=branch_name).first()
+            if selected_branch:
+                alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
+                names = [selected_branch.name] + alias_names
+                # Build OR conditions to match if any name appears in the comma-separated branch_name
+                conditions = []
+                for name in names:
+                    # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
+                    conditions.append(PaymentRequest.branch_name == name)  # Exact match
+                    conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
+                    conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
+                    conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
+                    conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
+                    conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
+                all_branch_conditions.append(db.or_(*conditions))
+            else:
+                # For non-alias branches, check if branch name appears in comma-separated list
+                conditions = [
+                    PaymentRequest.branch_name == branch_name,  # Exact match
+                    PaymentRequest.branch_name.like(f'{branch_name},%'),  # At start
+                    PaymentRequest.branch_name.like(f'%, {branch_name}'),  # At end (with space)
+                    PaymentRequest.branch_name.like(f'%,{branch_name}'),  # At end (no space)
+                    PaymentRequest.branch_name.like(f'%, {branch_name},%'),  # In middle (with spaces)
+                    PaymentRequest.branch_name.like(f'%,{branch_name},%')  # In middle (no spaces)
+                ]
+                all_branch_conditions.append(db.or_(*conditions))
+        if all_branch_conditions:
+            query = query.filter(db.or_(*all_branch_conditions))
     if payment_type_filter:
-        if payment_type_filter == 'Recurring':
-            query = query.filter(PaymentRequest.recurring == 'Recurring')
-        elif payment_type_filter == 'One-Time':
-            query = query.filter(
-                db.or_(
-                    PaymentRequest.recurring == None,
-                    PaymentRequest.recurring == '',
-                    PaymentRequest.recurring == 'One-Time'
+        # Handle multiple payment type filters
+        payment_type_conditions = []
+        for pt in payment_type_filter:
+            if pt == 'Recurring':
+                payment_type_conditions.append(PaymentRequest.recurring == 'Recurring')
+            elif pt == 'Scheduled One-Time':
+                payment_type_conditions.append(
+                    db.and_(
+                        db.or_(
+                            PaymentRequest.recurring == 'Scheduled One-Time',
+                            PaymentRequest.payment_date.isnot(None)
+                        ),
+                        PaymentRequest.recurring != 'Recurring'
+                    )
                 )
-            )
+            elif pt == 'One-Time':
+                payment_type_conditions.append(
+                    db.and_(
+                        db.or_(
+                            PaymentRequest.recurring == None,
+                            PaymentRequest.recurring == '',
+                            PaymentRequest.recurring == 'One-Time'
+                        ),
+                        PaymentRequest.payment_date.is_(None)
+                    )
+                )
+        if payment_type_conditions:
+            query = query.filter(db.or_(*payment_type_conditions))
     if payment_method_filter:
-        query = query.filter(PaymentRequest.payment_method == payment_method_filter)
+        # Handle multiple payment method filters
+        query = query.filter(PaymentRequest.payment_method.in_(payment_method_filter))
     if date_from:
         query = query.filter(PaymentRequest.date >= datetime.strptime(date_from, '%Y-%m-%d').date())
     if date_to:
@@ -9710,15 +9780,15 @@ def export_reports_excel():
         generation_date = datetime.now().strftime('%Y-%m-%d %H:%M')
         ws['A2'] = f"Report Generated: {generation_date}"
         
-        # Build comprehensive filters line
+        # Build comprehensive filters line (handle multiple values)
         filter_parts = []
-        filter_parts.append(f"Dept: {department_filter or 'All'}")
-        filter_parts.append(f"Type: {request_type_filter or 'All'}")
-        filter_parts.append(f"Branch: {branch_filter or 'All'}")
-        filter_parts.append(f"Company: {company_filter or 'All'}")
-        filter_parts.append(f"Payment Type: {payment_type_filter or 'All'}")
-        filter_parts.append(f"Payment Method: {payment_method_filter or 'All'}")
-        filter_parts.append(f"Status: {status_filter or 'All'}")
+        filter_parts.append(f"Dept: {', '.join(department_filter) if department_filter else 'All'}")
+        filter_parts.append(f"Type: {', '.join(request_type_filter) if request_type_filter else 'All'}")
+        filter_parts.append(f"Branch: {', '.join(branch_filter) if branch_filter else 'All'}")
+        filter_parts.append(f"Company: {', '.join(company_filter) if company_filter else 'All'}")
+        filter_parts.append(f"Payment Type: {', '.join(payment_type_filter) if payment_type_filter else 'All'}")
+        filter_parts.append(f"Payment Method: {', '.join(payment_method_filter) if payment_method_filter else 'All'}")
+        filter_parts.append(f"Status: {', '.join(status_filter) if status_filter else 'All'}")
         filters_line = " | ".join(filter_parts)
         ws['A3'] = filters_line
         
@@ -9894,16 +9964,16 @@ def export_reports_pdf():
         arabic_reshaper = None
         get_display = None
 
-    # Reuse the same filters as the reports() view
-    department_filter = request.args.get('department', '')
-    request_type_filter = request.args.get('request_type', '')
-    company_filter = request.args.get('company', '')
-    branch_filter = request.args.get('branch', '')
+    # Reuse the same filters as the reports() view (support multiple values)
+    department_filter = request.args.getlist('department')
+    request_type_filter = request.args.getlist('request_type')
+    company_filter = request.args.getlist('company')
+    branch_filter = request.args.getlist('branch')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
-    status_filter = request.args.get('status', '')
-    payment_type_filter = request.args.get('payment_type', '')
-    payment_method_filter = request.args.get('payment_method', '')
+    status_filter = request.args.getlist('status')
+    payment_type_filter = request.args.getlist('payment_type')
+    payment_method_filter = request.args.getlist('payment_method')
 
     # Show ALL statuses by default (consistent with reports() view), but exclude archived requests
     query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
@@ -9929,75 +9999,102 @@ def export_reports_pdf():
             query = query.filter(PaymentRequest.department == current_user.department)
     
     if status_filter:
-        if status_filter == 'All Pending':
-            # Show both pending statuses
-            query = query.filter(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
-        else:
-            query = query.filter_by(status=status_filter)
+        # Handle multiple status filters
+        status_conditions = []
+        for status in status_filter:
+            if status == 'All Pending':
+                status_conditions.append(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
+            else:
+                status_conditions.append(PaymentRequest.status == status)
+        if status_conditions:
+            query = query.filter(db.or_(*status_conditions))
     if department_filter:
-        query = query.filter_by(department=department_filter)
+        # Filter by multiple departments
+        query = query.filter(PaymentRequest.department.in_(department_filter))
     if request_type_filter:
         # Special handling for "Others" to match both "Others" and "Others:..."
-        if request_type_filter == 'Others':
-            query = query.filter(PaymentRequest.request_type.like('Others%'))
-        else:
-            query = query.filter_by(request_type=request_type_filter)
+        request_type_conditions = []
+        for rt in request_type_filter:
+            if rt == 'Others':
+                request_type_conditions.append(PaymentRequest.request_type.like('Others%'))
+            else:
+                request_type_conditions.append(PaymentRequest.request_type == rt)
+        if request_type_conditions:
+            query = query.filter(db.or_(*request_type_conditions))
     if company_filter:
-        # Filter by person_company field only (company_name is no longer used)
-        query = query.filter(PaymentRequest.person_company.ilike(f'%{company_filter}%'))
+        # Filter by multiple companies (person_company field only)
+        company_conditions = []
+        for company in company_filter:
+            company_conditions.append(PaymentRequest.person_company.ilike(f'%{company}%'))
+        if company_conditions:
+            query = query.filter(db.or_(*company_conditions))
     if branch_filter:
         # Alias-aware branch filtering for PDF export
-        # Also handle multiple branch names (comma-separated) in branch_name field
-        selected_branch = Branch.query.filter_by(name=branch_filter).first()
-        if selected_branch:
-            alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
-            names = [selected_branch.name] + alias_names
-            # Build OR conditions to match if any name appears in the comma-separated branch_name
-            conditions = []
-            for name in names:
-                # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
-                conditions.append(PaymentRequest.branch_name == name)  # Exact match
-                conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
-                conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
-                conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
-                conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
-                conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
-            query = query.filter(db.or_(*conditions))
-        else:
-            # For non-alias branches, check if branch name appears in comma-separated list
-            conditions = [
-                PaymentRequest.branch_name == branch_filter,  # Exact match
-                PaymentRequest.branch_name.like(f'{branch_filter},%'),  # At start
-                PaymentRequest.branch_name.like(f'%, {branch_filter}'),  # At end (with space)
-                PaymentRequest.branch_name.like(f'%,{branch_filter}'),  # At end (no space)
-                PaymentRequest.branch_name.like(f'%, {branch_filter},%'),  # In middle (with spaces)
-                PaymentRequest.branch_name.like(f'%,{branch_filter},%')  # In middle (no spaces)
-            ]
-            query = query.filter(db.or_(*conditions))
+        # Handle multiple branch filters
+        all_branch_conditions = []
+        for branch_name in branch_filter:
+            selected_branch = Branch.query.filter_by(name=branch_name).first()
+            if selected_branch:
+                alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
+                names = [selected_branch.name] + alias_names
+                # Build OR conditions to match if any name appears in the comma-separated branch_name
+                conditions = []
+                for name in names:
+                    # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
+                    conditions.append(PaymentRequest.branch_name == name)  # Exact match
+                    conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
+                    conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
+                    conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
+                    conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
+                    conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
+                all_branch_conditions.append(db.or_(*conditions))
+            else:
+                # For non-alias branches, check if branch name appears in comma-separated list
+                conditions = [
+                    PaymentRequest.branch_name == branch_name,  # Exact match
+                    PaymentRequest.branch_name.like(f'{branch_name},%'),  # At start
+                    PaymentRequest.branch_name.like(f'%, {branch_name}'),  # At end (with space)
+                    PaymentRequest.branch_name.like(f'%,{branch_name}'),  # At end (no space)
+                    PaymentRequest.branch_name.like(f'%, {branch_name},%'),  # In middle (with spaces)
+                    PaymentRequest.branch_name.like(f'%,{branch_name},%')  # In middle (no spaces)
+                ]
+                all_branch_conditions.append(db.or_(*conditions))
+        if all_branch_conditions:
+            query = query.filter(db.or_(*all_branch_conditions))
     
-    # Payment type filter
+    # Payment type filter (handle multiple values)
     if payment_type_filter:
-        if payment_type_filter == 'Recurring':
-            query = query.filter(PaymentRequest.recurring == 'Recurring')
-        elif payment_type_filter == 'Scheduled One-Time':
-            query = query.filter(
-                db.or_(
-                    PaymentRequest.recurring == 'Scheduled One-Time',
-                    PaymentRequest.payment_date.isnot(None)
+        payment_type_conditions = []
+        for pt in payment_type_filter:
+            if pt == 'Recurring':
+                payment_type_conditions.append(PaymentRequest.recurring == 'Recurring')
+            elif pt == 'Scheduled One-Time':
+                payment_type_conditions.append(
+                    db.and_(
+                        db.or_(
+                            PaymentRequest.recurring == 'Scheduled One-Time',
+                            PaymentRequest.payment_date.isnot(None)
+                        ),
+                        PaymentRequest.recurring != 'Recurring'
+                    )
                 )
-            ).filter(PaymentRequest.recurring != 'Recurring')
-        elif payment_type_filter == 'One-Time':
-            query = query.filter(
-                db.or_(
-                    PaymentRequest.recurring == None,
-                    PaymentRequest.recurring == '',
-                    PaymentRequest.recurring == 'One-Time'
+            elif pt == 'One-Time':
+                payment_type_conditions.append(
+                    db.and_(
+                        db.or_(
+                            PaymentRequest.recurring == None,
+                            PaymentRequest.recurring == '',
+                            PaymentRequest.recurring == 'One-Time'
+                        ),
+                        PaymentRequest.payment_date.is_(None)
+                    )
                 )
-            ).filter(PaymentRequest.payment_date.is_(None))
+        if payment_type_conditions:
+            query = query.filter(db.or_(*payment_type_conditions))
     
-    # Payment method filter
+    # Payment method filter (handle multiple values)
     if payment_method_filter:
-        query = query.filter(PaymentRequest.payment_method == payment_method_filter)
+        query = query.filter(PaymentRequest.payment_method.in_(payment_method_filter))
 
     # Date filtering - use submission date (date field) which exists for all requests
     if date_from:
@@ -10127,8 +10224,8 @@ def export_reports_pdf():
         c.drawString(left, y, prepare_text(f"Report Generated: {generation_date}"))
         y -= 12
         
-        # Filters
-        filters_line = f"Dept: {department_filter or 'All'} | Type: {request_type_filter or 'All'} | Branch: {branch_filter or 'All'} | Payment: {payment_type_filter or 'All'}"
+        # Filters (handle multiple values)
+        filters_line = f"Dept: {', '.join(department_filter) if department_filter else 'All'} | Type: {', '.join(request_type_filter) if request_type_filter else 'All'} | Branch: {', '.join(branch_filter) if branch_filter else 'All'} | Payment: {', '.join(payment_type_filter) if payment_type_filter else 'All'}"
         c.drawString(left, y, prepare_text(filters_line))
         y -= 12
         

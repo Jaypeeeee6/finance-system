@@ -224,6 +224,57 @@
         font-size: 14px;
     }
 
+    /* Checkbox Groups for Multi-Select Filters */
+    .checkbox-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 200px;
+        overflow-y: auto;
+        padding: 8px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        background: white;
+        margin-top: 8px;
+    }
+
+    .checkbox-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: background-color 0.2s;
+    }
+
+    .checkbox-option:hover {
+        background-color: #f8f9fa;
+    }
+
+    .checkbox-option input[type="checkbox"] {
+        margin: 0;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    .checkbox-option label {
+        margin: 0;
+        cursor: pointer;
+        font-weight: normal;
+        flex: 1;
+        user-select: none;
+    }
+    
+    /* Make entire checkbox option clickable */
+    .checkbox-option:has(input[type="checkbox"]:not(:checked)):hover {
+        background-color: #f8f9fa;
+    }
+    
+    .checkbox-option:has(input[type="checkbox"]:checked) {
+        background-color: #e7f3ff;
+    }
+
     .filter-panel-body small {
         display: block;
         margin-top: 4px;
@@ -280,7 +331,7 @@
         border-color: #000;
     }
 
-    .payment-method-option input[type="radio"] {
+    .payment-method-option input[type="checkbox"] {
         display: none;
     }
 </style>
@@ -298,51 +349,51 @@
         </button>
         <div class="active-filters" id="active-filters">
             {% set has_filters = False %}
-            {% if request.args.get('department') %}
+            {% if request.args.getlist('department') %}
                 <span class="filter-pill">
-                    Department: {{ request.args.get('department') }}
+                    Department: {{ request.args.getlist('department') | join(', ') }}
                     <button type="button" class="remove-filter" onclick="removeFilter('department')" title="Remove filter">×</button>
                 </span>
                 {% set has_filters = True %}
             {% endif %}
-            {% if request.args.get('request_type') %}
+            {% if request.args.getlist('request_type') %}
                 <span class="filter-pill">
-                    Type: {{ request.args.get('request_type') }}
+                    Type: {{ request.args.getlist('request_type') | join(', ') }}
                     <button type="button" class="remove-filter" onclick="removeFilter('request_type')" title="Remove filter">×</button>
                 </span>
                 {% set has_filters = True %}
             {% endif %}
-            {% if request.args.get('company') %}
+            {% if request.args.getlist('company') %}
                 <span class="filter-pill">
-                    Company: {{ request.args.get('company') }}
+                    Company: {{ request.args.getlist('company') | join(', ') }}
                     <button type="button" class="remove-filter" onclick="removeFilter('company')" title="Remove filter">×</button>
                 </span>
                 {% set has_filters = True %}
             {% endif %}
-            {% if request.args.get('branch') %}
+            {% if request.args.getlist('branch') %}
                 <span class="filter-pill">
-                    Branch: {{ request.args.get('branch') }}
+                    Branch: {{ request.args.getlist('branch') | join(', ') }}
                     <button type="button" class="remove-filter" onclick="removeFilter('branch')" title="Remove filter">×</button>
                 </span>
                 {% set has_filters = True %}
             {% endif %}
-            {% if request.args.get('payment_type') %}
+            {% if request.args.getlist('payment_type') %}
                 <span class="filter-pill">
-                    Payment Type: {{ request.args.get('payment_type') }}
+                    Payment Type: {{ request.args.getlist('payment_type') | join(', ') }}
                     <button type="button" class="remove-filter" onclick="removeFilter('payment_type')" title="Remove filter">×</button>
                 </span>
                 {% set has_filters = True %}
             {% endif %}
-            {% if request.args.get('payment_method') %}
+            {% if request.args.getlist('payment_method') %}
                 <span class="filter-pill">
-                    Payment Method: {{ request.args.get('payment_method') }}
+                    Payment Method: {{ request.args.getlist('payment_method') | join(', ') }}
                     <button type="button" class="remove-filter" onclick="removeFilter('payment_method')" title="Remove filter">×</button>
                 </span>
                 {% set has_filters = True %}
             {% endif %}
-            {% if request.args.get('status') %}
+            {% if request.args.getlist('status') %}
                 <span class="filter-pill">
-                    Status: {{ request.args.get('status') }}
+                    Status: {{ request.args.getlist('status') | join(', ') }}
                     <button type="button" class="remove-filter" onclick="removeFilter('status')" title="Remove filter">×</button>
                 </span>
                 {% set has_filters = True %}
@@ -379,89 +430,134 @@
         <div class="filter-panel-body">
             <form method="GET" action="{{ url_for('reports') }}" id="filter-form">
                 <div class="form-group">
-                    <label for="department">Department</label>
-                    <select name="department" id="department">
-                        <option value="">All Departments</option>
+                    <label>Department</label>
+                    <div class="checkbox-group" id="department-group">
                         {% for dept in departments %}
-                        <option value="{{ dept }}" {% if request.args.get('department') == dept %}selected{% endif %}>{{ dept }}</option>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="department" id="dept_{{ loop.index }}" value="{{ dept }}" {% if dept in request.args.getlist('department') %}checked{% endif %}>
+                            <label for="dept_{{ loop.index }}">{{ dept }}</label>
+                        </div>
                         {% endfor %}
-                    </select>
+                    </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="request_type">Request Type</label>
-                    <select name="request_type" id="request_type">
-                        <option value="">All Types</option>
+                    <label>Request Type</label>
+                    <div class="checkbox-group" id="request_type-group">
                         {# Non-"Others" first #}
                         {% for request_type in request_types | reject('equalto', 'Others') %}
-                        <option value="{{ request_type }}" {% if request.args.get('request_type') == request_type %}selected{% endif %}>{{ request_type }}</option>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="request_type" id="rt_{{ loop.index }}" value="{{ request_type }}" {% if request_type in request.args.getlist('request_type') %}checked{% endif %}>
+                            <label for="rt_{{ loop.index }}">{{ request_type }}</label>
+                        </div>
                         {% endfor %}
                         {# Ensure "Others" is always last if present #}
                         {% for request_type in request_types | select('equalto', 'Others') %}
-                        <option value="{{ request_type }}" {% if request.args.get('request_type') == request_type %}selected{% endif %}>{{ request_type }}</option>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="request_type" id="rt_others_{{ loop.index }}" value="{{ request_type }}" {% if request_type in request.args.getlist('request_type') %}checked{% endif %}>
+                            <label for="rt_others_{{ loop.index }}">{{ request_type }}</label>
+                        </div>
                         {% endfor %}
-                    </select>
+                    </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="company">Company Name</label>
-                    <select name="company" id="company">
-                        <option value="">All Companies</option>
+                    <label>Company Name</label>
+                    <div class="checkbox-group" id="company-group">
                         {% for company in companies %}
-                        <option value="{{ company }}" {% if company_filter == company %}selected{% endif %}>{{ company }}</option>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="company" id="company_{{ loop.index }}" value="{{ company }}" {% if company in request.args.getlist('company') %}checked{% endif %}>
+                            <label for="company_{{ loop.index }}">{{ company }}</label>
+                        </div>
                         {% endfor %}
-                    </select>
+                    </div>
                     <small class="form-text text-muted">Only available for approved requests</small>
                 </div>
 
                 <div class="form-group">
-                    <label for="branch">Branch Name</label>
-                    <select name="branch" id="branch">
-                        <option value="">All Branches</option>
+                    <label>Branch Name</label>
+                    <div class="checkbox-group" id="branch-group">
                         {% for branch in branches %}
-                        <option value="{{ branch.name }}" {% if branch_filter == branch.name %}selected{% endif %}>{{ branch.name }}</option>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="branch" id="branch_{{ loop.index }}" value="{{ branch.name }}" {% if branch.name in request.args.getlist('branch') %}checked{% endif %}>
+                            <label for="branch_{{ loop.index }}">{{ branch.name }}</label>
+                        </div>
                         {% endfor %}
-                    </select>
+                    </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="payment_type">Payment Type</label>
-                    <select name="payment_type" id="payment_type">
-                        <option value="" {% if not payment_type_filter %}selected{% endif %}>All Payment Types</option>
-                        <option value="One-Time" {% if payment_type_filter == 'One-Time' %}selected{% endif %}>One-Time</option>
-                        <option value="Scheduled One-Time" {% if payment_type_filter == 'Scheduled One-Time' %}selected{% endif %}>Scheduled One-Time</option>
-                        <option value="Recurring" {% if payment_type_filter == 'Recurring' %}selected{% endif %}>Recurring</option>
-                    </select>
+                    <label>Payment Type</label>
+                    <div class="checkbox-group" id="payment_type-group">
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="payment_type" id="pt_onetime" value="One-Time" {% if 'One-Time' in request.args.getlist('payment_type') %}checked{% endif %}>
+                            <label for="pt_onetime">One-Time</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="payment_type" id="pt_scheduled" value="Scheduled One-Time" {% if 'Scheduled One-Time' in request.args.getlist('payment_type') %}checked{% endif %}>
+                            <label for="pt_scheduled">Scheduled One-Time</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="payment_type" id="pt_recurring" value="Recurring" {% if 'Recurring' in request.args.getlist('payment_type') %}checked{% endif %}>
+                            <label for="pt_recurring">Recurring</label>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group">
                     <label>Payment Method</label>
                     <div class="payment-method-options">
-                        <label class="payment-method-option {% if request.args.get('payment_method') == 'Card' %}selected{% endif %}" onclick="selectPaymentMethod(event, 'Card')">
-                            <input type="radio" name="payment_method" value="Card" {% if request.args.get('payment_method') == 'Card' %}checked{% endif %}>
+                        <label class="payment-method-option {% if 'Card' in request.args.getlist('payment_method') %}selected{% endif %}" onclick="togglePaymentMethod(event, 'Card')">
+                            <input type="checkbox" name="payment_method" value="Card" {% if 'Card' in request.args.getlist('payment_method') %}checked{% endif %}>
                             Card
                         </label>
-                        <label class="payment-method-option {% if request.args.get('payment_method') == 'Cheque' %}selected{% endif %}" onclick="selectPaymentMethod(event, 'Cheque')">
-                            <input type="radio" name="payment_method" value="Cheque" {% if request.args.get('payment_method') == 'Cheque' %}checked{% endif %}>
+                        <label class="payment-method-option {% if 'Cheque' in request.args.getlist('payment_method') %}selected{% endif %}" onclick="togglePaymentMethod(event, 'Cheque')">
+                            <input type="checkbox" name="payment_method" value="Cheque" {% if 'Cheque' in request.args.getlist('payment_method') %}checked{% endif %}>
                             Cheque
                         </label>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="status">Status</label>
-                    <select name="status" id="status">
-                        <option value="">All Statuses</option>
-                        <option value="All Pending" {% if status_filter == 'All Pending' %}selected{% endif %}>All Pending</option>
-                        <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
-                        <option value="Pending Finance Approval" {% if status_filter == 'Pending Finance Approval' %}selected{% endif %}>Pending Finance Approval</option>
-                        <option value="Rejected by Manager" {% if status_filter == 'Rejected by Manager' %}selected{% endif %}>Rejected by Manager</option>
-                        <option value="Proof Pending" {% if status_filter == 'Proof Pending' %}selected{% endif %}>Proof Pending</option>
-                        <option value="Proof Sent" {% if status_filter == 'Proof Sent' %}selected{% endif %}>Proof Sent</option>
-                        <option value="Proof Rejected" {% if status_filter == 'Proof Rejected' %}selected{% endif %}>Proof Rejected</option>
-                        <option value="Recurring" {% if status_filter == 'Recurring' %}selected{% endif %}>Recurring</option>
-                        <option value="Completed" {% if status_filter == 'Completed' %}selected{% endif %}>Completed</option>
-                    </select>
+                    <label>Status</label>
+                    <div class="checkbox-group" id="status-group">
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_allpending" value="All Pending" {% if 'All Pending' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_allpending">All Pending</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_pendingmgr" value="Pending Manager Approval" {% if 'Pending Manager Approval' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_pendingmgr">Pending Manager Approval</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_pendingfin" value="Pending Finance Approval" {% if 'Pending Finance Approval' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_pendingfin">Pending Finance Approval</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_rejectedmgr" value="Rejected by Manager" {% if 'Rejected by Manager' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_rejectedmgr">Rejected by Manager</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_proofpending" value="Proof Pending" {% if 'Proof Pending' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_proofpending">Proof Pending</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_proofsent" value="Proof Sent" {% if 'Proof Sent' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_proofsent">Proof Sent</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_proofrejected" value="Proof Rejected" {% if 'Proof Rejected' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_proofrejected">Proof Rejected</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_recurring" value="Recurring" {% if 'Recurring' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_recurring">Recurring</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_completed" value="Completed" {% if 'Completed' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_completed">Completed</label>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -538,10 +634,10 @@
             <h2><i class="fas fa-table"></i> Report Results</h2>
             {% if requests and requests|length > 0 %}
             <div class="header-actions">
-                <a class="btn btn-success" id="export-excel-btn" href="{{ url_for('export_reports_excel', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to',''), status=request.args.get('status',''), payment_type=request.args.get('payment_type',''), payment_method=request.args.get('payment_method','')) }}" onclick="return showExportLoading(event)">
+                <a class="btn btn-success" id="export-excel-btn" href="{{ url_for('export_reports_excel') }}{{ '?' + request.query_string.decode('utf-8') if request.query_string else '' }}" onclick="return showExportLoading(event)">
                     <i class="fas fa-file-excel"></i> <span id="export-excel-text">Export Excel</span>
                 </a>
-                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf', department=request.args.get('department',''), request_type=request.args.get('request_type',''), company=request.args.get('company',''), branch=request.args.get('branch',''), date_from=request.args.get('date_from',''), date_to=request.args.get('date_to',''), status=request.args.get('status',''), payment_type=request.args.get('payment_type',''), payment_method=request.args.get('payment_method','')) }}" onclick="return showExportLoading(event)">
+                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_reports_pdf') }}{{ '?' + request.query_string.decode('utf-8') if request.query_string else '' }}" onclick="return showExportLoading(event)">
                     <i class="fas fa-file-pdf"></i> <span id="export-text">Export PDF</span>
                 </a>
             </div>
@@ -726,7 +822,7 @@
                     {% if pagination.pages > 1 %}
                     <div class="pagination">
                         {% if pagination.has_prev %}
-                            <a href="{{ url_for('reports', page=pagination.prev_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter, payment_type=payment_type_filter, payment_method=request.args.get('payment_method','')) }}" class="btn btn-sm btn-secondary">
+                            <a href="#" class="btn btn-sm btn-secondary pagination-link" data-page="{{ pagination.prev_num }}">
                                 <i class="fas fa-chevron-left"></i> Previous
                             </a>
                         {% endif %}
@@ -734,7 +830,7 @@
                         {% for page_num in pagination.iter_pages() %}
                             {% if page_num %}
                                 {% if page_num != pagination.page %}
-                                    <a href="{{ url_for('reports', page=page_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter, payment_type=payment_type_filter, payment_method=request.args.get('payment_method','')) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
+                                    <a href="#" class="btn btn-sm btn-outline pagination-link" data-page="{{ page_num }}">{{ page_num }}</a>
                                 {% else %}
                                     <span class="btn btn-sm btn-primary">{{ page_num }}</span>
                                 {% endif %}
@@ -744,7 +840,7 @@
                         {% endfor %}
                         
                         {% if pagination.has_next %}
-                            <a href="{{ url_for('reports', page=pagination.next_num, per_page=pagination.per_page, department=department_filter, request_type=request_type_filter, company=company_filter, branch=branch_filter, date_from=date_from, date_to=date_to, status=status_filter, payment_type=payment_type_filter, payment_method=request.args.get('payment_method','')) }}" class="btn btn-sm btn-secondary">
+                            <a href="#" class="btn btn-sm btn-secondary pagination-link" data-page="{{ pagination.next_num }}">
                                 Next <i class="fas fa-chevron-right"></i>
                             </a>
                         {% endif %}
@@ -999,6 +1095,21 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Also hide any global loader that might be stuck
     hideGlobalLoader();
+    
+    // Make entire checkbox option clickable
+    document.querySelectorAll('.checkbox-option').forEach(option => {
+        option.addEventListener('click', function(e) {
+            // Don't toggle if clicking directly on the checkbox (to avoid double-toggle)
+            if (e.target.tagName !== 'INPUT') {
+                const checkbox = this.querySelector('input[type="checkbox"]');
+                if (checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    // Trigger change event for any listeners
+                    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+        });
+    });
 });
 
 // Monitor for mouse movement - user interaction indicates they're back
@@ -1015,34 +1126,132 @@ document.addEventListener('mousemove', function() {
     lastMouseMove = Date.now();
 });
 
-// Update request types when department changes
+// Update request types when department checkboxes change (handle multiple selections)
 document.addEventListener('DOMContentLoaded', function() {
-    const departmentSelect = document.getElementById('department');
-    if (departmentSelect) {
-        departmentSelect.addEventListener('change', function() {
-            const department = this.value;
-            const requestTypeSelect = document.getElementById('request_type');
+    const departmentGroup = document.getElementById('department-group');
+    if (departmentGroup) {
+        const departmentCheckboxes = departmentGroup.querySelectorAll('input[type="checkbox"][name="department"]');
+        const requestTypeGroup = document.getElementById('request_type-group');
+        
+        if (!requestTypeGroup) return;
+        
+        function updateRequestTypes() {
+            // Get selected departments
+            const selectedDepartments = Array.from(departmentCheckboxes)
+                .filter(cb => cb.checked)
+                .map(cb => cb.value);
             
-            if (!requestTypeSelect) return;
+            // Get currently selected request types to preserve them
+            const currentRequestTypes = Array.from(requestTypeGroup.querySelectorAll('input[type="checkbox"]'))
+                .filter(cb => cb.checked)
+                .map(cb => cb.value);
             
-            // Clear existing options except "All Types"
-            requestTypeSelect.innerHTML = '<option value="">All Types</option>';
+            // Clear existing checkboxes
+            requestTypeGroup.innerHTML = '';
             
-            // Fetch request types for selected department
-            fetch(`/api/request-types?department=${encodeURIComponent(department)}`)
-                .then(response => response.json())
-                .then(data => {
-                    data.request_types.forEach(requestType => {
-                        const option = document.createElement('option');
-                        option.value = requestType;
-                        option.textContent = requestType;
-                        requestTypeSelect.appendChild(option);
+            // If no departments selected, show all request types
+            if (selectedDepartments.length === 0) {
+                // Fetch all request types
+                fetch('/api/request-types')
+                    .then(response => response.json())
+                    .then(data => {
+                        data.request_types.forEach((requestType, index) => {
+                            const optionDiv = document.createElement('div');
+                            optionDiv.className = 'checkbox-option';
+                            
+                            const checkbox = document.createElement('input');
+                            checkbox.type = 'checkbox';
+                            checkbox.name = 'request_type';
+                            checkbox.id = `rt_${index}`;
+                            checkbox.value = requestType;
+                            // Preserve checked state if it was previously selected
+                            if (currentRequestTypes.includes(requestType)) {
+                                checkbox.checked = true;
+                            }
+                            
+                            const label = document.createElement('label');
+                            label.htmlFor = `rt_${index}`;
+                            label.textContent = requestType;
+                            
+                            optionDiv.appendChild(checkbox);
+                            optionDiv.appendChild(label);
+                            requestTypeGroup.appendChild(optionDiv);
+                            
+                            // Make the entire option clickable
+                            optionDiv.addEventListener('click', function(e) {
+                                if (e.target.tagName !== 'INPUT') {
+                                    checkbox.checked = !checkbox.checked;
+                                    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                            });
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error fetching request types:', error);
                     });
-                })
-                .catch(error => {
-                    console.error('Error fetching request types:', error);
-                });
+            } else {
+                // Fetch request types for all selected departments
+                const promises = selectedDepartments.map(dept => 
+                    fetch(`/api/request-types?department=${encodeURIComponent(dept)}`)
+                        .then(response => response.json())
+                );
+                
+                Promise.all(promises)
+                    .then(results => {
+                        // Combine and deduplicate request types
+                        const allRequestTypes = new Set();
+                        results.forEach(data => {
+                            data.request_types.forEach(rt => allRequestTypes.add(rt));
+                        });
+                        
+                        // Sort and add checkboxes
+                        Array.from(allRequestTypes).sort().forEach((requestType, index) => {
+                            const optionDiv = document.createElement('div');
+                            optionDiv.className = 'checkbox-option';
+                            
+                            const checkbox = document.createElement('input');
+                            checkbox.type = 'checkbox';
+                            checkbox.name = 'request_type';
+                            checkbox.id = `rt_${index}`;
+                            checkbox.value = requestType;
+                            // Preserve checked state if it was previously selected
+                            if (currentRequestTypes.includes(requestType)) {
+                                checkbox.checked = true;
+                            }
+                            
+                            const label = document.createElement('label');
+                            label.htmlFor = `rt_${index}`;
+                            label.textContent = requestType;
+                            
+                            optionDiv.appendChild(checkbox);
+                            optionDiv.appendChild(label);
+                            requestTypeGroup.appendChild(optionDiv);
+                            
+                            // Make the entire option clickable
+                            optionDiv.addEventListener('click', function(e) {
+                                if (e.target.tagName !== 'INPUT') {
+                                    checkbox.checked = !checkbox.checked;
+                                    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                            });
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error fetching request types:', error);
+                    });
+            }
+        }
+        
+        // Add change listeners to all department checkboxes
+        departmentCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateRequestTypes);
         });
+        
+        // Initialize request types on page load if departments are already selected
+        const hasSelectedDepartments = Array.from(departmentCheckboxes).some(cb => cb.checked);
+        if (hasSelectedDepartments) {
+            updateRequestTypes();
+        }
     }
 });
 
@@ -1053,6 +1262,42 @@ function changeItemsPerPage(perPage) {
     url.searchParams.set('page', '1');
     window.location.href = url.toString();
 }
+
+// Handle pagination links - preserve all query parameters including multiple values
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.pagination-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const pageNum = this.getAttribute('data-page');
+            
+            // Build URL preserving all query parameters (including multiple values)
+            const currentUrl = new URL(window.location);
+            const baseUrl = currentUrl.origin + currentUrl.pathname;
+            const paramParts = [];
+            
+            // Add page number first
+            paramParts.push('page=' + encodeURIComponent(pageNum));
+            
+            // Preserve all existing query parameters (including multiple values)
+            const originalSearch = window.location.search;
+            if (originalSearch) {
+                // Parse the original search string manually to preserve multiple values
+                const pairs = originalSearch.substring(1).split('&');
+                
+                pairs.forEach(pair => {
+                    const [key, value] = pair.split('=');
+                    if (key && key !== 'page') {
+                        // Preserve each parameter (including multiple values for same key)
+                        paramParts.push(key + '=' + (value || ''));
+                    }
+                });
+            }
+            
+            // Navigate to new URL
+            window.location.href = baseUrl + '?' + paramParts.join('&');
+        });
+    });
+});
 
 // Filter Panel Functions
 function openFilterPanel() {
@@ -1081,11 +1326,28 @@ function applyFilters() {
         // Reset to page 1 when applying filters
         const url = new URL(form.action, window.location.origin);
         const formData = new FormData(form);
+        
+        // Handle multiple values for multi-select fields
+        const multiSelectFields = ['department', 'request_type', 'company', 'branch', 'status', 'payment_type', 'payment_method'];
+        const processedKeys = new Set();
+        
         for (const [key, value] of formData.entries()) {
             if (value) {
-                url.searchParams.set(key, value);
+                if (multiSelectFields.includes(key)) {
+                    // For multi-select fields, append each value
+                    if (!processedKeys.has(key)) {
+                        // Remove existing params for this key
+                        url.searchParams.delete(key);
+                        processedKeys.add(key);
+                    }
+                    url.searchParams.append(key, value);
+                } else {
+                    // For single-value fields, use set
+                    url.searchParams.set(key, value);
+                }
             }
         }
+        
         url.searchParams.set('page', '1');
         window.location.href = url.toString();
     }
@@ -1113,33 +1375,25 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Payment Method Selection
-function selectPaymentMethod(event, value) {
+// Payment Method Selection (now supports multiple selections with checkboxes)
+function togglePaymentMethod(event, value) {
     event.preventDefault();
     event.stopPropagation();
     
     const clickedOption = event.currentTarget;
     if (!clickedOption) return;
     
-    const radio = clickedOption.querySelector('input[type="radio"]');
-    const isCurrentlySelected = clickedOption.classList.contains('selected');
+    const checkbox = clickedOption.querySelector('input[type="checkbox"]');
+    if (!checkbox) return;
     
-    // Remove selected class from all options
-    const options = document.querySelectorAll('.payment-method-option');
-    options.forEach(option => {
-        option.classList.remove('selected');
-        const optRadio = option.querySelector('input[type="radio"]');
-        if (optRadio) {
-            optRadio.checked = false;
-        }
-    });
+    // Toggle checkbox
+    checkbox.checked = !checkbox.checked;
     
-    // If clicking the same option, deselect it; otherwise select the new one
-    if (!isCurrentlySelected) {
+    // Update visual state
+    if (checkbox.checked) {
         clickedOption.classList.add('selected');
-        if (radio) {
-            radio.checked = true;
-        }
+    } else {
+        clickedOption.classList.remove('selected');
     }
 }
 </script>
