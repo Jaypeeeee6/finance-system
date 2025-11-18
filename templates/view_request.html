@@ -418,7 +418,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
             </div>
 
             <!-- Request Details Form -->
-            <form method="POST" action="{{ url_for('edit_request', request_id=request.request_id) }}">
+            <form method="POST" action="{{ url_for('edit_request', request_id=request.request_id) }}" enctype="multipart/form-data">
                 <div class="form-row">
                     <div class="form-group">
                         <label for="request_type">Request Type {% if 'request_type' in edited_fields %}<span class="edited-badge" data-field="request_type" role="button" tabindex="0">Edited</span>{% endif %}</label>
@@ -705,15 +705,30 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
            <label><i class="fas fa-upload"></i> Receipt/Proof of Payment (Uploaded by Requestor)</label>
            {% if requestor_receipts and requestor_receipts|length > 0 %}
                {% for receipt_file in requestor_receipts %}
-               <div style="margin-bottom: 10px; padding: 8px; background: #e7f3ff; border-radius: 4px; border: 1px solid #b3d9ff;">
+               <div style="margin-bottom: 10px; padding: 8px; background: #e7f3ff; border-radius: 4px; border: 1px solid #b3d9ff; display: flex; align-items: center; gap: 10px;">
                    <a href="{{ url_for('uploaded_file', filename=receipt_file) }}" target="_blank" class="btn btn-info">
                        <i class="fas fa-download"></i> View Requestor Receipt {{ loop.index }}
                    </a>
-                   <small style="color: #666; margin-left: 10px;">{{ receipt_file.split('_', 1)[1] if '_' in receipt_file else receipt_file }}</small>
+                   <small style="color: #666;">{{ receipt_file.split('_', 1)[1] if '_' in receipt_file else receipt_file }}</small>
+                   {% if can_edit_request and request.status == 'Returned to Manager' %}
+                   <label style="margin-left: auto; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                       <input type="checkbox" name="delete_files" value="{{ receipt_file }}" style="width: auto; margin: 0;">
+                       <span style="color: #dc3545; font-size: 0.9rem;">Delete</span>
+                   </label>
+                   {% endif %}
                </div>
                {% endfor %}
            {% else %}
                <p style="color: #666; font-style: italic;">No receipt files uploaded by requestor</p>
+           {% endif %}
+           {% if can_edit_request and request.status == 'Returned to Manager' %}
+           <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">
+               <label style="font-weight: 600; margin-bottom: 8px; display: block;">
+                   <i class="fas fa-plus-circle"></i> Add Files
+               </label>
+               <input type="file" name="receipt_files" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" style="margin-bottom: 10px;">
+               <small style="display: block; color: #666; margin-bottom: 10px;">Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX (Max 50MB each)</small>
+           </div>
            {% endif %}
        </div>
 
@@ -2627,6 +2642,29 @@ document.addEventListener('DOMContentLoaded', function() {
             bankSelect.addEventListener('change', showSwiftCode);
             showSwiftCode();
         }
+        
+        // Show Save Edits button when files are selected or deletion checkboxes are checked
+        const fileInputs = document.querySelectorAll('input[type="file"][name="receipt_files"]');
+        const deleteCheckboxes = document.querySelectorAll('input[type="checkbox"][name="delete_files"]');
+        const saveContainerForFiles = document.getElementById('save-edits-container');
+        
+        const showSaveForFiles = () => {
+            if (saveContainerForFiles && saveContainerForFiles.style.display !== 'block') {
+                saveContainerForFiles.style.display = 'block';
+            }
+        };
+        
+        fileInputs.forEach(input => {
+            input.addEventListener('change', function() {
+                if (this.files && this.files.length > 0) {
+                    showSaveForFiles();
+                }
+            });
+        });
+        
+        deleteCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', showSaveForFiles);
+        });
     }
 
     // Edited badge click -> fetch field history

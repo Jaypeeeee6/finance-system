@@ -4188,7 +4188,8 @@ def procurement_request_item():
     if request.method == 'POST':
         # Handle form submission
         requestor_name = request.form.get('requestor_name', '').strip()
-        item_name = request.form.get('item_name', '').strip()
+        # Check for item_name_value first (from searchable dropdown), then fall back to item_name
+        item_name = request.form.get('item_name_value', '').strip() or request.form.get('item_name', '').strip()
         quantity = request.form.get('quantity', '').strip()
         purpose = request.form.get('purpose', '').strip()
         branch_name = request.form.get('branch_name', '').strip()
@@ -8336,6 +8337,103 @@ def edit_request(request_id):
             # Invalid amount, keep existing value
             pass
 
+    # Handle file management (only when status is "Returned to Manager")
+    if req.status == 'Returned to Manager':
+        # Handle file deletions
+        delete_files = request.form.getlist('delete_files')
+        if delete_files:
+            # Get existing requestor receipts
+            existing_receipts = []
+            if req.requestor_receipt_path:
+                try:
+                    existing_receipts = json.loads(req.requestor_receipt_path)
+                    if not isinstance(existing_receipts, list):
+                        existing_receipts = [req.requestor_receipt_path]
+                except (json.JSONDecodeError, TypeError):
+                    existing_receipts = [req.requestor_receipt_path] if req.requestor_receipt_path else []
+            
+            # Remove deleted files and log each deletion
+            deleted_file_names = []
+            for filename_to_delete in delete_files:
+                if filename_to_delete in existing_receipts:
+                    existing_receipts.remove(filename_to_delete)
+                    # Extract readable filename (remove timestamp prefix if present)
+                    readable_filename = filename_to_delete.split('_', 3)[-1] if '_' in filename_to_delete else filename_to_delete
+                    deleted_file_names.append(readable_filename)
+                    # Delete the physical file
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename_to_delete)
+                    if os.path.exists(filepath):
+                        try:
+                            os.remove(filepath)
+                        except Exception as e:
+                            app.logger.warning(f"Failed to delete file {filename_to_delete}: {e}")
+            
+            # Log file deletions in audit log
+            if deleted_file_names:
+                requestor_name = getattr(req.user, 'name', 'Unknown')
+                files_list = ', '.join(deleted_file_names)
+                log_action(
+                    f"Deleted receipt file(s) from payment request #{request_id} ({requestor_name}): {files_list}"
+                )
+            
+            # Update database
+            if existing_receipts:
+                req.requestor_receipt_path = json.dumps(existing_receipts)
+            else:
+                req.requestor_receipt_path = None
+        
+        # Handle file uploads
+        if 'receipt_files' in request.files:
+            receipt_files = request.files.getlist('receipt_files')
+            if receipt_files and any(f.filename for f in receipt_files):
+                uploaded_files = []
+                allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
+                max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+                
+                # Get existing requestor receipts (after deletions)
+                existing_receipts = []
+                if req.requestor_receipt_path:
+                    try:
+                        existing_receipts = json.loads(req.requestor_receipt_path)
+                        if not isinstance(existing_receipts, list):
+                            existing_receipts = [req.requestor_receipt_path]
+                    except (json.JSONDecodeError, TypeError):
+                        existing_receipts = [req.requestor_receipt_path] if req.requestor_receipt_path else []
+                
+                # Process new files
+                for receipt_file in receipt_files:
+                    if receipt_file and receipt_file.filename:
+                        # Validate file extension first
+                        file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
+                        if file_extension not in allowed_extensions:
+                            flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'error')
+                            return redirect(url_for('view_request', request_id=request_id))
+                        
+                        # Read file content once for size check and save
+                        file_content = receipt_file.read()
+                        file_size = len(file_content)
+                        if file_size > max_file_size:
+                            flash(f'File "{receipt_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'error')
+                            return redirect(url_for('view_request', request_id=request_id))
+                        
+                        # Generate unique filename
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                        filename = secure_filename(receipt_file.filename)
+                        filename = f"receipt_{request_id}_{timestamp}_{filename}"
+                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                        
+                        # Save file content
+                        with open(filepath, 'wb') as f:
+                            f.write(file_content)
+                        
+                        uploaded_files.append(filename)
+                
+                # Combine existing and new files
+                if uploaded_files:
+                    all_receipts = existing_receipts + uploaded_files
+                    req.requestor_receipt_path = json.dumps(all_receipts)
+                    log_action(f"Manager added {len(uploaded_files)} file(s) to request #{request_id}")
+
     db.session.commit()
 
     # Build edited_fields list for UI badges: only fields submitted AND changed this save
@@ -8503,6 +8601,158 @@ def edit_request(request_id):
 
     flash('Edits saved successfully.', 'success')
     return redirect(url_for('view_request', request_id=request_id, tab='submit', edited='1', edited_fields=','.join(edited_fields)))
+
+
+@app.route('/request/<int:request_id>/manager-add-file', methods=['POST'])
+@login_required
+def manager_add_file(request_id):
+    """Manager adds a file to request when status is Returned to Manager"""
+    req = PaymentRequest.query.get_or_404(request_id)
+    
+    # Check authorization - only managers can add files when status is "Returned to Manager"
+    if req.status != 'Returned to Manager':
+        flash('Files can only be added when request status is "Returned to Manager".', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Check if user is an authorized manager approver
+    authorized_approvers = get_authorized_manager_approvers(req)
+    if current_user not in authorized_approvers:
+        flash('You are not authorized to add files to this request.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Handle file uploads
+    if 'receipt_files' not in request.files:
+        flash('No files selected.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    receipt_files = request.files.getlist('receipt_files')
+    if not receipt_files or not any(f.filename for f in receipt_files):
+        flash('No files selected.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    uploaded_files = []
+    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
+    max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+    
+    # Get existing requestor receipts
+    existing_receipts = []
+    if req.requestor_receipt_path:
+        try:
+            existing_receipts = json.loads(req.requestor_receipt_path)
+            if not isinstance(existing_receipts, list):
+                existing_receipts = [req.requestor_receipt_path]
+        except (json.JSONDecodeError, TypeError):
+            existing_receipts = [req.requestor_receipt_path] if req.requestor_receipt_path else []
+    
+    # Process new files
+    for receipt_file in receipt_files:
+        if receipt_file and receipt_file.filename:
+            # Validate file size
+            file_size = len(receipt_file.read())
+            if file_size > max_file_size:
+                flash(f'File "{receipt_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'error')
+                return redirect(url_for('view_request', request_id=request_id))
+            
+            receipt_file.seek(0)
+            
+            # Validate file extension
+            file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
+            if file_extension not in allowed_extensions:
+                flash(f'Invalid file type for "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'error')
+                return redirect(url_for('view_request', request_id=request_id))
+            
+            # Generate unique filename
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = secure_filename(receipt_file.filename)
+            filename = f"receipt_{request_id}_{timestamp}_{filename}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            receipt_file.save(filepath)
+            uploaded_files.append(filename)
+    
+    if not uploaded_files:
+        flash('No valid files were uploaded.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Combine existing and new files
+    all_receipts = existing_receipts + uploaded_files
+    req.requestor_receipt_path = json.dumps(all_receipts)
+    req.updated_at = datetime.utcnow()
+    
+    db.session.commit()
+    
+    log_action(f"Manager added {len(uploaded_files)} file(s) to request #{request_id}")
+    flash(f'Successfully added {len(uploaded_files)} file(s) to the request.', 'success')
+    
+    return redirect(url_for('view_request', request_id=request_id))
+
+
+@app.route('/request/<int:request_id>/manager-delete-file', methods=['POST'])
+@login_required
+def manager_delete_file(request_id):
+    """Manager deletes a file from request when status is Returned to Manager"""
+    req = PaymentRequest.query.get_or_404(request_id)
+    
+    # Check authorization - only managers can delete files when status is "Returned to Manager"
+    if req.status != 'Returned to Manager':
+        flash('Files can only be deleted when request status is "Returned to Manager".', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Check if user is an authorized manager approver
+    authorized_approvers = get_authorized_manager_approvers(req)
+    if current_user not in authorized_approvers:
+        flash('You are not authorized to delete files from this request.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    filename_to_delete = request.form.get('filename', '').strip()
+    if not filename_to_delete:
+        flash('No file specified for deletion.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Get existing requestor receipts
+    existing_receipts = []
+    if req.requestor_receipt_path:
+        try:
+            existing_receipts = json.loads(req.requestor_receipt_path)
+            if not isinstance(existing_receipts, list):
+                existing_receipts = [req.requestor_receipt_path]
+        except (json.JSONDecodeError, TypeError):
+            existing_receipts = [req.requestor_receipt_path] if req.requestor_receipt_path else []
+    
+    # Remove the file from the list
+    if filename_to_delete not in existing_receipts:
+        flash('File not found in request.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    existing_receipts.remove(filename_to_delete)
+    
+    # Delete the physical file
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename_to_delete)
+    if os.path.exists(filepath):
+        try:
+            os.remove(filepath)
+        except Exception as e:
+            flash(f'Warning: File deleted from database but could not delete physical file: {str(e)}', 'warning')
+    
+    # Update database
+    if existing_receipts:
+        req.requestor_receipt_path = json.dumps(existing_receipts)
+    else:
+        req.requestor_receipt_path = None
+    
+    req.updated_at = datetime.utcnow()
+    db.session.commit()
+    
+    # Log file deletion in audit log with readable filename
+    requestor_name = getattr(req.user, 'name', 'Unknown')
+    # Extract readable filename (remove timestamp prefix if present)
+    readable_filename = filename_to_delete.split('_', 3)[-1] if '_' in filename_to_delete else filename_to_delete
+    log_action(
+        f"Deleted receipt file from payment request #{request_id} ({requestor_name}): {readable_filename}"
+    )
+    
+    flash('File deleted successfully.', 'success')
+    
+    return redirect(url_for('view_request', request_id=request_id))
 
 
 @app.route('/request/<int:request_id>/field_history')
