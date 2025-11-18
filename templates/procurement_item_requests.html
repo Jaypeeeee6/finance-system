@@ -18,7 +18,7 @@
     <!-- Statistics Summary (only for Procurement users) -->
     {% if is_procurement_user %}
     <div class="card" style="margin-bottom: 30px; background: #f8f9fa;">
-        <div class="card-body" style="padding: 25px;">
+        <div class="card-body request-statistics" style="padding: 25px;">
             <h3 style="margin-top: 0; color: #333;">
                 <i class="fas fa-chart-bar"></i> Request Statistics
             </h3>
@@ -49,9 +49,50 @@
     {% endif %}
 
     <!-- Item Requests Table -->
+    <h4 class="card-title" style="margin-bottom: 15px; margin-top: 0;">All Item Requests</h4>
     <div class="card">
         <div class="card-header">
-            <h4 class="card-title">All Item Requests</h4>
+            <div class="header-top">
+                <div class="filter-controls">
+                    <select id="departmentFilter" onchange="applyDepartmentFilter()" class="form-select">
+                        <option value="">All Departments</option>
+                        {% for dept in departments %}
+                        <option value="{{ dept }}" {% if department_filter == dept %}selected{% endif %}>{{ dept }}</option>
+                        {% endfor %}
+                    </select>
+                    <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
+                        <option value="">All Statuses</option>
+                        <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
+                        <option value="Pending Procurement Manager Approval" {% if status_filter == 'Pending Procurement Manager Approval' %}selected{% endif %}>Pending Procurement Manager Approval</option>
+                        <option value="Assigned to Procurement" {% if status_filter == 'Assigned to Procurement' %}selected{% endif %}>Assigned to Procurement</option>
+                        <option value="Completed" {% if status_filter == 'Completed' %}selected{% endif %}>Completed</option>
+                        <option value="Rejected by Manager" {% if status_filter == 'Rejected by Manager' %}selected{% endif %}>Rejected by Manager</option>
+                        <option value="Rejected by Procurement Manager" {% if status_filter == 'Rejected by Procurement Manager' %}selected{% endif %}>Rejected by Procurement Manager</option>
+                    </select>
+                    <select id="urgentFilter" onchange="applyUrgentFilter()" class="form-select">
+                        <option value="">All Requests</option>
+                        <option value="urgent" {% if urgent_filter == 'urgent' %}selected{% endif %}>🔴 Urgent Only</option>
+                        <option value="not_urgent" {% if urgent_filter == 'not_urgent' %}selected{% endif %}>⚪ Not Urgent</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-header-actions">
+                {% if department_filter or status_filter or urgent_filter %}
+                <div class="filter-indicator">
+                    <span class="badge" style="background: #f57c00; color: white;">
+                        <i class="fas fa-filter"></i> 
+                        {% set filters = [] %}
+                        {% if department_filter %}{{ filters.append('Dept: ' + department_filter) or '' }}{% endif %}
+                        {% if status_filter %}{{ filters.append('Status: ' + status_filter) or '' }}{% endif %}
+                        {% if urgent_filter %}{{ filters.append(urgent_filter) or '' }}{% endif %}
+                        {{ filters|join(' | ') }}
+                    </span>
+                    <a href="{{ url_for('procurement_item_requests') }}" class="btn btn-sm btn-outline">
+                        <i class="fas fa-times"></i> Clear All
+                    </a>
+                </div>
+                {% endif %}
+            </div>
         </div>
         <div class="card-body">
             {% if item_requests %}
@@ -265,6 +306,45 @@ window.onclick = function(event) {
         closeModal();
     }
 }
+
+function applyDepartmentFilter() {
+    const departmentFilter = document.getElementById('departmentFilter');
+    const departmentValue = departmentFilter.value;
+    
+    const url = new URL(window.location);
+    if (departmentValue) {
+        url.searchParams.set('department', departmentValue);
+    } else {
+        url.searchParams.delete('department');
+    }
+    window.location.href = url.toString();
+}
+
+function applyStatusFilter() {
+    const statusFilter = document.getElementById('statusFilter');
+    const statusValue = statusFilter.value;
+    
+    const url = new URL(window.location);
+    if (statusValue) {
+        url.searchParams.set('status', statusValue);
+    } else {
+        url.searchParams.delete('status');
+    }
+    window.location.href = url.toString();
+}
+
+function applyUrgentFilter() {
+    const urgentFilter = document.getElementById('urgentFilter');
+    const urgentValue = urgentFilter.value;
+    
+    const url = new URL(window.location);
+    if (urgentValue) {
+        url.searchParams.set('urgent', urgentValue);
+    } else {
+        url.searchParams.delete('urgent');
+    }
+    window.location.href = url.toString();
+}
 </script>
 
 <style>
@@ -300,6 +380,43 @@ window.onclick = function(event) {
 .close:hover,
 .close:focus {
     color: black;
+}
+
+/* Responsive styles - center Back to Dashboard button and reduce card heights */
+@media (max-width: 768px) {
+    .dashboard-actions {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    /* Request Statistics cards */
+    .request-statistics {
+        padding: 15px !important;
+    }
+    
+    .request-statistics > div[style*="grid-template-columns"] > div {
+        padding: 10px !important;
+    }
+    
+    .request-statistics > div[style*="grid-template-columns"] > div > div[style*="font-size: 24px"] {
+        font-size: 18px !important;
+    }
+    
+    .request-statistics > div[style*="grid-template-columns"] > div > div[style*="font-size: 14px"] {
+        font-size: 12px !important;
+        margin-bottom: 5px !important;
+    }
+    
+    .request-statistics > div[style*="grid-template-columns"] > div > div[style*="font-size: 12px"] {
+        font-size: 10px !important;
+        margin-top: 3px !important;
+    }
+    
+    .request-statistics h3 {
+        font-size: 18px !important;
+        margin-bottom: 10px !important;
+    }
 }
 </style>
 

@@ -1958,12 +1958,12 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
             query = Notification.query.filter(
                 db.and_(
                     Notification.user_id == user.user_id,
-                        Notification.notification_type.in_([
-                            'ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited',
-                            'finance_approval_timing_alert', 'finance_approval_timing_recurring',
-                            'system_maintenance', 'system_update', 'security_alert', 'system_error',
+                    Notification.notification_type.in_([
+                        'ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited',
+                        'finance_approval_timing_alert', 'finance_approval_timing_recurring',
+                        'system_maintenance', 'system_update', 'security_alert', 'system_error',
                             'admin_announcement', 'one_time_payment_scheduled', 'request_returned'
-                        ])
+                    ])
                 )
             ).order_by(Notification.created_at.desc())
 
@@ -3426,6 +3426,10 @@ def procurement_dashboard():
 @login_required
 def procurement_item_requests():
     """Item Requests page - shows requests based on user role"""
+    # Get filter parameters
+    department_filter = request.args.get('department', None)
+    status_filter = request.args.get('status', None)
+    urgent_filter = request.args.get('urgent', None)
     
     # Migrate: Add amount column to procurement_item_requests if it doesn't exist
     try:
@@ -3491,14 +3495,47 @@ def procurement_item_requests():
         timestamp = dt.timestamp() if dt else 0
         return (status_priority, -timestamp)
     
+    # Apply filters
+    if department_filter:
+        item_requests = [r for r in item_requests if r.department == department_filter]
+    
+    if status_filter:
+        item_requests = [r for r in item_requests if r.status == status_filter]
+    
+    if urgent_filter == 'urgent':
+        item_requests = [r for r in item_requests if r.is_urgent == True]
+    elif urgent_filter == 'not_urgent':
+        item_requests = [r for r in item_requests if r.is_urgent == False]
+    
     item_requests.sort(key=sort_key, reverse=False)
     
-    # Calculate statistics
-    total_requests = len(item_requests)
-    pending_requests = [r for r in item_requests if r.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval', 'Assigned to Procurement']]
-    completed_requests = [r for r in item_requests if r.status == 'Completed']
-    rejected_requests = [r for r in item_requests if r.status in ['Rejected by Manager', 'Rejected by Procurement Manager']]
-    urgent_requests = [r for r in item_requests if r.is_urgent]
+    # Calculate statistics (before filtering for display)
+    all_item_requests_for_stats = ProcurementItemRequest.query.all()
+    # Filter stats based on user role (same logic as above)
+    if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
+        stats_requests = all_item_requests_for_stats
+    elif current_user.department == 'Procurement' and current_user.role != 'Department Manager':
+        stats_requests = [r for r in all_item_requests_for_stats if r.status == 'Assigned to Procurement' or r.assigned_to_user_id == current_user.user_id]
+    else:
+        authorized_approvers_ids = set()
+        for req in all_item_requests_for_stats:
+            approvers = get_authorized_manager_approvers_for_item_request(req)
+            approver_ids = [a.user_id for a in approvers]
+            if current_user.user_id in approver_ids:
+                authorized_approvers_ids.add(req.id)
+        my_requests = [r.id for r in all_item_requests_for_stats if r.user_id == current_user.user_id]
+        visible_request_ids = authorized_approvers_ids.union(my_requests)
+        stats_requests = [r for r in all_item_requests_for_stats if r.id in visible_request_ids]
+    
+    total_requests = len(stats_requests)
+    pending_requests = [r for r in stats_requests if r.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval', 'Assigned to Procurement']]
+    completed_requests = [r for r in stats_requests if r.status == 'Completed']
+    rejected_requests = [r for r in stats_requests if r.status in ['Rejected by Manager', 'Rejected by Procurement Manager']]
+    urgent_requests = [r for r in stats_requests if r.is_urgent]
+    
+    # Get all unique departments for filter dropdown
+    all_departments = db.session.query(ProcurementItemRequest.department).distinct().order_by(ProcurementItemRequest.department).all()
+    departments = [dept[0] for dept in all_departments]
     
     # Get procurement members for assignment dropdown (only for Procurement Manager)
     # Convert to dictionaries for JSON serialization
@@ -3520,7 +3557,11 @@ def procurement_item_requests():
                          rejected_requests=rejected_requests,
                          urgent_requests=urgent_requests,
                          procurement_members=procurement_members,
-                         is_procurement_user=is_procurement_user)
+                         is_procurement_user=is_procurement_user,
+                         department_filter=department_filter,
+                         status_filter=status_filter,
+                         urgent_filter=urgent_filter,
+                         departments=departments)
 
 
 @app.route('/procurement/item-request/<int:request_id>')
@@ -11074,9 +11115,9 @@ def reports():
         status_conditions = []
         for status in status_filter:
             if status == 'All Pending':
-                # Show both pending statuses
+            # Show both pending statuses
                 status_conditions.append(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
-            else:
+        else:
                 status_conditions.append(PaymentRequest.status == status)
         if status_conditions:
             query = query.filter(db.or_(*status_conditions))
@@ -11089,7 +11130,7 @@ def reports():
         for rt in request_type_filter:
             if rt == 'Others':
                 request_type_conditions.append(PaymentRequest.request_type.like('Others%'))
-            else:
+        else:
                 request_type_conditions.append(PaymentRequest.request_type == rt)
         if request_type_conditions:
             query = query.filter(db.or_(*request_type_conditions))
@@ -11107,31 +11148,31 @@ def reports():
         all_branch_conditions = []
         for branch_name in branch_filter:
             selected_branch = Branch.query.filter_by(name=branch_name).first()
-            if selected_branch:
-                alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
-                names = [selected_branch.name] + alias_names
-                # Build OR conditions to match if any name appears in the comma-separated branch_name
-                conditions = []
-                for name in names:
-                    # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
-                    conditions.append(PaymentRequest.branch_name == name)  # Exact match
-                    conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
-                    conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
-                    conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
-                    conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
-                    conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
+        if selected_branch:
+            alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
+            names = [selected_branch.name] + alias_names
+            # Build OR conditions to match if any name appears in the comma-separated branch_name
+            conditions = []
+            for name in names:
+                # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
+                conditions.append(PaymentRequest.branch_name == name)  # Exact match
+                conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
+                conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
+                conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
+                conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
+                conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
                 all_branch_conditions.append(db.or_(*conditions))
-            else:
-                # For non-alias branches, check if branch name appears in comma-separated list
-                conditions = [
-                    PaymentRequest.branch_name == branch_name,  # Exact match
-                    PaymentRequest.branch_name.like(f'{branch_name},%'),  # At start
-                    PaymentRequest.branch_name.like(f'%, {branch_name}'),  # At end (with space)
-                    PaymentRequest.branch_name.like(f'%,{branch_name}'),  # At end (no space)
-                    PaymentRequest.branch_name.like(f'%, {branch_name},%'),  # In middle (with spaces)
-                    PaymentRequest.branch_name.like(f'%,{branch_name},%')  # In middle (no spaces)
-                ]
-                all_branch_conditions.append(db.or_(*conditions))
+        else:
+            # For non-alias branches, check if branch name appears in comma-separated list
+            conditions = [
+                PaymentRequest.branch_name == branch_name,  # Exact match
+                PaymentRequest.branch_name.like(f'{branch_name},%'),  # At start
+                PaymentRequest.branch_name.like(f'%, {branch_name}'),  # At end (with space)
+                PaymentRequest.branch_name.like(f'%,{branch_name}'),  # At end (no space)
+                PaymentRequest.branch_name.like(f'%, {branch_name},%'),  # In middle (with spaces)
+                PaymentRequest.branch_name.like(f'%,{branch_name},%')  # In middle (no spaces)
+            ]
+            all_branch_conditions.append(db.or_(*conditions))
         if all_branch_conditions:
             query = query.filter(db.or_(*all_branch_conditions))
     # Payment type filter (handle multiple values)
@@ -11143,9 +11184,9 @@ def reports():
             elif pt == 'Scheduled One-Time':
                 payment_type_conditions.append(
                     db.and_(
-                        db.or_(
-                            PaymentRequest.recurring == 'Scheduled One-Time',
-                            PaymentRequest.payment_date.isnot(None)
+                db.or_(
+                    PaymentRequest.recurring == 'Scheduled One-Time',
+                    PaymentRequest.payment_date.isnot(None)
                         ),
                         PaymentRequest.recurring != 'Recurring'
                     )
@@ -11153,13 +11194,13 @@ def reports():
             elif pt == 'One-Time':
                 payment_type_conditions.append(
                     db.and_(
-                        db.or_(
-                            PaymentRequest.recurring == None,
-                            PaymentRequest.recurring == '',
-                            PaymentRequest.recurring == 'One-Time'
+                db.or_(
+                    PaymentRequest.recurring == None,
+                    PaymentRequest.recurring == '',
+                    PaymentRequest.recurring == 'One-Time'
                         ),
                         PaymentRequest.payment_date.is_(None)
-                    )
+                )
                 )
         if payment_type_conditions:
             query = query.filter(db.or_(*payment_type_conditions))
@@ -11227,7 +11268,7 @@ def reports():
         for status in status_filter:
             if status == 'All Pending':
                 status_conditions.append(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
-            else:
+        else:
                 status_conditions.append(PaymentRequest.status == status)
         if status_conditions:
             companies_query = companies_query.filter(db.or_(*status_conditions))
@@ -11555,7 +11596,7 @@ def export_reports_excel():
         for status in status_filter:
             if status == 'All Pending':
                 status_conditions.append(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
-            else:
+        else:
                 status_conditions.append(PaymentRequest.status == status)
         if status_conditions:
             query = query.filter(db.or_(*status_conditions))
@@ -11568,7 +11609,7 @@ def export_reports_excel():
         for rt in request_type_filter:
             if rt == 'Others':
                 request_type_conditions.append(PaymentRequest.request_type.like('Others%'))
-            else:
+        else:
                 request_type_conditions.append(PaymentRequest.request_type == rt)
         if request_type_conditions:
             query = query.filter(db.or_(*request_type_conditions))
@@ -11585,31 +11626,31 @@ def export_reports_excel():
         all_branch_conditions = []
         for branch_name in branch_filter:
             selected_branch = Branch.query.filter_by(name=branch_name).first()
-            if selected_branch:
-                alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
-                names = [selected_branch.name] + alias_names
-                # Build OR conditions to match if any name appears in the comma-separated branch_name
-                conditions = []
-                for name in names:
-                    # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
-                    conditions.append(PaymentRequest.branch_name == name)  # Exact match
-                    conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
-                    conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
-                    conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
-                    conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
-                    conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
+        if selected_branch:
+            alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
+            names = [selected_branch.name] + alias_names
+            # Build OR conditions to match if any name appears in the comma-separated branch_name
+            conditions = []
+            for name in names:
+                # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
+                conditions.append(PaymentRequest.branch_name == name)  # Exact match
+                conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
+                conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
+                conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
+                conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
+                conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
                 all_branch_conditions.append(db.or_(*conditions))
-            else:
-                # For non-alias branches, check if branch name appears in comma-separated list
-                conditions = [
-                    PaymentRequest.branch_name == branch_name,  # Exact match
-                    PaymentRequest.branch_name.like(f'{branch_name},%'),  # At start
-                    PaymentRequest.branch_name.like(f'%, {branch_name}'),  # At end (with space)
-                    PaymentRequest.branch_name.like(f'%,{branch_name}'),  # At end (no space)
-                    PaymentRequest.branch_name.like(f'%, {branch_name},%'),  # In middle (with spaces)
-                    PaymentRequest.branch_name.like(f'%,{branch_name},%')  # In middle (no spaces)
-                ]
-                all_branch_conditions.append(db.or_(*conditions))
+        else:
+            # For non-alias branches, check if branch name appears in comma-separated list
+            conditions = [
+                PaymentRequest.branch_name == branch_name,  # Exact match
+                PaymentRequest.branch_name.like(f'{branch_name},%'),  # At start
+                PaymentRequest.branch_name.like(f'%, {branch_name}'),  # At end (with space)
+                PaymentRequest.branch_name.like(f'%,{branch_name}'),  # At end (no space)
+                PaymentRequest.branch_name.like(f'%, {branch_name},%'),  # In middle (with spaces)
+                PaymentRequest.branch_name.like(f'%,{branch_name},%')  # In middle (no spaces)
+            ]
+            all_branch_conditions.append(db.or_(*conditions))
         if all_branch_conditions:
             query = query.filter(db.or_(*all_branch_conditions))
     if payment_type_filter:
@@ -11631,14 +11672,14 @@ def export_reports_excel():
             elif pt == 'One-Time':
                 payment_type_conditions.append(
                     db.and_(
-                        db.or_(
-                            PaymentRequest.recurring == None,
-                            PaymentRequest.recurring == '',
-                            PaymentRequest.recurring == 'One-Time'
+                db.or_(
+                    PaymentRequest.recurring == None,
+                    PaymentRequest.recurring == '',
+                    PaymentRequest.recurring == 'One-Time'
                         ),
                         PaymentRequest.payment_date.is_(None)
-                    )
                 )
+            )
         if payment_type_conditions:
             query = query.filter(db.or_(*payment_type_conditions))
     if payment_method_filter:
@@ -11898,7 +11939,7 @@ def export_reports_pdf():
         for status in status_filter:
             if status == 'All Pending':
                 status_conditions.append(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
-            else:
+        else:
                 status_conditions.append(PaymentRequest.status == status)
         if status_conditions:
             query = query.filter(db.or_(*status_conditions))
@@ -11911,7 +11952,7 @@ def export_reports_pdf():
         for rt in request_type_filter:
             if rt == 'Others':
                 request_type_conditions.append(PaymentRequest.request_type.like('Others%'))
-            else:
+        else:
                 request_type_conditions.append(PaymentRequest.request_type == rt)
         if request_type_conditions:
             query = query.filter(db.or_(*request_type_conditions))
@@ -11928,31 +11969,31 @@ def export_reports_pdf():
         all_branch_conditions = []
         for branch_name in branch_filter:
             selected_branch = Branch.query.filter_by(name=branch_name).first()
-            if selected_branch:
-                alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
-                names = [selected_branch.name] + alias_names
-                # Build OR conditions to match if any name appears in the comma-separated branch_name
-                conditions = []
-                for name in names:
-                    # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
-                    conditions.append(PaymentRequest.branch_name == name)  # Exact match
-                    conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
-                    conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
-                    conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
-                    conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
-                    conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
+        if selected_branch:
+            alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
+            names = [selected_branch.name] + alias_names
+            # Build OR conditions to match if any name appears in the comma-separated branch_name
+            conditions = []
+            for name in names:
+                # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
+                conditions.append(PaymentRequest.branch_name == name)  # Exact match
+                conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
+                conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
+                conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
+                conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
+                conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
                 all_branch_conditions.append(db.or_(*conditions))
-            else:
-                # For non-alias branches, check if branch name appears in comma-separated list
-                conditions = [
-                    PaymentRequest.branch_name == branch_name,  # Exact match
-                    PaymentRequest.branch_name.like(f'{branch_name},%'),  # At start
-                    PaymentRequest.branch_name.like(f'%, {branch_name}'),  # At end (with space)
-                    PaymentRequest.branch_name.like(f'%,{branch_name}'),  # At end (no space)
-                    PaymentRequest.branch_name.like(f'%, {branch_name},%'),  # In middle (with spaces)
-                    PaymentRequest.branch_name.like(f'%,{branch_name},%')  # In middle (no spaces)
-                ]
-                all_branch_conditions.append(db.or_(*conditions))
+        else:
+            # For non-alias branches, check if branch name appears in comma-separated list
+            conditions = [
+                PaymentRequest.branch_name == branch_name,  # Exact match
+                PaymentRequest.branch_name.like(f'{branch_name},%'),  # At start
+                PaymentRequest.branch_name.like(f'%, {branch_name}'),  # At end (with space)
+                PaymentRequest.branch_name.like(f'%,{branch_name}'),  # At end (no space)
+                PaymentRequest.branch_name.like(f'%, {branch_name},%'),  # In middle (with spaces)
+                PaymentRequest.branch_name.like(f'%,{branch_name},%')  # In middle (no spaces)
+            ]
+            all_branch_conditions.append(db.or_(*conditions))
         if all_branch_conditions:
             query = query.filter(db.or_(*all_branch_conditions))
     
@@ -11965,9 +12006,9 @@ def export_reports_pdf():
             elif pt == 'Scheduled One-Time':
                 payment_type_conditions.append(
                     db.and_(
-                        db.or_(
-                            PaymentRequest.recurring == 'Scheduled One-Time',
-                            PaymentRequest.payment_date.isnot(None)
+                db.or_(
+                    PaymentRequest.recurring == 'Scheduled One-Time',
+                    PaymentRequest.payment_date.isnot(None)
                         ),
                         PaymentRequest.recurring != 'Recurring'
                     )
@@ -11975,13 +12016,13 @@ def export_reports_pdf():
             elif pt == 'One-Time':
                 payment_type_conditions.append(
                     db.and_(
-                        db.or_(
-                            PaymentRequest.recurring == None,
-                            PaymentRequest.recurring == '',
-                            PaymentRequest.recurring == 'One-Time'
+                db.or_(
+                    PaymentRequest.recurring == None,
+                    PaymentRequest.recurring == '',
+                    PaymentRequest.recurring == 'One-Time'
                         ),
                         PaymentRequest.payment_date.is_(None)
-                    )
+                )
                 )
         if payment_type_conditions:
             query = query.filter(db.or_(*payment_type_conditions))

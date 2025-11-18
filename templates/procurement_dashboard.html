@@ -37,7 +37,7 @@
     <!-- Current Money Summary -->
     {% if current_user.role == 'Department Manager' and current_user.department == 'Procurement' %}
     <div class="card" style="margin-bottom: 30px; background: #f8f9fa;">
-        <div class="card-body" style="padding: 25px;">
+        <div class="card-body current-money-status" style="padding: 25px;">
             <h3 style="margin-top: 0; color: #333;">
                 <i class="fas fa-wallet"></i> Current Money Status
             </h3>
@@ -738,5 +738,37 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
+<style>
+/* Responsive styles - reduce Current Money Status card heights */
+@media (max-width: 768px) {
+    .current-money-status {
+        padding: 15px !important;
+    }
+    
+    .current-money-status > div[style*="grid-template-columns"] > div {
+        padding: 10px !important;
+    }
+    
+    .current-money-status > div[style*="grid-template-columns"] > div > div[style*="font-size: 24px"] {
+        font-size: 18px !important;
+    }
+    
+    .current-money-status > div[style*="grid-template-columns"] > div > div[style*="font-size: 14px"] {
+        font-size: 12px !important;
+        margin-bottom: 5px !important;
+    }
+    
+    .current-money-status > div[style*="grid-template-columns"] > div > div[style*="font-size: 12px"] {
+        font-size: 10px !important;
+        margin-top: 3px !important;
+    }
+    
+    .current-money-status h3 {
+        font-size: 18px !important;
+        margin-bottom: 10px !important;
+    }
+}
+</style>
 {% endblock %}
 
