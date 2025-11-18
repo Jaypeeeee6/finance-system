@@ -390,6 +390,35 @@ class InstallmentEditHistory(db.Model):
         return f'<InstallmentEditHistory {self.id} - Schedule {self.schedule_id} - Edited by {self.edited_by.name if self.edited_by else "Unknown"}>'
 
 
+class ReturnReasonHistory(db.Model):
+    """Track history of return reasons when Finance Admin returns requests to manager multiple times"""
+    __tablename__ = 'return_reason_history'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    request_id = db.Column(db.Integer, db.ForeignKey('payment_requests.request_id'), nullable=False)
+    return_reason = db.Column(db.Text, nullable=False)
+    returned_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    returned_by_name = db.Column(db.String(100), nullable=False)
+    returned_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    request = db.relationship('PaymentRequest', backref='return_reason_history')
+    returned_by = db.relationship('User', backref='returned_requests')
+    
+    def to_dict(self):
+        """Convert return reason history to dictionary"""
+        return {
+            'id': self.id,
+            'request_id': self.request_id,
+            'return_reason': self.return_reason,
+            'returned_by': self.returned_by_name,
+            'returned_at': self.returned_at.strftime('%Y-%m-%d %H:%M:%S') if self.returned_at else None
+        }
+    
+    def __repr__(self):
+        return f'<ReturnReasonHistory {self.id} - Request {self.request_id} - Returned by {self.returned_by_name}>'
+
+
 class RequestType(db.Model):
     """Request types available for each department"""
     __tablename__ = 'request_types'

@@ -534,6 +534,10 @@
                             <label for="status_pendingfin">Pending Finance Approval</label>
                         </div>
                         <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_returnedmgr" value="Returned to Manager" {% if 'Returned to Manager' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_returnedmgr">Returned to Manager</label>
+                        </div>
+                        <div class="checkbox-option">
                             <input type="checkbox" name="status" id="status_rejectedmgr" value="Rejected by Manager" {% if 'Rejected by Manager' in request.args.getlist('status') %}checked{% endif %}>
                             <label for="status_rejectedmgr">Rejected by Manager</label>
                         </div>
@@ -759,6 +763,8 @@
                                         <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
                                     {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
                                         <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
+                                    {% elif req.status == 'Returned to Manager' %}
+                                        <span class="badge" style="background: #2196F3; color: white;">↩ {{ req.status }}</span>
                                     {% elif req.status == 'Payment Pending' %}
                                         <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
                                     {% elif req.status in ['Proof Pending', 'Proof Sent'] %}

@@ -80,6 +80,7 @@
                         <option value="">All Statuses</option>
                         <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
                         <option value="Pending Finance Approval" {% if status_filter == 'Pending Finance Approval' %}selected{% endif %}>Pending Finance Approval</option>
+                        <option value="Returned to Manager" {% if status_filter == 'Returned to Manager' %}selected{% endif %}>Returned to Manager</option>
                         <option value="Proof Pending" {% if status_filter == 'Proof Pending' %}selected{% endif %}>Proof Pending</option>
                         <option value="Proof Sent" {% if status_filter == 'Proof Sent' %}selected{% endif %}>Proof Sent</option>
                         <option value="Proof Rejected" {% if status_filter == 'Proof Rejected' %}selected{% endif %}>Proof Rejected</option>
@@ -174,6 +175,8 @@
                                             <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
                                         {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
                                             <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
+                                        {% elif req.status == 'Returned to Manager' %}
+                                            <span class="badge" style="background: #2196F3; color: white;">↩ {{ req.status }}</span>
                                         {% elif req.status == 'Payment Pending' %}
                                             <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
                                         {% elif req.status in ['Proof Pending', 'Proof Sent'] %}
@@ -268,6 +271,8 @@
                                             <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
                                         {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
                                             <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
+                                        {% elif req.status == 'Returned to Manager' %}
+                                            <span class="badge" style="background: #2196F3; color: white;">↩ {{ req.status }}</span>
                                         {% elif req.status == 'Payment Pending' %}
                                             <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
                                         {% elif req.status in ['Proof Pending', 'Proof Sent'] %}
@@ -504,6 +509,8 @@
                                             <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
                                         {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
                                             <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
+                                        {% elif req.status == 'Returned to Manager' %}
+                                            <span class="badge" style="background: #2196F3; color: white;">↩ {{ req.status }}</span>
                                         {% elif req.status == 'Payment Pending' %}
                                             <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
                                         {% elif req.status in ['Proof Pending', 'Proof Sent'] %}

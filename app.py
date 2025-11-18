@@ -12,7 +12,7 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest
+from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest
 from config import Config
 import json
 from playwright.sync_api import sync_playwright
@@ -1894,7 +1894,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled'
+                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned'
                     ])
                 )
             )
@@ -1917,7 +1917,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         Notification.notification_type.in_([
                             'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                             'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                            'installment_paid', 'finance_note_added', 'one_time_payment_scheduled'
+                            'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned'
                         ])
                     )
                 )
@@ -1937,7 +1937,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         Notification.notification_type.in_([
                             'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                             'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                            'installment_paid', 'finance_note_added', 'one_time_payment_scheduled'
+                            'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned'
                         ]),
                         # new_submission only for GM, Operation Manager, Finance Staff, or CEO (his assigned managers)
                         db.and_(
@@ -1958,12 +1958,12 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
             query = Notification.query.filter(
                 db.and_(
                     Notification.user_id == user.user_id,
-                    Notification.notification_type.in_([
-                        'ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited',
-                        'finance_approval_timing_alert', 'finance_approval_timing_recurring',
-                        'system_maintenance', 'system_update', 'security_alert', 'system_error',
-                        'admin_announcement', 'one_time_payment_scheduled'
-                    ])
+                        Notification.notification_type.in_([
+                            'ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited',
+                            'finance_approval_timing_alert', 'finance_approval_timing_recurring',
+                            'system_maintenance', 'system_update', 'security_alert', 'system_error',
+                            'admin_announcement', 'one_time_payment_scheduled', 'request_returned'
+                        ])
                 )
             ).order_by(Notification.created_at.desc())
 
@@ -1978,7 +1978,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled'
+                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -2000,7 +2000,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid', 'one_time_payment_scheduled'
+                        'installment_paid', 'one_time_payment_scheduled', 'request_returned'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -2041,7 +2041,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'request_rejected', 'request_approved', 'proof_uploaded', 'status_changed',
                         'proof_required', 'recurring_approved', 'request_completed', 'installment_paid',
                         'user_created', 'user_updated', 'user_deleted', 'finance_note_added',
-                        'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled'
+                        'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -2062,7 +2062,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'request_rejected', 'request_approved', 'proof_uploaded', 'status_changed',
                         'proof_required', 'recurring_approved', 'request_completed', 'installment_paid',
                         'user_created', 'user_updated', 'user_deleted', 'finance_note_added',
-                        'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled'
+                        'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -2092,7 +2092,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled'
+                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned'
                     ]),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -2108,7 +2108,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                     'status_changed', 'recurring_due', 'proof_required', 'recurring_approved',
                     'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled',
-                    'item_request_assigned'
+                    'item_request_assigned', 'request_returned'
                 ])
             )
         ).order_by(Notification.created_at.desc())
@@ -2131,7 +2131,7 @@ def get_unread_count_for_user(user):
                 Notification.is_read == False,
                 db.or_(
                     Notification.notification_type == 'recurring_due',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned'])
                 )
             )
         ).count()
@@ -2146,7 +2146,7 @@ def get_unread_count_for_user(user):
                     Notification.is_read == False,
                     db.or_(
                         Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned'])
                     )
                 )
             ).count()
@@ -2158,7 +2158,7 @@ def get_unread_count_for_user(user):
                     Notification.is_read == False,
                     db.or_(
                         Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned']),
                         # new_submission only for GM, Operation Manager, Finance Staff, or CEO (his assigned managers)
                         db.and_(
                             Notification.notification_type == 'new_submission',
@@ -2181,7 +2181,7 @@ def get_unread_count_for_user(user):
                     Notification.is_read == False,
                     db.or_(
                         Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid'])
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned'])
                     )
                 )
             ).count()
@@ -2195,7 +2195,7 @@ def get_unread_count_for_user(user):
                 db.or_(
                     Notification.notification_type == 'item_request_submission',
                     Notification.notification_type == 'new_submission',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -2211,7 +2211,7 @@ def get_unread_count_for_user(user):
                 db.or_(
                     Notification.notification_type == 'item_request_submission',
                     Notification.notification_type == 'new_submission',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -2245,7 +2245,7 @@ def get_unread_count_for_user(user):
                             Notification.message.contains('IT')
                         )
                     ),
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -2259,7 +2259,7 @@ def get_unread_count_for_user(user):
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
                 db.or_(
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
                 )
             )
@@ -2275,7 +2275,7 @@ def get_unread_count_for_user(user):
                     Notification.notification_type == 'item_request_submission',
                     Notification.notification_type == 'new_submission',  # Simplified - same as get_notifications_for_user
                     Notification.notification_type == 'recurring_due',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
             )
@@ -2287,7 +2287,7 @@ def get_unread_count_for_user(user):
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
-                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned'])
+                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'request_returned'])
             )
         ).count()
 
@@ -4408,7 +4408,7 @@ def admin_dashboard():
     # Build query with optional status, department, and search filters
     # Apply finance status filtering for all tabs (including "All Requests" tab)
     # Finance Admin can see finance-related statuses + Pending Manager Approval from Finance department only (or their own requests)
-    finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
+    finance_statuses = ['Pending Finance Approval', 'Returned to Manager', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
 
     # For Abdalaziz, also include Pending Manager Approval and Rejected by Manager
     # for Finance department, his own requests, temporary manager assignments,
@@ -4573,7 +4573,7 @@ def finance_dashboard():
     # Apply finance status filtering for all tabs (including "All Requests" tab)
     # Finance Staff can see finance-related statuses + their own requests with Pending Manager Approval + their own requests with Rejected by Manager
     # Abdalaziz can see finance-related statuses + Pending Manager Approval + Rejected by Manager for Finance department only (or his own requests)
-    finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
+    finance_statuses = ['Pending Finance Approval', 'Returned to Manager', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
     
     # Base query for finance-related statuses (exclude archived)
     query = PaymentRequest.query.filter(
@@ -7401,7 +7401,7 @@ def view_request(request_id):
                 pass
             else:
                 # Finance users can only view requests in finance-related statuses
-                finance_statuses = ['Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
+                finance_statuses = ['Pending Finance Approval', 'Returned to Manager', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
                 
                 # For Abdalaziz, also allow viewing PMA/Rejected-by-Manager for Finance dept, his own, and GM/CEO/Operation Manager submissions
                 if current_user.name == 'Abdalaziz Al-Brashdi' and req.status in ['Pending Manager Approval', 'Rejected by Manager']:
@@ -7722,7 +7722,27 @@ def view_request(request_id):
         cumulative_fields = []
     # Union of current-save markers and cumulative markers
     edited_fields_all = sorted(set(edited_fields) | set(cumulative_fields))
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, was_just_edited=was_just_edited, edited_fields=edited_fields_all, can_schedule_one_time=can_schedule_one_time, one_time_scheduled_by=one_time_scheduled_by)
+    
+    # Fetch return reason history (for multiple returns)
+    return_reason_history = ReturnReasonHistory.query.filter_by(request_id=req.request_id).order_by(ReturnReasonHistory.returned_at.desc()).all()
+    
+    # Check if current user can edit this request (for "Returned to Manager" status)
+    can_edit_request = False
+    if req.status == 'Returned to Manager':
+        # IT can always edit
+        if current_user.department == 'IT' and current_user.role in ['IT Staff', 'Department Manager']:
+            can_edit_request = True
+        else:
+            # Check if user is an authorized manager approver
+            authorized_approvers = get_authorized_manager_approvers(req)
+            if current_user in authorized_approvers:
+                can_edit_request = True
+    elif req.status == 'Pending Manager Approval':
+        # IT can always edit
+        if current_user.department == 'IT' and current_user.role in ['IT Staff', 'Department Manager']:
+            can_edit_request = True
+    
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, was_just_edited=was_just_edited, edited_fields=edited_fields_all, can_schedule_one_time=can_schedule_one_time, one_time_scheduled_by=one_time_scheduled_by, can_edit_request=can_edit_request, return_reason_history=return_reason_history)
 
 
 @app.route('/request/<int:request_id>/schedule_one_time_payment', methods=['POST'])
@@ -7908,21 +7928,44 @@ def schedule_one_time_payment(request_id):
 @app.route('/request/<int:request_id>/edit', methods=['POST'])
 @login_required
 def edit_request(request_id):
-    """Save inline edits by IT users when status is Pending Manager Approval."""
+    """Save inline edits by IT users, assigned managers, GM, and Operation Manager when status is Pending Manager Approval or Returned to Manager."""
     req = PaymentRequest.query.get_or_404(request_id)
 
-    # Authorization: Only IT Staff and IT Department Manager
-    if not (current_user.department == 'IT' and current_user.role in ['IT Staff', 'Department Manager']):
-        flash('You are not authorized to edit this request.', 'error')
+    # Status gate - allow editing when status is "Pending Manager Approval" or "Returned to Manager"
+    if req.status not in ['Pending Manager Approval', 'Returned to Manager']:
+        flash('This request cannot be edited in its current status.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
 
-    # Status gate
-    if req.status != 'Pending Manager Approval':
-        flash('This request cannot be edited in its current status.', 'error')
+    # Authorization: 
+    # - IT Staff and IT Department Manager can always edit when status is "Pending Manager Approval" or "Returned to Manager"
+    # - Assigned managers, GM, and Operation Manager can edit when status is "Returned to Manager"
+    is_authorized = False
+    
+    # IT department can always edit
+    if current_user.department == 'IT' and current_user.role in ['IT Staff', 'Department Manager']:
+        is_authorized = True
+    # For "Returned to Manager" status, also allow assigned managers, GM, and Operation Manager
+    elif req.status == 'Returned to Manager':
+        # Check if user is an authorized manager approver
+        authorized_approvers = get_authorized_manager_approvers(req)
+        if current_user in authorized_approvers:
+            is_authorized = True
+    
+    if not is_authorized:
+        flash('You are not authorized to edit this request.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
 
     # Collect form fields (only those we allow)
     # Track original values to compute which fields changed
+    # Normalize amount for comparison (format to 3 decimal places to match display)
+    def norm_amount(v):
+        if not v:
+            return ''
+        try:
+            # Convert to float and format consistently
+            return f"{float(v):.3f}"
+        except (ValueError, TypeError):
+            return str(v).strip()
     original = {
         'request_type': req.request_type or '',
         'branch_name': req.branch_name or '',
@@ -7932,6 +7975,7 @@ def edit_request(request_id):
         'bank_name': req.bank_name or '',
         'account_name': req.account_name or '',
         'account_number': req.account_number or '',
+        'amount': norm_amount(req.amount),
         'item_name': req.item_name or ''
     }
     new_request_type = request.form.get('request_type') or req.request_type
@@ -7951,12 +7995,24 @@ def edit_request(request_id):
     req.account_name = request.form.get('account_name') or req.account_name
     req.account_number = request.form.get('account_number') or req.account_number
     req.item_name = request.form.get('item_name') or req.item_name
+    
+    # Handle amount field
+    amount_str = request.form.get('amount', '').strip()
+    if amount_str:
+        try:
+            amount_float = float(amount_str)
+            if amount_float >= 0:
+                req.amount = amount_float
+        except (ValueError, TypeError):
+            # Invalid amount, keep existing value
+            pass
 
     db.session.commit()
 
     # Build edited_fields list for UI badges: only fields submitted AND changed this save
     def norm(v):
         return (v or '').strip()
+    # Use norm_amount function defined above for amount normalization
     updated = {
         'request_type': req.request_type or '',
         'branch_name': req.branch_name or '',
@@ -7966,6 +8022,7 @@ def edit_request(request_id):
         'bank_name': req.bank_name or '',
         'account_name': req.account_name or '',
         'account_number': req.account_number or '',
+        'amount': norm_amount(req.amount),  # Normalize amount for consistent comparison
         'item_name': req.item_name or ''
     }
     submitted_keys = set(request.form.keys())
@@ -7980,10 +8037,21 @@ def edit_request(request_id):
         'bank_name': 'bank_name',
         'account_name': 'account_name',
         'account_number': 'account_number',
+        'amount': 'amount',
         'item_name': 'item_name'
     }
     candidate_keys = set(form_to_key[k] for k in submitted_keys if k in form_to_key)
-    edited_fields = [key for key in candidate_keys if norm(original.get(key, '')) != norm(updated.get(key, ''))]
+    # Use special normalization for amount field
+    edited_fields = []
+    for key in candidate_keys:
+        if key == 'amount':
+            # Use amount-specific normalization
+            if norm_amount(original.get(key, '')) != norm_amount(updated.get(key, '')):
+                edited_fields.append(key)
+        else:
+            # Use standard normalization for other fields
+            if norm(original.get(key, '')) != norm(updated.get(key, '')):
+                edited_fields.append(key)
 
     # Persist cumulative edited fields (create table if missing, upsert per field)
     try:
@@ -8058,6 +8126,13 @@ def edit_request(request_id):
         for u in User.query.filter_by(role='Operation Manager').all():
             recipients.add(u.user_id)
         # Finance Admins are NOT notified here (unless they are the requestor, handled above)
+        # EXCEPTION: Notify Finance Admins when status is "Returned to Manager" (they returned it and need to know if it's edited)
+        finance_admin_user_ids = set()
+        if req.status == 'Returned to Manager':
+            finance_admin_users = User.query.filter_by(role='Finance Admin').all()
+            for u in finance_admin_users:
+                finance_admin_user_ids.add(u.user_id)
+                recipients.add(u.user_id)
 
         title = 'Request Updated'
         requestor_name = getattr(req.user, 'name', 'Unknown')
@@ -8067,6 +8142,9 @@ def edit_request(request_id):
             if user_id == req.user_id:
                 # Personalized message for the requestor
                 message = f"Your request #{req.request_id} has been edited by {current_user.name}."
+            elif req.status == 'Returned to Manager' and user_id in finance_admin_user_ids:
+                # Special message for Finance Admin when request was returned
+                message = f"Payment request #{req.request_id} from {requestor_name} (which you returned to manager) has been edited by {current_user.name}. Please review the changes."
             else:
                 # Include requestor name for all others
                 message = f"{requestor_name}'s request #{req.request_id} has been edited by {current_user.name}."
@@ -8166,7 +8244,132 @@ def approve_request(request_id):
     # Get form data
     approval_status = request.form.get('approval_status')
     
-    if approval_status == 'approve':
+    if approval_status == 'return_to_manager':
+        # Return to Manager - set status to "Returned to Manager"
+        return_reason = request.form.get('return_reason', '').strip()
+        if not return_reason:
+            flash('Please provide a reason for returning this request to the manager.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        # Save current return reason to history if it exists (for multiple returns)
+        # Check if there's already a return reason (could be from a previous return)
+        if req.rejection_reason:
+            # There's already a return reason, save it to history before overwriting
+            # Check if this return reason is already in history to avoid duplicates
+            existing_history = ReturnReasonHistory.query.filter_by(
+                request_id=request_id,
+                return_reason=req.rejection_reason
+            ).first()
+            
+            if not existing_history:
+                # Only save if not already in history (avoid duplicates)
+                # Use original return date if available, otherwise use current time
+                if req.manager_rejection_date:
+                    # Convert date to datetime (use start of day)
+                    from datetime import time as dt_time
+                    returned_at = datetime.combine(req.manager_rejection_date, dt_time.min)
+                else:
+                    returned_at = datetime.utcnow()
+                
+                return_history = ReturnReasonHistory(
+                    request_id=request_id,
+                    return_reason=req.rejection_reason,
+                    returned_by_user_id=req.manager_rejector_user_id if req.manager_rejector_user_id else current_user.user_id,
+                    returned_by_name=req.manager_rejector if req.manager_rejector else current_user.name,
+                    returned_at=returned_at
+                )
+                db.session.add(return_history)
+        
+        # Update request status
+        req.status = 'Returned to Manager'
+        req.rejection_reason = return_reason  # Store the new return reason in rejection_reason field
+        req.manager_rejection_date = datetime.utcnow().date()  # Track when returned
+        req.manager_rejector = current_user.name  # Track who returned it
+        req.manager_rejector_user_id = current_user.user_id
+        req.updated_at = datetime.utcnow()
+        
+        # Reset manager approval timing since it's going back
+        req.manager_approval_end_time = None
+        req.manager_approval_duration_minutes = None
+        
+        db.session.commit()
+        
+        log_action(f"Finance Admin returned payment request #{request_id} to manager - Reason: {return_reason}")
+        
+        # Notify the requestor
+        create_notification(
+            user_id=req.user_id,
+            title="Request Returned to Manager",
+            message=f"Your payment request #{request_id} has been returned to the manager for review. Reason: {return_reason}",
+            notification_type="request_returned",
+            request_id=request_id
+        )
+        
+        # Notify ALL authorized managers who can approve this request
+        authorized_approvers = get_authorized_manager_approvers(req)
+        notified_user_ids = {req.user_id}  # Track notified users to avoid duplicates
+        notification_count = 0
+        
+        print(f"DEBUG: Returning request #{request_id} to manager. Found {len(authorized_approvers)} authorized approvers.")
+        
+        # Notify all authorized manager approvers
+        for approver in authorized_approvers:
+            if approver.user_id not in notified_user_ids:
+                try:
+                    print(f"DEBUG: Notifying authorized approver: {approver.name} (ID: {approver.user_id}, Role: {approver.role}, Department: {approver.department})")
+                    notification = create_notification(
+                        user_id=approver.user_id,
+                        title="Request Returned for Review",
+                        message=f"Payment request #{request_id} from {req.department} department has been returned by Finance Admin for review. Reason: {return_reason}",
+                        notification_type="request_returned",
+                        request_id=request_id
+                    )
+                    if notification:
+                        print(f"DEBUG: Successfully created notification {notification.notification_id} for user {approver.user_id}")
+                        notification_count += 1
+                    else:
+                        print(f"DEBUG: ERROR - Failed to create notification for user {approver.user_id}")
+                    notified_user_ids.add(approver.user_id)
+                except Exception as e:
+                    print(f"DEBUG: ERROR - Exception while creating notification for user {approver.user_id}: {str(e)}")
+                    app.logger.error(f"Failed to create notification for user {approver.user_id} when returning request #{request_id}: {str(e)}")
+        
+        # Also notify IT Department Manager if request is from IT department (they can edit and reassign managers)
+        if req.department == 'IT':
+            it_managers = User.query.filter_by(
+                department='IT',
+                role='Department Manager'
+            ).all()
+            for it_manager in it_managers:
+                if it_manager.user_id not in notified_user_ids:
+                    try:
+                        create_notification(
+                            user_id=it_manager.user_id,
+                            title="Request Returned for Review",
+                            message=f"Payment request #{request_id} from IT department has been returned by Finance Admin for review. Reason: {return_reason}",
+                            notification_type="request_returned",
+                            request_id=request_id
+                        )
+                        notification_count += 1
+                        notified_user_ids.add(it_manager.user_id)
+                    except Exception as e:
+                        print(f"DEBUG: ERROR - Exception while creating notification for IT manager {it_manager.user_id}: {str(e)}")
+                        app.logger.error(f"Failed to create notification for IT manager {it_manager.user_id} when returning request #{request_id}: {str(e)}")
+        
+        print(f"DEBUG: Total notifications sent: {notification_count} out of {len(authorized_approvers)} authorized approvers")
+        log_action(f"Finance Admin returned request #{request_id} to manager - Notified {notification_count} authorized approvers")
+        
+        # Emit real-time update
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'Returned to Manager',
+            'returned': True
+        })
+        
+        flash(f'Payment request #{request_id} has been returned to the manager.', 'info')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    elif approval_status == 'approve':
         # Automatically assign the logged-in finance admin user as the approver
         approver = current_user.name
         proof_required = request.form.get('proof_required') == 'on'
@@ -9344,7 +9547,8 @@ def manager_approve_request(request_id):
         return redirect(url_for('dashboard'))
     
     # Check if request is in correct status
-    if req.status != 'Pending Manager Approval':
+    # Allow approval when status is "Pending Manager Approval" or "Returned to Manager"
+    if req.status not in ['Pending Manager Approval', 'Returned to Manager']:
         flash('This request is not pending manager approval.', 'error')
         return redirect(url_for('dashboard'))
     
@@ -9537,7 +9741,8 @@ def manager_reject_request(request_id):
         return redirect(url_for('dashboard'))
     
     # Check if request is in correct status
-    if req.status != 'Pending Manager Approval':
+    # Allow approval when status is "Pending Manager Approval" or "Returned to Manager"
+    if req.status not in ['Pending Manager Approval', 'Returned to Manager']:
         flash('This request is not pending manager approval.', 'error')
         return redirect(url_for('dashboard'))
     
