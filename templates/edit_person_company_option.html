@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Person/Company Name{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-edit"></i> Edit Person/Company Name</h1>
+        <p>Edit person/company name option: <strong>{{ option.name }}</strong></p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('edit_person_company_option', option_id=option.id) }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="name">Person/Company Name *</label>
+                        <input type="text" name="name" id="name" class="form-control" required 
+                               value="{{ option.name }}" placeholder="e.g., Dr. Scent, Oman Oil">
+                        <small class="form-text text-muted">Enter the person or company name that will appear in the dropdown</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="department">Department *</label>
+                        <select name="department" id="department" class="form-control" required onchange="updateRequestTypes()">
+                            <option value="">-- Select Department --</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept }}" {% if dept == option.department %}selected{% endif %}>{{ dept }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Select which department this option belongs to</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="request_type">Request Type *</label>
+                    <select name="request_type" id="request_type" class="form-control" required>
+                        <option value="">-- Select Request Type --</option>
+                    </select>
+                    <small class="form-text text-muted">Select the request type for which this person/company name will appear</small>
+                </div>
+
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" name="is_active" id="is_active" class="form-check-input" 
+                               {% if option.is_active %}checked{% endif %}>
+                        <label for="is_active" class="form-check-label">
+                            Active
+                        </label>
+                    </div>
+                    <small class="form-text text-muted">Active options will be available in the dropdown when creating new payment requests</small>
+                </div>
+
+                <!-- Display additional information -->
+                <div class="form-group">
+                    <div class="info-box">
+                        <h6><i class="fas fa-info-circle"></i> Option Information</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Created By:</strong> {{ option.created_by.name if option.created_by else 'System' }}</p>
+                                <p><strong>Created Date:</strong> {{ option.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Last Updated:</strong> {{ option.updated_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                                <p><strong>Current Status:</strong> 
+                                    <span class="badge {% if option.is_active %}badge-success{% else %}badge-secondary{% endif %}">
+                                        {% if option.is_active %}Active{% else %}Inactive{% endif %}
+                                    </span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Update Person/Company Name
+                    </button>
+                    <a href="{{ url_for('manage_person_company_options') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Warning Section -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-exclamation-triangle"></i> Important Notes</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning">
+                <i class="fas fa-warning"></i>
+                <strong>Warning:</strong> Changing the name, department, or request type of an option may affect existing payment requests that use this option. 
+                Please ensure that the changes are appropriate and necessary.
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Name Changes:</h5>
+                    <ul>
+                        <li>Existing payment requests will show the new name</li>
+                        <li>Reports and filters will use the new name</li>
+                        <li>Make sure the new name is clear and accurate</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h5>Department/Request Type Changes:</h5>
+                    <ul>
+                        <li>This will change which users can see this option</li>
+                        <li>Existing requests will keep their original values</li>
+                        <li>New requests will use the updated assignment</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Store request types by department
+const requestTypesByDept = {{ request_types_by_dept | tojson }};
+const currentRequestType = '{{ option.request_type }}';
+
+function updateRequestTypes() {
+    const departmentSelect = document.getElementById('department');
+    const requestTypeSelect = document.getElementById('request_type');
+    const selectedDept = departmentSelect.value;
+    
+    // Clear existing options
+    requestTypeSelect.innerHTML = '<option value="">-- Select Request Type --</option>';
+    
+    if (selectedDept && requestTypesByDept[selectedDept]) {
+        const requestTypes = requestTypesByDept[selectedDept];
+        requestTypes.forEach(rt => {
+            const option = document.createElement('option');
+            option.value = rt;
+            option.textContent = rt;
+            if (rt === currentRequestType) {
+                option.selected = true;
+            }
+            requestTypeSelect.appendChild(option);
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize request types for current department
+    updateRequestTypes();
+    
+    const form = document.querySelector('form');
+    const nameInput = document.getElementById('name');
+    const departmentSelect = document.getElementById('department');
+    const requestTypeSelect = document.getElementById('request_type');
+    
+    form.addEventListener('submit', function(e) {
+        const name = nameInput.value.trim();
+        const department = departmentSelect.value;
+        const requestType = requestTypeSelect.value;
+        
+        if (!name || !department || !requestType) {
+            e.preventDefault();
+            alert('Please fill in all required fields.');
+            return;
+        }
+        
+        // Basic name validation
+        if (name.length < 2) {
+            e.preventDefault();
+            alert('Person/Company name must be at least 2 characters long.');
+            nameInput.focus();
+            return;
+        }
+        
+        if (name.length > 200) {
+            e.preventDefault();
+            alert('Person/Company name must be less than 200 characters long.');
+            nameInput.focus();
+            return;
+        }
+        
+        // Warn about significant changes
+        const originalName = '{{ option.name }}';
+        const originalDepartment = '{{ option.department }}';
+        const originalRequestType = '{{ option.request_type }}';
+        
+        if (name !== originalName || department !== originalDepartment || requestType !== originalRequestType) {
+            if (!confirm('You are about to change this person/company name option. This may affect existing payment requests. Are you sure you want to continue?')) {
+                e.preventDefault();
+                return;
+            }
+        }
+    });
+});
+</script>
+
+<style>
+.info-box {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.info-box h6 {
+    color: #495057;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.info-box p {
+    margin-bottom: 5px;
+    color: #6c757d;
+}
+</style>
+{% endblock %}
+

@@ -34,6 +34,9 @@
         <button class="tab-btn {% if active_tab == 'request-types' %}active{% endif %}" onclick="showTab('request-types')">
             <i class="fas fa-tags"></i> Request Types
         </button>
+        <button class="tab-btn {% if active_tab == 'person-company-names' %}active{% endif %}" onclick="showTab('person-company-names')">
+            <i class="fas fa-user-tag"></i> Person/Company Names
+        </button>
         <button class="tab-btn {% if active_tab == 'branches' %}active{% endif %}" onclick="showTab('branches')">
             <i class="fas fa-building"></i> Branches
         </button>
@@ -858,25 +861,32 @@
                     These types will appear in the dropdown when users create new payment requests.</span>
                 </div>
                 
-                <!-- Department Filter -->
+                <!-- Department Filter and Search -->
                 <div class="filter-section mb-3">
-                    <form method="GET" action="{{ url_for('it_dashboard') }}" class="filter-form">
+                    <form method="GET" action="{{ url_for('it_dashboard') }}" class="filter-form" id="requestTypesFilterForm" onsubmit="return false;">
                         <input type="hidden" name="tab" value="request-types">
                         <div class="filter-row">
                             <div class="filter-group">
                                 <label for="department_filter" class="filter-label">
                                     <i class="fas fa-building"></i> Filter by Department:
                                 </label>
-                                <select name="department" id="department_filter" class="form-control filter-select" onchange="this.form.submit()">
+                                <select name="department" id="department_filter" class="form-control filter-select">
                                     <option value="all" {% if not department_filter or department_filter == 'all' %}selected{% endif %}>All Departments</option>
                                     {% for dept in departments %}
                                     <option value="{{ dept }}" {% if department_filter == dept %}selected{% endif %}>{{ dept }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
+                            <div class="filter-group">
+                                <label for="request_types_search" class="filter-label">
+                                    <i class="fas fa-search"></i> Search:
+                                </label>
+                                <input type="text" name="request_types_search" id="request_types_search" class="form-control filter-input" 
+                                       placeholder="Search by name..." value="{{ request_types_search or '' }}">
+                            </div>
                             <div class="filter-actions">
                                 <a href="{{ url_for('it_dashboard', tab='request-types') }}" class="btn btn-outline-secondary btn-sm">
-                                    <i class="fas fa-times"></i> Clear Filter
+                                    <i class="fas fa-times"></i> Clear
                                 </a>
                             </div>
                         </div>
@@ -888,8 +898,10 @@
                     <div class="summary-info">
                         <i class="fas fa-info-circle"></i>
                         <span>
-                            {% if department_filter and department_filter != 'all' %}
-                                Showing {{ request_types|length }} request type{{ 's' if request_types|length != 1 else '' }} for <strong>{{ department_filter }}</strong> department
+                            {% if department_filter and department_filter != 'all' or request_types_search %}
+                                Showing {{ request_types|length }} request type{{ 's' if request_types|length != 1 else '' }}
+                                {% if department_filter and department_filter != 'all' %}for <strong>{{ department_filter }}</strong> department{% endif %}
+                                {% if request_types_search %}matching "<strong>{{ request_types_search }}</strong>"{% endif %}
                             {% else %}
                                 Showing all {{ request_types|length }} request types across all departments
                             {% endif %}
@@ -944,6 +956,139 @@
                                         <div class="empty-state">
                                             <i class="fas fa-tags"></i>
                                             <p>No request types found. <a href="{{ url_for('add_request_type') }}">Add the first request type</a></p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Person/Company Names Tab -->
+    <div id="person-company-names-tab" class="tab-content {% if active_tab == 'person-company-names' %}active{% endif %}">
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="fas fa-user-tag"></i> Person/Company Names Management</h2>
+                <div class="header-buttons">
+                    <a href="{{ url_for('add_person_company_option') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add Person/Company Name
+                    </a>
+                    <a href="{{ url_for('manage_person_company_options') }}" class="btn btn-secondary">
+                        <i class="fas fa-cog"></i> Manage All Person/Company Names
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info alert-persistent">
+                    <i class="fas fa-info-circle"></i>
+                    <span><strong>Person/Company Names Management:</strong> Manage dropdown options for Person/Company Name field based on department and request type. 
+                    These options will appear in the searchable dropdown when users create new payment requests.</span>
+                </div>
+                
+                <!-- Department Filter and Search -->
+                <div class="filter-section mb-3">
+                    <form method="GET" action="{{ url_for('it_dashboard') }}" class="filter-form" id="personCompanyFilterForm" onsubmit="return false;">
+                        <input type="hidden" name="tab" value="person-company-names">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="department_filter_pcn" class="filter-label">
+                                    <i class="fas fa-building"></i> Filter by Department:
+                                </label>
+                                <select name="department" id="department_filter_pcn" class="form-control filter-select">
+                                    <option value="all" {% if not department_filter or department_filter == 'all' %}selected{% endif %}>All Departments</option>
+                                    {% for dept in departments %}
+                                    <option value="{{ dept }}" {% if department_filter == dept %}selected{% endif %}>{{ dept }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="person_company_search" class="filter-label">
+                                    <i class="fas fa-search"></i> Search:
+                                </label>
+                                <input type="text" name="person_company_search" id="person_company_search" class="form-control filter-input" 
+                                       placeholder="Search by name..." value="{{ person_company_search or '' }}">
+                            </div>
+                            <div class="filter-actions">
+                                <a href="{{ url_for('it_dashboard', tab='person-company-names') }}" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-times"></i> Clear
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Filter Summary -->
+                <div class="filter-summary mb-3">
+                    <div class="summary-info">
+                        <i class="fas fa-info-circle"></i>
+                        <span>
+                            {% if department_filter and department_filter != 'all' or person_company_search %}
+                                Showing {{ person_company_options|length }} person/company name option{{ 's' if person_company_options|length != 1 else '' }}
+                                {% if department_filter and department_filter != 'all' %}for <strong>{{ department_filter }}</strong> department{% endif %}
+                                {% if person_company_search %}matching "<strong>{{ person_company_search }}</strong>"{% endif %}
+                            {% else %}
+                                Showing all {{ person_company_options|length }} person/company name options across all departments
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Department</th>
+                                <th>Request Type</th>
+                                <th>Status</th>
+                                <th>Created By</th>
+                                <th>Created Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if person_company_options %}
+                                {% for option in person_company_options %}
+                                <tr>
+                                    <td>{{ option.id }}</td>
+                                    <td><strong>{{ option.name }}</strong></td>
+                                    <td><span class="badge badge-info">{{ option.department }}</span></td>
+                                    <td><span class="badge badge-secondary">{{ option.request_type }}</span></td>
+                                    <td>
+                                        {% if option.is_active %}
+                                            <span class="badge badge-success">Active</span>
+                                        {% else %}
+                                            <span class="badge badge-danger">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ option.created_by.name if option.created_by else 'System' }}</td>
+                                    <td>{{ option.created_at.strftime('%Y-%m-%d') if option.created_at else 'N/A' }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <a href="{{ url_for('edit_person_company_option', option_id=option.id) }}" class="btn btn-sm btn-info" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <form method="POST" action="{{ url_for('toggle_person_company_option', option_id=option.id) }}" style="display: inline;">
+                                                <button type="submit" class="btn btn-sm {% if option.is_active %}btn-warning{% else %}btn-success{% endif %}" 
+                                                        title="{% if option.is_active %}Deactivate{% else %}Activate{% endif %}"
+                                                        onclick="return confirm('Are you sure you want to {% if option.is_active %}deactivate{% else %}activate{% endif %} this person/company name option?')">
+                                                    <i class="fas fa-{% if option.is_active %}pause{% else %}play{% endif %}"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="8" class="text-center">
+                                        <div class="empty-state">
+                                            <i class="fas fa-user-tag"></i>
+                                            <p>No person/company name options found. <a href="{{ url_for('add_person_company_option') }}">Add the first option</a></p>
                                         </div>
                                     </td>
                                 </tr>
@@ -1229,8 +1374,10 @@ function filterByUrgent() {
     window.location.href = url.toString();
 }
 
-// Debounce timer for search
+// Debounce timers for search
 let searchDebounceTimer = null;
+let requestTypesSearchDebounceTimer = null;
+let personCompanySearchDebounceTimer = null;
 
 function performSearch(commit) {
     const searchInput = document.getElementById('tabSearchInput');
@@ -1261,6 +1408,108 @@ function performSearch(commit) {
             const curBody = document.querySelector('.card-body');
             if (newBody && curBody) {
                 curBody.innerHTML = newBody.innerHTML;
+            }
+        })
+        .catch(() => {});
+}
+
+function performRequestTypesSearch(commit) {
+    const searchInput = document.getElementById('request_types_search');
+    const searchValue = searchInput ? searchInput.value.trim() : '';
+    const url = new URL(window.location);
+    
+    // Update search query parameter
+    if (searchValue) {
+        url.searchParams.set('request_types_search', searchValue);
+    } else {
+        url.searchParams.delete('request_types_search');
+    }
+    
+    // Preserve tab
+    url.searchParams.set('tab', 'request-types');
+    
+    if (commit) {
+        window.location.href = url.toString();
+        return;
+    }
+    
+    fetch(url.toString(), { headers: { 'X-Requested-With': 'fetch' } })
+        .then(res => res.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const requestTypesTab = doc.querySelector('#request-types-tab');
+            const currentRequestTypesTab = document.querySelector('#request-types-tab');
+            
+            if (requestTypesTab && currentRequestTypesTab) {
+                // Update the table and filter summary
+                const newTable = requestTypesTab.querySelector('.table-responsive');
+                const newSummary = requestTypesTab.querySelector('.filter-summary');
+                
+                if (newTable) {
+                    const currentTable = currentRequestTypesTab.querySelector('.table-responsive');
+                    if (currentTable) {
+                        currentTable.innerHTML = newTable.innerHTML;
+                    }
+                }
+                
+                if (newSummary) {
+                    const currentSummary = currentRequestTypesTab.querySelector('.filter-summary');
+                    if (currentSummary) {
+                        currentSummary.innerHTML = newSummary.innerHTML;
+                    }
+                }
+            }
+        })
+        .catch(() => {});
+}
+
+function performPersonCompanySearch(commit) {
+    const searchInput = document.getElementById('person_company_search');
+    const searchValue = searchInput ? searchInput.value.trim() : '';
+    const url = new URL(window.location);
+    
+    // Update search query parameter
+    if (searchValue) {
+        url.searchParams.set('person_company_search', searchValue);
+    } else {
+        url.searchParams.delete('person_company_search');
+    }
+    
+    // Preserve tab
+    url.searchParams.set('tab', 'person-company-names');
+    
+    if (commit) {
+        window.location.href = url.toString();
+        return;
+    }
+    
+    fetch(url.toString(), { headers: { 'X-Requested-With': 'fetch' } })
+        .then(res => res.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const personCompanyTab = doc.querySelector('#person-company-names-tab');
+            const currentPersonCompanyTab = document.querySelector('#person-company-names-tab');
+            
+            if (personCompanyTab && currentPersonCompanyTab) {
+                // Update the table and filter summary
+                const newTable = personCompanyTab.querySelector('.table-responsive');
+                const newSummary = personCompanyTab.querySelector('.filter-summary');
+                
+                if (newTable) {
+                    const currentTable = currentPersonCompanyTab.querySelector('.table-responsive');
+                    if (currentTable) {
+                        currentTable.innerHTML = newTable.innerHTML;
+                    }
+                }
+                
+                if (newSummary) {
+                    const currentSummary = currentPersonCompanyTab.querySelector('.filter-summary');
+                    if (currentSummary) {
+                        currentSummary.innerHTML = newSummary.innerHTML;
+                    }
+                }
             }
         })
         .catch(() => {});
@@ -1309,7 +1558,7 @@ function clearSearch() {
 
 function showTab(tabName) {
     // Hide all main dashboard tabs (not nested ones)
-    const mainTabs = document.querySelectorAll('#requests-tab, #users-tab, #request-types-tab, #branches-tab, #logs-tab');
+    const mainTabs = document.querySelectorAll('#requests-tab, #users-tab, #request-types-tab, #person-company-names-tab, #branches-tab, #logs-tab');
     mainTabs.forEach(tab => {
         tab.classList.remove('active');
         tab.style.display = 'none';
@@ -1487,8 +1736,83 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Set up Request Types search functionality
+    const requestTypesSearchInput = document.getElementById('request_types_search');
+    if (requestTypesSearchInput) {
+        requestTypesSearchInput.addEventListener('input', function() {
+            clearTimeout(requestTypesSearchDebounceTimer);
+            // Wait 500ms after user stops typing before performing search
+            requestTypesSearchDebounceTimer = setTimeout(function() {
+                performRequestTypesSearch(false);
+            }, 500);
+        });
+        
+        // Also trigger search on Enter key
+        requestTypesSearchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                clearTimeout(requestTypesSearchDebounceTimer);
+                performRequestTypesSearch(true);
+            }
+        });
+    }
+    
+    // Set up Person/Company Names search functionality
+    const personCompanySearchInput = document.getElementById('person_company_search');
+    if (personCompanySearchInput) {
+        personCompanySearchInput.addEventListener('input', function() {
+            clearTimeout(personCompanySearchDebounceTimer);
+            // Wait 500ms after user stops typing before performing search
+            personCompanySearchDebounceTimer = setTimeout(function() {
+                performPersonCompanySearch(false);
+            }, 500);
+        });
+        
+        // Also trigger search on Enter key
+        personCompanySearchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                clearTimeout(personCompanySearchDebounceTimer);
+                performPersonCompanySearch(true);
+            }
+        });
+    }
+    
+    // Set up department filter change handlers
+    const departmentFilter = document.getElementById('department_filter');
+    if (departmentFilter) {
+        departmentFilter.addEventListener('change', function() {
+            // Update URL and refresh request types
+            const url = new URL(window.location);
+            const deptValue = this.value;
+            if (deptValue && deptValue !== 'all') {
+                url.searchParams.set('department', deptValue);
+            } else {
+                url.searchParams.delete('department');
+            }
+            url.searchParams.set('tab', 'request-types');
+            url.searchParams.delete('request_types_search'); // Clear search when department changes
+            window.location.href = url.toString();
+        });
+    }
+    
+    const departmentFilterPCN = document.getElementById('department_filter_pcn');
+    if (departmentFilterPCN) {
+        departmentFilterPCN.addEventListener('change', function() {
+            // Update URL and refresh person/company options
+            const url = new URL(window.location);
+            const deptValue = this.value;
+            if (deptValue && deptValue !== 'all') {
+                url.searchParams.set('department', deptValue);
+            } else {
+                url.searchParams.delete('department');
+            }
+            url.searchParams.set('tab', 'person-company-names');
+            url.searchParams.delete('person_company_search'); // Clear search when department changes
+            window.location.href = url.toString();
+        });
+    }
+    
     // Initialize tab display - show only the active main dashboard tab
-    const mainTabs = document.querySelectorAll('#requests-tab, #users-tab, #request-types-tab, #branches-tab, #logs-tab');
+    const mainTabs = document.querySelectorAll('#requests-tab, #users-tab, #request-types-tab, #person-company-names-tab, #branches-tab, #logs-tab');
     mainTabs.forEach(tab => {
         if (!tab.classList.contains('active')) {
             tab.style.display = 'none';

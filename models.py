@@ -450,6 +450,39 @@ class RequestType(db.Model):
         return f'<RequestType {self.id} - {self.name} ({self.department})>'
 
 
+class PersonCompanyOption(db.Model):
+    """Person/Company Name options for specific department and request type combinations"""
+    __tablename__ = 'person_company_options'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)  # e.g., "Dr. Scent", "Oman Oil"
+    department = db.Column(db.String(100), nullable=False)  # Department this option belongs to
+    request_type = db.Column(db.String(100), nullable=False)  # Request type this option belongs to
+    is_active = db.Column(db.Boolean, default=True)  # Whether this option is currently available
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    
+    # Relationship to User who created this option
+    created_by = db.relationship('User', backref='created_person_company_options')
+    
+    def to_dict(self):
+        """Convert person/company option to dictionary"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'department': self.department,
+            'request_type': self.request_type,
+            'is_active': self.is_active,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'created_by': self.created_by.name if self.created_by else 'System'
+        }
+    
+    def __repr__(self):
+        return f'<PersonCompanyOption {self.id} - {self.name} ({self.department}/{self.request_type})>'
+
+
 class Branch(db.Model):
     """Branch locations for the company"""
     __tablename__ = 'branches'

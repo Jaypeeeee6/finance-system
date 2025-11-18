@@ -12,7 +12,7 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest
+from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, PersonCompanyOption
 from config import Config
 import json
 from playwright.sync_api import sync_playwright
@@ -5096,6 +5096,10 @@ def it_dashboard():
     users = User.query.all()
     logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(50).all()
     
+    # Get search queries for request types and person/company options
+    request_types_search = request.args.get('request_types_search', '')
+    person_company_search = request.args.get('person_company_search', '')
+    
     # Get request types for the Request Types Management section with department filter
     request_types_query = RequestType.query
     
@@ -5106,7 +5110,27 @@ def it_dashboard():
         else:
             request_types_query = request_types_query.filter(RequestType.department == department_filter)
     
+    # Apply search filter for request types
+    if request_types_search:
+        request_types_query = request_types_query.filter(RequestType.name.contains(request_types_search))
+    
     request_types = request_types_query.order_by(RequestType.id).all()
+    
+    # Get person/company options for the Person/Company Names Management section with department filter
+    person_company_options_query = PersonCompanyOption.query
+    
+    # Apply department filter if specified
+    if department_filter and department_filter != 'all':
+        if department_filter == 'Management':
+            person_company_options_query = person_company_options_query.filter(PersonCompanyOption.department.in_(['Management', 'General Manager']))
+        else:
+            person_company_options_query = person_company_options_query.filter(PersonCompanyOption.department == department_filter)
+    
+    # Apply search filter for person/company options
+    if person_company_search:
+        person_company_options_query = person_company_options_query.filter(PersonCompanyOption.name.contains(person_company_search))
+    
+    person_company_options = person_company_options_query.order_by(PersonCompanyOption.id).all()
     
     # Get branches for the Branches Management section
     branches_query = Branch.query.filter_by(is_active=True)
@@ -5131,6 +5155,7 @@ def it_dashboard():
                          users=users, 
                          logs=logs, 
                          request_types=request_types,
+                         person_company_options=person_company_options,
                          branches=branches,
                          departments=departments,
                          user=current_user,
@@ -5139,6 +5164,8 @@ def it_dashboard():
                          department_filter=department_filter,
                          status_filter=status_filter,
                          search_query=search_query,
+                         request_types_search=request_types_search,
+                         person_company_search=person_company_search,
                          location_filter=location_filter,
                          urgent_filter=urgent_filter,
                          completed_requests=completed_requests,
@@ -5736,6 +5763,254 @@ def toggle_request_type(request_type_id):
         flash(f'Error updating request type: {str(e)}', 'danger')
     
     return redirect(url_for('manage_request_types'))
+
+
+# ==================== PERSON/COMPANY OPTIONS MANAGEMENT ROUTES ====================
+
+@app.route('/it/person-company-options')
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def manage_person_company_options():
+    """Manage person/company name options for all departments - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    department_filter = request.args.get('department', '')
+    search_query = request.args.get('search', '')
+    
+    # Validate per_page to prevent abuse
+    if per_page not in [10, 20, 50, 100]:
+        per_page = 20
+    
+    # Build query
+    query = PersonCompanyOption.query
+    
+    if department_filter:
+        if department_filter == 'Management':
+            query = query.filter(PersonCompanyOption.department.in_(['Management', 'General Manager']))
+        else:
+            query = query.filter(PersonCompanyOption.department == department_filter)
+    
+    if search_query:
+        query = query.filter(PersonCompanyOption.name.contains(search_query))
+    
+    # Get paginated results
+    options_pagination = query.order_by(PersonCompanyOption.id).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    # Get all departments for filter dropdown (normalize legacy values)
+    departments = db.session.query(RequestType.department).distinct().all()
+    departments = [('Management' if dept[0] == 'General Manager' else dept[0]) for dept in departments]
+    
+    return render_template('manage_person_company_options.html',
+                         options=options_pagination.items,
+                         pagination=options_pagination,
+                         departments=departments,
+                         department_filter=department_filter,
+                         search_query=search_query,
+                         user=current_user)
+
+
+@app.route('/it/person-company-options/add', methods=['GET', 'POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def add_person_company_option():
+    """Add new person/company name option - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        department = request.form.get('department', '').strip()
+        request_type = request.form.get('request_type', '').strip()
+        is_active = request.form.get('is_active') == 'on'
+        
+        if not name or not department or not request_type:
+            flash('Name, department, and request type are required.', 'danger')
+            return redirect(url_for('add_person_company_option'))
+        
+        # Check if option already exists for this department and request type combination
+        existing = PersonCompanyOption.query.filter_by(
+            name=name, 
+            department=department, 
+            request_type=request_type
+        ).first()
+        
+        if existing:
+            flash(f'Person/Company name "{name}" already exists for {department} department and {request_type} request type.', 'danger')
+            return redirect(url_for('add_person_company_option'))
+        
+        try:
+            option = PersonCompanyOption(
+                name=name,
+                department=department,
+                request_type=request_type,
+                is_active=is_active,
+                created_by_user_id=current_user.user_id
+            )
+            
+            db.session.add(option)
+            db.session.commit()
+            
+            # Log the action
+            log_action(f'Added person/company name option: {name} for {department}/{request_type}')
+            
+            flash(f'Person/Company name option "{name}" added successfully.', 'success')
+            return redirect(url_for('manage_person_company_options'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding person/company name option: {str(e)}', 'danger')
+            return redirect(url_for('add_person_company_option'))
+    
+    # Get all departments and request types for dropdowns
+    departments = ['Management', 'Finance', 'Operation', 'PR', 'Maintenance', 'Marketing', 
+                   'Logistic', 'HR', 'Quality Control', 'Procurement', 'IT', 'Customer Service', 
+                   'Project']
+    
+    # Get all active request types grouped by department
+    request_types_by_dept = {}
+    for dept in departments:
+        dept_name = 'Management' if dept == 'Management' else dept
+        if dept == 'Management':
+            types = RequestType.query.filter(
+                RequestType.department.in_(['Management', 'General Manager']),
+                RequestType.is_active == True
+            ).order_by(RequestType.name).all()
+        else:
+            types = RequestType.query.filter_by(
+                department=dept,
+                is_active=True
+            ).order_by(RequestType.name).all()
+        request_types_by_dept[dept] = [rt.name for rt in types]
+    
+    return render_template('add_person_company_option.html', 
+                         departments=departments,
+                         request_types_by_dept=request_types_by_dept,
+                         user=current_user)
+
+
+@app.route('/it/person-company-options/edit/<int:option_id>', methods=['GET', 'POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def edit_person_company_option(option_id):
+    """Edit person/company name option - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    option = PersonCompanyOption.query.get_or_404(option_id)
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        department = request.form.get('department', '').strip()
+        request_type = request.form.get('request_type', '').strip()
+        is_active = request.form.get('is_active') == 'on'
+        
+        if not name or not department or not request_type:
+            flash('Name, department, and request type are required.', 'danger')
+            return redirect(url_for('edit_person_company_option', option_id=option_id))
+        
+        # Check if option already exists for this department and request type combination (excluding current one)
+        existing = PersonCompanyOption.query.filter(
+            PersonCompanyOption.name == name,
+            PersonCompanyOption.department == department,
+            PersonCompanyOption.request_type == request_type,
+            PersonCompanyOption.id != option_id
+        ).first()
+        
+        if existing:
+            flash(f'Person/Company name "{name}" already exists for {department} department and {request_type} request type.', 'danger')
+            return redirect(url_for('edit_person_company_option', option_id=option_id))
+        
+        try:
+            old_name = option.name
+            old_department = option.department
+            old_request_type = option.request_type
+            
+            option.name = name
+            option.department = department
+            option.request_type = request_type
+            option.is_active = is_active
+            option.updated_at = datetime.utcnow()
+            
+            db.session.commit()
+            
+            # Log the action
+            log_action(f'Updated person/company name option: {old_name} ({old_department}/{old_request_type}) to {name} ({department}/{request_type})')
+            
+            flash(f'Person/Company name option updated successfully.', 'success')
+            return redirect(url_for('manage_person_company_options'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating person/company name option: {str(e)}', 'danger')
+            return redirect(url_for('edit_person_company_option', option_id=option_id))
+    
+    # Get all departments and request types for dropdowns
+    departments = ['Management', 'Finance', 'Operation', 'PR', 'Maintenance', 'Marketing', 
+                   'Logistic', 'HR', 'Quality Control', 'Procurement', 'IT', 'Customer Service', 
+                   'Project']
+    
+    # Get all active request types grouped by department
+    request_types_by_dept = {}
+    for dept in departments:
+        dept_name = 'Management' if dept == 'Management' else dept
+        if dept == 'Management':
+            types = RequestType.query.filter(
+                RequestType.department.in_(['Management', 'General Manager']),
+                RequestType.is_active == True
+            ).order_by(RequestType.name).all()
+        else:
+            types = RequestType.query.filter_by(
+                department=dept,
+                is_active=True
+            ).order_by(RequestType.name).all()
+        request_types_by_dept[dept] = [rt.name for rt in types]
+    
+    return render_template('edit_person_company_option.html', 
+                         option=option,
+                         departments=departments,
+                         request_types_by_dept=request_types_by_dept,
+                         user=current_user)
+
+
+@app.route('/it/person-company-options/toggle/<int:option_id>', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def toggle_person_company_option(option_id):
+    """Toggle person/company name option active status - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    option = PersonCompanyOption.query.get_or_404(option_id)
+    
+    try:
+        option.is_active = not option.is_active
+        option.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        # Log the action
+        status = 'activated' if option.is_active else 'deactivated'
+        log_action(f'{status.capitalize()} person/company name option: {option.name} ({option.department}/{option.request_type})')
+        
+        flash(f'Person/Company name option {status} successfully.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error toggling person/company name option: {str(e)}', 'danger')
+    
+    return redirect(url_for('manage_person_company_options'))
 
 
 # Branch Management Routes
@@ -6906,6 +7181,60 @@ def add_finance_request_types_route():
         
     except Exception as e:
         flash(f'Error adding Finance request types: {str(e)}', 'error')
+        return redirect(url_for('it_dashboard'))
+
+@app.route('/add-petrol-request-type')
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def add_petrol_request_type_route():
+    """Add Petrol request type for Finance Department"""
+    try:
+        from add_petrol_request_type import add_petrol_request_type
+        
+        # Add Petrol request type
+        add_petrol_request_type()
+        
+        flash('Petrol request type added successfully for Finance Department!', 'success')
+        return redirect(url_for('manage_request_types', department='Finance'))
+        
+    except Exception as e:
+        flash(f'Error adding Petrol request type: {str(e)}', 'error')
+        return redirect(url_for('it_dashboard'))
+
+@app.route('/add-rental-expenses-request-type')
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def add_rental_expenses_request_type_route():
+    """Add Rental Expenses request type for Finance Department"""
+    try:
+        from add_rental_expenses_request_type import add_rental_expenses_request_type
+        
+        # Add Rental Expenses request type
+        add_rental_expenses_request_type()
+        
+        flash('Rental Expenses request type added successfully for Finance Department!', 'success')
+        return redirect(url_for('manage_request_types', department='Finance'))
+        
+    except Exception as e:
+        flash(f'Error adding Rental Expenses request type: {str(e)}', 'error')
+        return redirect(url_for('it_dashboard'))
+
+@app.route('/add-social-insurance-salary-request-types')
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def add_social_insurance_salary_request_types_route():
+    """Add Social Insurance and Salary Expenses request types for Finance Department"""
+    try:
+        from add_social_insurance_salary_request_types import add_social_insurance_salary_request_types
+        
+        # Add Social Insurance and Salary Expenses request types
+        add_social_insurance_salary_request_types()
+        
+        flash('Social Insurance and Salary Expenses request types added successfully for Finance Department!', 'success')
+        return redirect(url_for('manage_request_types', department='Finance'))
+        
+    except Exception as e:
+        flash(f'Error adding request types: {str(e)}', 'error')
         return redirect(url_for('it_dashboard'))
 
 @app.route('/test-timezone')
@@ -10893,6 +11222,28 @@ def api_request_types():
     
     return jsonify({
         'request_types': request_types
+    })
+
+@app.route('/api/person-company-options')
+@login_required
+def api_person_company_options():
+    """API endpoint to get person/company name options by department and request type"""
+    department = request.args.get('department', '')
+    request_type = request.args.get('request_type', '')
+    
+    if department and request_type:
+        # Get options for specific department and request type
+        options = db.session.query(PersonCompanyOption.name).filter(
+            PersonCompanyOption.department == department,
+            PersonCompanyOption.request_type == request_type,
+            PersonCompanyOption.is_active == True
+        ).order_by(PersonCompanyOption.name).all()
+        options = [opt[0] for opt in options]
+    else:
+        options = []
+    
+    return jsonify({
+        'options': options
     })
 
 

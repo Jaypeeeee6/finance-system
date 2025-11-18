@@ -242,8 +242,28 @@ When creating a new payment request, users can only select from request types th
 
 ### **Finance Department**
 - Utilities Expenses
+- Rental Expenses
 - Coffee Shop Expenses
-- Supplier Expenses
+- Food Supplier
+- Vegetable/Fruits Supplier
+- Cheese Supplier
+- Spices Supplier
+- Syrup Supplier
+- Oil Supplier
+- Soft Drinks Supplier
+- Bakery
+- Water Supplier
+- Freshener Supplier
+- Gas Supplier
+- Cleaning Supplier
+- Plastics Supplier
+- Garbage Plastic Supplier
+- Furniture Supplier
+- Packing/Printing
+- Customer Service
+- Pest Control
+- Maintenance
+- Petrol
 
 ### **Operation Department**
 - Refund/Reimbursement

@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Add Person/Company Name{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-plus"></i> Add Person/Company Name</h1>
+        <p>Add a new dropdown option for Person/Company Name field</p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('add_person_company_option') }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="name">Person/Company Name *</label>
+                        <input type="text" name="name" id="name" class="form-control" required 
+                               placeholder="e.g., Dr. Scent, Oman Oil, Majid Al Futaim (Oman Mall)">
+                        <small class="form-text text-muted">Enter the person or company name that will appear in the dropdown</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="department">Department *</label>
+                        <select name="department" id="department" class="form-control" required onchange="updateRequestTypes()">
+                            <option value="">-- Select Department --</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept }}">{{ dept }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Select which department this option belongs to</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="request_type">Request Type *</label>
+                    <select name="request_type" id="request_type" class="form-control" required>
+                        <option value="">-- Select Department First --</option>
+                    </select>
+                    <small class="form-text text-muted">Select the request type for which this person/company name will appear</small>
+                </div>
+
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" name="is_active" id="is_active" class="form-check-input" checked>
+                        <label for="is_active" class="form-check-label">
+                            Active
+                        </label>
+                    </div>
+                    <small class="form-text text-muted">Active options will be available in the dropdown when creating new payment requests</small>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Add Person/Company Name
+                    </button>
+                    <a href="{{ url_for('manage_person_company_options') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Help Section -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-info-circle"></i> Person/Company Name Guidelines</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Naming Conventions:</h5>
+                    <ul>
+                        <li>Use the exact company or person name as it should appear</li>
+                        <li>Include any location or branch information if needed</li>
+                        <li>Keep names clear and consistent</li>
+                        <li>Use proper capitalization</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h5>Department & Request Type:</h5>
+                    <ul>
+                        <li>Each option is specific to a department and request type combination</li>
+                        <li>Different departments can have different options for the same request type</li>
+                        <li>Users will only see options for their department and selected request type</li>
+                        <li>Choose the most appropriate department and request type</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-lightbulb"></i>
+                <strong>Tip:</strong> You can always edit or deactivate person/company name options later if needed. 
+                Deactivated options will not appear in the dropdown but will remain in the database for historical records.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Store request types by department
+const requestTypesByDept = {{ request_types_by_dept | tojson }};
+
+function updateRequestTypes() {
+    const departmentSelect = document.getElementById('department');
+    const requestTypeSelect = document.getElementById('request_type');
+    const selectedDept = departmentSelect.value;
+    
+    // Clear existing options
+    requestTypeSelect.innerHTML = '<option value="">-- Select Request Type --</option>';
+    
+    if (selectedDept && requestTypesByDept[selectedDept]) {
+        const requestTypes = requestTypesByDept[selectedDept];
+        requestTypes.forEach(rt => {
+            const option = document.createElement('option');
+            option.value = rt;
+            option.textContent = rt;
+            requestTypeSelect.appendChild(option);
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const nameInput = document.getElementById('name');
+    const departmentSelect = document.getElementById('department');
+    const requestTypeSelect = document.getElementById('request_type');
+    
+    form.addEventListener('submit', function(e) {
+        const name = nameInput.value.trim();
+        const department = departmentSelect.value;
+        const requestType = requestTypeSelect.value;
+        
+        if (!name || !department || !requestType) {
+            e.preventDefault();
+            alert('Please fill in all required fields.');
+            return;
+        }
+        
+        // Basic name validation
+        if (name.length < 2) {
+            e.preventDefault();
+            alert('Person/Company name must be at least 2 characters long.');
+            nameInput.focus();
+            return;
+        }
+        
+        if (name.length > 200) {
+            e.preventDefault();
+            alert('Person/Company name must be less than 200 characters long.');
+            nameInput.focus();
+            return;
+        }
+    });
+});
+</script>
+{% endblock %}
+

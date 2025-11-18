@@ -641,27 +641,40 @@
 
 {% block extra_js %}
 <script>
-// Supplier options mapping for each request type
+// Supplier options mapping by department and request type
+// Structure: { department: { requestType: [options] } }
 const supplierOptions = {
-    'Freshener Supplier': ['Dr. Scent'],
-    'Water Supplier': ['Tanker', 'Ain Oman'],
-    'Cleaning Supplier': ['Al-Naba', 'Creative Icon'],
-    'Furniture Supplier': ['Ultimate Furnishing'],
-    'Customer Service': ['Lubek'],
-    'Gas Supplier': ['Muscat Gas Supplier', 'Al Amerat Gas Supplier', 'Nizwa Gas Supplier', 'Rustaq Gas Supplier', 'Al-Swaiq Gas Supplier', 'Sohar Gas Supplier', 'Al Amer Sohar City Center Gas Supplier', 'Golden Quality Gas'],
-    'Food Supplier': ['Al Amer Oman Mall Supplier', 'Al-Ismaily', 'Chef Middle East', 'Al Amer Majestic', 'Bid Food', 'Al Khan (PRF)'],
-    'Spices Supplier': ['Gazal Al Khadara'],
-    'Soft Drinks Supplier': ['Adhwa Al-Billa Drinks', 'Oman Refreshment'],
-    'Pest Control': ['Al-Shuhoomi'],
-    'Bakery': ['Al-Amin', 'Bakery LLC', 'Asalat Al Duqum'],
-    'Oil Supplier': ['Areej Oil'],
-    'Maintenance': ['Al-Bashiq'],
-    'Vegetable/Fruits Supplier': ['Alsadeen (Jalapeno)', 'Sindal', 'Sohol Al-Fiha', 'Al-Sowgra'],
-    'Cheese Supplier': ['Gulf Technical'],
-    'Syrup Supplier': ['Catering Solution'],
-    'Packing/Printing': ['Oman Printer', 'Al-Madenah', 'Excellent Packing', 'Al Andalus', 'Al Khalijia Company for Converting Industries'],
-    'Plastics Supplier': ['Al-Mera', 'Hotpack'],
-    'Garbage Plastic Supplier': ['Ariq']
+    'Finance': {
+        'Freshener Supplier': ['Dr. Scent'],
+        'Water Supplier': ['Tanker', 'Ain Oman'],
+        'Cleaning Supplier': ['Al-Naba', 'Creative Icon'],
+        'Furniture Supplier': ['Ultimate Furnishing'],
+        'Customer Service': ['Lubek'],
+        'Gas Supplier': ['Muscat Gas Supplier', 'Al Amerat Gas Supplier', 'Nizwa Gas Supplier', 'Rustaq Gas Supplier', 'Al-Swaiq Gas Supplier', 'Sohar Gas Supplier', 'Al Amer Sohar City Center Gas Supplier', 'Golden Quality Gas'],
+        'Food Supplier': ['Al Amer Oman Mall Supplier', 'Al-Ismaily', 'Chef Middle East', 'Al Amer Majestic', 'Bid Food', 'Al Khan (PRF)'],
+        'Spices Supplier': ['Gazal Al Khadara'],
+        'Soft Drinks Supplier': ['Adhwa Al-Billa Drinks', 'Oman Refreshment'],
+        'Pest Control': ['Al-Shuhoomi'],
+        'Bakery': ['Al-Amin', 'Bakery LLC', 'Asalat Al Duqum'],
+        'Oil Supplier': ['Areej Oil'],
+        'Maintenance': ['Al-Bashiq'],
+        'Vegetable/Fruits Supplier': ['Alsadeen (Jalapeno)', 'Sindal', 'Sohol Al-Fiha', 'Al-Sowgra'],
+        'Cheese Supplier': ['Gulf Technical'],
+        'Syrup Supplier': ['Catering Solution'],
+        'Packing/Printing': ['Oman Printer', 'Al-Madenah', 'Excellent Packing', 'Al Andalus', 'Al Khalijia Company for Converting Industries'],
+        'Plastics Supplier': ['Al-Mera', 'Hotpack'],
+        'Garbage Plastic Supplier': ['Ariq'],
+        'Petrol': ['Oman Oil'],
+        'Utilities Expenses': ['Majid Al Futaim (Oman Mall)', 'Majid Al Futaim (Avenues Mall)', 'Majid Al Futaim (City Center Qurum)', 'Majid Al Futaim (City Center Sohar)', 'IBN Arshad Trading'],
+        'Rental Expenses': ['Majid Al Futaim (Oman Mall)', 'Majid Al Futaim (Avenues Mall)', 'Majid Al Futaim (City Center Qurum)', 'Majid Al Futaim (City Center Sohar)'],
+        'Salary Expenses': ['Noora Al Khadhouri'],
+        'Social Insurance': ['SPF']
+    }
+    // Add other departments here as needed
+    // Example:
+    // 'HR': {
+    //     'Salary Expenses': ['Company A', 'Company B']
+    // }
 };
 
 // Date is already set to today's date in the template, no need to set it here
@@ -974,29 +987,60 @@ function handleRequestTypeChange() {
     // Person/Company Name field is always visible and required
     document.getElementById('personCompanyGroup').style.display = 'block';
     
-    // Check if this request type has supplier options
-    const hasSupplierOptions = supplierOptions.hasOwnProperty(requestType);
+    // Get department from the form
+    const department = document.getElementById('department').value;
+    
     const personCompanyInput = document.getElementById('person_company');
     const personCompanyContainer = document.getElementById('person_company_select_container');
     const personCompanySelect = document.getElementById('person_company_select');
     
-    if (hasSupplierOptions) {
-        // Show dropdown, hide text input
-        personCompanyInput.style.display = 'none';
-        personCompanyInput.required = false;
-        personCompanyContainer.style.display = 'block';
-        personCompanySelect.required = true;
-        
-        // Populate supplier options
-        populateSupplierOptions(requestType);
-        
-        // Initialize supplier search if not already initialized
-        if (!window.supplierSearchInitialized) {
-            initializeSupplierSearch();
-            window.supplierSearchInitialized = true;
-        }
+    // Check if this department and request type combination has supplier options from database
+    if (department && requestType) {
+        // Fetch options from API to check if dropdown should be shown
+        fetch(`/api/person-company-options?department=${encodeURIComponent(department)}&request_type=${encodeURIComponent(requestType)}`)
+            .then(response => response.json())
+            .then(data => {
+                const options = data.options || [];
+                
+                if (options.length > 0) {
+                    // Show dropdown, hide text input
+                    personCompanyInput.style.display = 'none';
+                    personCompanyInput.required = false;
+                    personCompanyContainer.style.display = 'block';
+                    personCompanySelect.required = true;
+                    
+                    // Populate supplier options
+                    populateSupplierOptions(department, requestType);
+                    
+                    // Initialize supplier search if not already initialized
+                    if (!window.supplierSearchInitialized) {
+                        initializeSupplierSearch();
+                        window.supplierSearchInitialized = true;
+                    }
+                } else {
+                    // Show text input, hide dropdown
+                    personCompanyInput.style.display = 'block';
+                    personCompanyInput.required = true;
+                    personCompanyContainer.style.display = 'none';
+                    personCompanySelect.required = false;
+                    
+                    // Clear supplier dropdown
+                    const searchInput = document.getElementById('person_company_search');
+                    const dropdown = document.getElementById('person_company_dropdown');
+                    if (searchInput) searchInput.value = '';
+                    if (dropdown) dropdown.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Error checking supplier options:', error);
+                // On error, show text input
+                personCompanyInput.style.display = 'block';
+                personCompanyInput.required = true;
+                personCompanyContainer.style.display = 'none';
+                personCompanySelect.required = false;
+            });
     } else {
-        // Show text input, hide dropdown
+        // Show text input, hide dropdown if no department/request type
         personCompanyInput.style.display = 'block';
         personCompanyInput.required = true;
         personCompanyContainer.style.display = 'none';
@@ -1020,30 +1064,50 @@ function handleRequestTypeChange() {
     recurringFields.style.display = 'block';
 }
 
-function populateSupplierOptions(requestType) {
-    const options = supplierOptions[requestType] || [];
+function populateSupplierOptions(department, requestType) {
     const select = document.getElementById('person_company_select');
     const searchInput = document.getElementById('person_company_search');
     
     // Clear existing options
     select.innerHTML = '<option value="">-- Select Supplier --</option>';
     
-    // Add options
-    options.forEach(option => {
-        const optionElement = document.createElement('option');
-        optionElement.value = option;
-        optionElement.textContent = option;
-        select.appendChild(optionElement);
-    });
-    
-    // Clear search input
-    if (searchInput) {
-        searchInput.value = '';
-    }
-    
-    // Rebuild dropdown if supplier search is initialized
-    if (window.supplierSearchInitialized) {
-        buildSupplierDropdown();
+    // Fetch options from API
+    if (department && requestType) {
+        fetch(`/api/person-company-options?department=${encodeURIComponent(department)}&request_type=${encodeURIComponent(requestType)}`)
+            .then(response => response.json())
+            .then(data => {
+                const options = data.options || [];
+                
+                // Add options
+                options.forEach(option => {
+                    const optionElement = document.createElement('option');
+                    optionElement.value = option;
+                    optionElement.textContent = option;
+                    select.appendChild(optionElement);
+                });
+                
+                // Clear search input
+                if (searchInput) {
+                    searchInput.value = '';
+                }
+                
+                // Rebuild dropdown if supplier search is initialized
+                if (window.supplierSearchInitialized) {
+                    buildSupplierDropdown();
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching supplier options:', error);
+                // Clear search input on error
+                if (searchInput) {
+                    searchInput.value = '';
+                }
+            });
+    } else {
+        // Clear search input if no department/request type
+        if (searchInput) {
+            searchInput.value = '';
+        }
     }
 }
 
@@ -3746,13 +3810,14 @@ function validateRequestForm() {
             errors.push('Please select a supplier from the dropdown.');
             if (!firstErrorField) firstErrorField = document.getElementById('person_company_search');
         } else {
-            // Validate that the selected value is in the allowed options for the current request type
-            if (supplierOptions[requestType]) {
-                const allowedSuppliers = supplierOptions[requestType];
-                if (!allowedSuppliers.includes(personCompanyValue)) {
-                    errors.push('Invalid supplier selected. Please select a valid supplier from the dropdown.');
-                    if (!firstErrorField) firstErrorField = document.getElementById('person_company_search');
-                }
+            // Validate that the selected value is in the allowed options for the current department and request type
+            const department = document.getElementById('department').value;
+            // Validate that the selected value is in the allowed options
+            // Get allowed suppliers from the select element options
+            const allowedSuppliers = Array.from(personCompanySelect.options).map(opt => opt.value).filter(v => v);
+            if (!allowedSuppliers.includes(personCompanyValue)) {
+                errors.push('Invalid supplier selected. Please select a valid supplier from the dropdown.');
+                if (!firstErrorField) firstErrorField = document.getElementById('person_company_search');
             }
         }
     } else {
@@ -4448,13 +4513,12 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
         
         if (personCompanySelect && personCompanySelect.value) {
             // Final validation: ensure the value is in the allowed suppliers list
-            if (supplierOptions[requestType]) {
-                const allowedSuppliers = supplierOptions[requestType];
-                if (!allowedSuppliers.includes(personCompanySelect.value)) {
-                    e.preventDefault();
-                    alert('Invalid supplier selected. Please select a valid supplier from the dropdown.');
-                    return false;
-                }
+            // Get allowed suppliers from the select element options
+            const allowedSuppliers = Array.from(personCompanySelect.options).map(opt => opt.value).filter(v => v);
+            if (!allowedSuppliers.includes(personCompanySelect.value)) {
+                e.preventDefault();
+                alert('Invalid supplier selected. Please select a valid supplier from the dropdown.');
+                return false;
             }
             formData.set('person_company', personCompanySelect.value);
         } else {

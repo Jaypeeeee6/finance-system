@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Person/Company Names{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-user-tag"></i> Manage Person/Company Names</h1>
+        <p>Manage dropdown options for Person/Company Name field based on department and request type</p>
+    </div>
+
+    <div class="dashboard-actions">
+        <a href="{{ url_for('add_person_company_option') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add Person/Company Name
+        </a>
+        <a href="{{ url_for('it_dashboard') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to IT Dashboard
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="header-top">
+                <div class="filter-controls">
+                    <select id="departmentFilter" onchange="filterTable()" class="form-select">
+                        <option value="">All Departments</option>
+                        {% for dept in departments %}
+                        <option value="{{ dept }}" {% if department_filter == dept %}selected{% endif %}>{{ dept }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" id="searchInput" placeholder="Search by name..." class="form-control" value="{{ search_query }}">
+                    <button type="button" class="btn btn-outline" onclick="filterTable()">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                <h2><i class="fas fa-user-tag"></i> Person/Company Name Options</h2>
+            </div>
+            <div class="card-header-actions">
+                {% if department_filter or search_query %}
+                <div class="filter-indicator">
+                    <span class="badge" style="background: #f57c00; color: white;">
+                        <i class="fas fa-filter"></i> 
+                        {% set filters = [] %}
+                        {% if department_filter %}{{ filters.append(department_filter) or '' }}{% endif %}
+                        {% if search_query %}{{ filters.append('Search: ' + search_query) or '' }}{% endif %}
+                        {{ filters|join(' | ') }}
+                    </span>
+                    <a href="{{ url_for('manage_person_company_options') }}" class="btn btn-sm btn-outline">
+                        <i class="fas fa-times"></i> Clear All
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card-body">
+            {% if options %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Department</th>
+                                <th>Request Type</th>
+                                <th>Status</th>
+                                <th>Created By</th>
+                                <th>Created Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for option in options %}
+                            <tr>
+                                <td>{{ option.id }}</td>
+                                <td><strong>{{ option.name }}</strong></td>
+                                <td><span class="badge badge-info">{{ option.department }}</span></td>
+                                <td><span class="badge badge-secondary">{{ option.request_type }}</span></td>
+                                <td>
+                                    {% if option.is_active %}
+                                        <span class="badge badge-success">Active</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ option.created_by.name if option.created_by else 'System' }}</td>
+                                <td>{{ option.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{{ url_for('edit_person_company_option', option_id=option.id) }}" class="btn btn-sm btn-info" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form method="POST" action="{{ url_for('toggle_person_company_option', option_id=option.id) }}" style="display: inline;">
+                                            <button type="submit" class="btn btn-sm {% if option.is_active %}btn-warning{% else %}btn-success{% endif %}" 
+                                                    title="{% if option.is_active %}Deactivate{% else %}Activate{% endif %}"
+                                                    onclick="return confirm('Are you sure you want to {% if option.is_active %}deactivate{% else %}activate{% endif %} this person/company name option?')">
+                                                <i class="fas fa-{% if option.is_active %}pause{% else %}play{% endif %}"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-user-tag"></i>
+                    <p>No person/company name options found.</p>
+                    <a href="{{ url_for('add_person_company_option') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add First Person/Company Name
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Pagination Controls -->
+    {% if pagination and pagination.pages > 1 %}
+    <div class="pagination-container">
+        <div class="pagination-left">
+            <div class="pagination-info">
+                Showing {{ pagination.per_page * (pagination.page - 1) + 1 }} to 
+                {{ pagination.per_page * (pagination.page - 1) + pagination.items|length }} 
+                of {{ pagination.total }} options
+            </div>
+            <div class="items-per-page">
+                <label for="per_page">Show:</label>
+                <select id="per_page" onchange="changeItemsPerPage(this.value)">
+                    <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10</option>
+                    <option value="20" {% if pagination.per_page == 20 %}selected{% endif %}>20</option>
+                    <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if pagination.per_page == 100 %}selected{% endif %}>100</option>
+                </select>
+                <span>per page</span>
+            </div>
+        </div>
+        <div class="pagination">
+            {% if pagination.has_prev %}
+                <a href="{{ url_for('manage_person_company_options', page=pagination.prev_num, per_page=pagination.per_page, department=department_filter, search=search_query) }}" class="btn btn-sm btn-secondary">
+                    <i class="fas fa-chevron-left"></i> Previous
+                </a>
+            {% endif %}
+            
+            {% for page_num in pagination.iter_pages() %}
+                {% if page_num %}
+                    {% if page_num != pagination.page %}
+                        <a href="{{ url_for('manage_person_company_options', page=page_num, per_page=pagination.per_page, department=department_filter, search=search_query) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
+                    {% else %}
+                        <span class="btn btn-sm btn-primary">{{ page_num }}</span>
+                    {% endif %}
+                {% else %}
+                    <span class="pagination-ellipsis">...</span>
+                {% endif %}
+            {% endfor %}
+            
+            {% if pagination.has_next %}
+                <a href="{{ url_for('manage_person_company_options', page=pagination.next_num, per_page=pagination.per_page, department=department_filter, search=search_query) }}" class="btn btn-sm btn-secondary">
+                    Next <i class="fas fa-chevron-right"></i>
+                </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterTable() {
+    const departmentFilter = document.getElementById('departmentFilter').value;
+    const searchInput = document.getElementById('searchInput').value;
+    
+    // Build URL with filters
+    const url = new URL(window.location);
+    url.searchParams.set('department', departmentFilter);
+    url.searchParams.set('search', searchInput);
+    url.searchParams.set('page', '1'); // Reset to page 1 when filtering
+    
+    window.location.href = url.toString();
+}
+
+function changeItemsPerPage(perPage) {
+    const url = new URL(window.location);
+    url.searchParams.set('per_page', perPage);
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}
+
+// Initialize search functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                filterTable();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+
