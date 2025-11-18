@@ -12,6 +12,46 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+document.addEventListener('DOMContentLoaded', function() {
+    const dropdowns = document.querySelectorAll('.new-request-dropdown');
+    if (!dropdowns.length) {
+        return;
+    }
+
+    const closeAll = () => {
+        dropdowns.forEach(dropdown => dropdown.classList.remove('open'));
+    };
+
+    dropdowns.forEach(dropdown => {
+        const toggle = dropdown.querySelector('.new-request-toggle');
+        const links = dropdown.querySelectorAll('.new-request-menu a');
+        if (!toggle) {
+            return;
+        }
+
+        toggle.addEventListener('click', function(event) {
+            event.preventDefault();
+            const isOpen = dropdown.classList.contains('open');
+            closeAll();
+            if (!isOpen) {
+                dropdown.classList.add('open');
+            }
+        });
+
+        links.forEach(link => {
+            link.addEventListener('click', () => {
+                closeAll();
+            });
+        });
+    });
+
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('.new-request-dropdown')) {
+            closeAll();
+        }
+    });
+});
+
 // Animation for slide out
 const style = document.createElement('style');
 style.textContent = `

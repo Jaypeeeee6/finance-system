@@ -10,12 +10,20 @@
     </div>
 
     <div class="dashboard-actions">
-        <a href="{{ url_for('new_request') }}" class="btn btn-primary">
-            <i class="fas fa-plus-circle"></i> New Payment Request
-        </a>
-        <a href="{{ url_for('procurement_request_item') }}" class="btn btn-primary">
-            <i class="fas fa-plus-circle"></i> New Item Request
-        </a>
+        <div class="new-request-dropdown">
+            <button type="button" class="btn btn-primary new-request-toggle">
+                <i class="fas fa-plus-circle"></i> New Request
+                <i class="fas fa-caret-down dropdown-caret"></i>
+            </button>
+            <div class="new-request-menu">
+                <a href="{{ url_for('new_request') }}">
+                    <i class="fas fa-credit-card"></i> Payment Request for Finance
+                </a>
+                <a href="{{ url_for('procurement_request_item') }}">
+                    <i class="fas fa-boxes"></i> Item Request for Procurement
+                </a>
+            </div>
+        </div>
         <a href="{{ url_for('procurement_item_requests') }}" class="btn btn-success">
             <i class="fas fa-shopping-cart"></i> Item Requests
         </a>

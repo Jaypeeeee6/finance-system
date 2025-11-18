@@ -122,9 +122,24 @@
         min-width: 0 !important;
         flex: 0 1 auto !important;
     }
+    .dashboard-container .dashboard-actions .new-request-dropdown {
+        width: 100% !important;
+        max-width: 95% !important;
+        min-width: 0 !important;
+        flex: 0 1 100% !important;
+    }
+    .dashboard-container .dashboard-actions .new-request-dropdown .new-request-toggle {
+        width: 100% !important;
+        height: 100%;
+        justify-content: center;
+    }
     /* IT Dashboard ONLY: Make buttons wider */
     .dashboard-container:has(> .dashboard-tabs) .dashboard-actions .btn {
         max-width: 98% !important;
+    }
+    .dashboard-container:has(> .dashboard-tabs) .dashboard-actions .new-request-dropdown {
+        width: 100% !important;
+        max-width: 100% !important;
     }
     /* IT Dashboard ONLY: Move buttons to the right (centered in their section) */
     .dashboard-container:has(> .dashboard-tabs) .dashboard-actions {
@@ -134,6 +149,10 @@
     /* Non-IT Dashboards ONLY: Make buttons wider */
     .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-actions .btn {
         max-width: 97% !important;
+    }
+    .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-actions .new-request-dropdown {
+        width: 100% !important;
+        max-width: 99% !important;
     }
     /* Non-IT Dashboards ONLY: Move buttons to the right */
     .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-actions {
