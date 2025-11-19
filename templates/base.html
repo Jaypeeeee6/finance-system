@@ -126,7 +126,7 @@
                 <li><a href="{{ url_for('reports') }}" class="nav-link"><i class="fas fa-chart-bar"></i> Reports</a></li>
                 {% endif %}
                 
-                {% if current_user.role == 'Department Manager' and current_user.department == 'Procurement' %}
+                {% if (current_user.role == 'Department Manager' and current_user.department == 'Procurement') or current_user.role in ['GM', 'Operation Manager'] %}
                 <li><a href="{{ url_for('procurement_item_requests') }}" class="nav-link"><i class="fas fa-shopping-cart"></i> Item Requests</a></li>
                 {% endif %}
                 
@@ -438,6 +438,7 @@
                     <div class="notification-time-dropdown" data-time-element="true">${getTimeAgo(notification.created_at)}</div>
                     <div class="notification-actions-dropdown">
                         ${notification.request_id ? `<a href="/request/${notification.request_id}" class="btn btn-sm btn-info"><i class="fas fa-eye"></i> View</a>` : ''}
+                        ${notification.item_request_id ? `<a href="/procurement/item-request/${notification.item_request_id}/view" class="btn btn-sm btn-info"><i class="fas fa-eye"></i> View</a>` : ''}
                         ${isUnread ? `<button onclick=\"markAsRead(${notification.notification_id})\" class=\"btn btn-sm btn-success\"><i class=\"fas fa-check\"></i> Mark Read</button>` : ''}
                     </div>
                 </div>

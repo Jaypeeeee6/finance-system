@@ -48,6 +48,11 @@
                                     <i class="fas fa-eye"></i> View Request
                                 </a>
                                 {% endif %}
+                                {% if notification.item_request_id %}
+                                <a href="{{ url_for('view_item_request_page', request_id=notification.item_request_id) }}" class="btn btn-sm btn-info">
+                                    <i class="fas fa-eye"></i> View Item Request
+                                </a>
+                                {% endif %}
                                 {% if notification.notification_type == 'recurring_due' and user.role in ['Finance Admin', 'Finance Staff'] %}
                                 <button onclick="markAsPaid({{ notification.notification_id }})" class="btn btn-sm btn-warning">
                                     <i class="fas fa-dollar-sign"></i> Mark as Paid

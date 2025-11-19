@@ -183,12 +183,12 @@
                     Submit Request
                 </div>
             </li>
-            <li class="step-tab {% if item_request.status == 'Rejected by Manager' %}rejected{% elif item_request.status == 'Pending Manager Approval' %}warning{% elif item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed'] %}completed{% else %}disabled{% endif %}" data-step="manager">
+            <li class="step-tab {% if item_request.status == 'Rejected by Manager' %}rejected{% elif item_request.status == 'Pending Manager Approval' or (item_request.status == 'On Hold' and item_request.manager_on_hold_by_user_id) %}warning{% elif item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed'] or (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) %}completed{% else %}disabled{% endif %}" data-step="manager">
                 <div class="step-tab-content">
                     Manager Approval
                 </div>
             </li>
-            <li class="step-tab {% if item_request.status == 'Rejected by Procurement Manager' %}rejected{% elif item_request.status == 'Pending Procurement Manager Approval' %}warning{% elif item_request.status in ['Assigned to Procurement', 'Completed'] %}completed{% else %}disabled{% endif %}" data-step="procurement">
+            <li class="step-tab {% if item_request.status == 'Rejected by Procurement Manager' %}rejected{% elif item_request.status == 'Pending Procurement Manager Approval' or (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) %}warning{% elif item_request.status in ['Assigned to Procurement', 'Completed'] %}completed{% else %}disabled{% endif %}" data-step="procurement">
                 <div class="step-tab-content">
                     Procurement Manager Approval
                 </div>
@@ -263,6 +263,8 @@
                 <div>
                     {% if item_request.status == 'Completed' %}
                         <span class="badge" style="background: #28a745; color: white; padding: 8px 16px; font-size: 0.9rem;">✓ {{ item_request.status }}</span>
+                    {% elif item_request.status == 'On Hold' %}
+                        <span class="badge" style="background: #ffc107; color: #212529; padding: 8px 16px; font-size: 0.9rem;">⏸ On Hold Until Further Notice</span>
                     {% elif item_request.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval', 'Assigned to Procurement'] %}
                         <span class="badge" style="background: #2196F3; color: white; padding: 8px 16px; font-size: 0.9rem;">⏳ {{ item_request.status }}</span>
                     {% elif item_request.status in ['Rejected by Manager', 'Rejected by Procurement Manager'] %}
@@ -283,7 +285,7 @@
         <div class="step-content" id="step-manager">
             <h3><i class="fas fa-user-tie"></i> Manager Approval</h3>
             
-            {% if item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed', 'Rejected by Manager'] %}
+            {% if item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed', 'Rejected by Manager'] or (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) %}
                 <div class="admin-mode-warning" style="background: #28a745; color: white;">
                     <i class="fas fa-check-circle"></i>
                     <span>Manager Approval: {% if item_request.status == 'Rejected by Manager' %}Rejected{% else %}Completed{% endif %}</span>
@@ -349,17 +351,41 @@
                         {% endif %}
                     </div>
                 </div>
-            {% elif item_request.status == 'Pending Manager Approval' %}
-                <!-- Manager approval required -->
+            {% elif item_request.status in ['Pending Manager Approval', 'On Hold'] and not (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) %}
+                <!-- Manager approval required or On Hold -->
                 <div class="card manager-approval-required" style="margin-bottom: 1.5rem;">
                     <div class="card-header">
                         <h4><i class="fas fa-user-tie"></i> Manager Approval Required</h4>
                     </div>
                     <div class="card-body">
+                        <!-- Status Display (similar to Finance Approval tab) -->
+                        {% if item_request.status == 'On Hold' %}
+                        <div class="status-display" style="margin-bottom: 1.5rem;">
+                            <div style="font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 0.5rem;">Status</div>
+                            <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 12px 20px; text-align: center;">
+                                <span style="color: #856404; font-weight: bold; font-size: 1.1rem;">ON HOLD UNTIL FURTHER NOTICE</span>
+                            </div>
+                            {% if item_request.manager_on_hold_by %}
+                            <div style="text-align: center; margin-top: 0.5rem; color: #666; font-size: 0.9rem;">
+                                <strong>Put on hold by:</strong> {{ item_request.manager_on_hold_by }}
+                                {% if item_request.manager_on_hold_date %}
+                                <span style="margin-left: 10px;">on {{ item_request.manager_on_hold_date.strftime('%Y-%m-%d') }}</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            {% if item_request.manager_on_hold_reason %}
+                            <div style="margin-top: 0.5rem; padding: 10px; background: #fff9e6; border: 1px solid #ffc107; border-radius: 6px;">
+                                <strong style="color: #856404;">Reason:</strong>
+                                <p style="color: #856404; margin: 5px 0 0 0; white-space: pre-wrap;">{{ item_request.manager_on_hold_reason }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
                         <div class="row">
                             <div class="col-md-8">
                                 <p style="margin-bottom: 0.5rem; font-size: 1.1rem;">
-                                    <strong>Status:</strong> Waiting for Manager Approval
+                                    <strong>Status:</strong> {% if item_request.status == 'On Hold' %}On Hold Until Further Notice{% else %}Waiting for Manager Approval{% endif %}
                                 </p>
                                 
                                 <p style="margin-bottom: 0.5rem; color: #666;">
@@ -408,31 +434,44 @@
                     <div class="card your-approval-required">
                         <div class="card-header">
                             <h4><i class="fas fa-check-circle"></i> Your Approval Required</h4>
-                            <p>As the manager, please review and approve this request.</p>
+                            <p>As the manager{% if requestor_user %} of {{ requestor_user.name }}{% endif %}, please review and approve this request.</p>
                         </div>
                         <div class="card-body">
-                            <!-- Approve Form -->
-                            <form method="POST" action="{{ url_for('item_request_manager_approve', request_id=item_request.id) }}" style="margin-bottom: 1rem;">
+                            <form method="POST" action="{{ url_for('item_request_manager_decision', request_id=item_request.id) }}">
                                 <div class="form-group">
-                                    <label for="manager_approval_reason">Approval Notes (Optional)</label>
-                                    <textarea name="approval_reason" id="manager_approval_reason" rows="3" placeholder="Add any notes about this approval..."></textarea>
+                                    <label for="item_manager_approval_status">Set Status *</label>
+                                    <select name="approval_status" id="item_manager_approval_status" required onchange="toggleItemManagerApprovalFields()">
+                                        <option value="">-- Select Status --</option>
+                                        <option value="approve">Approve</option>
+                                        <option value="reject">Reject</option>
+                                        <option value="on_hold">On Hold</option>
+                                    </select>
                                 </div>
+                                
+                                <div id="item_manager_approve_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="item_manager_approval_reason">Approval Notes (Optional)</label>
+                                        <textarea name="approval_reason" id="item_manager_approval_reason" rows="3" placeholder="Add any notes about this approval..."></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div id="item_manager_reject_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="item_manager_rejection_reason">Reason for Rejection *</label>
+                                        <textarea name="rejection_reason" id="item_manager_rejection_reason" rows="3" placeholder="Please provide a clear reason for rejecting this request..." required></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div id="item_manager_on_hold_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="item_manager_on_hold_reason">On Hold Reason (Optional)</label>
+                                        <textarea name="on_hold_reason" id="item_manager_on_hold_reason" rows="3" placeholder="Add any notes about why this request is on hold..."></textarea>
+                                    </div>
+                                </div>
+                                
                                 <div class="step-actions">
                                     <button type="submit" class="btn btn-success">
-                                        <i class="fas fa-check"></i> Approve
-                                    </button>
-                                </div>
-                            </form>
-                            
-                            <!-- Reject Form -->
-                            <form method="POST" action="{{ url_for('item_request_manager_reject', request_id=item_request.id) }}" style="border-top: 1px solid #e9ecef; padding-top: 1rem;">
-                                <div class="form-group">
-                                    <label for="manager_rejection_reason">Reason for Rejection *</label>
-                                    <textarea name="rejection_reason" id="manager_rejection_reason" rows="3" placeholder="Please provide a clear reason for rejecting this request..." required></textarea>
-                                </div>
-                                <div class="step-actions">
-                                    <button type="submit" class="btn btn-danger">
-                                        <i class="fas fa-times"></i> Reject
+                                        <i class="fas fa-check"></i> Submit Decision
                                     </button>
                                 </div>
                             </form>
@@ -446,7 +485,7 @@
         <div class="step-content" id="step-procurement">
             <h3><i class="fas fa-shopping-cart"></i> Procurement Manager Approval</h3>
             
-            {% if item_request.status in ['Assigned to Procurement', 'Completed', 'Rejected by Procurement Manager'] %}
+            {% if item_request.status in ['Assigned to Procurement', 'Completed', 'Rejected by Procurement Manager'] and item_request.status != 'On Hold' %}
                 <div class="admin-mode-warning" style="background: #28a745; color: white;">
                     <i class="fas fa-check-circle"></i>
                     <span>Procurement Manager Approval: {% if item_request.status == 'Rejected by Procurement Manager' %}Rejected{% else %}Completed{% endif %}</span>
@@ -520,17 +559,41 @@
                         {% endif %}
                     </div>
                 </div>
-            {% elif item_request.status == 'Pending Procurement Manager Approval' %}
-                <!-- Procurement Manager approval required -->
+            {% elif item_request.status in ['Pending Procurement Manager Approval', 'On Hold'] %}
+                <!-- Procurement Manager approval required or On Hold -->
                 <div class="card procurement-approval-required" style="margin-bottom: 1.5rem;">
                     <div class="card-header">
                         <h4><i class="fas fa-shopping-cart"></i> Procurement Manager Approval Required</h4>
                     </div>
                     <div class="card-body">
+                        <!-- Status Display (similar to Finance Approval tab) -->
+                        {% if item_request.status == 'On Hold' %}
+                        <div class="status-display" style="margin-bottom: 1.5rem;">
+                            <div style="font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 0.5rem;">Status</div>
+                            <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 12px 20px; text-align: center;">
+                                <span style="color: #856404; font-weight: bold; font-size: 1.1rem;">ON HOLD UNTIL FURTHER NOTICE</span>
+                            </div>
+                            {% if item_request.procurement_manager_on_hold_by %}
+                            <div style="text-align: center; margin-top: 0.5rem; color: #666; font-size: 0.9rem;">
+                                <strong>Put on hold by:</strong> {{ item_request.procurement_manager_on_hold_by }}
+                                {% if item_request.procurement_manager_on_hold_date %}
+                                <span style="margin-left: 10px;">on {{ item_request.procurement_manager_on_hold_date.strftime('%Y-%m-%d') }}</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            {% if item_request.procurement_manager_on_hold_reason %}
+                            <div style="margin-top: 0.5rem; padding: 10px; background: #fff9e6; border: 1px solid #ffc107; border-radius: 6px;">
+                                <strong style="color: #856404;">Reason:</strong>
+                                <p style="color: #856404; margin: 5px 0 0 0; white-space: pre-wrap;">{{ item_request.procurement_manager_on_hold_reason }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
                         <div class="row">
                             <div class="col-md-8">
                                 <p style="margin-bottom: 0.5rem; font-size: 1.1rem;">
-                                    <strong>Status:</strong> Waiting for Procurement Manager Approval
+                                    <strong>Status:</strong> {% if item_request.status == 'On Hold' %}On Hold Until Further Notice{% else %}Waiting for Procurement Manager Approval{% endif %}
                                 </p>
                                 <p style="margin-bottom: 0.5rem; color: #666;">
                                     <strong>Department:</strong> {{ item_request.department }}
@@ -551,47 +614,60 @@
                     <div class="card procurement-approval-form">
                         <div class="card-header">
                             <h4><i class="fas fa-check-circle"></i> Your Approval Required</h4>
-                            <p>As the Procurement Manager, please review, approve, and assign this request.</p>
+                            <p>As the Procurement Manager{% if requestor_user %} of {{ requestor_user.name }}{% endif %}, please review, approve, and assign this request.</p>
                         </div>
                         <div class="card-body">
-                            <!-- Approve Form -->
-                            <form method="POST" action="{{ url_for('item_request_procurement_manager_approve', request_id=item_request.id) }}" style="margin-bottom: 1rem;">
+                            <form method="POST" action="{{ url_for('item_request_procurement_manager_decision', request_id=item_request.id) }}">
                                 <div class="form-group">
-                                    <label for="amount">Amount (OMR) *</label>
-                                    <div style="position: relative;">
-                                        <span style="position: absolute; left: 12px; top: 12px; color: #666; font-weight: 600;">OMR</span>
-                                        <input type="number" name="amount" id="amount" step="0.001" min="0" required style="padding-left: 55px; width: 100%;" placeholder="0.000">
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="assigned_to_user_id">Assign to Procurement Member *</label>
-                                    <select name="assigned_to_user_id" id="assigned_to_user_id" required>
-                                        <option value="">-- Select Procurement Member --</option>
-                                        {% for member in procurement_members %}
-                                            <option value="{{ member.user_id }}">{{ member.name }}</option>
-                                        {% endfor %}
+                                    <label for="item_procurement_approval_status">Set Status *</label>
+                                    <select name="approval_status" id="item_procurement_approval_status" required onchange="toggleItemProcurementManagerApprovalFields()">
+                                        <option value="">-- Select Status --</option>
+                                        <option value="approve">Approve</option>
+                                        <option value="reject">Reject</option>
+                                        <option value="on_hold">On Hold</option>
                                     </select>
                                 </div>
-                                <div class="form-group">
-                                    <label for="procurement_approval_reason">Approval Notes (Optional)</label>
-                                    <textarea name="approval_reason" id="procurement_approval_reason" rows="3" placeholder="Add any notes about this approval..."></textarea>
+                                
+                                <div id="item_procurement_approve_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="procurement_amount">Amount (OMR) *</label>
+                                        <div style="position: relative;">
+                                            <span style="position: absolute; left: 12px; top: 12px; color: #666; font-weight: 600;">OMR</span>
+                                            <input type="number" name="amount" id="procurement_amount" step="0.001" min="0" required style="padding-left: 55px; width: 100%;" placeholder="0.000">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="procurement_assigned_to_user_id">Assign to Procurement Member *</label>
+                                        <select name="assigned_to_user_id" id="procurement_assigned_to_user_id" required>
+                                            <option value="">-- Select Procurement Member --</option>
+                                            {% for member in procurement_members %}
+                                                <option value="{{ member.user_id }}">{{ member.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="procurement_approval_reason">Approval Notes (Optional)</label>
+                                        <textarea name="approval_reason" id="procurement_approval_reason" rows="3" placeholder="Add any notes about this approval..."></textarea>
+                                    </div>
                                 </div>
+                                
+                                <div id="item_procurement_reject_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="procurement_rejection_reason">Reason for Rejection *</label>
+                                        <textarea name="rejection_reason" id="procurement_rejection_reason" rows="3" placeholder="Please provide a clear reason for rejecting this request..." required></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div id="item_procurement_on_hold_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="procurement_on_hold_reason">On Hold Reason (Optional)</label>
+                                        <textarea name="on_hold_reason" id="procurement_on_hold_reason" rows="3" placeholder="Add any notes about why this request is on hold..."></textarea>
+                                    </div>
+                                </div>
+                                
                                 <div class="step-actions">
                                     <button type="submit" class="btn btn-success">
-                                        <i class="fas fa-check"></i> Approve & Assign
-                                    </button>
-                                </div>
-                            </form>
-                            
-                            <!-- Reject Form -->
-                            <form method="POST" action="{{ url_for('item_request_procurement_manager_reject', request_id=item_request.id) }}" style="border-top: 1px solid #e9ecef; padding-top: 1rem;">
-                                <div class="form-group">
-                                    <label for="procurement_rejection_reason">Reason for Rejection *</label>
-                                    <textarea name="rejection_reason" id="procurement_rejection_reason" rows="3" placeholder="Please provide a clear reason for rejecting this request..." required></textarea>
-                                </div>
-                                <div class="step-actions">
-                                    <button type="submit" class="btn btn-danger">
-                                        <i class="fas fa-times"></i> Reject
+                                        <i class="fas fa-check"></i> Submit Decision
                                     </button>
                                 </div>
                             </form>
@@ -645,12 +721,29 @@
                             <p>Complete this item request once the item has been procured and delivered.</p>
                         </div>
                         <div class="card-body">
-                            <form method="POST" action="{{ url_for('item_request_complete', request_id=item_request.id) }}" enctype="multipart/form-data">
-                                <div class="form-group">
-                                    <label for="receipt_files">Upload Receipt *</label>
-                                    <input type="file" name="receipt_files" id="receipt_files" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" multiple required>
-                                    <small style="color: #666; display: block; margin-top: 5px;">Allowed formats: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX (Max 50MB each)</small>
+                            <form method="POST" action="{{ url_for('item_request_complete', request_id=item_request.id) }}" enctype="multipart/form-data" id="item-request-complete-form">
+                                <div id="item-receipt-upload-container" 
+                                     data-multiple-file-upload
+                                     data-input-name="receipt_files"
+                                     data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                     data-max-size="10485760"
+                                     data-max-files="10"
+                                     data-required="true"
+                                     data-label="Upload Receipt"
+                                     data-help-text="Required for Finance Admin approval (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)">
                                 </div>
+                                
+                                <div id="item-invoice-upload-container" 
+                                     data-multiple-file-upload
+                                     data-input-name="invoice_files"
+                                     data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                     data-max-size="10485760"
+                                     data-max-files="10"
+                                     data-required="true"
+                                     data-label="Upload Invoice"
+                                     data-help-text="Required for Finance Admin approval (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)">
+                                </div>
+                                
                                 <div class="form-group">
                                     <label for="completion_notes">Completion Notes (Optional)</label>
                                     <textarea name="completion_notes" id="completion_notes" rows="3" placeholder="Add any notes about the completion..."></textarea>
@@ -696,6 +789,20 @@
                                 <li style="margin-bottom: 6px;">
                                     <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-sm btn-outline-info">
                                         <i class="fas fa-file"></i> {{ file }}
+                                    </a>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                        {% if invoice_files %}
+                        <div class="form-group">
+                            <label>Upload Invoice</label>
+                            <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
+                                {% for file in invoice_files %}
+                                <li style="margin-bottom: 6px;">
+                                    <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-sm btn-outline-success">
+                                        <i class="fas fa-file-invoice"></i> {{ file }}
                                     </a>
                                 </li>
                                 {% endfor %}
@@ -759,6 +866,20 @@
                             </ul>
                         </div>
                         {% endif %}
+                        {% if invoice_files %}
+                        <div class="form-group">
+                            <label>Upload Invoice</label>
+                            <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
+                                {% for file in invoice_files %}
+                                <li style="margin-bottom: 6px;">
+                                    <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-sm btn-outline-success">
+                                        <i class="fas fa-file-invoice"></i> {{ file }}
+                                    </a>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             {% else %}
@@ -772,6 +893,78 @@
 </div>
 
 <script>
+// Toggle fields for Manager Approval based on status selection
+function toggleItemManagerApprovalFields() {
+    const status = document.getElementById('item_manager_approval_status').value;
+    const approveFields = document.getElementById('item_manager_approve_fields');
+    const rejectFields = document.getElementById('item_manager_reject_fields');
+    const onHoldFields = document.getElementById('item_manager_on_hold_fields');
+    const rejectionReasonField = document.getElementById('item_manager_rejection_reason');
+    
+    // Hide all fields first and remove required attributes
+    approveFields.style.display = 'none';
+    rejectFields.style.display = 'none';
+    onHoldFields.style.display = 'none';
+    if (rejectionReasonField) {
+        rejectionReasonField.removeAttribute('required');
+    }
+    
+    // Show relevant fields based on selection and add required attributes
+    if (status === 'approve') {
+        approveFields.style.display = 'block';
+    } else if (status === 'reject') {
+        rejectFields.style.display = 'block';
+        if (rejectionReasonField) {
+            rejectionReasonField.setAttribute('required', 'required');
+        }
+    } else if (status === 'on_hold') {
+        onHoldFields.style.display = 'block';
+    }
+}
+
+// Toggle fields for Procurement Manager Approval based on status selection
+function toggleItemProcurementManagerApprovalFields() {
+    const status = document.getElementById('item_procurement_approval_status').value;
+    const approveFields = document.getElementById('item_procurement_approve_fields');
+    const rejectFields = document.getElementById('item_procurement_reject_fields');
+    const onHoldFields = document.getElementById('item_procurement_on_hold_fields');
+    const rejectionReasonField = document.getElementById('procurement_rejection_reason');
+    const amountField = document.getElementById('procurement_amount');
+    const assignedToField = document.getElementById('procurement_assigned_to_user_id');
+    
+    // Hide all fields first and remove required attributes
+    approveFields.style.display = 'none';
+    rejectFields.style.display = 'none';
+    onHoldFields.style.display = 'none';
+    if (rejectionReasonField) {
+        rejectionReasonField.removeAttribute('required');
+    }
+    if (amountField) {
+        amountField.removeAttribute('required');
+    }
+    if (assignedToField) {
+        assignedToField.removeAttribute('required');
+    }
+    
+    // Show relevant fields based on selection and add required attributes
+    if (status === 'approve') {
+        approveFields.style.display = 'block';
+        if (amountField) {
+            amountField.setAttribute('required', 'required');
+        }
+        if (assignedToField) {
+            assignedToField.setAttribute('required', 'required');
+        }
+    } else if (status === 'reject') {
+        rejectFields.style.display = 'block';
+        if (rejectionReasonField) {
+            rejectionReasonField.setAttribute('required', 'required');
+        }
+    } else if (status === 'on_hold') {
+        onHoldFields.style.display = 'block';
+    }
+}
+
 // Step tabs functionality
 document.addEventListener('DOMContentLoaded', function() {
     const stepTabs = document.querySelectorAll('.step-tab');
@@ -806,6 +999,60 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // Handle item request completion form submission with multiple file upload components
+    const itemRequestCompleteForm = document.getElementById('item-request-complete-form');
+    if (itemRequestCompleteForm) {
+        itemRequestCompleteForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Get both upload components
+            const receiptContainer = document.getElementById('item-receipt-upload-container');
+            const invoiceContainer = document.getElementById('item-invoice-upload-container');
+            
+            if (receiptContainer && receiptContainer.uploadComponent && invoiceContainer && invoiceContainer.uploadComponent) {
+                const receiptComponent = receiptContainer.uploadComponent;
+                const invoiceComponent = invoiceContainer.uploadComponent;
+                
+                // Validate that both have files (both are required)
+                if (receiptComponent.getFiles().length === 0) {
+                    alert('Please select at least one receipt file to upload.');
+                    return;
+                }
+                
+                if (invoiceComponent.getFiles().length === 0) {
+                    alert('Please select at least one invoice file to upload.');
+                    return;
+                }
+                
+                // Prepare form data with all selected files
+                const formData = new FormData(this);
+                receiptComponent.prepareFormData(formData);
+                invoiceComponent.prepareFormData(formData);
+                
+                // Submit the form with FormData
+                fetch(this.action, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        window.location.href = window.location.href;
+                    } else {
+                        console.error('Form submission failed');
+                        alert('Form submission failed. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred. Please try again.');
+                });
+            } else {
+                // Fallback to regular form submission if components not found
+                this.submit();
+            }
+        });
+    }
 });
 
 </script>

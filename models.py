@@ -265,9 +265,11 @@ class Notification(db.Model):
     
     # Related request ID for notifications about specific requests
     request_id = db.Column(db.Integer, db.ForeignKey('payment_requests.request_id'), nullable=True)
+    item_request_id = db.Column(db.Integer, db.ForeignKey('procurement_item_requests.id'), nullable=True)
     
     user = db.relationship('User', backref='notifications')
     request = db.relationship('PaymentRequest', backref='notifications')
+    item_request = db.relationship('ProcurementItemRequest', backref='notifications')
     
     def to_dict(self):
         """Convert notification to dictionary"""
@@ -278,7 +280,8 @@ class Notification(db.Model):
             'notification_type': self.notification_type,
             'is_read': self.is_read,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'request_id': self.request_id
+            'request_id': self.request_id,
+            'item_request_id': self.item_request_id
         }
     
     def __repr__(self):
@@ -635,6 +638,10 @@ class ProcurementItemRequest(db.Model):
     manager_approval_reason = db.Column(db.Text, nullable=True)
     manager_approval_start_time = db.Column(db.DateTime, nullable=True)
     manager_approval_end_time = db.Column(db.DateTime, nullable=True)
+    manager_on_hold_date = db.Column(db.Date, nullable=True)
+    manager_on_hold_by = db.Column(db.String(100), nullable=True)
+    manager_on_hold_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    manager_on_hold_reason = db.Column(db.Text, nullable=True)
     
     # Procurement Manager approval fields
     procurement_manager_approval_date = db.Column(db.Date, nullable=True)
@@ -645,6 +652,10 @@ class ProcurementItemRequest(db.Model):
     procurement_manager_rejector_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
     procurement_manager_rejection_reason = db.Column(db.Text, nullable=True)
     procurement_manager_approval_reason = db.Column(db.Text, nullable=True)
+    procurement_manager_on_hold_date = db.Column(db.Date, nullable=True)
+    procurement_manager_on_hold_by = db.Column(db.String(100), nullable=True)
+    procurement_manager_on_hold_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    procurement_manager_on_hold_reason = db.Column(db.Text, nullable=True)
     amount = db.Column(db.Numeric(10, 3), nullable=True)  # Amount set by Procurement Manager when approving
     
     # Assignment fields
@@ -657,6 +668,7 @@ class ProcurementItemRequest(db.Model):
     completion_date = db.Column(db.DateTime, nullable=True)
     completion_notes = db.Column(db.Text, nullable=True)
     receipt_path = db.Column(db.String(255), nullable=True)  # Receipt file path for completed item requests
+    invoice_path = db.Column(db.String(255), nullable=True)  # Invoice file path for completed item requests
     
     # Relationships
     manager_approver_user = db.relationship('User', foreign_keys=[manager_approver_user_id], backref='approved_item_requests_as_manager')
