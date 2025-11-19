@@ -722,26 +722,36 @@
                         </div>
                         <div class="card-body">
                             <form method="POST" action="{{ url_for('item_request_complete', request_id=item_request.id) }}" enctype="multipart/form-data" id="item-request-complete-form">
-                                <div id="item-receipt-upload-container" 
-                                     data-multiple-file-upload
-                                     data-input-name="receipt_files"
-                                     data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                                     data-max-size="10485760"
-                                     data-max-files="10"
-                                     data-required="true"
-                                     data-label="Upload Receipt"
-                                     data-help-text="Required for Finance Admin approval (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)">
+                                <div class="form-group">
+                                    <p style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem;">
+                                        <strong>Upload Receipt:</strong> This is for the proof of transfer made by the Procurement Manager to the assigned Procurement Staff.
+                                    </p>
+                                    <div id="item-receipt-upload-container" 
+                                         data-multiple-file-upload
+                                         data-input-name="receipt_files"
+                                         data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                         data-max-size="10485760"
+                                         data-max-files="10"
+                                         data-required="true"
+                                         data-label="Upload Receipt"
+                                         data-help-text="Required for Finance Admin approval (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)">
+                                    </div>
                                 </div>
                                 
-                                <div id="item-invoice-upload-container" 
-                                     data-multiple-file-upload
-                                     data-input-name="invoice_files"
-                                     data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                                     data-max-size="10485760"
-                                     data-max-files="10"
-                                     data-required="true"
-                                     data-label="Upload Invoice"
-                                     data-help-text="Required for Finance Admin approval (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)">
+                                <div class="form-group">
+                                    <p style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem;">
+                                        <strong>Upload Invoice:</strong> This is for the proof of payment made for the requested item.
+                                    </p>
+                                    <div id="item-invoice-upload-container" 
+                                         data-multiple-file-upload
+                                         data-input-name="invoice_files"
+                                         data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                         data-max-size="10485760"
+                                         data-max-files="10"
+                                         data-required="true"
+                                         data-label="Upload Invoice"
+                                         data-help-text="Required for Finance Admin approval (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)">
+                                    </div>
                                 </div>
                                 
                                 <div class="form-group">
