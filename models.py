@@ -682,3 +682,73 @@ class ProcurementItemRequest(db.Model):
     
     def __repr__(self):
         return f'<ProcurementItemRequest {self.id} - {self.item_name} ({self.status})>'
+
+
+class ProcurementCategory(db.Model):
+    """Procurement category options for specific departments"""
+    __tablename__ = 'procurement_categories'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)  # e.g., "Kitchen Tool", "Dining", "Stationary"
+    department = db.Column(db.String(100), nullable=False)  # Department this category belongs to
+    is_active = db.Column(db.Boolean, default=True)  # Whether this category is currently available
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    
+    # Relationship to User who created this category
+    created_by = db.relationship('User', backref='created_procurement_categories')
+    
+    # Relationship to items in this category
+    items = db.relationship('ProcurementItem', backref='category', lazy=True, cascade='all, delete-orphan')
+    
+    def to_dict(self):
+        """Convert procurement category to dictionary"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'department': self.department,
+            'is_active': self.is_active,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'created_by': self.created_by.name if self.created_by else 'System'
+        }
+    
+    def __repr__(self):
+        return f'<ProcurementCategory {self.id} - {self.name} ({self.department})>'
+
+
+class ProcurementItem(db.Model):
+    """Procurement item options for specific departments and categories"""
+    __tablename__ = 'procurement_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)  # e.g., "JUICE BLENDER (500ML)", "Pens"
+    category_id = db.Column(db.Integer, db.ForeignKey('procurement_categories.id'), nullable=True)  # Category this item belongs to
+    department = db.Column(db.String(100), nullable=False)  # Department this item belongs to
+    description = db.Column(db.Text, nullable=True)  # Optional description
+    is_active = db.Column(db.Boolean, default=True)  # Whether this item is currently available
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    
+    # Relationship to User who created this item
+    created_by = db.relationship('User', backref='created_procurement_items')
+    
+    def to_dict(self):
+        """Convert procurement item to dictionary"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'category_id': self.category_id,
+            'category_name': self.category.name if self.category else None,
+            'department': self.department,
+            'description': self.description,
+            'is_active': self.is_active,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'created_by': self.created_by.name if self.created_by else 'System'
+        }
+    
+    def __repr__(self):
+        return f'<ProcurementItem {self.id} - {self.name} ({self.department})>'

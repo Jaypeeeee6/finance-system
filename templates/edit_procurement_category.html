@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Procurement Category{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-edit"></i> Edit Procurement Category</h1>
+        <p>Edit category: <strong>{{ category.name }}</strong></p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('edit_procurement_category', category_id=category.id) }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="name">Category Name *</label>
+                        <input type="text" name="name" id="name" class="form-control" required 
+                               value="{{ category.name }}" placeholder="e.g., Kitchen Tool, Dining, Stationary">
+                        <small class="form-text text-muted">Enter the category name that will appear in the dropdown</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="department">Department *</label>
+                        <select name="department" id="department" class="form-control" required>
+                            <option value="">-- Select Department --</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept }}" {% if dept == category.department %}selected{% endif %}>{{ dept }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Select which department this category belongs to</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" name="is_active" id="is_active" class="form-check-input" 
+                               {% if category.is_active %}checked{% endif %}>
+                        <label for="is_active" class="form-check-label">
+                            Active
+                        </label>
+                    </div>
+                    <small class="form-text text-muted">Active categories will be available in the dropdown when creating new procurement item requests</small>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Update Category
+                    </button>
+                    <a href="{{ url_for('manage_procurement_categories_items', filter_type='categories') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const nameInput = document.getElementById('name');
+    const departmentSelect = document.getElementById('department');
+    
+    form.addEventListener('submit', function(e) {
+        const name = nameInput.value.trim();
+        const department = departmentSelect.value;
+        
+        if (!name || !department) {
+            e.preventDefault();
+            alert('Please fill in all required fields.');
+            return;
+        }
+        
+        // Basic name validation
+        if (name.length < 2) {
+            e.preventDefault();
+            alert('Category name must be at least 2 characters long.');
+            nameInput.focus();
+            return;
+        }
+        
+        if (name.length > 200) {
+            e.preventDefault();
+            alert('Category name must be less than 200 characters long.');
+            nameInput.focus();
+            return;
+        }
+    });
+});
+</script>
+{% endblock %}
+

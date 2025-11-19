@@ -45,6 +45,9 @@
         <button class="tab-btn {% if active_tab == 'person-company-names' %}active{% endif %}" onclick="showTab('person-company-names')">
             <i class="fas fa-user-tag"></i> Person/Company Names
         </button>
+        <button class="tab-btn {% if active_tab == 'procurement-categories-items' %}active{% endif %}" onclick="showTab('procurement-categories-items')">
+            <i class="fas fa-shopping-cart"></i> Procurement Categories/Items
+        </button>
         <button class="tab-btn {% if active_tab == 'branches' %}active{% endif %}" onclick="showTab('branches')">
             <i class="fas fa-building"></i> Branches
         </button>
@@ -1108,6 +1111,211 @@
         </div>
     </div>
 
+    <!-- Procurement Categories/Items Tab -->
+    <div id="procurement-categories-items-tab" class="tab-content {% if active_tab == 'procurement-categories-items' %}active{% endif %}">
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="fas fa-shopping-cart"></i> Procurement Categories/Items Management</h2>
+                <div class="header-buttons">
+                    <a href="{{ url_for('add_procurement_category') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add Category
+                    </a>
+                    <a href="{{ url_for('add_procurement_item') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add Item
+                    </a>
+                    <a href="{{ url_for('manage_procurement_categories_items') }}" class="btn btn-secondary">
+                        <i class="fas fa-cog"></i> Manage All Categories/Items
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info alert-persistent">
+                    <i class="fas fa-info-circle"></i>
+                    <span><strong>Procurement Categories/Items Management:</strong> Manage category and item name/description options for each department when creating new item requests. 
+                    These options will appear in the dropdowns when users create new procurement item requests.</span>
+                </div>
+                
+                <!-- Department Filter and Search -->
+                <div class="filter-section mb-3">
+                    <form method="GET" action="{{ url_for('it_dashboard') }}" class="filter-form" id="procurementFilterForm" onsubmit="return false;">
+                        <input type="hidden" name="tab" value="procurement-categories-items">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="procurement_department_filter" class="filter-label">
+                                    <i class="fas fa-building"></i> Filter by Department:
+                                </label>
+                                <select name="procurement_department_filter" id="procurement_department_filter" class="form-control filter-select">
+                                    <option value="all" {% if not procurement_department_filter or procurement_department_filter == 'all' %}selected{% endif %}>All Departments</option>
+                                    {% for dept in departments %}
+                                    <option value="{{ dept }}" {% if procurement_department_filter == dept %}selected{% endif %}>{{ dept }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="procurement_search" class="filter-label">
+                                    <i class="fas fa-search"></i> Search:
+                                </label>
+                                <input type="text" name="procurement_search" id="procurement_search" class="form-control filter-input" 
+                                       placeholder="Search by name..." value="{{ procurement_search or '' }}">
+                            </div>
+                            <div class="filter-actions">
+                                <a href="{{ url_for('it_dashboard', tab='procurement-categories-items') }}" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-times"></i> Clear
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Filter Summary -->
+                <div class="filter-summary mb-3">
+                    <div class="summary-info">
+                        <i class="fas fa-info-circle"></i>
+                        <span>
+                            {% if procurement_department_filter and procurement_department_filter != 'all' or procurement_search %}
+                                Showing {{ procurement_categories|length }} categor{{ 'y' if procurement_categories|length == 1 else 'ies' }} and {{ procurement_items|length }} item{{ 's' if procurement_items|length != 1 else '' }}
+                                {% if procurement_department_filter and procurement_department_filter != 'all' %}for <strong>{{ procurement_department_filter }}</strong> department{% endif %}
+                                {% if procurement_search %}matching "<strong>{{ procurement_search }}</strong>"{% endif %}
+                            {% else %}
+                                Showing all {{ procurement_categories|length }} categor{{ 'y' if procurement_categories|length == 1 else 'ies' }} and {{ procurement_items|length }} item{{ 's' if procurement_items|length != 1 else '' }} across all departments
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Categories Section -->
+                <div class="mb-4">
+                    <h3><i class="fas fa-tags"></i> Categories</h3>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Department</th>
+                                    <th>Status</th>
+                                    <th>Created By</th>
+                                    <th>Created Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if procurement_categories %}
+                                    {% for category in procurement_categories %}
+                                    <tr>
+                                        <td>{{ category.id }}</td>
+                                        <td><strong>{{ category.name }}</strong></td>
+                                        <td><span class="badge badge-info">{{ category.department }}</span></td>
+                                        <td>
+                                            {% if category.is_active %}
+                                                <span class="badge badge-success">Active</span>
+                                            {% else %}
+                                                <span class="badge badge-danger">Inactive</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ category.created_by.name if category.created_by else 'System' }}</td>
+                                        <td>{{ category.created_at.strftime('%Y-%m-%d') if category.created_at else 'N/A' }}</td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <a href="{{ url_for('edit_procurement_category', category_id=category.id) }}" class="btn btn-sm btn-info" title="Edit">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <form method="POST" action="{{ url_for('toggle_procurement_category', category_id=category.id) }}" style="display: inline;">
+                                                    <button type="submit" class="btn btn-sm {% if category.is_active %}btn-warning{% else %}btn-success{% endif %}" 
+                                                            title="{% if category.is_active %}Deactivate{% else %}Activate{% endif %}"
+                                                            onclick="return confirm('Are you sure you want to {% if category.is_active %}deactivate{% else %}activate{% endif %} this category?')">
+                                                        <i class="fas fa-{% if category.is_active %}pause{% else %}play{% endif %}"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="7" class="text-center">
+                                            <div class="empty-state">
+                                                <i class="fas fa-tags"></i>
+                                                <p>No categories found. <a href="{{ url_for('add_procurement_category') }}">Add the first category</a></p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Items Section -->
+                <div>
+                    <h3><i class="fas fa-box"></i> Items</h3>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Department</th>
+                                    <th>Description</th>
+                                    <th>Status</th>
+                                    <th>Created By</th>
+                                    <th>Created Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if procurement_items %}
+                                    {% for item in procurement_items %}
+                                    <tr>
+                                        <td>{{ item.id }}</td>
+                                        <td><strong>{{ item.name }}</strong></td>
+                                        <td><span class="badge badge-secondary">{{ item.category.name if item.category else 'N/A' }}</span></td>
+                                        <td><span class="badge badge-info">{{ item.department }}</span></td>
+                                        <td>{{ item.description or 'N/A' }}</td>
+                                        <td>
+                                            {% if item.is_active %}
+                                                <span class="badge badge-success">Active</span>
+                                            {% else %}
+                                                <span class="badge badge-danger">Inactive</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ item.created_by.name if item.created_by else 'System' }}</td>
+                                        <td>{{ item.created_at.strftime('%Y-%m-%d') if item.created_at else 'N/A' }}</td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <a href="{{ url_for('edit_procurement_item', item_id=item.id) }}" class="btn btn-sm btn-info" title="Edit">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <form method="POST" action="{{ url_for('toggle_procurement_item', item_id=item.id) }}" style="display: inline;">
+                                                    <button type="submit" class="btn btn-sm {% if item.is_active %}btn-warning{% else %}btn-success{% endif %}" 
+                                                            title="{% if item.is_active %}Deactivate{% else %}Activate{% endif %}"
+                                                            onclick="return confirm('Are you sure you want to {% if item.is_active %}deactivate{% else %}activate{% endif %} this item?')">
+                                                        <i class="fas fa-{% if item.is_active %}pause{% else %}play{% endif %}"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="9" class="text-center">
+                                            <div class="empty-state">
+                                                <i class="fas fa-box"></i>
+                                                <p>No items found. <a href="{{ url_for('add_procurement_item') }}">Add the first item</a></p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Audit Logs Tab -->
     <div id="logs-tab" class="tab-content {% if active_tab == 'logs' %}active{% endif %}">
         <div class="card">
@@ -1523,6 +1731,65 @@ function performPersonCompanySearch(commit) {
         .catch(() => {});
 }
 
+function performProcurementSearch(commit) {
+    const searchInput = document.getElementById('procurement_search');
+    const searchValue = searchInput ? searchInput.value.trim() : '';
+    const url = new URL(window.location);
+    
+    // Update search query parameter
+    if (searchValue) {
+        url.searchParams.set('procurement_search', searchValue);
+    } else {
+        url.searchParams.delete('procurement_search');
+    }
+    
+    // Preserve tab
+    url.searchParams.set('tab', 'procurement-categories-items');
+    
+    if (commit) {
+        window.location.href = url.toString();
+        return;
+    }
+    
+    fetch(url.toString(), { headers: { 'X-Requested-With': 'fetch' } })
+        .then(res => res.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const procurementTab = doc.querySelector('#procurement-categories-items-tab');
+            const currentProcurementTab = document.querySelector('#procurement-categories-items-tab');
+            
+            if (procurementTab && currentProcurementTab) {
+                // Update the tables and filter summary
+                const newCategoriesTable = procurementTab.querySelector('.mb-4 .table-responsive');
+                const newItemsTable = procurementTab.querySelector('.mb-4 + div .table-responsive');
+                const newSummary = procurementTab.querySelector('.filter-summary');
+                
+                if (newCategoriesTable) {
+                    const currentCategoriesTable = currentProcurementTab.querySelector('.mb-4 .table-responsive');
+                    if (currentCategoriesTable) {
+                        currentCategoriesTable.innerHTML = newCategoriesTable.innerHTML;
+                    }
+                }
+                
+                if (newItemsTable) {
+                    const currentItemsTable = currentProcurementTab.querySelector('.mb-4 + div .table-responsive');
+                    if (currentItemsTable) {
+                        currentItemsTable.innerHTML = newItemsTable.innerHTML;
+                    }
+                }
+                
+                if (newSummary) {
+                    const currentSummary = currentProcurementTab.querySelector('.filter-summary');
+                    if (currentSummary) {
+                        currentSummary.innerHTML = newSummary.innerHTML;
+                    }
+                }
+            }
+        })
+        .catch(() => {});
+}
+
 function filterTable() {
     // This function is kept for urgent filter (client-side filtering for urgent status)
     // Note: Department filtering is handled server-side via filterByDepartment()
@@ -1566,7 +1833,7 @@ function clearSearch() {
 
 function showTab(tabName) {
     // Hide all main dashboard tabs (not nested ones)
-    const mainTabs = document.querySelectorAll('#requests-tab, #users-tab, #request-types-tab, #person-company-names-tab, #branches-tab, #logs-tab');
+    const mainTabs = document.querySelectorAll('#requests-tab, #users-tab, #request-types-tab, #person-company-names-tab, #procurement-categories-items-tab, #branches-tab, #logs-tab');
     mainTabs.forEach(tab => {
         tab.classList.remove('active');
         tab.style.display = 'none';
@@ -1819,8 +2086,47 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Set up Procurement Categories/Items search functionality
+    let procurementSearchDebounceTimer;
+    const procurementSearchInput = document.getElementById('procurement_search');
+    if (procurementSearchInput) {
+        procurementSearchInput.addEventListener('input', function() {
+            clearTimeout(procurementSearchDebounceTimer);
+            // Wait 500ms after user stops typing before performing search
+            procurementSearchDebounceTimer = setTimeout(function() {
+                performProcurementSearch(false);
+            }, 500);
+        });
+        
+        // Also trigger search on Enter key
+        procurementSearchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                clearTimeout(procurementSearchDebounceTimer);
+                performProcurementSearch(true);
+            }
+        });
+    }
+    
+    // Set up Procurement department filter change handler
+    const procurementDepartmentFilter = document.getElementById('procurement_department_filter');
+    if (procurementDepartmentFilter) {
+        procurementDepartmentFilter.addEventListener('change', function() {
+            // Update URL and refresh procurement categories/items
+            const url = new URL(window.location);
+            const deptValue = this.value;
+            if (deptValue && deptValue !== 'all') {
+                url.searchParams.set('procurement_department_filter', deptValue);
+            } else {
+                url.searchParams.delete('procurement_department_filter');
+            }
+            url.searchParams.set('tab', 'procurement-categories-items');
+            url.searchParams.delete('procurement_search'); // Clear search when department changes
+            window.location.href = url.toString();
+        });
+    }
+    
     // Initialize tab display - show only the active main dashboard tab
-    const mainTabs = document.querySelectorAll('#requests-tab, #users-tab, #request-types-tab, #person-company-names-tab, #branches-tab, #logs-tab');
+    const mainTabs = document.querySelectorAll('#requests-tab, #users-tab, #request-types-tab, #person-company-names-tab, #procurement-categories-items-tab, #branches-tab, #logs-tab');
     mainTabs.forEach(tab => {
         if (!tab.classList.contains('active')) {
             tab.style.display = 'none';

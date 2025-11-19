@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Procurement Item{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-edit"></i> Edit Procurement Item</h1>
+        <p>Edit item: <strong>{{ item.name }}</strong></p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('edit_procurement_item', item_id=item.id) }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="name">Item Name *</label>
+                        <input type="text" name="name" id="name" class="form-control" required 
+                               value="{{ item.name }}" placeholder="e.g., JUICE BLENDER (500ML), Pens, Files">
+                        <small class="form-text text-muted">Enter the item name that will appear in the dropdown</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="department">Department *</label>
+                        <select name="department" id="department" class="form-control" required onchange="updateCategories()">
+                            <option value="">-- Select Department --</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept }}" {% if dept == item.department %}selected{% endif %}>{{ dept }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Select which department this item belongs to</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="category_id">Category</label>
+                    <select name="category_id" id="category_id" class="form-control">
+                        <option value="">-- Select Category (Optional) --</option>
+                    </select>
+                    <small class="form-text text-muted">Optional: Select a category for this item</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea name="description" id="description" class="form-control" rows="3" 
+                              placeholder="Optional: Enter a description for this item">{{ item.description or '' }}</textarea>
+                    <small class="form-text text-muted">Optional: Provide additional details about this item</small>
+                </div>
+
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" name="is_active" id="is_active" class="form-check-input" 
+                               {% if item.is_active %}checked{% endif %}>
+                        <label for="is_active" class="form-check-label">
+                            Active
+                        </label>
+                    </div>
+                    <small class="form-text text-muted">Active items will be available in the dropdown when creating new procurement item requests</small>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Update Item
+                    </button>
+                    <a href="{{ url_for('manage_procurement_categories_items', filter_type='items') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Store categories by department
+const categoriesByDept = {};
+{% for category in categories %}
+    const dept = '{{ category.department }}';
+    if (!categoriesByDept[dept]) {
+        categoriesByDept[dept] = [];
+    }
+    categoriesByDept[dept].push({
+        id: {{ category.id }},
+        name: '{{ category.name }}'
+    });
+{% endfor %}
+
+// Current item's category ID
+const currentCategoryId = {{ item.category_id if item.category_id else 'null' }};
+
+function updateCategories() {
+    const departmentSelect = document.getElementById('department');
+    const categorySelect = document.getElementById('category_id');
+    const selectedDept = departmentSelect.value;
+    
+    // Clear existing options
+    categorySelect.innerHTML = '<option value="">-- Select Category (Optional) --</option>';
+    
+    if (selectedDept && categoriesByDept[selectedDept]) {
+        const categories = categoriesByDept[selectedDept];
+        categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat.id;
+            option.textContent = cat.name;
+            if (currentCategoryId && cat.id == currentCategoryId) {
+                option.selected = true;
+            }
+            categorySelect.appendChild(option);
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize categories for current department
+    updateCategories();
+    
+    const form = document.querySelector('form');
+    const nameInput = document.getElementById('name');
+    const departmentSelect = document.getElementById('department');
+    
+    form.addEventListener('submit', function(e) {
+        const name = nameInput.value.trim();
+        const department = departmentSelect.value;
+        
+        if (!name || !department) {
+            e.preventDefault();
+            alert('Please fill in all required fields.');
+            return;
+        }
+        
+        // Basic name validation
+        if (name.length < 2) {
+            e.preventDefault();
+            alert('Item name must be at least 2 characters long.');
+            nameInput.focus();
+            return;
+        }
+        
+        if (name.length > 200) {
+            e.preventDefault();
+            alert('Item name must be less than 200 characters long.');
+            nameInput.focus();
+            return;
+        }
+    });
+});
+</script>
+{% endblock %}
+

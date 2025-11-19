@@ -37,28 +37,16 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="category">Category</label>
-                        {% if user and user.department == 'Operation' %}
-                            <select name="category" id="category">
-                                <option value="">-- Select Category --</option>
-                                <option value="Cleaning">Cleaning</option>
-                                <option value="Kitchen Tool">Kitchen Tool</option>
-                                <option value="Dining">Dining</option>
-                                <option value="Electrical">Electrical</option>
-                                <option value="Stationary">Stationary</option>
-                                <option value="Furniture">Furniture</option>
-                                <option value="Others">Others</option>
-                            </select>
-                            <small class="form-text text-muted">Select the category of the item</small>
-                        {% else %}
-                            <select name="category" id="category">
-                                <option value="">-- Select Category --</option>
-                                <option value="Maintenance of Items">Maintenance of Items</option>
-                                <option value="Stationary">Stationary</option>
-                                <option value="Electronics">Electronics</option>
-                                <option value="Others">Others</option>
-                            </select>
-                            <small class="form-text text-muted">Select the category of the item</small>
-                        {% endif %}
+                        <select name="category" id="category">
+                            <option value="">-- Select Category --</option>
+                            {% if procurement_categories %}
+                                {% for category in procurement_categories %}
+                                <option value="{{ category.name }}">{{ category.name }}</option>
+                                {% endfor %}
+                            {% endif %}
+                            <option value="Others">Others</option>
+                        </select>
+                        <small class="form-text text-muted">Select the category of the item</small>
                     </div>
 
                     <div class="form-group">
@@ -69,34 +57,16 @@
                                    autocomplete="off">
                             <select name="item_name" id="item_name" class="form-control" style="display: none;" required>
                                 <option value="">-- Select Item --</option>
-                                {% if user and user.department == 'Operation' and operation_items %}
-                                    {% for item in operation_items %}
-                                        {% if kitchen_tool_items and item in kitchen_tool_items %}
-                                        <option value="{{ item }}" data-category="Kitchen Tool">{{ item }}</option>
-                                        {% elif dining_items and item in dining_items %}
-                                        <option value="{{ item }}" data-category="Dining">{{ item }}</option>
-                                        {% elif stationary_items and item in stationary_items %}
-                                        <option value="{{ item }}" data-category="Stationary">{{ item }}</option>
-                                        {% elif electrical_items and item in electrical_items %}
-                                        <option value="{{ item }}" data-category="Electrical">{{ item }}</option>
-                                        {% elif furniture_items and item in furniture_items %}
-                                        <option value="{{ item }}" data-category="Furniture">{{ item }}</option>
-                                        {% else %}
-                                        <option value="{{ item }}">{{ item }}</option>
-                                        {% endif %}
-                                    {% endfor %}
-                                {% elif user and user.department == 'HR' and hr_stationary_items %}
-                                    {% for item in hr_stationary_items %}
-                                    <option value="{{ item }}" data-category="Stationary" data-department="HR">{{ item }}</option>
+                                {% if procurement_items %}
+                                    {% for item in procurement_items %}
+                                    <option value="{{ item.name }}" data-category="{{ item.category.name if item.category else '' }}" data-item-id="{{ item.id }}">{{ item.name }}</option>
                                     {% endfor %}
                                 {% endif %}
                             </select>
                             <input type="hidden" name="item_name_value" id="item_name_value" value="">
                             <div id="item_dropdown" class="item-dropdown" style="display: none;"></div>
                         </div>
-                        {% if user and user.department == 'Operation' %}
-                            <small class="form-text text-muted">Type to search or select from predefined items</small>
-                        {% elif user and user.department == 'HR' %}
+                        {% if procurement_items and procurement_items|length > 0 %}
                             <small class="form-text text-muted">Type to search or select from predefined items</small>
                         {% else %}
                             <small class="form-text text-muted">Enter the item name or description</small>

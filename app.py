@@ -12,7 +12,7 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, PersonCompanyOption
+from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, PersonCompanyOption, ProcurementCategory, ProcurementItem
 from config import Config
 import json
 from playwright.sync_api import sync_playwright
@@ -4856,7 +4856,25 @@ def procurement_request_item():
     # Get available branches
     available_branches = Branch.query.filter_by(is_active=True).order_by(Branch.restaurant, Branch.name).all()
     
-    # Predefined items for Operation department organized by category
+    # Get categories and items from database based on user's department
+    user_department = current_user.department if current_user else None
+    procurement_categories = []
+    procurement_items = []
+    
+    if user_department:
+        # Get active categories for the user's department
+        procurement_categories = ProcurementCategory.query.filter_by(
+            department=user_department,
+            is_active=True
+        ).order_by(ProcurementCategory.name).all()
+        
+        # Get active items for the user's department
+        procurement_items = ProcurementItem.query.filter_by(
+            department=user_department,
+            is_active=True
+        ).order_by(ProcurementItem.name).all()
+    
+    # Legacy hard-coded items for backward compatibility (will be removed after migration)
     kitchen_tool_items = [
         "JUICE BLENDER (500ML)",
         "PLASTIC JAG COVER (2L)",
@@ -5000,6 +5018,8 @@ def procurement_request_item():
                          electrical_items=electrical_items,
                          furniture_items=furniture_items,
                          hr_stationary_items=hr_stationary_items,
+                         procurement_categories=procurement_categories,
+                         procurement_items=procurement_items,
                          today=datetime.utcnow().date().strftime('%Y-%m-%d'))
 
 
@@ -5750,6 +5770,25 @@ def it_dashboard():
     
     person_company_options = person_company_options_query.order_by(PersonCompanyOption.id).all()
     
+    # Get procurement categories and items for the Procurement Categories/Items Management section
+    procurement_categories_query = ProcurementCategory.query
+    procurement_items_query = ProcurementItem.query
+    
+    # Apply department filter if specified
+    procurement_department_filter = request.args.get('procurement_department_filter', '')
+    if procurement_department_filter and procurement_department_filter != 'all':
+        procurement_categories_query = procurement_categories_query.filter(ProcurementCategory.department == procurement_department_filter)
+        procurement_items_query = procurement_items_query.filter(ProcurementItem.department == procurement_department_filter)
+    
+    # Apply search filter for procurement items
+    procurement_search = request.args.get('procurement_search', '')
+    if procurement_search:
+        procurement_categories_query = procurement_categories_query.filter(ProcurementCategory.name.contains(procurement_search))
+        procurement_items_query = procurement_items_query.filter(ProcurementItem.name.contains(procurement_search))
+    
+    procurement_categories = procurement_categories_query.order_by(ProcurementCategory.id).all()
+    procurement_items = procurement_items_query.order_by(ProcurementItem.id).all()
+    
     # Get branches for the Branches Management section
     branches_query = Branch.query.filter_by(is_active=True)
     
@@ -5774,6 +5813,10 @@ def it_dashboard():
                          logs=logs, 
                          request_types=request_types,
                          person_company_options=person_company_options,
+                         procurement_categories=procurement_categories,
+                         procurement_items=procurement_items,
+                         procurement_department_filter=procurement_department_filter,
+                         procurement_search=procurement_search,
                          branches=branches,
                          departments=departments,
                          user=current_user,
@@ -6629,6 +6672,410 @@ def toggle_person_company_option(option_id):
         flash(f'Error toggling person/company name option: {str(e)}', 'danger')
     
     return redirect(url_for('manage_person_company_options'))
+
+
+# Procurement Category and Item Management Routes
+@app.route('/it/procurement-categories-items')
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def manage_procurement_categories_items():
+    """Manage procurement categories and items for all departments - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    department_filter = request.args.get('department', '')
+    search_query = request.args.get('search', '')
+    filter_type = request.args.get('filter_type', 'items')  # 'categories' or 'items'
+    
+    # Validate per_page to prevent abuse
+    if per_page not in [10, 20, 50, 100]:
+        per_page = 20
+    
+    # Get all departments for filter dropdown
+    departments = ['Operation', 'HR', 'IT', 'Finance', 'Maintenance', 'Marketing', 
+                   'Logistic', 'Quality Control', 'Procurement', 'Customer Service', 
+                   'Project', 'PR']
+    
+    if filter_type == 'categories':
+        # Build query for categories
+        query = ProcurementCategory.query
+        
+        if department_filter:
+            query = query.filter(ProcurementCategory.department == department_filter)
+        
+        if search_query:
+            query = query.filter(ProcurementCategory.name.contains(search_query))
+        
+        # Get paginated results
+        items_pagination = query.order_by(ProcurementCategory.id).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        return render_template('manage_procurement_categories_items.html',
+                             items=items_pagination.items,
+                             pagination=items_pagination,
+                             departments=departments,
+                             department_filter=department_filter,
+                             search_query=search_query,
+                             filter_type='categories',
+                             user=current_user)
+    else:
+        # Build query for items
+        query = ProcurementItem.query
+        
+        if department_filter:
+            query = query.filter(ProcurementItem.department == department_filter)
+        
+        if search_query:
+            query = query.filter(ProcurementItem.name.contains(search_query))
+        
+        # Get paginated results
+        items_pagination = query.order_by(ProcurementItem.id).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        return render_template('manage_procurement_categories_items.html',
+                             items=items_pagination.items,
+                             pagination=items_pagination,
+                             departments=departments,
+                             department_filter=department_filter,
+                             search_query=search_query,
+                             filter_type='items',
+                             user=current_user)
+
+
+@app.route('/it/procurement-categories/add', methods=['GET', 'POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def add_procurement_category():
+    """Add new procurement category - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        department = request.form.get('department', '').strip()
+        is_active = request.form.get('is_active') == 'on'
+        
+        if not name or not department:
+            flash('Name and department are required.', 'danger')
+            return redirect(url_for('add_procurement_category'))
+        
+        # Check if category already exists for this department
+        existing = ProcurementCategory.query.filter_by(
+            name=name, 
+            department=department
+        ).first()
+        
+        if existing:
+            flash(f'Category "{name}" already exists for {department} department.', 'danger')
+            return redirect(url_for('add_procurement_category'))
+        
+        try:
+            category = ProcurementCategory(
+                name=name,
+                department=department,
+                is_active=is_active,
+                created_by_user_id=current_user.user_id
+            )
+            
+            db.session.add(category)
+            db.session.commit()
+            
+            # Log the action
+            log_action(f'Added procurement category: {name} for {department}')
+            
+            flash(f'Procurement category "{name}" added successfully.', 'success')
+            return redirect(url_for('manage_procurement_categories_items', filter_type='categories'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding procurement category: {str(e)}', 'danger')
+            return redirect(url_for('add_procurement_category'))
+    
+    # Get all departments for dropdown
+    departments = ['Operation', 'HR', 'IT', 'Finance', 'Maintenance', 'Marketing', 
+                   'Logistic', 'Quality Control', 'Procurement', 'Customer Service', 
+                   'Project', 'PR']
+    
+    return render_template('add_procurement_category.html', 
+                         departments=departments,
+                         user=current_user)
+
+
+@app.route('/it/procurement-categories/edit/<int:category_id>', methods=['GET', 'POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def edit_procurement_category(category_id):
+    """Edit procurement category - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    category = ProcurementCategory.query.get_or_404(category_id)
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        department = request.form.get('department', '').strip()
+        is_active = request.form.get('is_active') == 'on'
+        
+        if not name or not department:
+            flash('Name and department are required.', 'danger')
+            return redirect(url_for('edit_procurement_category', category_id=category_id))
+        
+        # Check if category already exists for this department (excluding current one)
+        existing = ProcurementCategory.query.filter(
+            ProcurementCategory.name == name,
+            ProcurementCategory.department == department,
+            ProcurementCategory.id != category_id
+        ).first()
+        
+        if existing:
+            flash(f'Category "{name}" already exists for {department} department.', 'danger')
+            return redirect(url_for('edit_procurement_category', category_id=category_id))
+        
+        try:
+            old_name = category.name
+            old_department = category.department
+            
+            category.name = name
+            category.department = department
+            category.is_active = is_active
+            category.updated_at = datetime.utcnow()
+            
+            db.session.commit()
+            
+            # Log the action
+            log_action(f'Updated procurement category: {old_name} ({old_department}) to {name} ({department})')
+            
+            flash(f'Procurement category updated successfully.', 'success')
+            return redirect(url_for('manage_procurement_categories_items', filter_type='categories'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating procurement category: {str(e)}', 'danger')
+            return redirect(url_for('edit_procurement_category', category_id=category_id))
+    
+    # Get all departments for dropdown
+    departments = ['Operation', 'HR', 'IT', 'Finance', 'Maintenance', 'Marketing', 
+                   'Logistic', 'Quality Control', 'Procurement', 'Customer Service', 
+                   'Project', 'PR']
+    
+    return render_template('edit_procurement_category.html', 
+                         category=category,
+                         departments=departments,
+                         user=current_user)
+
+
+@app.route('/it/procurement-categories/toggle/<int:category_id>', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def toggle_procurement_category(category_id):
+    """Toggle procurement category active status - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    category = ProcurementCategory.query.get_or_404(category_id)
+    
+    try:
+        category.is_active = not category.is_active
+        category.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        # Log the action
+        status = 'activated' if category.is_active else 'deactivated'
+        log_action(f'{status.capitalize()} procurement category: {category.name} ({category.department})')
+        
+        flash(f'Procurement category {status} successfully.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error toggling procurement category: {str(e)}', 'danger')
+    
+    return redirect(url_for('manage_procurement_categories_items', filter_type='categories'))
+
+
+@app.route('/it/procurement-items/add', methods=['GET', 'POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def add_procurement_item():
+    """Add new procurement item - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        category_id = request.form.get('category_id', '').strip()
+        department = request.form.get('department', '').strip()
+        description = request.form.get('description', '').strip()
+        is_active = request.form.get('is_active') == 'on'
+        
+        if not name or not department:
+            flash('Name and department are required.', 'danger')
+            return redirect(url_for('add_procurement_item'))
+        
+        # Check if item already exists for this department and category
+        existing = ProcurementItem.query.filter_by(
+            name=name, 
+            department=department,
+            category_id=category_id if category_id else None
+        ).first()
+        
+        if existing:
+            flash(f'Item "{name}" already exists for {department} department.', 'danger')
+            return redirect(url_for('add_procurement_item'))
+        
+        try:
+            item = ProcurementItem(
+                name=name,
+                category_id=int(category_id) if category_id else None,
+                department=department,
+                description=description if description else None,
+                is_active=is_active,
+                created_by_user_id=current_user.user_id
+            )
+            
+            db.session.add(item)
+            db.session.commit()
+            
+            # Log the action
+            log_action(f'Added procurement item: {name} for {department}')
+            
+            flash(f'Procurement item "{name}" added successfully.', 'success')
+            return redirect(url_for('manage_procurement_categories_items', filter_type='items'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding procurement item: {str(e)}', 'danger')
+            return redirect(url_for('add_procurement_item'))
+    
+    # Get all departments for dropdown
+    departments = ['Operation', 'HR', 'IT', 'Finance', 'Maintenance', 'Marketing', 
+                   'Logistic', 'Quality Control', 'Procurement', 'Customer Service', 
+                   'Project', 'PR']
+    
+    # Get all active categories for dropdown
+    categories = ProcurementCategory.query.filter_by(is_active=True).order_by(ProcurementCategory.department, ProcurementCategory.name).all()
+    
+    return render_template('add_procurement_item.html', 
+                         departments=departments,
+                         categories=categories,
+                         user=current_user)
+
+
+@app.route('/it/procurement-items/edit/<int:item_id>', methods=['GET', 'POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def edit_procurement_item(item_id):
+    """Edit procurement item - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    item = ProcurementItem.query.get_or_404(item_id)
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        category_id = request.form.get('category_id', '').strip()
+        department = request.form.get('department', '').strip()
+        description = request.form.get('description', '').strip()
+        is_active = request.form.get('is_active') == 'on'
+        
+        if not name or not department:
+            flash('Name and department are required.', 'danger')
+            return redirect(url_for('edit_procurement_item', item_id=item_id))
+        
+        # Check if item already exists for this department and category (excluding current one)
+        existing = ProcurementItem.query.filter(
+            ProcurementItem.name == name,
+            ProcurementItem.department == department,
+            ProcurementItem.category_id == (int(category_id) if category_id else None),
+            ProcurementItem.id != item_id
+        ).first()
+        
+        if existing:
+            flash(f'Item "{name}" already exists for {department} department.', 'danger')
+            return redirect(url_for('edit_procurement_item', item_id=item_id))
+        
+        try:
+            old_name = item.name
+            old_department = item.department
+            
+            item.name = name
+            item.category_id = int(category_id) if category_id else None
+            item.department = department
+            item.description = description if description else None
+            item.is_active = is_active
+            item.updated_at = datetime.utcnow()
+            
+            db.session.commit()
+            
+            # Log the action
+            log_action(f'Updated procurement item: {old_name} ({old_department}) to {name} ({department})')
+            
+            flash(f'Procurement item updated successfully.', 'success')
+            return redirect(url_for('manage_procurement_categories_items', filter_type='items'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating procurement item: {str(e)}', 'danger')
+            return redirect(url_for('edit_procurement_item', item_id=item_id))
+    
+    # Get all departments for dropdown
+    departments = ['Operation', 'HR', 'IT', 'Finance', 'Maintenance', 'Marketing', 
+                   'Logistic', 'Quality Control', 'Procurement', 'Customer Service', 
+                   'Project', 'PR']
+    
+    # Get all active categories for dropdown
+    categories = ProcurementCategory.query.filter_by(is_active=True).order_by(ProcurementCategory.department, ProcurementCategory.name).all()
+    
+    return render_template('edit_procurement_item.html', 
+                         item=item,
+                         departments=departments,
+                         categories=categories,
+                         user=current_user)
+
+
+@app.route('/it/procurement-items/toggle/<int:item_id>', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def toggle_procurement_item(item_id):
+    """Toggle procurement item active status - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    item = ProcurementItem.query.get_or_404(item_id)
+    
+    try:
+        item.is_active = not item.is_active
+        item.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        # Log the action
+        status = 'activated' if item.is_active else 'deactivated'
+        log_action(f'{status.capitalize()} procurement item: {item.name} ({item.department})')
+        
+        flash(f'Procurement item {status} successfully.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error toggling procurement item: {str(e)}', 'danger')
+    
+    return redirect(url_for('manage_procurement_categories_items', filter_type='items'))
 
 
 # Branch Management Routes
