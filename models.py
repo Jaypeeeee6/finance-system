@@ -612,6 +612,7 @@ class ProcurementItemRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     requestor_name = db.Column(db.String(100), nullable=False)
     department = db.Column(db.String(100), nullable=False)
+    category = db.Column(db.String(100), nullable=True)  # Category of the item
     item_name = db.Column(db.String(200), nullable=False)
     quantity = db.Column(db.String(100), nullable=True)  # Can be "10 units", "5 boxes", etc.
     purpose = db.Column(db.Text, nullable=False)

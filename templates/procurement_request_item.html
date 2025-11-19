@@ -36,14 +36,58 @@
 
                 <div class="form-row">
                     <div class="form-group">
+                        <label for="category">Category</label>
+                        {% if user and user.department == 'Operation' %}
+                            <select name="category" id="category">
+                                <option value="">-- Select Category --</option>
+                                <option value="Cleaning">Cleaning</option>
+                                <option value="Kitchen Tool">Kitchen Tool</option>
+                                <option value="Dining">Dining</option>
+                                <option value="Electrical">Electrical</option>
+                                <option value="Stationary">Stationary</option>
+                                <option value="Furniture">Furniture</option>
+                                <option value="Others">Others</option>
+                            </select>
+                            <small class="form-text text-muted">Select the category of the item</small>
+                        {% else %}
+                            <select name="category" id="category">
+                                <option value="">-- Select Category --</option>
+                                <option value="Maintenance of Items">Maintenance of Items</option>
+                                <option value="Stationary">Stationary</option>
+                                <option value="Electronics">Electronics</option>
+                                <option value="Others">Others</option>
+                            </select>
+                            <small class="form-text text-muted">Select the category of the item</small>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
                         <label for="item_name">Item Name/Description *</label>
                         <div class="item-select-container">
-                            <input type="text" id="item_search" class="form-control" placeholder="Search items..." autocomplete="off">
+                            <input type="text" id="item_search" class="form-control" 
+                                   placeholder="{% if user and user.department == 'Operation' %}Search items...{% elif user and user.department == 'HR' %}Search items...{% else %}Enter item name...{% endif %}" 
+                                   autocomplete="off">
                             <select name="item_name" id="item_name" class="form-control" style="display: none;" required>
                                 <option value="">-- Select Item --</option>
                                 {% if user and user.department == 'Operation' and operation_items %}
                                     {% for item in operation_items %}
-                                    <option value="{{ item }}">{{ item }}</option>
+                                        {% if kitchen_tool_items and item in kitchen_tool_items %}
+                                        <option value="{{ item }}" data-category="Kitchen Tool">{{ item }}</option>
+                                        {% elif dining_items and item in dining_items %}
+                                        <option value="{{ item }}" data-category="Dining">{{ item }}</option>
+                                        {% elif stationary_items and item in stationary_items %}
+                                        <option value="{{ item }}" data-category="Stationary">{{ item }}</option>
+                                        {% elif electrical_items and item in electrical_items %}
+                                        <option value="{{ item }}" data-category="Electrical">{{ item }}</option>
+                                        {% elif furniture_items and item in furniture_items %}
+                                        <option value="{{ item }}" data-category="Furniture">{{ item }}</option>
+                                        {% else %}
+                                        <option value="{{ item }}">{{ item }}</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% elif user and user.department == 'HR' and hr_stationary_items %}
+                                    {% for item in hr_stationary_items %}
+                                    <option value="{{ item }}" data-category="Stationary" data-department="HR">{{ item }}</option>
                                     {% endfor %}
                                 {% endif %}
                             </select>
@@ -52,8 +96,10 @@
                         </div>
                         {% if user and user.department == 'Operation' %}
                             <small class="form-text text-muted">Type to search or select from predefined items</small>
+                        {% elif user and user.department == 'HR' %}
+                            <small class="form-text text-muted">Type to search or select from predefined items</small>
                         {% else %}
-                            <small class="form-text text-muted">Type to search or enter your own item name</small>
+                            <small class="form-text text-muted">Enter the item name or description</small>
                         {% endif %}
                     </div>
 
@@ -270,6 +316,12 @@ function initializeItemSearch() {
             optionDiv.textContent = option.textContent;
             optionDiv.setAttribute('data-value', option.value);
             
+            // Copy category attribute if it exists
+            const category = option.getAttribute('data-category');
+            if (category) {
+                optionDiv.setAttribute('data-category', category);
+            }
+            
             // Use mousedown instead of click for better trackpad support
             optionDiv.addEventListener('mousedown', function(e) {
                 e.preventDefault(); // Prevent blur from firing
@@ -288,6 +340,7 @@ function initializeItemSearch() {
         });
         
         updateDropdownSelection();
+        filterByCategory(); // Apply category filter after building
     }
     
     function selectItem(value, text) {
@@ -326,19 +379,61 @@ function initializeItemSearch() {
         });
     }
     
+    function filterByCategory() {
+        const categorySelect = document.getElementById('category');
+        if (!categorySelect) return; // Category select might not exist for non-Operation users
+        
+        const selectedCategory = categorySelect.value;
+        const options = dropdown.querySelectorAll('.item-option');
+        
+        options.forEach(option => {
+            const optionCategory = option.getAttribute('data-category');
+            
+            // If a category is selected, only show items matching that category
+            // Items without a category attribute should be hidden when a category is selected
+            // If no category is selected, show all items (unless hidden by search)
+            if (selectedCategory) {
+                if (optionCategory === selectedCategory) {
+                    // Show items matching the selected category (unless hidden by search)
+                    if (!option.classList.contains('hidden-by-search')) {
+                        option.classList.remove('hidden');
+                    }
+                } else {
+                    // Hide items that don't match the selected category
+                    option.classList.add('hidden');
+                }
+            } else {
+                // No category selected - show all items (unless hidden by search)
+                if (!option.classList.contains('hidden-by-search')) {
+                    option.classList.remove('hidden');
+                }
+            }
+        });
+    }
+    
     function filterItems(searchTerm) {
         const options = dropdown.querySelectorAll('.item-option');
         let hasVisibleOptions = false;
+        const categorySelect = document.getElementById('category');
+        const selectedCategory = categorySelect ? categorySelect.value : '';
         
         options.forEach(option => {
             const text = option.textContent.toLowerCase();
-            const matches = text.includes(searchTerm.toLowerCase());
+            const matchesSearch = text.includes(searchTerm.toLowerCase());
+            const optionCategory = option.getAttribute('data-category');
             
-            if (matches) {
+            // Check if item matches category filter
+            const matchesCategory = !selectedCategory || optionCategory === selectedCategory;
+            
+            if (matchesSearch && matchesCategory) {
                 option.classList.remove('hidden');
+                option.classList.remove('hidden-by-search');
                 hasVisibleOptions = true;
             } else {
                 option.classList.add('hidden');
+                if (!matchesSearch) {
+                    option.classList.add('hidden-by-search');
+                }
             }
         });
         
@@ -347,9 +442,18 @@ function initializeItemSearch() {
     
     // Event listeners
     searchInput.addEventListener('input', function() {
+        const isOthersMode = this.getAttribute('data-others-mode') === 'true';
         const searchTerm = this.value.trim();
         
-        // Always allow free text entry - if user types something, use it
+        // Handle "Others" mode - free text entry
+        if (isOthersMode) {
+            hiddenInput.value = searchTerm;
+            hiddenSelect.value = searchTerm;
+            dropdown.style.display = 'none';
+            return;
+        }
+        
+        // Normal mode - search and filter
         if (searchTerm.length > 0) {
             // Check if the typed value matches any existing option
             const matchingOption = Array.from(hiddenSelect.options).find(opt => 
@@ -365,17 +469,26 @@ function initializeItemSearch() {
             // Filter dropdown options
             filterItems(searchTerm);
         } else {
-            // Show all options when search is empty
-            dropdown.querySelectorAll('.item-option').forEach(option => {
-                option.classList.remove('hidden');
-            });
-            dropdown.style.display = 'block';
+            // Show all options when search is empty (respecting category filter)
+            filterByCategory();
+            const visibleOptions = dropdown.querySelectorAll('.item-option:not(.hidden)');
+            dropdown.style.display = visibleOptions.length > 0 ? 'block' : 'none';
         }
     });
     
     searchInput.addEventListener('focus', function() {
+        const isOthersMode = this.getAttribute('data-others-mode') === 'true';
+        
+        // Don't show dropdown in Others mode
+        if (isOthersMode) {
+            dropdown.style.display = 'none';
+            return;
+        }
+        
         if (this.value.trim() === '') {
-            dropdown.style.display = 'block';
+            filterByCategory();
+            const visibleOptions = dropdown.querySelectorAll('.item-option:not(.hidden)');
+            dropdown.style.display = visibleOptions.length > 0 ? 'block' : 'none';
         } else {
             filterItems(this.value.trim());
         }
@@ -409,6 +522,50 @@ function initializeItemSearch() {
         }
     });
     
+    // Category change event listener
+    const categorySelect = document.getElementById('category');
+    if (categorySelect) {
+        categorySelect.addEventListener('change', function() {
+            const selectedCategory = this.value;
+            
+            // Clear selected item when category changes
+            selectedItem = null;
+            searchInput.value = '';
+            hiddenInput.value = '';
+            hiddenSelect.value = '';
+            
+            // Check if user is from Operation department (has predefined items)
+            const hasPredefinedItems = hiddenSelect.options.length > 1; // More than just the placeholder option
+            
+            // Handle "Others" category - allow free text entry
+            if (selectedCategory === 'Others') {
+                // Hide dropdown and change placeholder
+                dropdown.style.display = 'none';
+                searchInput.placeholder = 'Enter item name...';
+                searchInput.setAttribute('data-others-mode', 'true');
+            } else {
+                // Restore normal behavior for other categories
+                if (hasPredefinedItems) {
+                    searchInput.placeholder = 'Search items...';
+                } else {
+                    searchInput.placeholder = 'Enter item name...';
+                }
+                searchInput.removeAttribute('data-others-mode');
+                
+                // Apply category filter (only for Operation department with predefined items)
+                if (hasPredefinedItems) {
+                    filterByCategory();
+                    // Show dropdown with filtered items
+                    const visibleOptions = dropdown.querySelectorAll('.item-option:not(.hidden)');
+                    dropdown.style.display = visibleOptions.length > 0 ? 'block' : 'none';
+                } else {
+                    // For non-Operation departments, hide dropdown since there are no predefined items
+                    dropdown.style.display = 'none';
+                }
+            }
+        });
+    }
+    
     // Initialize dropdown
     buildDropdown();
     
@@ -416,11 +573,18 @@ function initializeItemSearch() {
     const form = document.getElementById('itemRequestForm');
     if (form) {
         form.addEventListener('submit', function(e) {
+            const isOthersMode = searchInput.getAttribute('data-others-mode') === 'true';
             const finalValue = hiddenInput.value || searchInput.value.trim();
+            
             if (finalValue) {
                 hiddenSelect.value = finalValue;
                 // Also ensure the hidden input has the value
                 hiddenInput.value = finalValue;
+                
+                // For Others mode, ensure the select has the value for form validation
+                if (isOthersMode) {
+                    hiddenSelect.value = finalValue;
+                }
             }
         });
     }

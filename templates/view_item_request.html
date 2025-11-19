@@ -224,6 +224,15 @@
                 </div>
             </div>
 
+            {% if item_request.category %}
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Category</label>
+                    <input type="text" value="{{ item_request.category }}" readonly style="background: #f5f5f5;">
+                </div>
+            </div>
+            {% endif %}
+
             <div class="form-row">
                 <div class="form-group">
                     <label>Item Name</label>

@@ -3491,6 +3491,7 @@ def procurement_item_requests():
             base_query = base_query.filter(
                 db.or_(
                     ProcurementItemRequest.requestor_name.ilike(search_term),
+                    ProcurementItemRequest.category.ilike(search_term),
                     ProcurementItemRequest.item_name.ilike(search_term),
                     ProcurementItemRequest.purpose.ilike(search_term),
                     ProcurementItemRequest.department.ilike(search_term),
@@ -3525,6 +3526,9 @@ def procurement_item_requests():
     elif current_user.department == 'Procurement' and current_user.role != 'Department Manager':
         # Procurement Staff sees all assigned requests (any Procurement member can complete them)
         item_requests = [r for r in all_requests if r.status == 'Assigned to Procurement' or r.assigned_to_user_id == current_user.user_id]
+    elif current_user.department == 'Auditing':
+        # Auditing department can see all completed item requests for auditing purposes
+        item_requests = [r for r in all_requests if r.status == 'Completed']
     else:
         # Managers see requests from their department
         authorized_approvers_ids = set()
@@ -3562,6 +3566,9 @@ def procurement_item_requests():
         stats_requests = all_item_requests_for_stats
     elif current_user.department == 'Procurement' and current_user.role != 'Department Manager':
         stats_requests = [r for r in all_item_requests_for_stats if r.status == 'Assigned to Procurement' or r.assigned_to_user_id == current_user.user_id]
+    elif current_user.department == 'Auditing':
+        # Auditing department stats show only completed requests
+        stats_requests = [r for r in all_item_requests_for_stats if r.status == 'Completed']
     else:
         authorized_approvers_ids = set()
         for req in all_item_requests_for_stats:
@@ -3663,6 +3670,9 @@ def view_item_request(request_id):
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager can view all requests (view-only)
         can_view = True
+    elif current_user.department == 'Auditing' and item_request.status == 'Completed':
+        # Auditing department can view all completed item requests for auditing purposes
+        can_view = True
     elif current_user.department == 'Procurement' and item_request.assigned_to_user_id == current_user.user_id:
         can_view = True
     elif item_request.user_id == current_user.user_id:
@@ -3751,6 +3761,7 @@ def view_item_request(request_id):
             'id': item_request.id,
             'requestor_name': item_request.requestor_name,
             'department': item_request.department,
+            'category': item_request.category,
             'item_name': item_request.item_name,
             'quantity': item_request.quantity,
             'purpose': item_request.purpose,
@@ -3792,6 +3803,9 @@ def view_item_request_page(request_id):
         can_view = True
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager can view all requests (view-only)
+        can_view = True
+    elif current_user.department == 'Auditing' and item_request.status == 'Completed':
+        # Auditing department can view all completed item requests for auditing purposes
         can_view = True
     elif current_user.department == 'Procurement' and item_request.assigned_to_user_id == current_user.user_id:
         can_view = True
@@ -4723,6 +4737,7 @@ def procurement_request_item():
     if request.method == 'POST':
         # Handle form submission
         requestor_name = request.form.get('requestor_name', '').strip()
+        category = request.form.get('category', '').strip()
         # Check for item_name_value first (from searchable dropdown), then fall back to item_name
         item_name = request.form.get('item_name_value', '').strip() or request.form.get('item_name', '').strip()
         quantity = request.form.get('quantity', '').strip()
@@ -4748,6 +4763,7 @@ def procurement_request_item():
         item_request = ProcurementItemRequest(
             requestor_name=requestor_name,
             department=current_user.department if current_user else '',
+            category=category if category else None,
             item_name=item_name,
             quantity=quantity if quantity else None,
             purpose=purpose,
@@ -4840,8 +4856,8 @@ def procurement_request_item():
     # Get available branches
     available_branches = Branch.query.filter_by(is_active=True).order_by(Branch.restaurant, Branch.name).all()
     
-    # Predefined items for Operation department
-    operation_items = [
+    # Predefined items for Operation department organized by category
+    kitchen_tool_items = [
         "JUICE BLENDER (500ML)",
         "PLASTIC JAG COVER (2L)",
         "JUICE BLENDER JUG 5000ML",
@@ -4901,23 +4917,61 @@ def procurement_request_item():
         "RED KNIFE BIG (12INCH)",
         "BREAD KNIFE BIG (12 INCH)",
         "BREAD KNIFE SMALL",
+        "SQUEEZER BOTTLE YELLOW BIG 1000ML",
+        "SQUEEZAR BOTTLE RED BIG 1000ML",
+        "SQUEEZAR BOTTLE WHITE BIG 1000ML",
+        "WHISK",
+        "BIG WHITE SCALE (30/40KG)",
+    ]
+    
+    # Dining items for Operation department
+    dining_items = [
         "DINING TREY BIG",
         "DINING TREY MEDUIM",
         "DINING TREY SMALL",
         "DINING PLATE FOR FRIES",
         "DINING PLATE FOR BURGER",
         "DINING CUP FOR EXTRA SAUCE (2OZ)",
-        "SQUEEZER BOTTLE YELLOW BIG 1000ML",
-        "SQUEEZAR BOTTLE RED BIG 1000ML",
-        "SQUEEZAR BOTTLE WHITE BIG 1000ML",
+    ]
+    
+    # Stationary items for Operation department
+    stationary_items = [
         "DUSTBIN BIG OPEN WITH LEG 120L",
         "DUSTBIN MEDUIM OPEN WITH LEG 60L",
         "DUSTBIN SMALL OPEN WITH LEG 40L",
         "DUSTBIN SMALL WITH LEG 40L FOR DINING AREA TOILET",
         "DUSTPAN WITH STICK BRUSH",
         "GRABBER TOOL",
-        "WHISK",
-        "BIG WHITE SCALE (30/40KG)",
+    ]
+    
+    # Electrical items for Operation department
+    electrical_items = [
+        "Washing Machine",
+        "Freezer",
+        "Cashier Machine",
+        "Phone",
+        "Ipad",
+        "Adapter",
+        "Wire",
+        "Fridge",
+        "Cooker",
+    ]
+    
+    # Furniture items for Operation department
+    furniture_items = [
+        "Curtains",
+        "Door Mat",
+    ]
+    
+    # HR Stationary items
+    hr_stationary_items = [
+        "Pens",
+        "Note",
+        "Files",
+    ]
+    
+    # All items for Operation department (for backward compatibility)
+    operation_items = kitchen_tool_items + dining_items + stationary_items + electrical_items + furniture_items + [
         "SMALL WEIGHT SCALE (IN TOP GLASS)",
         "BAIN MARIE (56*35)",
         "FRIES WARMER",
@@ -4940,6 +4994,12 @@ def procurement_request_item():
                          user=current_user,
                          available_branches=available_branches,
                          operation_items=operation_items,
+                         kitchen_tool_items=kitchen_tool_items,
+                         dining_items=dining_items,
+                         stationary_items=stationary_items,
+                         electrical_items=electrical_items,
+                         furniture_items=furniture_items,
+                         hr_stationary_items=hr_stationary_items,
                          today=datetime.utcnow().date().strftime('%Y-%m-%d'))
 
 
