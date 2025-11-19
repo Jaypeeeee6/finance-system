@@ -3404,11 +3404,16 @@ def procurement_dashboard():
     assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
     item_requests_amount = sum(float(r.amount) for r in assigned_item_requests if r.amount is not None)
     
+    # Get completed item requests and their amounts
+    completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+    completed_item_requests_amount = sum(float(r.amount) for r in completed_item_requests if r.amount is not None)
+    
     # Adjust calculations: deduct from available balance, add to money spent
-    # Money Spent = Completed payment requests + Assigned item requests
-    money_spent = completed_amount + item_requests_amount
-    # Available Balance = Completed payment requests - Assigned item requests
-    available_balance = completed_amount - item_requests_amount
+    # Money Spent = Assigned item requests + Completed item requests (only item requests, not payment requests)
+    money_spent = item_requests_amount + completed_item_requests_amount
+    # Available Balance = Completed payment requests - Assigned item requests - Completed item requests
+    # (Both assigned and completed item requests reduce available balance since they represent money spent/committed)
+    available_balance = completed_amount - item_requests_amount - completed_item_requests_amount
     
     return render_template('procurement_dashboard.html', 
                          requests=requests_pagination.items, 
@@ -3614,11 +3619,16 @@ def procurement_item_requests():
         assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
         item_requests_amount = sum(float(r.amount) for r in assigned_item_requests if r.amount is not None)
         
+        # Get completed item requests and their amounts
+        completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+        completed_item_requests_amount = sum(float(r.amount) for r in completed_item_requests if r.amount is not None)
+        
         # Adjust calculations: deduct from available balance, add to money spent
-        # Money Spent = Completed payment requests + Assigned item requests
-        completed_amount = completed_amount_bm + item_requests_amount
-        # Available Balance = Completed payment requests - Assigned item requests
-        available_balance = completed_amount_bm - item_requests_amount
+        # Money Spent = Assigned item requests + Completed item requests (only item requests, not payment requests)
+        completed_amount = item_requests_amount + completed_item_requests_amount
+        # Available Balance = Completed payment requests - Assigned item requests - Completed item requests
+        # (Both assigned and completed item requests reduce available balance since they represent money spent/committed)
+        available_balance = completed_amount_bm - item_requests_amount - completed_item_requests_amount
     
     return render_template('procurement_item_requests.html',
                          user=current_user,
@@ -4304,6 +4314,36 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
             return redirect(url_for('view_item_request_page', request_id=request_id))
     except ValueError:
         flash('Invalid amount format.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    
+    # Calculate available balance to check if amount exceeds it
+    # Get completed payment requests (Bank money, Procurement department)
+    bank_money_requests = PaymentRequest.query.filter(
+        PaymentRequest.department == 'Procurement',
+        PaymentRequest.request_type == 'Bank money',
+        PaymentRequest.is_archived == False
+    ).all()
+    
+    completed_requests_bm = [r for r in bank_money_requests if r.status == 'Completed']
+    completed_amount_bm = sum(float(r.amount) for r in completed_requests_bm)
+    
+    # Get item requests with status "Assigned to Procurement" (excluding current request if it's already assigned)
+    assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
+    # Exclude current request if it's already in the assigned list
+    assigned_item_requests = [r for r in assigned_item_requests if r.id != request_id]
+    item_requests_amount = sum(float(r.amount) for r in assigned_item_requests if r.amount is not None)
+    
+    # Get completed item requests
+    completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+    completed_item_requests_amount = sum(float(r.amount) for r in completed_item_requests if r.amount is not None)
+    
+    # Calculate available balance
+    # Available Balance = Completed payment requests - Assigned item requests - Completed item requests
+    available_balance = completed_amount_bm - item_requests_amount - completed_item_requests_amount
+    
+    # Check if amount exceeds available balance
+    if amount > available_balance:
+        flash(f'Insufficient balance. Available balance is OMR {available_balance:.3f}, but the requested amount is OMR {amount:.3f}. Please put the request on hold.', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
     assigned_to_user_id = request.form.get('assigned_to_user_id', '').strip()

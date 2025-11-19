@@ -48,6 +48,17 @@
     </div>
     {% endif %}
 
+    <!-- Low Balance Warning (for Procurement Manager, GM, and Operation Manager) -->
+    {% if available_balance is not none and available_balance <= 50 %}
+    <div class="alert alert-danger alert-persistent" style="margin-bottom: 20px; padding: 15px 20px; background-color: #dc3545; color: white; border-radius: 8px; border: none; display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; animation: none !important; transition: none !important;">
+        <i class="fas fa-exclamation-triangle" style="font-size: 24px;"></i>
+        <div style="flex: 1;">
+            <strong style="font-size: 16px; display: block; margin-bottom: 5px;">⚠️ Low Balance Warning</strong>
+            <p style="margin: 0; font-size: 14px;">Your available balance is running low (OMR {{ "%.3f"|format(available_balance) }}). Please request money from the Finance Department as soon as possible to avoid service interruptions.</p>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Current Money Status (for Procurement Manager, GM, and Operation Manager) -->
     {% if available_balance is not none %}
     <div class="card" style="margin-bottom: 30px; background: #f8f9fa;">
@@ -56,15 +67,15 @@
                 <i class="fas fa-wallet"></i> Current Money Status
             </h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 20px;">
-                <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 2px solid #43e97b;">
+                <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 2px solid {% if available_balance <= 50 %}#dc3545{% else %}#43e97b{% endif %};">
                     <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Available Balance</div>
-                    <div style="font-size: 24px; font-weight: bold; color: #43e97b;">OMR {{ "%.3f"|format(available_balance) }}</div>
-                    <div style="font-size: 12px; color: #999; margin-top: 5px;">(Completed - Assigned Items)</div>
+                    <div style="font-size: 24px; font-weight: bold; color: {% if available_balance <= 50 %}#dc3545{% else %}#43e97b{% endif %};">OMR {{ "%.3f"|format(available_balance) }}</div>
+                    <div style="font-size: 12px; color: #999; margin-top: 5px;">(Completed - Assigned Items - Completed Items)</div>
                 </div>
                 <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Money Spent</div>
                     <div style="font-size: 24px; font-weight: bold; color: #f5576c;">OMR {{ "%.3f"|format(completed_amount) }}</div>
-                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Completed + Assigned Items</div>
+                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Assigned Items + Completed Items</div>
                 </div>
                 <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Money Pending</div>
@@ -92,6 +103,7 @@
                         <option value="">All Statuses</option>
                         <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
                         <option value="Pending Procurement Manager Approval" {% if status_filter == 'Pending Procurement Manager Approval' %}selected{% endif %}>Pending Procurement Manager Approval</option>
+                        <option value="On Hold" {% if status_filter == 'On Hold' %}selected{% endif %}>On Hold</option>
                         <option value="Assigned to Procurement" {% if status_filter == 'Assigned to Procurement' %}selected{% endif %}>Assigned to Procurement</option>
                         <option value="Completed" {% if status_filter == 'Completed' %}selected{% endif %}>Completed</option>
                         <option value="Rejected by Manager" {% if status_filter == 'Rejected by Manager' %}selected{% endif %}>Rejected by Manager</option>
