@@ -797,6 +797,61 @@ def create_notification(user_id, title, message, notification_type, request_id=N
     print(f"DEBUG: Notification created successfully with ID: {notification.notification_id}")
     return notification
 
+def check_and_notify_low_balance(available_balance):
+    """Check if balance is low and send notification to procurement managers"""
+    LOW_BALANCE_THRESHOLD = 2500.0
+    
+    if available_balance is None:
+        return
+    
+    if available_balance <= LOW_BALANCE_THRESHOLD:
+        # Get all Procurement Department Managers
+        procurement_managers = User.query.filter(
+            User.department == 'Procurement',
+            User.role == 'Department Manager'
+        ).all()
+        
+        # Check if notification was already sent in the last 24 hours to avoid spam
+        yesterday = datetime.utcnow() - timedelta(hours=24)
+        
+        for manager in procurement_managers:
+            # Check if a low balance notification was already sent recently
+            existing_notification = Notification.query.filter(
+                Notification.user_id == manager.user_id,
+                Notification.notification_type == 'low_balance_alert',
+                Notification.created_at >= yesterday
+            ).first()
+            
+            if not existing_notification:
+                # Send notification
+                notification = create_notification(
+                    user_id=manager.user_id,
+                    title="⚠️ Low Balance Alert",
+                    message=f"Your available balance is running low (OMR {available_balance:.3f}). Please request money from the Finance Department as soon as possible to avoid service interruptions.",
+                    notification_type='low_balance_alert',
+                    request_id=None,
+                    item_request_id=None
+                )
+                log_action(f"Low balance notification sent to Procurement Manager: {manager.name} (Balance: OMR {available_balance:.3f})")
+                
+                # Broadcast real-time notification via WebSocket
+                try:
+                    socketio.emit('new_notification', {
+                        'title': notification.title,
+                        'message': notification.message,
+                        'type': notification.notification_type,
+                        'user_id': manager.user_id
+                    }, room=f'user_{manager.user_id}')
+                    
+                    # Also emit a general update event to trigger notification count updates
+                    socketio.emit('notification_update', {
+                        'action': 'new_notification',
+                        'type': notification.notification_type,
+                        'user_id': manager.user_id
+                    }, room=f'user_{manager.user_id}')
+                except Exception as e:
+                    log_action(f"Error broadcasting low balance notification via WebSocket: {str(e)}")
+
 def get_authorized_manager_approvers(request):
     """Get all users who are authorized to approve this request at the manager stage.
     This mirrors the authorization logic in manager_approve_request."""
@@ -3415,6 +3470,9 @@ def procurement_dashboard():
     # (Both assigned and completed item requests reduce available balance since they represent money spent/committed)
     available_balance = completed_amount - item_requests_amount - completed_item_requests_amount
     
+    # Check and notify if balance is low
+    check_and_notify_low_balance(available_balance)
+    
     return render_template('procurement_dashboard.html', 
                          requests=requests_pagination.items, 
                          pagination=requests_pagination,
@@ -3636,6 +3694,9 @@ def procurement_item_requests():
         # Available Balance = Completed payment requests - Assigned item requests - Completed item requests
         # (Both assigned and completed item requests reduce available balance since they represent money spent/committed)
         available_balance = completed_amount_bm - item_requests_amount - completed_item_requests_amount
+        
+        # Check and notify if balance is low
+        check_and_notify_low_balance(available_balance)
     
     return render_template('procurement_item_requests.html',
                          user=current_user,
@@ -4354,6 +4415,9 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
     # Calculate available balance
     # Available Balance = Completed payment requests - Assigned item requests - Completed item requests
     available_balance = completed_amount_bm - item_requests_amount - completed_item_requests_amount
+    
+    # Check and notify if balance is low
+    check_and_notify_low_balance(available_balance)
     
     # Check if amount exceeds available balance
     if amount > available_balance:
@@ -12147,6 +12211,9 @@ def reports():
             # Other Department Managers (non-IT, non-Auditing) can ONLY see their own department's requests
             query = query.filter(PaymentRequest.department == current_user.department)
     
+    # Check if "Rejected by Manager" is explicitly in the status filter
+    has_rejected_by_manager_filter = status_filter and 'Rejected by Manager' in status_filter
+    
     if status_filter:
         # Handle multiple status filters
         status_conditions = []
@@ -12158,6 +12225,10 @@ def reports():
                 status_conditions.append(PaymentRequest.status == status)
         if status_conditions:
             query = query.filter(db.or_(*status_conditions))
+    else:
+        # If no status filter is selected (showing all statuses), exclude "Rejected by Manager"
+        query = query.filter(PaymentRequest.status != 'Rejected by Manager')
+    
     if department_filter:
         # Filter by multiple departments
         query = query.filter(PaymentRequest.department.in_(department_filter))
@@ -12637,6 +12708,10 @@ def export_reports_excel():
                 status_conditions.append(PaymentRequest.status == status)
         if status_conditions:
             query = query.filter(db.or_(*status_conditions))
+    else:
+        # If no status filter is selected (showing all statuses), exclude "Rejected by Manager"
+        query = query.filter(PaymentRequest.status != 'Rejected by Manager')
+    
     if department_filter:
         # Filter by multiple departments
         query = query.filter(PaymentRequest.department.in_(department_filter))
@@ -12980,6 +13055,10 @@ def export_reports_pdf():
                 status_conditions.append(PaymentRequest.status == status)
         if status_conditions:
             query = query.filter(db.or_(*status_conditions))
+    else:
+        # If no status filter is selected (showing all statuses), exclude "Rejected by Manager"
+        query = query.filter(PaymentRequest.status != 'Rejected by Manager')
+    
     if department_filter:
         # Filter by multiple departments
         query = query.filter(PaymentRequest.department.in_(department_filter))
