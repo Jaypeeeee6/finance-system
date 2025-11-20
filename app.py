@@ -4742,7 +4742,12 @@ def procurement_request_item():
         item_name = request.form.get('item_name_value', '').strip() or request.form.get('item_name', '').strip()
         quantity = request.form.get('quantity', '').strip()
         purpose = request.form.get('purpose', '').strip()
+        # Check for multiple branch names first (new format), then fall back to single branch_name (backward compatibility)
+        branch_names = request.form.get('branch_names', '').strip()
         branch_name = request.form.get('branch_name', '').strip()
+        # Use branch_names if available, otherwise use branch_name
+        if branch_names:
+            branch_name = branch_names
         date = request.form.get('date', '').strip()
         is_urgent = request.form.get('is_urgent') == 'on'
         notes = request.form.get('notes', '').strip()
@@ -4853,8 +4858,17 @@ def procurement_request_item():
         return redirect(url_for('procurement_item_requests'))
     
     # GET request - show the form
-    # Get available branches
-    available_branches = Branch.query.filter_by(is_active=True).order_by(Branch.restaurant, Branch.name).all()
+    # Get available branches with custom order: Office first, then Kucu, Boom, Thoum, Kitchen
+    from sqlalchemy import case
+    location_order = case(
+        (Branch.restaurant == 'Office', 1),
+        (Branch.restaurant == 'Kucu', 2),
+        (Branch.restaurant == 'Boom', 3),
+        (Branch.restaurant == 'Thoum', 4),
+        (Branch.restaurant == 'Kitchen', 5),
+        else_=6
+    )
+    available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
     
     # Get categories and items from database based on user's department
     user_department = current_user.department if current_user else None
@@ -14796,6 +14810,13 @@ if __name__ == '__main__':
                 print("✓ Added 'invoice_path' column to procurement_item_requests table")
             else:
                 print("✓ 'invoice_path' column already exists in procurement_item_requests table")
+            
+            if 'category' not in existing_columns:
+                cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN category VARCHAR(100)")
+                conn.commit()
+                print("✓ Added 'category' column to procurement_item_requests table")
+            else:
+                print("✓ 'category' column already exists in procurement_item_requests table")
             
             # Migrate: Add item_request_id column to notifications table if it doesn't exist
             cursor.execute("PRAGMA table_info(notifications)")

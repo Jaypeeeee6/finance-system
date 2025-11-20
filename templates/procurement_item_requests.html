@@ -10,6 +10,9 @@
     </div>
 
     <div class="dashboard-actions">
+        <a href="{{ url_for('procurement_request_item') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> New Item Request
+        </a>
         <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Back to Dashboard
         </a>
@@ -175,7 +178,19 @@
                                 {{ req.item_name }}
                             </td>
                             <td>{{ req.quantity or '-' }}</td>
-                            <td>{{ req.branch_name }}</td>
+                            <td>
+                                {% if req.branch_name %}
+                                    {% set branch_list = req.branch_name.split(',') %}
+                                    {% for branch in branch_list %}
+                                        {% set branch_trimmed = branch.strip() %}
+                                        {% if branch_trimmed %}
+                                            <span class="filter-pill" style="margin-right: 4px; margin-bottom: 4px; display: inline-block;">{{ branch_trimmed }}</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    <span style="color: #999;">-</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if req.amount %}
                                     OMR {{ "%.3f"|format(req.amount) }}
@@ -476,6 +491,17 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+    .filter-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        background: #000;
+        color: white;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+    }
 .modal {
     display: none;
     position: fixed;
