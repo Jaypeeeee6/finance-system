@@ -776,15 +776,6 @@
                                         </div>
                                     </div>
                                     <div class="form-group">
-                                        <label for="procurement_assigned_to_user_id">Assign to Procurement Member *</label>
-                                        <select name="assigned_to_user_id" id="procurement_assigned_to_user_id" required>
-                                            <option value="">-- Select Procurement Member --</option>
-                                            {% for member in procurement_members %}
-                                                <option value="{{ member.user_id }}">{{ member.name }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
                                         <label for="procurement_approval_reason">Approval Notes (Optional)</label>
                                         <textarea name="approval_reason" id="procurement_approval_reason" rows="3" placeholder="Add any notes about this approval..."></textarea>
                                     </div>
@@ -860,6 +851,17 @@
                             <p>Complete this item request once the item has been procured and delivered.</p>
                         </div>
                         <div class="card-body">
+                            <!-- Procurement Member Name Display (similar to Finance Admin) -->
+                            {% if user.department == 'Procurement' %}
+                            <div class="form-group">
+                                <label>Procurement Member</label>
+                                <div class="form-control" style="background-color: #f8f9fa; border: 1px solid #ced4da; padding: 0.375rem 0.75rem;">
+                                    <strong>{{ user.name }}</strong>
+                                    <small class="text-muted d-block">Automatically assigned as the procurement member</small>
+                                </div>
+                            </div>
+                            {% endif %}
+                            
                             <form method="POST" action="{{ url_for('item_request_complete', request_id=item_request.id) }}" enctype="multipart/form-data" id="item-request-complete-form">
                                 <div class="form-group">
                                     <p style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem;">
@@ -1079,7 +1081,6 @@ function toggleItemProcurementManagerApprovalFields() {
     const onHoldFields = document.getElementById('item_procurement_on_hold_fields');
     const rejectionReasonField = document.getElementById('procurement_rejection_reason');
     const amountField = document.getElementById('procurement_amount');
-    const assignedToField = document.getElementById('procurement_assigned_to_user_id');
     
     // Hide all fields first and remove required attributes
     approveFields.style.display = 'none';
@@ -1091,18 +1092,12 @@ function toggleItemProcurementManagerApprovalFields() {
     if (amountField) {
         amountField.removeAttribute('required');
     }
-    if (assignedToField) {
-        assignedToField.removeAttribute('required');
-    }
     
     // Show relevant fields based on selection and add required attributes
     if (status === 'approve') {
         approveFields.style.display = 'block';
         if (amountField) {
             amountField.setAttribute('required', 'required');
-        }
-        if (assignedToField) {
-            assignedToField.setAttribute('required', 'required');
         }
     } else if (status === 'reject') {
         rejectFields.style.display = 'block';

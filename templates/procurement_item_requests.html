@@ -90,8 +90,31 @@
     </div>
     {% endif %}
 
+    <!-- Tab Navigation (only for Procurement department users) -->
+    {% if user.department == 'Procurement' %}
+    <div class="tab-navigation">
+        <button class="tab-button {% if active_tab == 'all' %}active{% endif %}" onclick="switchTab('all')" id="tab-all">
+            <i class="fas fa-list"></i> All Item Requests
+        </button>
+        <button class="tab-button {% if active_tab == 'assigned_to_self' %}active{% endif %}" onclick="switchTab('assigned_to_self')" id="tab-assigned_to_self">
+            <i class="fas fa-user"></i> Assigned to Self
+        </button>
+        <button class="tab-button {% if active_tab == 'completed' %}active{% endif %}" onclick="switchTab('completed')" id="tab-completed">
+            <i class="fas fa-check-circle"></i> Completed
+        </button>
+        <button class="tab-button {% if active_tab == 'returned' %}active{% endif %}" onclick="switchTab('returned')" id="tab-returned">
+            <i class="fas fa-undo"></i> Returned Items
+        </button>
+        <div class="tab-search">
+            <input type="text" id="tabSearchInput" placeholder="Search by request #, requestor, item, purpose..." class="tab-search-input" value="{{ search_query or '' }}">
+            <button type="button" class="tab-search-btn" onclick="performSearch()">
+                <i class="fas fa-search"></i>
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Item Requests Table -->
-    <h4 class="card-title" style="margin-bottom: 15px; margin-top: 0;">All Item Requests</h4>
     <div class="card">
         <div class="card-header">
             <div class="header-top">
@@ -120,12 +143,6 @@
                 </div>
             </div>
             <div class="card-header-actions">
-                <div class="tab-search" style="margin-left: auto; margin-right: 15px;">
-                    <input type="text" id="tabSearchInput" placeholder="Search by request #, requestor, item, purpose..." class="tab-search-input" value="{{ search_query or '' }}">
-                    <button type="button" class="tab-search-btn" onclick="performSearch()">
-                        <i class="fas fa-search"></i>
-                    </button>
-                </div>
                 {% if department_filter or status_filter or urgent_filter or search_query %}
                 <div class="filter-indicator">
                     <span class="badge" style="background: #f57c00; color: white;">
@@ -137,7 +154,7 @@
                         {% if search_query %}{{ filters.append('Search: ' + search_query) or '' }}{% endif %}
                         {{ filters|join(' | ') }}
                     </span>
-                    <a href="{{ url_for('procurement_item_requests') }}" class="btn btn-sm btn-outline">
+                    <a href="{{ url_for('procurement_item_requests', tab=active_tab if user.department == 'Procurement' else 'all') }}" class="btn btn-sm btn-outline">
                         <i class="fas fa-times"></i> Clear All
                     </a>
                 </div>
@@ -150,6 +167,11 @@
                 <table class="data-table">
                     <thead>
                         <tr>
+                            {% if user.department == 'Procurement' %}
+                            <th style="width: 40px;">
+                                <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                            </th>
+                            {% endif %}
                             <th>Request ID</th>
                             <th>Requestor</th>
                             <th>Department</th>
@@ -165,6 +187,15 @@
                     <tbody>
                         {% for req in item_requests %}
                         <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
+                            {% if user.department == 'Procurement' %}
+                            <td>
+                                {% if req.status in ['Completed', 'On Hold', 'Pending Procurement Manager Approval'] %}
+                                <input type="checkbox" class="request-checkbox" value="{{ req.id }}" disabled title="Cannot select requests with status: {{ req.status }}">
+                                {% else %}
+                                <input type="checkbox" class="request-checkbox" value="{{ req.id }}" onchange="updateBulkActions()">
+                                {% endif %}
+                            </td>
+                            {% endif %}
                             <td>
                                 <span>#{{ req.id }}</span>
                                 {% if req.is_urgent %}
@@ -253,7 +284,74 @@
             {% endif %}
         </div>
     </div>
+    
+    <!-- Bulk Actions Bar (only for Procurement users) -->
+    {% if user.department == 'Procurement' %}
+    <div id="bulkActionsBar" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: white; padding: 12px 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; border: 2px solid #007bff; min-width: 800px; max-width: 95%;">
+        <div style="display: flex; align-items: center; gap: 12px; justify-content: center;">
+            <span id="selectedCount" style="font-weight: bold; color: #007bff; margin-right: 5px;"></span>
+            <button type="button" class="btn btn-primary btn-sm" onclick="bulkAssignToSelf()" style="padding: 6px 12px; font-size: 0.875rem;">
+                <i class="fas fa-user-check"></i> Bulk Assign to Self
+            </button>
+            <button type="button" class="btn btn-success btn-sm" onclick="openBulkUploadModal()" style="padding: 6px 12px; font-size: 0.875rem;">
+                <i class="fas fa-upload"></i> Bulk Upload Invoice/Receipt
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="clearSelection()" style="padding: 6px 12px; font-size: 0.875rem;">
+                <i class="fas fa-times"></i> Clear Selection
+            </button>
+        </div>
+    </div>
+    {% endif %}
 </div>
+
+<!-- Bulk Upload Modal -->
+{% if user.department == 'Procurement' %}
+<div id="bulkUploadModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+        <span class="close" onclick="closeBulkUploadModal()">&times;</span>
+        <h2>Bulk Upload Invoice/Receipt</h2>
+        <form id="bulkUploadForm" method="POST" action="{{ url_for('bulk_upload_item_files') }}" enctype="multipart/form-data">
+            <input type="hidden" name="request_ids" id="bulkUploadRequestIds">
+            <div class="form-group" style="margin-bottom: 20px;">
+                <p style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem;">
+                    <strong>Upload Receipt:</strong> This is for the proof of transfer made by the Procurement Manager to the assigned Procurement Staff.
+                </p>
+                <div id="bulk-receipt-upload-container" 
+                     data-multiple-file-upload
+                     data-input-name="receipt_files"
+                     data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                     data-max-size="10485760"
+                     data-max-files="10"
+                     data-required="false"
+                     data-label="Upload Receipt"
+                     data-help-text="">
+                </div>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 20px;">
+                <p style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem;">
+                    <strong>Upload Invoice:</strong> This is for the proof of payment made for the requested item.
+                </p>
+                <div id="bulk-invoice-upload-container" 
+                     data-multiple-file-upload
+                     data-input-name="invoice_files"
+                     data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                     data-max-size="10485760"
+                     data-max-files="10"
+                     data-required="false"
+                     data-label="Upload Invoice"
+                     data-help-text="">
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" onclick="closeBulkUploadModal()">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="confirmBulkUpload()">Upload Files</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
 
 <!-- View Request Modal -->
 <div id="viewRequestModal" class="modal" style="display: none;">
@@ -396,6 +494,10 @@ function applyDepartmentFilter() {
     const departmentValue = departmentFilter.value;
     
     const url = new URL(window.location);
+    // Preserve current tab
+    const currentTab = url.searchParams.get('tab') || 'all';
+    url.searchParams.set('tab', currentTab);
+    
     if (departmentValue) {
         url.searchParams.set('department', departmentValue);
     } else {
@@ -409,6 +511,10 @@ function applyStatusFilter() {
     const statusValue = statusFilter.value;
     
     const url = new URL(window.location);
+    // Preserve current tab
+    const currentTab = url.searchParams.get('tab') || 'all';
+    url.searchParams.set('tab', currentTab);
+    
     if (statusValue) {
         url.searchParams.set('status', statusValue);
     } else {
@@ -422,6 +528,10 @@ function applyUrgentFilter() {
     const urgentValue = urgentFilter.value;
     
     const url = new URL(window.location);
+    // Preserve current tab
+    const currentTab = url.searchParams.get('tab') || 'all';
+    url.searchParams.set('tab', currentTab);
+    
     if (urgentValue) {
         url.searchParams.set('urgent', urgentValue);
     } else {
@@ -433,6 +543,17 @@ function applyUrgentFilter() {
 // Debounce timer for search
 let searchDebounceTimer = null;
 
+function switchTab(tab) {
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tab);
+    // Preserve other filters
+    const searchInput = document.getElementById('tabSearchInput');
+    if (searchInput && searchInput.value.trim()) {
+        url.searchParams.set('search', searchInput.value.trim());
+    }
+    window.location.href = url.toString();
+}
+
 function performSearch(commit) {
     const searchInput = document.getElementById('tabSearchInput');
     const searchValue = searchInput.value.trim();
@@ -443,6 +564,9 @@ function performSearch(commit) {
     } else {
         url.searchParams.delete('search');
     }
+    // Preserve current tab
+    const currentTab = new URL(window.location).searchParams.get('tab') || 'all';
+    url.searchParams.set('tab', currentTab);
     url.searchParams.set('page', '1');
     
     if (commit) {
@@ -474,6 +598,118 @@ function performSearch(commit) {
 function clearSearch() {
     document.getElementById('tabSearchInput').value = '';
     performSearch();
+}
+
+// Bulk Actions Functions
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.request-checkbox:not(:disabled)');
+    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    updateBulkActions();
+}
+
+function updateBulkActions() {
+    const checkboxes = document.querySelectorAll('.request-checkbox:checked:not(:disabled)');
+    const bulkActionsBar = document.getElementById('bulkActionsBar');
+    const selectedCount = document.getElementById('selectedCount');
+    
+    if (checkboxes.length > 0) {
+        bulkActionsBar.style.display = 'block';
+        selectedCount.textContent = `${checkboxes.length} request(s) selected`;
+    } else {
+        bulkActionsBar.style.display = 'none';
+        // Update select all checkbox state
+        const allEnabled = document.querySelectorAll('.request-checkbox:not(:disabled)');
+        const allChecked = document.querySelectorAll('.request-checkbox:not(:disabled):checked');
+        document.getElementById('selectAll').checked = allEnabled.length > 0 && allEnabled.length === allChecked.length;
+    }
+}
+
+function clearSelection() {
+    const checkboxes = document.querySelectorAll('.request-checkbox:not(:disabled)');
+    checkboxes.forEach(cb => cb.checked = false);
+    document.getElementById('selectAll').checked = false;
+    updateBulkActions();
+}
+
+function getSelectedRequestIds() {
+    const checkboxes = document.querySelectorAll('.request-checkbox:checked:not(:disabled)');
+    return Array.from(checkboxes).map(cb => parseInt(cb.value));
+}
+
+function bulkAssignToSelf() {
+    const selectedIds = getSelectedRequestIds();
+    if (selectedIds.length === 0) {
+        alert('Please select at least one request.');
+        return;
+    }
+    
+    const requestIdsText = selectedIds.map(id => `#${id}`).join(', ');
+    const userName = '{{ user.name }}';
+    
+    if (confirm(`Are you sure that you want to assign request ${requestIdsText} to ${userName}?`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("bulk_assign_item_requests") }}';
+        
+        selectedIds.forEach(id => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'request_ids';
+            input.value = id;
+            form.appendChild(input);
+        });
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function openBulkUploadModal() {
+    const selectedIds = getSelectedRequestIds();
+    if (selectedIds.length === 0) {
+        alert('Please select at least one request.');
+        return;
+    }
+    
+    document.getElementById('bulkUploadRequestIds').value = selectedIds.join(',');
+    document.getElementById('bulkUploadModal').style.display = 'block';
+    
+    // Initialize file upload components if not already initialized
+    if (typeof initMultipleFileUpload === 'function') {
+        setTimeout(() => {
+            initMultipleFileUpload(document.getElementById('bulk-receipt-upload-container'));
+            initMultipleFileUpload(document.getElementById('bulk-invoice-upload-container'));
+        }, 100);
+    }
+}
+
+function closeBulkUploadModal() {
+    document.getElementById('bulkUploadModal').style.display = 'none';
+    // Reset form
+    document.getElementById('bulkUploadForm').reset();
+}
+
+function confirmBulkUpload() {
+    const selectedIds = getSelectedRequestIds();
+    if (selectedIds.length === 0) {
+        alert('Please select at least one request.');
+        return;
+    }
+    
+    const requestIdsText = selectedIds.map(id => `#${id}`).join(', ');
+    
+    if (confirm(`Are you sure you want to upload files to request ${requestIdsText}?`)) {
+        document.getElementById('bulkUploadForm').submit();
+    }
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const bulkUploadModal = document.getElementById('bulkUploadModal');
+    if (event.target == bulkUploadModal) {
+        closeBulkUploadModal();
+    }
 }
 
 // Initialize tab search functionality when page loads
@@ -632,6 +868,15 @@ document.addEventListener('DOMContentLoaded', function() {
         font-size: 18px !important;
         margin-bottom: 10px !important;
     }
+}
+
+/* Consistent hover effects for bulk action buttons */
+#bulkActionsBar .btn-primary:hover,
+#bulkActionsBar .btn-success:hover,
+#bulkActionsBar .btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
 }
 </style>
 

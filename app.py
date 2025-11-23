@@ -3498,6 +3498,7 @@ def procurement_dashboard():
 def procurement_item_requests():
     """Item Requests page - shows requests based on user role"""
     # Get filter parameters
+    tab = request.args.get('tab', 'all')
     department_filter = request.args.get('department', None)
     status_filter = request.args.get('status', None)
     urgent_filter = request.args.get('urgent', None)
@@ -3581,18 +3582,15 @@ def procurement_item_requests():
     all_requests = base_query.order_by(ProcurementItemRequest.created_at.desc()).all()
     
     # Filter requests based on user role (after database-level filters)
-    if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
-        # Procurement Manager sees all requests except "Pending Manager Approval" and "Rejected by Manager"
-        item_requests = [r for r in all_requests if r.status not in ['Pending Manager Approval', 'Rejected by Manager']]
+    if current_user.department == 'Procurement':
+        # All Procurement staff (Manager and Staff) see all requests except "Pending Manager Approval" and "Rejected by Manager"
+        base_item_requests = [r for r in all_requests if r.status not in ['Pending Manager Approval', 'Rejected by Manager']]
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager see all requests (view-only, same as Procurement Manager)
-        item_requests = all_requests
-    elif current_user.department == 'Procurement' and current_user.role != 'Department Manager':
-        # Procurement Staff sees all assigned requests (any Procurement member can complete them)
-        item_requests = [r for r in all_requests if r.status == 'Assigned to Procurement' or r.assigned_to_user_id == current_user.user_id]
+        base_item_requests = all_requests
     elif current_user.department == 'Auditing':
         # Auditing department can see all completed item requests for auditing purposes
-        item_requests = [r for r in all_requests if r.status == 'Completed']
+        base_item_requests = [r for r in all_requests if r.status == 'Completed']
     else:
         # Managers see requests from their department
         authorized_approvers_ids = set()
@@ -3605,13 +3603,69 @@ def procurement_item_requests():
         # Also show requests created by current user
         my_requests = [r.id for r in all_requests if r.user_id == current_user.user_id]
         visible_request_ids = authorized_approvers_ids.union(my_requests)
-        item_requests = [r for r in all_requests if r.id in visible_request_ids]
+        base_item_requests = [r for r in all_requests if r.id in visible_request_ids]
+    
+    # Apply tab-based filtering (only for Procurement department users)
+    if current_user.department == 'Procurement':
+        if tab == 'assigned_to_self':
+            # Show requests assigned to current user
+            item_requests = [r for r in base_item_requests if r.status == 'Assigned to Procurement' and r.assigned_to_user_id == current_user.user_id]
+        elif tab == 'completed':
+            # Show completed requests
+            item_requests = [r for r in base_item_requests if r.status == 'Completed']
+        elif tab == 'returned':
+            # Show returned/rejected items
+            item_requests = [r for r in base_item_requests if r.status in ['Rejected by Procurement Manager']]
+        else:  # tab == 'all'
+            # Show all requests (default)
+            item_requests = base_item_requests
+    else:
+        # For non-procurement users, don't apply tab filtering
+        item_requests = base_item_requests
     
     # Sort item requests: first by status priority, then by datetime (most recent first)
     # This matches the sorting logic used in payment requests dashboard
     # Use a tuple key: (status_priority, -timestamp) where timestamp is negated for descending order
     def sort_key(req):
-        status_priority = get_item_request_status_priority(req)
+        # For Procurement Department Manager, use specific priority order
+        if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
+            # Custom priority order for Procurement Department Manager:
+            # 1. Pending Procurement Manager Approval
+            # 2. Assigned to Procurement
+            # 3. On Hold
+            # 4. Completed
+            # 5. Rejected by Procurement Manager
+            procurement_manager_status_priority = {
+                'Pending Procurement Manager Approval': 1,
+                'Assigned to Procurement': 2,
+                'On Hold': 3,
+                'Completed': 4,
+                'Rejected by Procurement Manager': 5,
+                'Pending Manager Approval': 6,
+                'Rejected by Manager': 6,
+            }
+            status_priority = procurement_manager_status_priority.get(req.status, 99)
+        # For other Procurement staff (not Department Manager), use different priority order
+        elif current_user.department == 'Procurement':
+            # Custom priority order for Procurement Staff:
+            # 1. Assigned to Procurement
+            # 2. Pending Procurement Manager Approval
+            # 3. On Hold
+            # 4. Completed
+            procurement_staff_status_priority = {
+                'Assigned to Procurement': 1,
+                'Pending Procurement Manager Approval': 2,
+                'On Hold': 3,
+                'Completed': 4,
+                'Pending Manager Approval': 5,
+                'Rejected by Manager': 6,
+                'Rejected by Procurement Manager': 6,
+            }
+            status_priority = procurement_staff_status_priority.get(req.status, 99)
+        else:
+            # For other users, use default priority order
+            status_priority = get_item_request_status_priority(req)
+        
         dt = get_item_request_datetime_for_sorting(req)
         # Convert datetime to timestamp for negation (most recent = higher timestamp, so negate for descending)
         timestamp = dt.timestamp() if dt else 0
@@ -3622,14 +3676,12 @@ def procurement_item_requests():
     # Calculate statistics (before filtering for display)
     all_item_requests_for_stats = ProcurementItemRequest.query.all()
     # Filter stats based on user role (same logic as above)
-    if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
-        # Procurement Manager stats exclude "Pending Manager Approval" and "Rejected by Manager"
+    if current_user.department == 'Procurement':
+        # All Procurement staff (Manager and Staff) stats exclude "Pending Manager Approval" and "Rejected by Manager"
         stats_requests = [r for r in all_item_requests_for_stats if r.status not in ['Pending Manager Approval', 'Rejected by Manager']]
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager see all requests (view-only, same as Procurement Manager)
         stats_requests = all_item_requests_for_stats
-    elif current_user.department == 'Procurement' and current_user.role != 'Department Manager':
-        stats_requests = [r for r in all_item_requests_for_stats if r.status == 'Assigned to Procurement' or r.assigned_to_user_id == current_user.user_id]
     elif current_user.department == 'Auditing':
         # Auditing department stats show only completed requests
         stats_requests = [r for r in all_item_requests_for_stats if r.status == 'Completed']
@@ -3714,6 +3766,7 @@ def procurement_item_requests():
                          urgent_requests=urgent_requests,
                          procurement_members=procurement_members,
                          is_procurement_user=is_procurement_user,
+                         active_tab=tab,
                          department_filter=department_filter,
                          status_filter=status_filter,
                          urgent_filter=urgent_filter,
@@ -3732,15 +3785,15 @@ def view_item_request(request_id):
     
     # Check access permissions
     can_view = False
-    if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
-        can_view = True
+    if current_user.department == 'Procurement':
+        # All Procurement staff (Manager and Staff) can view all requests except "Pending Manager Approval" and "Rejected by Manager"
+        if item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
+            can_view = True
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager can view all requests (view-only)
         can_view = True
     elif current_user.department == 'Auditing' and item_request.status == 'Completed':
         # Auditing department can view all completed item requests for auditing purposes
-        can_view = True
-    elif current_user.department == 'Procurement' and item_request.assigned_to_user_id == current_user.user_id:
         can_view = True
     elif item_request.user_id == current_user.user_id:
         can_view = True
@@ -3784,9 +3837,9 @@ def view_item_request(request_id):
                 can_approve_procurement_manager = True
                 can_reject_procurement_manager = True
     
-    # Completion: Only assigned procurement member can complete (GM and Operation Manager cannot complete)
+    # Completion: All procurement staff can complete when status is 'Assigned to Procurement' (GM and Operation Manager cannot complete)
     if current_user.role not in ['GM', 'Operation Manager']:
-        if item_request.status == 'Assigned to Procurement' and item_request.assigned_to_user_id == current_user.user_id:
+        if item_request.status == 'Assigned to Procurement' and current_user.department == 'Procurement':
             can_complete = True
     
     # Get user names safely (avoid lazy loading issues)
@@ -3866,15 +3919,15 @@ def view_item_request_page(request_id):
     
     # Check access permissions
     can_view = False
-    if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
-        can_view = True
+    if current_user.department == 'Procurement':
+        # All Procurement staff (Manager and Staff) can view all requests except "Pending Manager Approval" and "Rejected by Manager"
+        if item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
+            can_view = True
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager can view all requests (view-only)
         can_view = True
     elif current_user.department == 'Auditing' and item_request.status == 'Completed':
         # Auditing department can view all completed item requests for auditing purposes
-        can_view = True
-    elif current_user.department == 'Procurement' and item_request.assigned_to_user_id == current_user.user_id:
         can_view = True
     elif item_request.user_id == current_user.user_id:
         can_view = True
@@ -4010,9 +4063,9 @@ def view_item_request_page(request_id):
                 can_approve_procurement_manager = True
                 can_reject_procurement_manager = True
     
-    # Completion: Only assigned procurement member can complete (GM and Operation Manager cannot complete)
+    # Completion: All procurement staff can complete when status is 'Assigned to Procurement' (GM and Operation Manager cannot complete)
     if current_user.role not in ['GM', 'Operation Manager']:
-        if item_request.status == 'Assigned to Procurement' and item_request.assigned_to_user_id == current_user.user_id:
+        if item_request.status == 'Assigned to Procurement' and current_user.department == 'Procurement':
             can_complete = True
     
     # Authorization for scheduling payment date (similar to payment requests)
@@ -4586,59 +4639,44 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         flash(f'Insufficient balance. Available balance is OMR {available_balance:.3f}, but the requested amount is OMR {amount:.3f}. Please put the request on hold.', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
-    assigned_to_user_id = request.form.get('assigned_to_user_id', '').strip()
-    if not assigned_to_user_id:
-        flash('Please select a procurement member to assign this request to.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
-    
-    try:
-        assigned_to_user_id = int(assigned_to_user_id)
-    except ValueError:
-        flash('Invalid user selected.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
-    
-    # Verify the assigned user is from Procurement department
-    assigned_user = User.query.get(assigned_to_user_id)
-    if not assigned_user or assigned_user.department != 'Procurement':
-        flash('Selected user must be from Procurement department.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
-    
     current_time = datetime.utcnow()
     
-    # Update request
+    # Update request - set status to 'Assigned to Procurement' without assigning to specific user
     item_request.status = 'Assigned to Procurement'
     item_request.procurement_manager_approval_date = current_time.date()
     item_request.procurement_manager_approver = current_user.name
     item_request.procurement_manager_approver_user_id = current_user.user_id
     item_request.procurement_manager_approval_reason = request.form.get('approval_reason', '').strip()
     item_request.amount = amount
-    item_request.assigned_to_user_id = assigned_to_user_id
+    # Don't set assigned_to_user_id - let any procurement staff member complete it
     item_request.assigned_by_user_id = current_user.user_id
     item_request.assignment_date = current_time
     item_request.updated_at = current_time
     
     db.session.commit()
     
-    log_action(f"Procurement Manager approved and assigned item request #{request_id} to {assigned_user.name}")
+    log_action(f"Procurement Manager approved item request #{request_id} - available for all procurement staff")
     
     # Notify requestor
     if item_request.user_id:
         create_notification(
             user_id=item_request.user_id,
             title="Item Request Approved by Procurement Manager",
-            message=f"Your item request #{request_id} for {item_request.item_name} has been approved and assigned to a procurement member.",
+            message=f"Your item request #{request_id} for {item_request.item_name} has been approved and is now available for procurement staff to process.",
             notification_type="request_approved",
             item_request_id=request_id
         )
     
-    # Notify assigned procurement member
-    create_notification(
-        user_id=assigned_to_user_id,
-        title="New Item Request Assigned",
-        message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been assigned to you. Amount: OMR {amount:.3f}",
-        notification_type="item_request_assigned",
-        item_request_id=request_id
-    )
+    # Notify all procurement staff members
+    procurement_staff = User.query.filter_by(department='Procurement').all()
+    for staff_member in procurement_staff:
+        create_notification(
+            user_id=staff_member.user_id,
+            title="New Item Request Available",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} is now available for processing. Amount: OMR {amount:.3f}",
+            notification_type="item_request_assigned",
+            item_request_id=request_id
+        )
     
     # Notify the manager who originally approved (they should know it progressed)
     if item_request.manager_approver_user_id:
@@ -4828,13 +4866,18 @@ def item_request_complete(request_id):
     """Procurement member completes an item request"""
     item_request = ProcurementItemRequest.query.get_or_404(request_id)
     
-    # Check if current user is the assigned person
-    if item_request.assigned_to_user_id != current_user.user_id:
-        flash('Only the assigned person can complete this request.', 'danger')
+    # Check if current user is from Procurement department
+    if current_user.department != 'Procurement':
+        flash('Only procurement staff can complete this request.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    
+    # GM and Operation Manager cannot complete
+    if current_user.role in ['GM', 'Operation Manager']:
+        flash('You do not have permission to complete this request.', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
     if item_request.status != 'Assigned to Procurement':
-        flash('This request is not assigned.', 'danger')
+        flash('This request is not assigned to procurement.', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
     completion_notes = request.form.get('completion_notes', '').strip()
@@ -4953,6 +4996,262 @@ def item_request_complete(request_id):
     
     flash('Item request marked as completed!', 'success')
     return redirect(url_for('view_item_request_page', request_id=request_id))
+
+
+@app.route('/procurement/item-requests/bulk-assign', methods=['POST'])
+@login_required
+def bulk_assign_item_requests():
+    """Bulk assign item requests to the current user"""
+    if current_user.department != 'Procurement':
+        flash('Only procurement staff can perform this action.', 'danger')
+        return redirect(url_for('procurement_item_requests'))
+    
+    request_ids = request.form.getlist('request_ids')
+    if not request_ids:
+        flash('Please select at least one request.', 'danger')
+        return redirect(url_for('procurement_item_requests'))
+    
+    try:
+        request_ids = [int(rid) for rid in request_ids]
+    except ValueError:
+        flash('Invalid request IDs.', 'danger')
+        return redirect(url_for('procurement_item_requests'))
+    
+    current_time = datetime.utcnow()
+    assigned_count = 0
+    skipped_count = 0
+    
+    for request_id in request_ids:
+        item_request = ProcurementItemRequest.query.get(request_id)
+        if not item_request:
+            skipped_count += 1
+            continue
+        
+        # Only assign if status is "Assigned to Procurement" (not assigned to anyone yet)
+        if item_request.status == 'Assigned to Procurement':
+            item_request.assigned_to_user_id = current_user.user_id
+            item_request.assigned_by_user_id = current_user.user_id
+            item_request.assignment_date = current_time
+            item_request.updated_at = current_time
+            
+            assigned_count += 1
+            
+            # Get authorized persons for notifications
+            authorized_users = []
+            
+            # Add requestor
+            if item_request.user_id:
+                authorized_users.append(item_request.user_id)
+            
+            # Add manager approver
+            if item_request.manager_approver_user_id:
+                authorized_users.append(item_request.manager_approver_user_id)
+            
+            # Add procurement manager approver
+            if item_request.procurement_manager_approver_user_id:
+                authorized_users.append(item_request.procurement_manager_approver_user_id)
+            
+            # Add all procurement staff (they should know about assignments)
+            procurement_staff = User.query.filter_by(department='Procurement').all()
+            for staff in procurement_staff:
+                if staff.user_id not in authorized_users:
+                    authorized_users.append(staff.user_id)
+            
+            # Send notifications to all authorized users
+            for user_id in authorized_users:
+                create_notification(
+                    user_id=user_id,
+                    title="Item Request Assigned",
+                    message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been assigned to {current_user.name} by {current_user.name}.",
+                    notification_type="item_request_assigned",
+                    item_request_id=request_id
+                )
+            
+            log_action(f"Bulk assigned item request #{request_id} to {current_user.name}")
+        else:
+            skipped_count += 1
+    
+    db.session.commit()
+    
+    if assigned_count > 0:
+        flash(f'Successfully assigned {assigned_count} request(s) to {current_user.name}.', 'success')
+    if skipped_count > 0:
+        flash(f'Skipped {skipped_count} request(s) that are not in "Assigned to Procurement" status.', 'info')
+    
+    return redirect(url_for('procurement_item_requests'))
+
+
+@app.route('/procurement/item-requests/bulk-upload', methods=['POST'])
+@login_required
+def bulk_upload_item_files():
+    """Bulk upload invoice/receipt files to multiple item requests"""
+    if current_user.department != 'Procurement':
+        flash('Only procurement staff can perform this action.', 'danger')
+        return redirect(url_for('procurement_item_requests'))
+    
+    request_ids_str = request.form.get('request_ids', '').strip()
+    if not request_ids_str:
+        flash('No requests selected.', 'danger')
+        return redirect(url_for('procurement_item_requests'))
+    
+    try:
+        request_ids = [int(rid.strip()) for rid in request_ids_str.split(',')]
+    except ValueError:
+        flash('Invalid request IDs.', 'danger')
+        return redirect(url_for('procurement_item_requests'))
+    
+    # Handle receipt files (optional)
+    receipt_files = request.files.getlist('receipt_files')
+    uploaded_receipt_filenames = []
+    
+    # Handle invoice files (optional)
+    invoice_files = request.files.getlist('invoice_files')
+    uploaded_invoice_filenames = []
+    
+    # Check if at least one file type is provided
+    if not receipt_files or not any(f.filename for f in receipt_files):
+        if not invoice_files or not any(f.filename for f in invoice_files):
+            flash('Please upload at least one receipt or invoice file.', 'danger')
+            return redirect(url_for('procurement_item_requests'))
+    
+    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
+    max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+    
+    # Process receipt files
+    if receipt_files and any(f.filename for f in receipt_files):
+        for receipt_file in receipt_files:
+            if receipt_file and receipt_file.filename:
+                file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
+                if file_extension not in allowed_extensions:
+                    flash(f'Invalid file type for receipt "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'danger')
+                    return redirect(url_for('procurement_item_requests'))
+                
+                file_size = len(receipt_file.read())
+                if file_size > max_file_size:
+                    flash(f'Receipt file "{receipt_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'danger')
+                    return redirect(url_for('procurement_item_requests'))
+                
+                receipt_file.seek(0)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = secure_filename(receipt_file.filename)
+                filename = f"bulk_receipt_{timestamp}_{filename}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                receipt_file.save(filepath)
+                uploaded_receipt_filenames.append(filename)
+    
+    # Process invoice files
+    if invoice_files and any(f.filename for f in invoice_files):
+        for invoice_file in invoice_files:
+            if invoice_file and invoice_file.filename:
+                file_extension = invoice_file.filename.rsplit('.', 1)[1].lower() if '.' in invoice_file.filename else ''
+                if file_extension not in allowed_extensions:
+                    flash(f'Invalid file type for invoice "{invoice_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'danger')
+                    return redirect(url_for('procurement_item_requests'))
+                
+                file_size = len(invoice_file.read())
+                if file_size > max_file_size:
+                    flash(f'Invoice file "{invoice_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'danger')
+                    return redirect(url_for('procurement_item_requests'))
+                
+                invoice_file.seek(0)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = secure_filename(invoice_file.filename)
+                filename = f"bulk_invoice_{timestamp}_{filename}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                invoice_file.save(filepath)
+                uploaded_invoice_filenames.append(filename)
+    
+    # Update all selected requests
+    updated_count = 0
+    skipped_count = 0
+    
+    for request_id in request_ids:
+        item_request = ProcurementItemRequest.query.get(request_id)
+        if not item_request:
+            skipped_count += 1
+            continue
+        
+        # Only update if status is "Assigned to Procurement"
+        if item_request.status == 'Assigned to Procurement':
+            # Merge with existing files if any
+            existing_receipts = []
+            existing_invoices = []
+            
+            if item_request.receipt_path:
+                try:
+                    existing_receipts = json.loads(item_request.receipt_path)
+                    if not isinstance(existing_receipts, list):
+                        existing_receipts = [item_request.receipt_path]
+                except:
+                    existing_receipts = [item_request.receipt_path] if item_request.receipt_path else []
+            
+            if item_request.invoice_path:
+                try:
+                    existing_invoices = json.loads(item_request.invoice_path)
+                    if not isinstance(existing_invoices, list):
+                        existing_invoices = [item_request.invoice_path]
+                except:
+                    existing_invoices = [item_request.invoice_path] if item_request.invoice_path else []
+            
+            # Add new files to existing ones
+            all_receipts = existing_receipts + uploaded_receipt_filenames
+            all_invoices = existing_invoices + uploaded_invoice_filenames
+            
+            item_request.receipt_path = json.dumps(all_receipts) if all_receipts else None
+            item_request.invoice_path = json.dumps(all_invoices) if all_invoices else None
+            item_request.updated_at = datetime.utcnow()
+            
+            updated_count += 1
+            
+            # Get authorized persons for notifications
+            authorized_users = []
+            
+            # Add requestor
+            if item_request.user_id:
+                authorized_users.append(item_request.user_id)
+            
+            # Add manager approver
+            if item_request.manager_approver_user_id:
+                authorized_users.append(item_request.manager_approver_user_id)
+            
+            # Add procurement manager approver
+            if item_request.procurement_manager_approver_user_id:
+                authorized_users.append(item_request.procurement_manager_approver_user_id)
+            
+            # Add all procurement staff
+            procurement_staff = User.query.filter_by(department='Procurement').all()
+            for staff in procurement_staff:
+                if staff.user_id not in authorized_users:
+                    authorized_users.append(staff.user_id)
+            
+            # Send notifications
+            file_types = []
+            if uploaded_receipt_filenames:
+                file_types.append('receipt')
+            if uploaded_invoice_filenames:
+                file_types.append('invoice')
+            
+            for user_id in authorized_users:
+                create_notification(
+                    user_id=user_id,
+                    title="Files Uploaded to Item Request",
+                    message=f"{current_user.name} uploaded {', '.join(file_types)} file(s) to item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name}.",
+                    notification_type="item_request_updated",
+                    item_request_id=request_id
+                )
+            
+            log_action(f"Bulk uploaded files to item request #{request_id} by {current_user.name}")
+        else:
+            skipped_count += 1
+    
+    db.session.commit()
+    
+    if updated_count > 0:
+        flash(f'Successfully uploaded files to {updated_count} request(s).', 'success')
+    if skipped_count > 0:
+        flash(f'Skipped {skipped_count} request(s) that are not in "Assigned to Procurement" status.', 'info')
+    
+    return redirect(url_for('procurement_item_requests'))
 
 
 @app.route('/procurement/request-item', methods=['GET', 'POST'])
@@ -7184,25 +7483,25 @@ def add_procurement_item():
         description = request.form.get('description', '').strip()
         is_active = request.form.get('is_active') == 'on'
         
-        if not name or not department:
-            flash('Name and department are required.', 'danger')
+        if not name or not department or not category_id:
+            flash('Name, department, and category are required.', 'danger')
             return redirect(url_for('add_procurement_item'))
         
         # Check if item already exists for this department and category
         existing = ProcurementItem.query.filter_by(
             name=name, 
             department=department,
-            category_id=category_id if category_id else None
+            category_id=int(category_id)
         ).first()
         
         if existing:
-            flash(f'Item "{name}" already exists for {department} department.', 'danger')
+            flash(f'Item "{name}" already exists for {department} department in this category.', 'danger')
             return redirect(url_for('add_procurement_item'))
         
         try:
             item = ProcurementItem(
                 name=name,
-                category_id=int(category_id) if category_id else None,
+                category_id=int(category_id),
                 department=department,
                 description=description if description else None,
                 is_active=is_active,
@@ -7256,20 +7555,20 @@ def edit_procurement_item(item_id):
         description = request.form.get('description', '').strip()
         is_active = request.form.get('is_active') == 'on'
         
-        if not name or not department:
-            flash('Name and department are required.', 'danger')
+        if not name or not department or not category_id:
+            flash('Name, department, and category are required.', 'danger')
             return redirect(url_for('edit_procurement_item', item_id=item_id))
         
         # Check if item already exists for this department and category (excluding current one)
         existing = ProcurementItem.query.filter(
             ProcurementItem.name == name,
             ProcurementItem.department == department,
-            ProcurementItem.category_id == (int(category_id) if category_id else None),
+            ProcurementItem.category_id == int(category_id),
             ProcurementItem.id != item_id
         ).first()
         
         if existing:
-            flash(f'Item "{name}" already exists for {department} department.', 'danger')
+            flash(f'Item "{name}" already exists for {department} department in this category.', 'danger')
             return redirect(url_for('edit_procurement_item', item_id=item_id))
         
         try:
@@ -7277,7 +7576,7 @@ def edit_procurement_item(item_id):
             old_department = item.department
             
             item.name = name
-            item.category_id = int(category_id) if category_id else None
+            item.category_id = int(category_id)
             item.department = department
             item.description = description if description else None
             item.is_active = is_active

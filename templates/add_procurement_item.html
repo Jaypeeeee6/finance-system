@@ -22,7 +22,7 @@
 
                     <div class="form-group">
                         <label for="department">Department *</label>
-                        <select name="department" id="department" class="form-control" required onchange="updateCategories()">
+                        <select name="department" id="department" class="form-control" required>
                             <option value="">-- Select Department --</option>
                             {% for dept in departments %}
                             <option value="{{ dept }}">{{ dept }}</option>
@@ -33,11 +33,11 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="category_id">Category</label>
-                    <select name="category_id" id="category_id" class="form-control">
+                    <label for="category_id">Category *</label>
+                    <select name="category_id" id="category_id" class="form-control" required>
                         <option value="">-- Select Department First --</option>
                     </select>
-                    <small class="form-text text-muted">Optional: Select a category for this item</small>
+                    <small class="form-text text-muted">Select a category for this item</small>
                 </div>
 
                 <div class="form-group">
@@ -89,7 +89,7 @@
                     <h5>Department & Category:</h5>
                     <ul>
                         <li>Each item is specific to a department</li>
-                        <li>Items can optionally be assigned to a category</li>
+                        <li>Items must be assigned to a category</li>
                         <li>Users will only see items for their department</li>
                         <li>Choose the most appropriate department and category</li>
                     </ul>
@@ -111,23 +111,28 @@
 // Store categories by department
 const categoriesByDept = {};
 {% for category in categories %}
-    const dept = '{{ category.department }}';
+    const dept = {{ category.department|tojson }};
     if (!categoriesByDept[dept]) {
         categoriesByDept[dept] = [];
     }
     categoriesByDept[dept].push({
         id: {{ category.id }},
-        name: '{{ category.name }}'
+        name: {{ category.name|tojson }}
     });
 {% endfor %}
 
 function updateCategories() {
     const departmentSelect = document.getElementById('department');
     const categorySelect = document.getElementById('category_id');
-    const selectedDept = departmentSelect.value;
+    
+    if (!departmentSelect || !categorySelect) {
+        return;
+    }
+    
+    const selectedDept = departmentSelect.value.trim();
     
     // Clear existing options
-    categorySelect.innerHTML = '<option value="">-- Select Category (Optional) --</option>';
+    categorySelect.innerHTML = '<option value="">-- Select Category --</option>';
     
     if (selectedDept && categoriesByDept[selectedDept]) {
         const categories = categoriesByDept[selectedDept];
@@ -145,13 +150,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const nameInput = document.getElementById('name');
     const departmentSelect = document.getElementById('department');
     
+    // Attach event listener to department select
+    if (departmentSelect) {
+        departmentSelect.addEventListener('change', updateCategories);
+    }
+    
     form.addEventListener('submit', function(e) {
         const name = nameInput.value.trim();
         const department = departmentSelect.value;
+        const categorySelect = document.getElementById('category_id');
+        const category = categorySelect ? categorySelect.value : '';
         
-        if (!name || !department) {
+        if (!name || !department || !category) {
             e.preventDefault();
-            alert('Please fill in all required fields.');
+            alert('Please fill in all required fields (Name, Department, and Category).');
             return;
         }
         
