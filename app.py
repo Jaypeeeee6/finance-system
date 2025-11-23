@@ -13356,10 +13356,12 @@ def export_reports_excel():
         # Add headers starting from row 7
         headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment Type', 'Payment Method', 'Scheduled', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver', 'Manager Duration', 'Finance Duration']
         for col, header in enumerate(headers, 1):
-            cell = ws.cell(row=7, column=col, value=header)
+            cell = ws.cell(row=7, column=col, value=str(header))
             cell.font = Font(bold=True)
             cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
-            cell.alignment = Alignment(horizontal="center")
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            # Ensure header row has proper height
+            ws.row_dimensions[7].height = 20
 
         # Helper function to format duration
         def format_duration(seconds):
@@ -13432,42 +13434,36 @@ def export_reports_excel():
                     # Ensure the value is a proper float, not string or None
                     numeric_value = float(amount_value) if amount_value is not None else 0.0
                     cell = ws.cell(row=row_idx, column=col, value=numeric_value)
-                    cell.number_format = '"OMR "#,##0.000'
+                    # Use a simple numeric format so Excel recognizes it as a pure number for formulas
+                    # This ensures SUM, SUBTOTAL, and other formulas work correctly with filters
+                    cell.number_format = '#,##0.000'
+                    cell.alignment = Alignment(horizontal='right', vertical='top')
                 else:
-                    cell = ws.cell(row=row_idx, column=col, value=data)
-                # Enable text wrapping for Scheduled Date column (column G = 7)
-                if col == 7:
-                    cell.alignment = Alignment(wrap_text=True, vertical='top')
-                # Enable text wrapping for Branch Name column (column I = 9)
-                if col == 9:
-                    cell.alignment = Alignment(wrap_text=True, vertical='top')
-                # Enable text wrapping for Company column (column J = 10)
-                if col == 10:
-                    cell.alignment = Alignment(wrap_text=True, vertical='top')
+                    cell = ws.cell(row=row_idx, column=col, value=str(data) if data is not None else '')
+                    # Enable text wrapping for columns that may have long text
+                    if col in [7, 9, 10]:  # Scheduled Date, Branch Name, Company columns
+                        cell.alignment = Alignment(wrap_text=True, vertical='top')
+                    else:
+                        cell.alignment = Alignment(vertical='top', horizontal='left')
 
-        # Add a SUBTOTAL formula in the Amount column that respects filters
-        # Find the last row with data (data starts at row 8, so last row is 7 + len(result_requests))
-        if result_requests:
-            last_data_row = 7 + len(result_requests)
-            # Add a summary row with SUBTOTAL formula (109 = SUM function that ignores hidden rows)
-            summary_row = last_data_row + 1
-            ws.cell(row=summary_row, column=1, value="Total (Filtered):").font = Font(bold=True)
-            # Add SUBTOTAL formula in Amount column (H) that sums only visible rows
-            # SUBTOTAL(109, H8:H{last_row}) - 109 means SUM and ignore hidden/filtered rows
-            amount_col_letter = get_column_letter(8)  # Column H
-            formula = f"=SUBTOTAL(109,{amount_col_letter}8:{amount_col_letter}{last_data_row})"
-            total_cell = ws.cell(row=summary_row, column=8, value=formula)
-            total_cell.number_format = '"OMR "#,##0.000'
-            total_cell.font = Font(bold=True)
-
-        # Auto-adjust column widths
-        for column in ws.columns:
+        # Auto-adjust column widths - fix iteration to properly get column index
+        for col_idx in range(1, len(headers) + 1):
             max_length = 0
-            column_letter = get_column_letter(column[0].column)
-            for cell in column:
+            column_letter = get_column_letter(col_idx)
+            
+            # Check all cells in this column (including header row 7 and all data rows)
+            for row in range(7, ws.max_row + 1):
+                cell = ws.cell(row=row, column=col_idx)
                 try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
+                    cell_value = str(cell.value) if cell.value is not None else ''
+                    # For wrapped text columns, estimate width needed (divide by 2 for multi-line)
+                    if col_idx in [7, 9, 10]:  # Scheduled Date, Branch Name, Company
+                        # Count newlines and estimate width
+                        lines = cell_value.split('\n')
+                        max_line_length = max(len(line) for line in lines) if lines else 0
+                        max_length = max(max_length, max_line_length)
+                    else:
+                        max_length = max(max_length, len(cell_value))
                 except:
                     pass
             
@@ -13482,12 +13478,34 @@ def export_reports_excel():
                 adjusted_width = max(max_length + 2, 20)  # Minimum 20 characters, can grow if needed
             elif column_letter == 'M':  # Approver column - make it wider
                 adjusted_width = min(max_length + 2, 35)  # Cap Approver column at 35 characters
-            elif column_letter in ['L']:  # Duration columns - make them narrower
+            elif column_letter in ['N', 'O']:  # Duration columns - make them narrower
                 adjusted_width = min(max_length + 2, 15)  # Cap duration columns at 15 characters
             else:
                 adjusted_width = min(max_length + 2, 50)  # Cap other columns at 50 characters
             
+            # Ensure minimum width
+            adjusted_width = max(adjusted_width, 10)
             ws.column_dimensions[column_letter].width = adjusted_width
+
+        # Auto-adjust row heights for rows with wrapped text
+        for row_idx in range(7, ws.max_row + 1):
+            max_height = 15  # Default row height
+            for col_idx in [7, 9, 10]:  # Columns with wrapped text
+                cell = ws.cell(row=row_idx, column=col_idx)
+                if cell.value:
+                    cell_value = str(cell.value)
+                    # Count lines (including wrapped lines based on column width)
+                    column_letter = get_column_letter(col_idx)
+                    column_width = ws.column_dimensions[column_letter].width
+                    # Estimate lines needed (rough calculation: ~7 characters per unit width)
+                    chars_per_line = max(1, int(column_width * 7))
+                    lines = len(cell_value.split('\n'))
+                    estimated_lines = max(lines, (len(cell_value) // chars_per_line) + 1)
+                    # Row height: ~15 points per line
+                    row_height = max(max_height, estimated_lines * 15)
+                    max_height = row_height
+            
+            ws.row_dimensions[row_idx].height = max_height
 
         # No frozen panes - all columns can be scrolled freely
 
