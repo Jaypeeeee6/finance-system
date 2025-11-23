@@ -157,6 +157,48 @@
     color: white !important;
     margin: 0 !important;
 }
+
+/* Filter pill style for item chips */
+.filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #000;
+    color: white;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    margin-right: 8px;
+    margin-bottom: 8px;
+}
+
+.item-quantity-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #f0f0f0;
+    color: #333;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    margin-right: 8px;
+    margin-bottom: 8px;
+}
+
+.item-chips-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.item-chip-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
 </style>
 {% endblock %}
 
@@ -239,16 +281,42 @@
             </div>
             {% endif %}
 
-            <div class="form-row">
+            {% if item_request.item_name and ',' in item_request.item_name %}
+                {# Multiple items - display as chips #}
                 <div class="form-group">
-                    <label>Item Name</label>
-                    <input type="text" value="{{ item_request.item_name }}" readonly style="background: #f5f5f5;">
+                    <label>Item Name & Quantity</label>
+                    <div class="item-chips-container">
+                        {% set item_list = item_request.item_name.split(',') %}
+                        {% set quantity_list = (item_request.quantity or '').split(';') if item_request.quantity else [] %}
+                        {% for item in item_list %}
+                            {% set item_trimmed = item.strip() %}
+                            {% if item_trimmed %}
+                                <div class="item-chip-row">
+                                    <span class="filter-pill">{{ item_trimmed }}</span>
+                                    {% if loop.index0 < quantity_list|length %}
+                                        {% set qty_trimmed = quantity_list[loop.index0].strip() %}
+                                        {% if qty_trimmed %}
+                                            <span class="item-quantity-chip">Qty: {{ qty_trimmed }}</span>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Quantity</label>
-                    <input type="text" value="{{ item_request.quantity or 'Not specified' }}" readonly style="background: #f5f5f5;">
+            {% else %}
+                {# Single item - display as normal input fields #}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Item Name</label>
+                        <input type="text" value="{{ item_request.item_name }}" readonly style="background: #f5f5f5;">
+                    </div>
+                    <div class="form-group">
+                        <label>Quantity</label>
+                        <input type="text" value="{{ item_request.quantity or 'Not specified' }}" readonly style="background: #f5f5f5;">
+                    </div>
                 </div>
-            </div>
+            {% endif %}
 
             <div class="form-row">
                 <div class="form-group">
