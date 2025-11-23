@@ -13386,11 +13386,6 @@ def export_reports_excel():
             else:
                 payment_type_display = r.recurring or 'One-Time'
             
-            # Calculate amount value explicitly as float to ensure it's numeric
-            amount_value = to_float(r.amount)
-            if amount_value is None:
-                amount_value = 0.0
-            
             row_data = [
                 f"#{r.request_id}",
                 str(r.request_type or ''),
@@ -13399,7 +13394,7 @@ def export_reports_excel():
                 payment_type_display,
                 str(r.payment_method or 'Card'),
                 scheduled_date,
-                amount_value,  # Store numeric value for Amount column (column H = 8)
+                f"OMR {to_float(r.amount):.3f}",
                 str(r.branch_name or '').replace(',', ', '),
                 str(company_display or ''),
                 r.date.strftime('%Y-%m-%d') if getattr(r, 'date', None) else '',
@@ -13410,14 +13405,7 @@ def export_reports_excel():
             ]
             
             for col, data in enumerate(row_data, 1):
-                # For Amount column, explicitly set as float to ensure Excel treats it as number
-                if col == 8:
-                    # Ensure the value is a proper float, not string or None
-                    numeric_value = float(amount_value) if amount_value is not None else 0.0
-                    cell = ws.cell(row=row_idx, column=col, value=numeric_value)
-                    cell.number_format = '"OMR "#,##0.000'
-                else:
-                    cell = ws.cell(row=row_idx, column=col, value=data)
+                cell = ws.cell(row=row_idx, column=col, value=data)
                 # Enable text wrapping for Scheduled Date column (column G = 7)
                 if col == 7:
                     cell.alignment = Alignment(wrap_text=True, vertical='top')
@@ -13427,21 +13415,6 @@ def export_reports_excel():
                 # Enable text wrapping for Company column (column J = 10)
                 if col == 10:
                     cell.alignment = Alignment(wrap_text=True, vertical='top')
-
-        # Add a SUBTOTAL formula in the Amount column that respects filters
-        # Find the last row with data (data starts at row 8, so last row is 7 + len(result_requests))
-        if result_requests:
-            last_data_row = 7 + len(result_requests)
-            # Add a summary row with SUBTOTAL formula (109 = SUM function that ignores hidden rows)
-            summary_row = last_data_row + 1
-            ws.cell(row=summary_row, column=1, value="Total (Filtered):").font = Font(bold=True)
-            # Add SUBTOTAL formula in Amount column (H) that sums only visible rows
-            # SUBTOTAL(109, H8:H{last_row}) - 109 means SUM and ignore hidden/filtered rows
-            amount_col_letter = get_column_letter(8)  # Column H
-            formula = f"=SUBTOTAL(109,{amount_col_letter}8:{amount_col_letter}{last_data_row})"
-            total_cell = ws.cell(row=summary_row, column=8, value=formula)
-            total_cell.number_format = '"OMR "#,##0.000'
-            total_cell.font = Font(bold=True)
 
         # Auto-adjust column widths
         for column in ws.columns:
@@ -13461,8 +13434,6 @@ def export_reports_excel():
                 adjusted_width = min(max_length + 2, 25)  # Cap Department column at 25 characters
             elif column_letter == 'G':  # Scheduled Date column - make it wider
                 adjusted_width = min(max_length + 2, 60)  # Cap Scheduled Date column at 60 characters
-            elif column_letter == 'H':  # Amount column - make it wider to accommodate "OMR #,##0.000" format
-                adjusted_width = max(max_length + 2, 20)  # Minimum 20 characters, can grow if needed
             elif column_letter == 'M':  # Approver column - make it wider
                 adjusted_width = min(max_length + 2, 35)  # Cap Approver column at 35 characters
             elif column_letter in ['L']:  # Duration columns - make them narrower
