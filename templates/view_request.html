@@ -422,7 +422,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 <div class="form-row">
                     <div class="form-group">
                         <label for="request_type">Request Type {% if 'request_type' in edited_fields %}<span class="edited-badge" data-field="request_type" role="button" tabindex="0">Edited</span>{% endif %}</label>
-                        {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') %}
+                        {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') or (user and user.role == 'Finance Admin' and request.status == 'Pending Finance Approval') %}
                         {% set is_others = request.request_type.startswith('Others:') %}
                         {% set others_spec = is_others and request.request_type.split(':', 1)[1].strip() or '' %}
                         {% set base_request_type = is_others and 'Others' or request.request_type %}
@@ -465,7 +465,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     </div>
                 </div>
 
-                {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') %}
+                {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') or (user and user.role == 'Finance Admin' and request.status == 'Pending Finance Approval') %}
                 {% set is_others = request.request_type.startswith('Others:') %}
                 {% set others_spec = is_others and request.request_type.split(':', 1)[1].strip() or '' %}
                 <div class="form-group" id="othersDescriptionGroup" style="display: {% if is_others %}block{% else %}none{% endif %};">
@@ -864,7 +864,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     </div>
                 </div>
                 {% endif %}
-                {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') %}
+                {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') or (user and user.role == 'Finance Admin' and request.status == 'Pending Finance Approval') %}
                 <div class="form-group" id="save-edits-container" style="display: none; margin-top: 15px;">
                     <button type="submit" id="save-edits-btn" class="btn btn-primary">Save Edits</button>
                 </div>
@@ -2581,6 +2581,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // IT department and authorized managers inline editability for Request Details (excluding specific fields)
     const canEdit = {{ 1 if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') else 0 }} === 1;
+    
+    // Finance Admin can ONLY edit Request Type field when status is Pending Finance Approval
+    const canEditFinanceAdmin = {{ 1 if (user and user.role == 'Finance Admin' and request.status == 'Pending Finance Approval') else 0 }} === 1;
+    
     if (canEdit) {
         const form = document.querySelector('#step-submit form');
         if (form) {
@@ -2610,6 +2614,48 @@ document.addEventListener('DOMContentLoaded', function() {
                     el.addEventListener('change', showSave);
                 }
             });
+        }
+    }
+    
+    // Finance Admin: Only enable Request Type field and Others description field
+    if (canEditFinanceAdmin) {
+        const form = document.querySelector('#step-submit form');
+        if (form) {
+            const saveContainer = document.getElementById('save-edits-container');
+            const showSave = () => {
+                if (saveContainer && saveContainer.style.display !== 'block') {
+                    saveContainer.style.display = 'block';
+                }
+            };
+            
+            // Only enable Request Type dropdown
+            const requestTypeSelect = document.getElementById('request_type');
+            if (requestTypeSelect) {
+                requestTypeSelect.addEventListener('change', function() {
+                    showSave();
+                    // Toggle Others description visibility
+                    const othersGroup = document.getElementById('othersDescriptionGroup');
+                    if (othersGroup) {
+                        if (requestTypeSelect.value === 'Others') {
+                            othersGroup.style.display = 'block';
+                        } else {
+                            othersGroup.style.display = 'none';
+                        }
+                    }
+                });
+                // Initialize Others description visibility on page load
+                const othersGroup = document.getElementById('othersDescriptionGroup');
+                if (othersGroup && requestTypeSelect.value === 'Others') {
+                    othersGroup.style.display = 'block';
+                }
+            }
+            
+            // Only enable Others description field
+            const othersDescriptionInput = document.getElementById('others_description_edit');
+            if (othersDescriptionInput) {
+                othersDescriptionInput.addEventListener('input', showSave);
+                othersDescriptionInput.addEventListener('change', showSave);
+            }
         }
     }
     
