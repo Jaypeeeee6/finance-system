@@ -3522,9 +3522,15 @@ def procurement_item_requests():
             conn.commit()
             print("✓ Added 'amount' column to procurement_item_requests table")
         
+        # Check if payment_date column exists
+        if 'payment_date' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN payment_date DATE")
+            conn.commit()
+            print("✓ Added 'payment_date' column to procurement_item_requests table")
+        
         conn.close()
     except Exception as e:
-        print(f"Warning: Could not migrate amount column: {e}")
+        print(f"Warning: Could not migrate columns: {e}")
     
     # Update any old "Assigned" status to "Assigned to Procurement" (one-time migration)
     old_assigned = ProcurementItemRequest.query.filter_by(status='Assigned').all()
@@ -4009,6 +4015,40 @@ def view_item_request_page(request_id):
         if item_request.status == 'Assigned to Procurement' and item_request.assigned_to_user_id == current_user.user_id:
             can_complete = True
     
+    # Authorization for scheduling payment date (similar to payment requests)
+    can_schedule_payment_date = False
+    payment_date_scheduled_by = None
+    
+    # Only allow scheduling when status is Pending Manager Approval or Pending Procurement Manager Approval
+    if item_request.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval']:
+        try:
+            # Get authorized approvers (same logic as manager approval)
+            approvers = get_authorized_manager_approvers_for_item_request(item_request)
+            # Also include Procurement Manager if status is Pending Procurement Manager Approval
+            if item_request.status == 'Pending Procurement Manager Approval':
+                if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
+                    can_schedule_payment_date = True
+            # Check if current user is an authorized approver
+            if current_user in approvers:
+                can_schedule_payment_date = True
+            
+            # Resolve the name of the scheduler from audit logs (latest)
+            if item_request.payment_date:
+                from models import AuditLog
+                keyword = f"item request #{request_id}"
+                log = (
+                    AuditLog.query
+                    .filter(AuditLog.action.like('%scheduled for%'))
+                    .filter(AuditLog.action.like(f"%{keyword}%"))
+                    .order_by(AuditLog.timestamp.desc())
+                    .first()
+                )
+                if log:
+                    payment_date_scheduled_by = getattr(log.user, 'name', None) or log.username_snapshot or 'Unknown'
+        except Exception as e:
+            # Fail-safe: do not break view if any of the above fails
+            print(f"DEBUG: Error computing can_schedule_payment_date or scheduled_by: {e}")
+    
     # Prepare receipt files list
     receipt_files = []
     if item_request.receipt_path:
@@ -4054,7 +4094,128 @@ def view_item_request_page(request_id):
                          can_reject_manager=can_reject_manager,
                          can_approve_procurement_manager=can_approve_procurement_manager,
                          can_reject_procurement_manager=can_reject_procurement_manager,
-                         can_complete=can_complete)
+                         can_complete=can_complete,
+                         can_schedule_payment_date=can_schedule_payment_date,
+                         payment_date_scheduled_by=payment_date_scheduled_by)
+
+
+@app.route('/procurement/item-request/<int:request_id>/schedule_payment_date', methods=['POST'])
+@login_required
+def schedule_item_payment_date(request_id):
+    """Allow authorized users to set a payment date for item requests (optional)."""
+    item_request = ProcurementItemRequest.query.get_or_404(request_id)
+    
+    # Only allowed when request is in these statuses
+    if item_request.status not in ['Pending Manager Approval', 'Pending Procurement Manager Approval']:
+        flash('Payment date can only be scheduled when status is Pending Manager Approval or Pending Procurement Manager Approval.', 'error')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    
+    # Authorization logic - same as manager approval authorization
+    authorized = False
+    approvers = get_authorized_manager_approvers_for_item_request(item_request)
+    
+    # Check if current user is an authorized approver
+    if current_user in approvers:
+        authorized = True
+    # Also allow Procurement Manager if status is Pending Procurement Manager Approval
+    elif item_request.status == 'Pending Procurement Manager Approval':
+        if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
+            authorized = True
+    
+    if not authorized:
+        flash('You are not authorized to schedule a payment date for this request.', 'error')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    
+    payment_date_str = request.form.get('payment_date', '').strip()
+    if not payment_date_str:
+        flash('Please select a payment date.', 'error')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    
+    try:
+        from datetime import datetime as _dt
+        payment_date_val = _dt.strptime(payment_date_str, '%Y-%m-%d').date()
+    except Exception:
+        flash('Invalid payment date format.', 'error')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    
+    # Persist payment date
+    item_request.payment_date = payment_date_val
+    item_request.updated_at = datetime.utcnow()
+    db.session.commit()
+    
+    # Audit and log
+    log_action(
+        f"Item request #{request_id} from {item_request.requestor_name} in the {item_request.department} department has been scheduled for {payment_date_val} by {current_user.name}"
+    )
+    
+    # Notify all authorized users
+    try:
+        title = "Item Request Payment Date Scheduled"
+        msg = (
+            f"Item request #{request_id} from {item_request.requestor_name} in the {item_request.department} department "
+            f"has been scheduled for {payment_date_val.strftime('%B %d, %Y')} by {current_user.name}."
+        )
+        notified_user_ids = set()
+        
+        def add_user(u):
+            if u and getattr(u, 'user_id', None):
+                notified_user_ids.add(u.user_id)
+        
+        # Requestor
+        if item_request.user_id:
+            requestor_user = User.query.get(item_request.user_id)
+            add_user(requestor_user)
+        
+        # Department Manager of the requestor's department
+        try:
+            dept_managers = User.query.filter_by(role='Department Manager', department=item_request.department).all()
+        except Exception:
+            dept_managers = []
+        for u in dept_managers:
+            add_user(u)
+        
+        # Authorized approvers
+        for approver in approvers:
+            add_user(approver)
+        
+        # Procurement Managers
+        try:
+            procurement_managers = User.query.filter_by(department='Procurement', role='Department Manager').all()
+        except Exception:
+            procurement_managers = []
+        for u in procurement_managers:
+            add_user(u)
+        
+        # General Managers
+        try:
+            gms = User.query.filter_by(role='GM').all()
+        except Exception:
+            gms = []
+        for u in gms:
+            add_user(u)
+        
+        # Operation Managers
+        try:
+            opms = User.query.filter_by(role='Operation Manager').all()
+        except Exception:
+            opms = []
+        for u in opms:
+            add_user(u)
+        
+        # Send notifications
+        for user_id in notified_user_ids:
+            create_notification(
+                user_id=user_id,
+                title=title,
+                message=msg,
+                notification_type="payment_scheduled",
+                item_request_id=request_id
+            )
+    except Exception as e:
+        print(f"Error sending notifications for scheduled payment date: {e}")
+    
+    flash(f'Payment date scheduled for {payment_date_val.strftime("%B %d, %Y")}.', 'success')
+    return redirect(url_for('view_item_request_page', request_id=request_id))
 
 
 @app.route('/procurement/item-request/<int:request_id>/manager-decision', methods=['POST'])
@@ -4097,6 +4258,7 @@ def item_request_manager_approve_handler(request_id, item_request):
     item_request.manager_approver = current_user.name
     item_request.manager_approver_user_id = current_user.user_id
     item_request.manager_approval_end_time = current_time
+    item_request.is_urgent = request.form.get('is_urgent') == 'on'
     item_request.manager_approval_reason = request.form.get('approval_reason', '').strip()
     item_request.updated_at = current_time
     
@@ -4802,9 +4964,38 @@ def procurement_request_item():
         # Handle form submission
         requestor_name = request.form.get('requestor_name', '').strip()
         category = request.form.get('category', '').strip()
-        # Check for item_name_value first (from searchable dropdown), then fall back to item_name
-        item_name = request.form.get('item_name_value', '').strip() or request.form.get('item_name', '').strip()
+        # Check for multiple item names first (new format), then fall back to item_name_value or item_name (backward compatibility)
+        item_names = request.form.get('item_names', '').strip()
+        item_name_value = request.form.get('item_name_value', '').strip()
+        item_name = request.form.get('item_name', '').strip()
+        item_quantities_json = request.form.get('item_quantities', '').strip()
+        # Use item_names if available, otherwise use item_name_value or item_name
+        if item_names:
+            item_name = item_names
+        elif item_name_value:
+            item_name = item_name_value
+        # Handle quantities - if item_quantities is provided, use it; otherwise fall back to single quantity field
         quantity = request.form.get('quantity', '').strip()
+        if item_quantities_json:
+            try:
+                import json
+                quantities = json.loads(item_quantities_json)
+                # Combine quantities into a formatted string if multiple items
+                if item_names and len(quantities) > 1:
+                    item_list = item_names.split(',')
+                    quantity_parts = []
+                    for i, qty in enumerate(quantities):
+                        if qty and qty.strip():
+                            quantity_parts.append(f"{item_list[i].strip()}: {qty.strip()}")
+                    if quantity_parts:
+                        quantity = '; '.join(quantity_parts)
+                    elif len(quantities) == 1 and quantities[0]:
+                        quantity = quantities[0]
+                elif len(quantities) == 1 and quantities[0]:
+                    quantity = quantities[0]
+            except (json.JSONDecodeError, ValueError):
+                # If JSON parsing fails, fall back to single quantity field
+                pass
         purpose = request.form.get('purpose', '').strip()
         # Check for multiple branch names first (new format), then fall back to single branch_name (backward compatibility)
         branch_names = request.form.get('branch_names', '').strip()
@@ -4812,19 +5003,13 @@ def procurement_request_item():
         # Use branch_names if available, otherwise use branch_name
         if branch_names:
             branch_name = branch_names
-        date = request.form.get('date', '').strip()
-        is_urgent = request.form.get('is_urgent') == 'on'
+        # Date is automatically set to today's date (no longer required from form)
+        request_date = datetime.utcnow().date()
         notes = request.form.get('notes', '').strip()
         
-        # Validation
-        if not all([requestor_name, item_name, purpose, branch_name, date]):
+        # Validation (date is no longer required from form)
+        if not all([requestor_name, category, item_name, purpose, branch_name]):
             flash('Please fill in all required fields.', 'danger')
-            return redirect(url_for('procurement_request_item'))
-        
-        try:
-            request_date = datetime.strptime(date, '%Y-%m-%d').date()
-        except ValueError:
-            flash('Invalid date format.', 'danger')
             return redirect(url_for('procurement_request_item'))
         
         # Create procurement item request record
@@ -4838,7 +5023,7 @@ def procurement_request_item():
             purpose=purpose,
             branch_name=branch_name,
             request_date=request_date,
-            is_urgent=is_urgent,
+            is_urgent=False,  # Will be set by manager during approval
             notes=notes if notes else None,
             status='Pending Manager Approval',
             user_id=current_user.user_id if current_user else None,
@@ -4906,7 +5091,7 @@ def procurement_request_item():
                 create_notification(
                     user_id=it_user.user_id,
                     title="New Item Request Created",
-                    message=f"New item request #{item_request.id} submitted by {requestor_name} from {item_request.department} department for {item_name}{' (URGENT)' if is_urgent else ''}",
+                    message=f"New item request #{item_request.id} submitted by {requestor_name} from {item_request.department} department for {item_name}",
                     notification_type="item_request_submission",
                     item_request_id=item_request.id
                 )

@@ -36,8 +36,8 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="category">Category</label>
-                        <select name="category" id="category">
+                        <label for="category">Category *</label>
+                        <select name="category" id="category" required>
                             <option value="">-- Select Category --</option>
                             {% if procurement_categories %}
                                 {% for category in procurement_categories %}
@@ -55,6 +55,7 @@
                             <input type="text" id="item_search" class="form-control" 
                                    placeholder="{% if user and user.department == 'Operation' %}Search items...{% elif user and user.department == 'HR' %}Search items...{% else %}Enter item name...{% endif %}" 
                                    autocomplete="off">
+                            <div id="item_chips_container" class="item-chips-container"></div>
                             <select name="item_name" id="item_name" class="form-control" style="display: none;">
                                 <option value="">-- Select Item --</option>
                                 {% if procurement_items %}
@@ -64,6 +65,8 @@
                                 {% endif %}
                             </select>
                             <input type="hidden" name="item_name_value" id="item_name_value" value="">
+                            <input type="hidden" name="item_names" id="item_names" value="">
+                            <input type="hidden" name="item_quantities" id="item_quantities" value="">
                             <div id="item_dropdown" class="item-dropdown" style="display: none;"></div>
                         </div>
                         {% if procurement_items and procurement_items|length > 0 %}
@@ -73,7 +76,7 @@
                         {% endif %}
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" id="quantity_field_group">
                         <label for="quantity">Quantity</label>
                         <input type="text" name="quantity" id="quantity" 
                                placeholder="e.g., 10 units, 5 boxes, 1 set">
@@ -114,8 +117,9 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="date">Request Date *</label>
-                        <input type="date" name="date" id="date" value="{{ today }}" required>
+                        <label for="date">Date of Submission</label>
+                        <input type="text" name="date" id="date" value="{{ today }}" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                        <small style="color: #666;">Automatically set to today's date</small>
                     </div>
                 </div>
 
@@ -134,16 +138,6 @@
                         <textarea name="notes" id="notes" rows="3" 
                                   placeholder="Any additional information, specifications, or special requirements"></textarea>
                         <small class="form-text text-muted">Optional: Add any additional details or specifications</small>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label style="display: flex; align-items: center; cursor: pointer;">
-                            <input type="checkbox" name="is_urgent" id="is_urgent" style="margin-right: 8px; width: auto;">
-                            <span>Mark as Urgent</span>
-                        </label>
-                        <small class="form-text text-muted">Check this if the item is needed urgently</small>
                     </div>
                 </div>
 
@@ -216,6 +210,97 @@
 /* Item Select Container Styles */
 .item-select-container {
     position: relative;
+}
+
+.item-chips-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 0;
+    margin-top: 12px;
+    min-height: 0;
+}
+
+.item-chips-container:not(:empty) {
+    margin-bottom: 8px;
+}
+
+.item-chip-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.item-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #000;
+    color: white;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    flex: 1;
+    min-width: 0;
+    justify-content: space-between;
+}
+
+.item-chip span {
+    white-space: nowrap;
+    flex: 1;
+}
+
+.item-chip .remove-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0;
+    transition: background 0.2s;
+    line-height: 1;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.item-chip .remove-chip:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.item-chip-quantity-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    margin: 0;
+    padding: 0 4px;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.item-chip-quantity {
+    width: 70px;
+    min-width: 300px;
+    max-width: 300px;
+    flex-shrink: 0;
+    padding: 6px 6px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.item-chip-quantity:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 
 .item-dropdown {
@@ -436,13 +521,98 @@ function initializeItemSearch() {
     const searchInput = document.getElementById('item_search');
     const hiddenSelect = document.getElementById('item_name');
     const dropdown = document.getElementById('item_dropdown');
+    const chipsContainer = document.getElementById('item_chips_container');
     const hiddenInput = document.getElementById('item_name_value');
+    const hiddenInputNames = document.getElementById('item_names');
+    const hiddenInputQuantities = document.getElementById('item_quantities');
     
-    if (!searchInput || !hiddenSelect || !dropdown || !hiddenInput) return;
+    if (!searchInput || !hiddenSelect || !dropdown || !chipsContainer || !hiddenInput || !hiddenInputNames || !hiddenInputQuantities) return;
     
-    let selectedItem = null;
+    // Array to store selected items {value: string, text: string, quantity: string}
+    let selectedItems = [];
+    
+    // Flag to track if we're clicking on an option
     let clickingOnOption = false;
     let blurTimeout = null;
+    
+    // Function to update chips display
+    function updateChips() {
+        chipsContainer.innerHTML = '';
+        selectedItems.forEach((item, index) => {
+            // Create row container
+            const row = document.createElement('div');
+            row.className = 'item-chip-row';
+            
+            // Create chip
+            const chip = document.createElement('div');
+            chip.className = 'item-chip';
+            chip.innerHTML = `
+                <span>${item.text}</span>
+                <button type="button" class="remove-chip" onclick="removeItemChip(${index})" title="Remove item">×</button>
+            `;
+            
+            // Create quantity label
+            const quantityLabel = document.createElement('label');
+            quantityLabel.className = 'item-chip-quantity-label';
+            quantityLabel.textContent = 'QTY:';
+            
+            // Create quantity input
+            const quantityInput = document.createElement('input');
+            quantityInput.type = 'text';
+            quantityInput.className = 'item-chip-quantity';
+            quantityInput.placeholder = 'e.g., 10 units, 5 boxes';
+            quantityInput.value = item.quantity || '';
+            quantityInput.setAttribute('data-item-index', index);
+            
+            // Update quantity when input changes
+            quantityInput.addEventListener('input', function() {
+                const itemIndex = parseInt(this.getAttribute('data-item-index'));
+                if (selectedItems[itemIndex]) {
+                    selectedItems[itemIndex].quantity = this.value;
+                    updateHiddenInputs();
+                }
+            });
+            
+            // Append chip, label, and quantity to row
+            row.appendChild(chip);
+            row.appendChild(quantityLabel);
+            row.appendChild(quantityInput);
+            chipsContainer.appendChild(row);
+        });
+        
+        updateHiddenInputs();
+    }
+    
+    // Function to update hidden inputs
+    function updateHiddenInputs() {
+        // Update hidden input with comma-separated values
+        hiddenInputNames.value = selectedItems.map(i => i.value).join(',');
+        // Update quantities as JSON array matching item order
+        hiddenInputQuantities.value = JSON.stringify(selectedItems.map(i => i.quantity || ''));
+        // Also update item_name_value for backward compatibility (use first item or empty)
+        hiddenInput.value = selectedItems.length > 0 ? selectedItems[0].value : '';
+    }
+    
+    // Function to remove an item chip
+    window.removeItemChip = function(index) {
+        selectedItems.splice(index, 1);
+        updateChips();
+        updateDropdownSelection();
+    };
+    
+    // Function to update dropdown to show selected items
+    function updateDropdownSelection() {
+        const options = dropdown.querySelectorAll('.item-option');
+        options.forEach(option => {
+            const value = option.getAttribute('data-value');
+            const isSelected = selectedItems.some(i => i.value === value);
+            if (isSelected) {
+                option.classList.add('selected');
+            } else {
+                option.classList.remove('selected');
+            }
+        });
+    }
     
     // Build dropdown from select options
     function buildDropdown() {
@@ -486,39 +656,51 @@ function initializeItemSearch() {
     }
     
     function selectItem(value, text) {
+        // Check if item is already selected - if so, remove it (toggle behavior)
+        const existingIndex = selectedItems.findIndex(i => i.value === value);
+        if (existingIndex !== -1) {
+            // Item already selected, remove it
+            selectedItems.splice(existingIndex, 1);
+            updateChips();
+            updateDropdownSelection();
+            
+            // Clear search input but keep dropdown open so user can continue selecting
+            searchInput.value = '';
+            dropdown.style.display = 'block';
+            searchInput.focus();
+            
+            setTimeout(() => {
+                clickingOnOption = false;
+            }, 100);
+            return;
+        }
+        
         // Clear any pending blur timeout
         if (blurTimeout) {
             clearTimeout(blurTimeout);
             blurTimeout = null;
         }
         
-        // Set selected item
-        selectedItem = { value: value, text: text };
-        searchInput.value = text;
-        hiddenInput.value = value;
-        hiddenSelect.value = value;
+        // Set flag to prevent any immediate blur actions
+        clickingOnOption = true;
         
+        // Add to selected items with empty quantity
+        selectedItems.push({ value: value, text: text, quantity: '' });
+        
+        // Update UI
+        updateChips();
         updateDropdownSelection();
         
-        // Hide dropdown
-        dropdown.style.display = 'none';
+        // Clear search input but keep dropdown open so user can continue selecting
+        searchInput.value = '';
+        dropdown.style.display = 'block';
         
-        // Reset flag after a short delay
+        // Restore focus so user can continue typing
+        // Since blur handler won't close dropdown when items are selected, we can simplify this
         setTimeout(() => {
+            searchInput.focus();
             clickingOnOption = false;
         }, 100);
-    }
-    
-    function updateDropdownSelection() {
-        const options = dropdown.querySelectorAll('.item-option');
-        options.forEach(option => {
-            const value = option.getAttribute('data-value');
-            if (selectedItem && selectedItem.value === value) {
-                option.classList.add('selected');
-            } else {
-                option.classList.remove('selected');
-            }
-        });
     }
     
     function filterByCategory() {
@@ -587,27 +769,16 @@ function initializeItemSearch() {
         const isOthersMode = this.getAttribute('data-others-mode') === 'true';
         const searchTerm = this.value.trim();
         
-        // Handle "Others" mode - free text entry
+        // Handle "Others" mode - free text entry (for single custom item)
         if (isOthersMode) {
-            hiddenInput.value = searchTerm;
-            hiddenSelect.value = searchTerm;
+            // In Others mode, allow typing a custom item name
+            // When user presses Enter or blurs, add it as a single item
             dropdown.style.display = 'none';
             return;
         }
         
         // Normal mode - search and filter
         if (searchTerm.length > 0) {
-            // Check if the typed value matches any existing option
-            const matchingOption = Array.from(hiddenSelect.options).find(opt => 
-                opt.value.toLowerCase() === searchTerm.toLowerCase()
-            );
-            
-            if (!matchingOption) {
-                // User typed something new - allow free text entry
-                hiddenInput.value = searchTerm;
-                hiddenSelect.value = '';
-            }
-            
             // Filter dropdown options
             filterItems(searchTerm);
         } else {
@@ -615,6 +786,24 @@ function initializeItemSearch() {
             filterByCategory();
             const visibleOptions = dropdown.querySelectorAll('.item-option:not(.hidden)');
             dropdown.style.display = visibleOptions.length > 0 ? 'block' : 'none';
+        }
+    });
+    
+    // Handle Enter key in Others mode to add custom item
+    searchInput.addEventListener('keydown', function(e) {
+        const isOthersMode = this.getAttribute('data-others-mode') === 'true';
+        if (isOthersMode && e.key === 'Enter') {
+            e.preventDefault();
+            const customValue = this.value.trim();
+            if (customValue) {
+                // Check if already added
+                const existingIndex = selectedItems.findIndex(i => i.value === customValue);
+                if (existingIndex === -1) {
+                    selectedItems.push({ value: customValue, text: customValue, quantity: '' });
+                    updateChips();
+                    this.value = '';
+                }
+            }
         }
     });
     
@@ -636,21 +825,50 @@ function initializeItemSearch() {
         }
     });
     
-    searchInput.addEventListener('blur', function() {
-        // Delay hiding to allow clicks on options
+    searchInput.addEventListener('blur', function(e) {
+        // If we have selected items, NEVER close dropdown via blur - only close when clicking outside
+        // This prevents the glitchy disappearing/reappearing behavior
+        if (selectedItems.length > 0) {
+            // Don't set any timeout - just keep dropdown open
+            // The click-outside handler will close it if needed
+            return;
+        }
+        
+        // Delay hiding to allow clicks on options (only when no items selected yet)
         if (blurTimeout) {
             clearTimeout(blurTimeout);
         }
         blurTimeout = setTimeout(() => {
-            if (!clickingOnOption) {
+            // Don't close dropdown if we're clicking on an option
+            if (clickingOnOption) {
+                blurTimeout = null;
+                return;
+            }
+            
+            const relatedTarget = e.relatedTarget;
+            const isClickingInsideContainer = relatedTarget && (
+                searchInput.contains(relatedTarget) || 
+                dropdown.contains(relatedTarget) || 
+                chipsContainer.contains(relatedTarget) ||
+                (searchInput.closest('.item-select-container') && searchInput.closest('.item-select-container').contains(relatedTarget))
+            );
+            
+            // No items selected yet, close dropdown if not clicking inside
+            if (!isClickingInsideContainer) {
                 dropdown.style.display = 'none';
-                // If no item selected from dropdown but user typed something, use that as the value
-                if (!selectedItem && this.value.trim()) {
-                    hiddenInput.value = this.value.trim();
-                    hiddenSelect.value = '';
-                } else if (!selectedItem && this.value.trim() === '') {
-                    hiddenInput.value = '';
-                    hiddenSelect.value = '';
+            }
+            
+            // In Others mode, if user typed something and blurred, add it
+            const isOthersMode = this.getAttribute('data-others-mode') === 'true';
+            if (isOthersMode && !clickingOnOption) {
+                const customValue = this.value.trim();
+                if (customValue) {
+                    const existingIndex = selectedItems.findIndex(i => i.value === customValue);
+                    if (existingIndex === -1) {
+                        selectedItems.push({ value: customValue, text: customValue, quantity: '' });
+                        updateChips();
+                    }
+                    this.value = '';
                 }
             }
             blurTimeout = null;
@@ -659,10 +877,46 @@ function initializeItemSearch() {
     
     // Hide dropdown when clicking outside
     document.addEventListener('click', function(e) {
-        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+        // Don't hide if clicking inside the item-select-container
+        const itemSelectContainer = searchInput.closest('.item-select-container');
+        const isClickingInsideContainer = itemSelectContainer && itemSelectContainer.contains(e.target);
+        
+        // Don't hide if clicking on quantity inputs or remove buttons
+        const isQuantityInput = e.target.classList.contains('item-chip-quantity');
+        const isRemoveButton = e.target.classList.contains('remove-chip') || e.target.closest('.remove-chip');
+        const isQuantityLabel = e.target.classList.contains('item-chip-quantity-label');
+        
+        // Only close if clicking completely outside the container
+        if (!isClickingInsideContainer && !isQuantityInput && !isRemoveButton && !isQuantityLabel) {
             dropdown.style.display = 'none';
         }
     });
+    
+    // Function to check if category has predefined items
+    function categoryHasPredefinedItems(categoryName) {
+        if (!categoryName || categoryName === 'Others') {
+            return false;
+        }
+        const options = hiddenSelect.querySelectorAll('option[data-category="' + categoryName + '"]');
+        return options.length > 0;
+    }
+    
+    // Function to toggle quantity field visibility
+    function toggleQuantityField() {
+        const quantityFieldGroup = document.getElementById('quantity_field_group');
+        if (!quantityFieldGroup) return;
+        
+        const categorySelect = document.getElementById('category');
+        const selectedCategory = categorySelect ? categorySelect.value : '';
+        
+        // Hide quantity field if category has predefined items (each item will have its own quantity)
+        // Show it if category is empty, "Others", or has no predefined items
+        if (selectedCategory && selectedCategory !== 'Others' && categoryHasPredefinedItems(selectedCategory)) {
+            quantityFieldGroup.style.display = 'none';
+        } else {
+            quantityFieldGroup.style.display = 'block';
+        }
+    }
     
     // Category change event listener
     const categorySelect = document.getElementById('category');
@@ -670,12 +924,7 @@ function initializeItemSearch() {
         categorySelect.addEventListener('change', function() {
             const selectedCategory = this.value;
             
-            // Clear selected item when category changes
-            selectedItem = null;
-            searchInput.value = '';
-            hiddenInput.value = '';
-            hiddenSelect.value = '';
-            
+            // Don't clear selected items when category changes - just filter the dropdown
             // Check if user is from Operation department (has predefined items)
             const hasPredefinedItems = hiddenSelect.options.length > 1; // More than just the placeholder option
             
@@ -705,11 +954,18 @@ function initializeItemSearch() {
                     dropdown.style.display = 'none';
                 }
             }
+            
+            // Toggle quantity field visibility based on category
+            toggleQuantityField();
         });
     }
     
+    // Initial toggle of quantity field on page load
+    toggleQuantityField();
+    
     // Initialize dropdown
     buildDropdown();
+    updateChips();
     
     // Update form submission to use hidden input value and validate
     const form = document.getElementById('itemRequestForm');
@@ -718,27 +974,41 @@ function initializeItemSearch() {
             // Clear previous error messages
             clearErrorMessages();
             
-            const isOthersMode = searchInput.getAttribute('data-others-mode') === 'true';
-            const finalValue = hiddenInput.value || searchInput.value.trim();
-            
-            // Validate item name
-            if (!finalValue || finalValue.trim() === '') {
+            // Validate that at least one item is selected
+            if (selectedItems.length === 0) {
                 e.preventDefault();
-                showErrorMessage('item_name', 'Please enter or select an item name.');
+                showErrorMessage('item_name', 'Please select at least one item name.');
                 searchInput.focus();
                 return false;
             }
             
-            if (finalValue) {
-                hiddenSelect.value = finalValue;
-                // Also ensure the hidden input has the value
-                hiddenInput.value = finalValue;
-                
-                // For Others mode, ensure the select has the value for form validation
-                if (isOthersMode) {
-                    hiddenSelect.value = finalValue;
+            // Validate that all selected items have a quantity
+            // First, update quantities from DOM inputs to ensure we have the latest values
+            const quantityInputs = document.querySelectorAll('.item-chip-quantity');
+            quantityInputs.forEach((input, index) => {
+                if (selectedItems[index]) {
+                    selectedItems[index].quantity = input.value.trim();
                 }
+            });
+            
+            const itemsWithoutQuantity = selectedItems.filter(item => !item.quantity || item.quantity.trim() === '');
+            if (itemsWithoutQuantity.length > 0) {
+                e.preventDefault();
+                showErrorMessage('item_name', 'Please enter a quantity for all selected items.');
+                // Focus on the first quantity input that's empty
+                const firstEmptyQuantityInput = Array.from(quantityInputs).find(input => !input.value || input.value.trim() === '');
+                if (firstEmptyQuantityInput) {
+                    firstEmptyQuantityInput.focus();
+                } else {
+                    searchInput.focus();
+                }
+                return false;
             }
+            
+            // Ensure item_names is set before submission
+            hiddenInputNames.value = selectedItems.map(i => i.value).join(',');
+            // Also set item_name_value for backward compatibility
+            hiddenInput.value = selectedItems.length > 0 ? selectedItems[0].value : '';
         });
     }
 }

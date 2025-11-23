@@ -169,6 +169,12 @@
                     URGENT
                 </span>
             {% endif %}
+            {% if item_request.payment_date %}
+                <span style="margin-left: 12px; font-size: 0.9rem; background: #eef7ee; color: #198754; padding: 6px 10px; border-radius: 18px; font-weight: 600;">
+                    This item request has been scheduled for {{ item_request.payment_date.strftime('%B %d, %Y') }}
+                    {% if payment_date_scheduled_by %} by {{ payment_date_scheduled_by }}{% endif %}
+                </span>
+            {% endif %}
         </h1>
         <a href="{{ url_for('procurement_item_requests') }}" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Back to Item Requests
@@ -265,6 +271,56 @@
                 <label>Additional Notes</label>
                 <textarea rows="3" readonly style="background: #f5f5f5;">{{ item_request.notes }}</textarea>
             </div>
+            {% endif %}
+
+            <!-- Optional: Schedule payment date (authorized roles only, not required) -->
+            {% if item_request.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval'] and can_schedule_payment_date %}
+            <div class="form-group" style="margin-top: 10px;">
+                <label for="item_payment_date"><i class="fas fa-calendar-plus"></i> Schedule Payment Date (optional)</label>
+                {% if not item_request.payment_date %}
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap: wrap;">
+                    <input type="date" id="item_payment_date" name="item_payment_date_input">
+                    <button type="button" class="btn btn-primary btn-sm" style="padding: 6px 10px; font-size: 0.9rem;" onclick="scheduleItemPaymentDate()"><i class="fas fa-save"></i> Set Payment Date</button>
+                </div>
+                <small class="form-text text-muted" style="display:block; margin-top: 6px;">Setting a date is optional and applies to this request only.</small>
+                {% else %}
+                <div style="background:#f8f9fa; border:1px solid #e1e5ea; border-radius:6px; padding:10px; display:block;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <i class="fas fa-calendar-check" style="color:#198754;"></i>
+                        <span style="font-weight:600;">Scheduled for {{ item_request.payment_date.strftime('%B %d, %Y') }}</span>
+                        {% if payment_date_scheduled_by %}<span style="color:#6c757d;">by {{ payment_date_scheduled_by }}</span>{% endif %}
+                    </div>
+                    <div style="display:flex; gap:10px; align-items:center; margin-top:10px;">
+                        <input type="date" id="item_payment_date" value="{{ item_request.payment_date.strftime('%Y-%m-%d') }}">
+                        <button type="button" class="btn btn-primary btn-sm" style="padding: 6px 10px; font-size: 0.9rem;" onclick="scheduleItemPaymentDate()"><i class="fas fa-edit"></i> Update Payment Date</button>
+                    </div>
+                    <small class="form-text text-muted" style="display:block; margin-top: 6px;">You can change the scheduled date at any time.</small>
+                </div>
+                {% endif %}
+            </div>
+            <script>
+            async function scheduleItemPaymentDate(){
+                const input = document.getElementById('item_payment_date');
+                if(!input || !input.value){
+                    alert('Please select a payment date.');
+                    return;
+                }
+                try {
+                    const res = await fetch(`{{ url_for('schedule_item_payment_date', request_id=item_request.id) }}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({ payment_date: input.value })
+                    });
+                    if(res.redirected){
+                        window.location.href = res.url;
+                    } else {
+                        window.location.reload();
+                    }
+                } catch (e) {
+                    alert('Failed to schedule payment date.');
+                }
+            }
+            </script>
             {% endif %}
 
             <div class="form-group">
@@ -458,6 +514,12 @@
                                 </div>
                                 
                                 <div id="item_manager_approve_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label>
+                                            <input type="checkbox" name="is_urgent" id="item_manager_is_urgent">
+                                            Mark as Urgent
+                                        </label>
+                                    </div>
                                     <div class="form-group">
                                         <label for="item_manager_approval_reason">Approval Notes (Optional)</label>
                                         <textarea name="approval_reason" id="item_manager_approval_reason" rows="3" placeholder="Add any notes about this approval..."></textarea>

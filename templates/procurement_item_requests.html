@@ -158,8 +158,7 @@
                             <th>Branch</th>
                             <th>Amount</th>
                             <th>Status</th>
-                            <th>Request Date</th>
-                            <th>Created At</th>
+                            <th>Submission Date</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -174,10 +173,32 @@
                             </td>
                             <td>{{ req.requestor_name }}</td>
                             <td>{{ req.department }}</td>
-                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ req.item_name }}">
-                                {{ req.item_name }}
+                            <td>
+                                {% if req.item_name %}
+                                    {% set item_list = req.item_name.split(',') %}
+                                    {% for item in item_list %}
+                                        {% set item_trimmed = item.strip() %}
+                                        {% if item_trimmed %}
+                                            <span class="filter-pill" style="margin-right: 4px; margin-bottom: 4px; display: inline-block;">{{ item_trimmed }}</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    <span style="color: #999;">-</span>
+                                {% endif %}
                             </td>
-                            <td>{{ req.quantity or '-' }}</td>
+                            <td style="padding: 4px 8px !important; line-height: 1.4 !important; vertical-align: middle !important;">
+                                {% if req.quantity %}
+                                    {% set quantity_list = req.quantity.split(';') %}
+                                    {% for qty in quantity_list %}
+                                        {% set qty_trimmed = qty.strip() %}
+                                        {% if qty_trimmed %}
+                                            {{ qty_trimmed }}{% if not loop.last %}<br>{% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    <span style="color: #999;">-</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if req.branch_name %}
                                     {% set branch_list = req.branch_name.split(',') %}
@@ -214,7 +235,6 @@
                                 {% endif %}
                             </td>
                             <td>{{ req.request_date.strftime('%Y-%m-%d') }}</td>
-                            <td>{{ req.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-info" onclick="viewRequest({{ req.id }})">
                                     <i class="fas fa-eye"></i> View
@@ -501,6 +521,19 @@ document.addEventListener('DOMContentLoaded', function() {
         border-radius: 20px;
         font-size: 13px;
         font-weight: 500;
+    }
+    
+    /* Adjust column widths for Item Name and Quantity */
+    .data-table th:nth-child(4),
+    .data-table td:nth-child(4) {
+        width: 10%;
+        max-width: 10%;
+    }
+    
+    .data-table th:nth-child(5),
+    .data-table td:nth-child(5) {
+        width: 14%;
+        max-width: 14%;
     }
 .modal {
     display: none;

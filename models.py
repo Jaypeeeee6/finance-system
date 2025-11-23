@@ -658,6 +658,7 @@ class ProcurementItemRequest(db.Model):
     procurement_manager_on_hold_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
     procurement_manager_on_hold_reason = db.Column(db.Text, nullable=True)
     amount = db.Column(db.Numeric(10, 3), nullable=True)  # Amount set by Procurement Manager when approving
+    payment_date = db.Column(db.Date, nullable=True)  # Date when payment is scheduled
     
     # Assignment fields
     assigned_to_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
