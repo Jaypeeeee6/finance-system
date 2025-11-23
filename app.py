@@ -9884,34 +9884,21 @@ def schedule_one_time_payment(request_id):
 @app.route('/request/<int:request_id>/edit', methods=['POST'])
 @login_required
 def edit_request(request_id):
-    """Save inline edits by IT users, assigned managers, GM, and Operation Manager when status is Pending Manager Approval or Returned to Manager. Also allows Finance Admin to edit Request Type only when status is Pending Finance Approval."""
+    """Save inline edits by IT users, assigned managers, GM, and Operation Manager when status is Pending Manager Approval or Returned to Manager."""
     req = PaymentRequest.query.get_or_404(request_id)
 
-    # Check if Finance Admin is editing Request Type only for Pending Finance Approval status
-    is_finance_admin_edit = (current_user.role == 'Finance Admin' and req.status == 'Pending Finance Approval')
-    
     # Status gate - allow editing when status is "Pending Manager Approval" or "Returned to Manager"
-    # OR when Finance Admin is editing Request Type for "Pending Finance Approval"
-    if req.status not in ['Pending Manager Approval', 'Returned to Manager', 'Pending Finance Approval']:
-        flash('This request cannot be edited in its current status.', 'error')
-        return redirect(url_for('view_request', request_id=request_id))
-    
-    # If status is "Pending Finance Approval" but user is not Finance Admin, deny access
-    if req.status == 'Pending Finance Approval' and not is_finance_admin_edit:
+    if req.status not in ['Pending Manager Approval', 'Returned to Manager']:
         flash('This request cannot be edited in its current status.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
 
     # Authorization: 
     # - IT Staff and IT Department Manager can always edit when status is "Pending Manager Approval" or "Returned to Manager"
     # - Assigned managers, GM, and Operation Manager can edit when status is "Returned to Manager"
-    # - Finance Admin can edit Request Type only when status is "Pending Finance Approval"
     is_authorized = False
     
-    # Finance Admin can edit Request Type only for Pending Finance Approval
-    if is_finance_admin_edit:
-        is_authorized = True
     # IT department can always edit
-    elif current_user.department == 'IT' and current_user.role in ['IT Staff', 'Department Manager']:
+    if current_user.department == 'IT' and current_user.role in ['IT Staff', 'Department Manager']:
         is_authorized = True
     # For "Returned to Manager" status, also allow assigned managers, GM, and Operation Manager
     elif req.status == 'Returned to Manager':
@@ -9956,32 +9943,28 @@ def edit_request(request_id):
         new_request_type = f"Others: {others_description}"
 
     req.request_type = new_request_type
+    req.branch_name = request.form.get('branch_name') or req.branch_name
+    req.person_company = request.form.get('person_company') or req.person_company
+    req.company_name = request.form.get('company_name') or req.company_name
+    req.purpose = request.form.get('purpose') or req.purpose
+    req.bank_name = request.form.get('bank_name') or req.bank_name
+    req.account_name = request.form.get('account_name') or req.account_name
+    req.account_number = request.form.get('account_number') or req.account_number
+    req.item_name = request.form.get('item_name') or req.item_name
     
-    # For Finance Admin editing Request Type only in Pending Finance Approval status,
-    # skip updating all other fields
-    if not is_finance_admin_edit:
-        req.branch_name = request.form.get('branch_name') or req.branch_name
-        req.person_company = request.form.get('person_company') or req.person_company
-        req.company_name = request.form.get('company_name') or req.company_name
-        req.purpose = request.form.get('purpose') or req.purpose
-        req.bank_name = request.form.get('bank_name') or req.bank_name
-        req.account_name = request.form.get('account_name') or req.account_name
-        req.account_number = request.form.get('account_number') or req.account_number
-        req.item_name = request.form.get('item_name') or req.item_name
-        
-        # Handle amount field
-        amount_str = request.form.get('amount', '').strip()
-        if amount_str:
-            try:
-                amount_float = float(amount_str)
-                if amount_float >= 0:
-                    req.amount = amount_float
-            except (ValueError, TypeError):
-                # Invalid amount, keep existing value
-                pass
+    # Handle amount field
+    amount_str = request.form.get('amount', '').strip()
+    if amount_str:
+        try:
+            amount_float = float(amount_str)
+            if amount_float >= 0:
+                req.amount = amount_float
+        except (ValueError, TypeError):
+            # Invalid amount, keep existing value
+            pass
 
-    # Handle file management (only when status is "Returned to Manager" and not Finance Admin edit)
-    if req.status == 'Returned to Manager' and not is_finance_admin_edit:
+    # Handle file management (only when status is "Returned to Manager")
+    if req.status == 'Returned to Manager':
         # Handle file deletions
         delete_files = request.form.getlist('delete_files')
         if delete_files:
