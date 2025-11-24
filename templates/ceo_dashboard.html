@@ -19,14 +19,12 @@
                 <a href="{{ url_for('new_request') }}">
                     <i class="fas fa-credit-card"></i> Payment Request for Finance
                 </a>
-                <a href="{{ url_for('procurement_request_item') }}">
-                    <i class="fas fa-boxes"></i> Item Request for Procurement
+                <a href="#" onclick="return false;" style="opacity: 0.6; cursor: not-allowed; pointer-events: none;">
+                    <i class="fas fa-boxes"></i> Item Request for Procurement (COMING SOON)
                 </a>
             </div>
         </div>
-        <a href="{{ url_for('procurement_item_requests') }}" class="btn btn-success">
-            <i class="fas fa-shopping-cart"></i> Item Requests
-        </a>
+        <!-- Item Requests button temporarily hidden -->
         <a href="{{ url_for('write_cheque') }}" class="btn btn-success">
             <i class="fas fa-file-invoice"></i> Write Cheque
         </a>
