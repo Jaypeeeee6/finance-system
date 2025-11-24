@@ -13377,8 +13377,37 @@ def export_reports_excel():
 
         # Add data rows
         for row_idx, r in enumerate(result_requests, 8):
-            # For Approved column: show approval_date (matching reports page)
-            approved_date = r.approval_date.strftime('%Y-%m-%d') if getattr(r, 'approval_date', None) else ''
+            # For Approved column: format as string (like before) to ensure immediate rendering
+            approved_date_str = ''
+            if getattr(r, 'approval_date', None):
+                approval_val = r.approval_date
+                try:
+                    if isinstance(approval_val, datetime):
+                        approved_date_str = approval_val.date().strftime('%Y-%m-%d')
+                    elif isinstance(approval_val, date):
+                        approved_date_str = approval_val.strftime('%Y-%m-%d')
+                    elif isinstance(approval_val, str):
+                        approved_date_str = approval_val
+                    else:
+                        approved_date_str = str(approval_val)
+                except:
+                    approved_date_str = ''
+            
+            # For Submitted column: format as string (like before) to ensure immediate rendering
+            submitted_date_str = ''
+            if getattr(r, 'date', None):
+                date_val = r.date
+                try:
+                    if isinstance(date_val, datetime):
+                        submitted_date_str = date_val.date().strftime('%Y-%m-%d')
+                    elif isinstance(date_val, date):
+                        submitted_date_str = date_val.strftime('%Y-%m-%d')
+                    elif isinstance(date_val, str):
+                        submitted_date_str = date_val
+                    else:
+                        submitted_date_str = str(date_val)
+                except:
+                    submitted_date_str = ''
             
             # For Person/Company column, show person_company field only
             company_display = r.person_company
@@ -13421,8 +13450,8 @@ def export_reports_excel():
                 amount_value,  # Store numeric value for Amount column (column H = 8)
                 str(r.branch_name or '').replace(',', ', '),
                 str(company_display or ''),
-                r.date.strftime('%Y-%m-%d') if getattr(r, 'date', None) else '',
-                approved_date,
+                submitted_date_str,  # Store as formatted string for Submitted column (column K = 11)
+                approved_date_str,  # Store as formatted string for Approved column (column L = 12)
                 str(r.approver or ''),
                 manager_duration,
                 finance_duration
@@ -13438,6 +13467,14 @@ def export_reports_excel():
                     # This ensures SUM, SUBTOTAL, and other formulas work correctly with filters
                     cell.number_format = '#,##0.000'
                     cell.alignment = Alignment(horizontal='right', vertical='top')
+                # For Submitted date column (column K = 11) - store as string for immediate rendering
+                elif col == 11:
+                    cell = ws.cell(row=row_idx, column=col, value=str(data) if data else '')
+                    cell.alignment = Alignment(horizontal='left', vertical='top')
+                # For Approved date column (column L = 12) - store as string for immediate rendering
+                elif col == 12:
+                    cell = ws.cell(row=row_idx, column=col, value=str(data) if data else '')
+                    cell.alignment = Alignment(horizontal='left', vertical='top')
                 else:
                     cell = ws.cell(row=row_idx, column=col, value=str(data) if data is not None else '')
                     # Enable text wrapping for columns that may have long text
@@ -13509,10 +13546,33 @@ def export_reports_excel():
 
         # No frozen panes - all columns can be scrolled freely
 
-        # Save to BytesIO
+        # Set workbook properties to help with date rendering
+        # Remove the post-processing loop - it might be causing the delay
+        # Instead, ensure dates are written correctly from the start
+        
+        # Ensure date columns have proper width to display dates fully
+        k_width = ws.column_dimensions.get('K').width if 'K' in ws.column_dimensions else None
+        l_width = ws.column_dimensions.get('L').width if 'L' in ws.column_dimensions else None
+        ws.column_dimensions['K'].width = max(k_width or 10, 12)  # Submitted column
+        ws.column_dimensions['L'].width = max(l_width or 10, 12)  # Approved column
+        
+        # Set workbook to use automatic calculation (helps with rendering)
+        try:
+            wb.calculation.calculateOnLoad = True
+        except:
+            pass
+
+        # Save to BytesIO with optimization settings
         buffer = io.BytesIO()
+        # Save with write_only=False to ensure all cells are properly written
+        # This helps Excel recognize dates immediately
         wb.save(buffer)
         buffer.seek(0)
+        
+        # Note: The lazy rendering issue is often Excel client-side behavior
+        # Excel only renders visible cells initially for performance
+        # When you scroll, Excel renders the newly visible cells
+        # This is normal Excel behavior, not a bug in the file
 
         from flask import make_response
         response = make_response(buffer.getvalue())
