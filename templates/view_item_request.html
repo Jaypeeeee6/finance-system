@@ -843,6 +843,45 @@
                     </div>
                 </div>
 
+                <!-- Display uploaded files (if any) -->
+                {% if receipt_files or invoice_files %}
+                <div class="card assigned-section" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h4>Uploaded Files</h4>
+                    </div>
+                    <div class="card-body">
+                        {% if receipt_files %}
+                        <div class="form-group">
+                            <label>Upload Receipt</label>
+                            <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
+                                {% for file in receipt_files %}
+                                <li style="margin-bottom: 6px;">
+                                    <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                        <i class="fas fa-file"></i> {{ file }}
+                                    </a>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                        {% if invoice_files %}
+                        <div class="form-group">
+                            <label>Upload Invoice</label>
+                            <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
+                                {% for file in invoice_files %}
+                                <li style="margin-bottom: 6px;">
+                                    <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-sm btn-outline-success">
+                                        <i class="fas fa-file-invoice"></i> {{ file }}
+                                    </a>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
                 <!-- Completion form (visible to Procurement department members) -->
                 {% if can_complete %}
                     <div class="card your-approval-required">

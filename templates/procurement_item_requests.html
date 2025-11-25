@@ -322,9 +322,9 @@
                      data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                      data-max-size="10485760"
                      data-max-files="10"
-                     data-required="false"
+                     data-required="true"
                      data-label="Upload Receipt"
-                     data-help-text="">
+                     data-help-text="Required (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
                 </div>
             </div>
             
@@ -338,15 +338,15 @@
                      data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                      data-max-size="10485760"
                      data-max-files="10"
-                     data-required="false"
+                     data-required="true"
                      data-label="Upload Invoice"
-                     data-help-text="">
+                     data-help-text="Required (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
                 </div>
             </div>
             
             <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
                 <button type="button" class="btn btn-secondary" onclick="closeBulkUploadModal()">Cancel</button>
-                <button type="button" class="btn btn-success" onclick="confirmBulkUpload()">Upload Files</button>
+                <button type="button" id="bulkUploadSubmitBtn" class="btn btn-success" onclick="confirmBulkUpload()" disabled>Upload Files and Mark as Completed</button>
             </div>
         </form>
     </div>
@@ -665,6 +665,32 @@ function bulkAssignToSelf() {
     }
 }
 
+function checkBulkUploadButtonState() {
+    const receiptContainer = document.getElementById('bulk-receipt-upload-container');
+    const invoiceContainer = document.getElementById('bulk-invoice-upload-container');
+    const submitBtn = document.getElementById('bulkUploadSubmitBtn');
+    
+    if (!receiptContainer || !invoiceContainer || !submitBtn) return;
+    
+    // Check if both upload components have files
+    const receiptComponent = receiptContainer.uploadComponent;
+    const invoiceComponent = invoiceContainer.uploadComponent;
+    
+    const hasReceiptFiles = receiptComponent && receiptComponent.getFiles().length > 0;
+    const hasInvoiceFiles = invoiceComponent && invoiceComponent.getFiles().length > 0;
+    
+    // Enable button only if both have files
+    if (hasReceiptFiles && hasInvoiceFiles) {
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = '1';
+        submitBtn.style.cursor = 'pointer';
+    } else {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.6';
+        submitBtn.style.cursor = 'not-allowed';
+    }
+}
+
 function openBulkUploadModal() {
     const selectedIds = getSelectedRequestIds();
     if (selectedIds.length === 0) {
@@ -675,11 +701,50 @@ function openBulkUploadModal() {
     document.getElementById('bulkUploadRequestIds').value = selectedIds.join(',');
     document.getElementById('bulkUploadModal').style.display = 'block';
     
+    // Disable button initially
+    const submitBtn = document.getElementById('bulkUploadSubmitBtn');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.6';
+        submitBtn.style.cursor = 'not-allowed';
+    }
+    
     // Initialize file upload components if not already initialized
     if (typeof initMultipleFileUpload === 'function') {
         setTimeout(() => {
-            initMultipleFileUpload(document.getElementById('bulk-receipt-upload-container'));
-            initMultipleFileUpload(document.getElementById('bulk-invoice-upload-container'));
+            const receiptContainer = document.getElementById('bulk-receipt-upload-container');
+            const invoiceContainer = document.getElementById('bulk-invoice-upload-container');
+            
+            initMultipleFileUpload(receiptContainer);
+            initMultipleFileUpload(invoiceContainer);
+            
+            // Set up listeners for file input changes
+            const receiptInput = document.getElementById('file-input-bulk-receipt-upload-container');
+            const invoiceInput = document.getElementById('file-input-bulk-invoice-upload-container');
+            
+            if (receiptInput) {
+                receiptInput.addEventListener('change', function() {
+                    setTimeout(checkBulkUploadButtonState, 100);
+                });
+            }
+            
+            if (invoiceInput) {
+                invoiceInput.addEventListener('change', function() {
+                    setTimeout(checkBulkUploadButtonState, 100);
+                });
+            }
+            
+            // Also check when files are removed (listen to click events on remove buttons)
+            const checkInterval = setInterval(function() {
+                checkBulkUploadButtonState();
+                // Stop checking if modal is closed
+                if (document.getElementById('bulkUploadModal').style.display === 'none') {
+                    clearInterval(checkInterval);
+                }
+            }, 500);
+            
+            // Initial check
+            setTimeout(checkBulkUploadButtonState, 200);
         }, 100);
     }
 }
@@ -688,6 +753,24 @@ function closeBulkUploadModal() {
     document.getElementById('bulkUploadModal').style.display = 'none';
     // Reset form
     document.getElementById('bulkUploadForm').reset();
+    
+    // Reset button state
+    const submitBtn = document.getElementById('bulkUploadSubmitBtn');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.6';
+        submitBtn.style.cursor = 'not-allowed';
+    }
+    
+    // Clear file upload components
+    const receiptContainer = document.getElementById('bulk-receipt-upload-container');
+    const invoiceContainer = document.getElementById('bulk-invoice-upload-container');
+    if (receiptContainer && receiptContainer.uploadComponent) {
+        receiptContainer.uploadComponent.clearFiles();
+    }
+    if (invoiceContainer && invoiceContainer.uploadComponent) {
+        invoiceContainer.uploadComponent.clearFiles();
+    }
 }
 
 function confirmBulkUpload() {
@@ -699,7 +782,7 @@ function confirmBulkUpload() {
     
     const requestIdsText = selectedIds.map(id => `#${id}`).join(', ');
     
-    if (confirm(`Are you sure you want to upload files to request ${requestIdsText}?`)) {
+    if (confirm(`Are you sure you want to upload files to request ${requestIdsText} and mark them as completed?`)) {
         document.getElementById('bulkUploadForm').submit();
     }
 }

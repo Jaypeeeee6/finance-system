@@ -5108,11 +5108,14 @@ def bulk_upload_item_files():
     invoice_files = request.files.getlist('invoice_files')
     uploaded_invoice_filenames = []
     
-    # Check if at least one file type is provided
+    # Check if both file types are provided (both are required)
     if not receipt_files or not any(f.filename for f in receipt_files):
-        if not invoice_files or not any(f.filename for f in invoice_files):
-            flash('Please upload at least one receipt or invoice file.', 'danger')
-            return redirect(url_for('procurement_item_requests'))
+        flash('Upload Receipt file is required.', 'danger')
+        return redirect(url_for('procurement_item_requests'))
+    
+    if not invoice_files or not any(f.filename for f in invoice_files):
+        flash('Upload Invoice file is required.', 'danger')
+        return redirect(url_for('procurement_item_requests'))
     
     allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
     max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
@@ -5199,7 +5202,13 @@ def bulk_upload_item_files():
             
             item_request.receipt_path = json.dumps(all_receipts) if all_receipts else None
             item_request.invoice_path = json.dumps(all_invoices) if all_invoices else None
-            item_request.updated_at = datetime.utcnow()
+            
+            # Mark request as completed
+            current_time = datetime.utcnow()
+            item_request.status = 'Completed'
+            item_request.completed_by_user_id = current_user.user_id
+            item_request.completion_date = current_time
+            item_request.updated_at = current_time
             
             updated_count += 1
             
@@ -5224,30 +5233,24 @@ def bulk_upload_item_files():
                 if staff.user_id not in authorized_users:
                     authorized_users.append(staff.user_id)
             
-            # Send notifications
-            file_types = []
-            if uploaded_receipt_filenames:
-                file_types.append('receipt')
-            if uploaded_invoice_filenames:
-                file_types.append('invoice')
-            
+            # Send notifications for completion
             for user_id in authorized_users:
                 create_notification(
                     user_id=user_id,
-                    title="Files Uploaded to Item Request",
-                    message=f"{current_user.name} uploaded {', '.join(file_types)} file(s) to item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name}.",
-                    notification_type="item_request_updated",
+                    title="Item Request Completed",
+                    message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been completed by {current_user.name}.",
+                    notification_type="request_completed",
                     item_request_id=request_id
                 )
             
-            log_action(f"Bulk uploaded files to item request #{request_id} by {current_user.name}")
+            log_action(f"Bulk uploaded files and marked item request #{request_id} as completed by {current_user.name}")
         else:
             skipped_count += 1
     
     db.session.commit()
     
     if updated_count > 0:
-        flash(f'Successfully uploaded files to {updated_count} request(s).', 'success')
+        flash(f'Successfully uploaded files and marked {updated_count} request(s) as completed.', 'success')
     if skipped_count > 0:
         flash(f'Skipped {skipped_count} request(s) that are not in "Assigned to Procurement" status.', 'info')
     

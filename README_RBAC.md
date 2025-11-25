@@ -254,16 +254,16 @@ When creating a new payment request, users can only select from request types th
 - Bakery
 - Water Supplier
 - Freshener Supplier
-- Gas Supplier
 - Cleaning Supplier
 - Plastics Supplier
 - Garbage Plastic Supplier
 - Furniture Supplier
+- Gas Supplier
+- Petrol
 - Packing/Printing
 - Customer Service
 - Pest Control
 - Maintenance
-- Petrol
 
 ### **Operation Department**
 - Refund/Reimbursement
