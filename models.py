@@ -462,6 +462,9 @@ class PersonCompanyOption(db.Model):
     department = db.Column(db.String(100), nullable=False)  # Department this option belongs to
     request_type = db.Column(db.String(100), nullable=False)  # Request type this option belongs to
     is_active = db.Column(db.Boolean, default=True)  # Whether this option is currently available
+    account_name = db.Column(db.String(200), nullable=True)  # Account name for payment requests
+    account_number = db.Column(db.String(50), nullable=True)  # Account number for payment requests
+    bank_name = db.Column(db.String(200), nullable=True)  # Bank name for payment requests
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
@@ -477,6 +480,9 @@ class PersonCompanyOption(db.Model):
             'department': self.department,
             'request_type': self.request_type,
             'is_active': self.is_active,
+            'account_name': self.account_name,
+            'account_number': self.account_number,
+            'bank_name': self.bank_name,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
             'created_by': self.created_by.name if self.created_by else 'System'

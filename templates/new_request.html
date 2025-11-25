@@ -156,10 +156,17 @@
                         cursor: pointer;
                         border-bottom: 1px solid #f1f3f4;
                         transition: background-color 0.2s;
+                        -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile/trackpad */
+                        touch-action: manipulation; /* Optimize for touch/trackpad */
+                        user-select: none; /* Prevent text selection */
                     }
                     
                     .branch-option:hover {
                         background-color: #e9ecef;
+                    }
+                    
+                    .branch-option:active {
+                        background-color: #dee2e6; /* Visual feedback for soft touches */
                     }
                     
                     .branch-option.selected {
@@ -255,6 +262,9 @@
                         </select>
                         <div id="person_company_dropdown" class="supplier-dropdown" style="display: none;"></div>
                     </div>
+                    <small id="person_company_auto_note" class="auto-populated-note" style="display: none; color: #28a745; font-style: italic; margin-top: 4px;">
+                        <i class="fas fa-info-circle"></i> Bank-related fields are automatically populated based on chosen Person/Company Name
+                    </small>
                 </div>
 
                 <div id="companyNameGroup" class="form-group" style="display: none;">
@@ -317,6 +327,9 @@
                         <option value="Al Yusr Islamic Banking Services (Oman Arab Bank)">Al Yusr Islamic Banking Services (Oman Arab Bank)</option>
                         <option value="Bank Nizwa">Bank Nizwa</option>
                     </select>
+                    <small id="bank_name_auto_note" class="auto-populated-note" style="display: none; color: #28a745; font-style: italic; margin-top: 4px;">
+                        <i class="fas fa-info-circle"></i> Automatically populated based on chosen Person/Company Name
+                    </small>
                     <div id="swift-code-display" style="margin-top: 8px; padding: 10px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; display: none;">
                         <strong>SWIFT Code:</strong> <span id="swift-code-text"></span>
                     </div>
@@ -326,12 +339,18 @@
                     <div class="form-group">
                         <label for="account_name">Account Name *</label>
                         <input type="text" name="account_name" id="account_name" required>
+                        <small id="account_name_auto_note" class="auto-populated-note" style="display: none; color: #28a745; font-style: italic; margin-top: 4px;">
+                            <i class="fas fa-info-circle"></i> Automatically populated based on chosen Person/Company Name
+                        </small>
                     </div>
 
                     <div class="form-group" id="account_number_group">
                         <label for="account_number">Account Number *</label>
                         <input type="text" name="account_number" id="account_number" pattern="[0-9]+" title="Please enter numbers only (maximum 16 digits)" required maxlength="16">
-                        <small>Numbers only (maximum 16 digits)</small>
+                        <small id="account_number_auto_note" class="auto-populated-note" style="display: none; color: #28a745; font-style: italic; margin-top: 4px;">
+                            <i class="fas fa-info-circle"></i> Automatically populated based on chosen Person/Company Name
+                        </small>
+                        <small style="display: block; margin-top: 4px;">Numbers only (maximum 16 digits)</small>
                     </div>
                 </div>
 
@@ -737,6 +756,175 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize payment method handler
     handlePaymentMethodChange();
+    
+    // Add event listeners to account fields to clear auto-populated flag on manual edit
+    const accountNameInput = document.getElementById('account_name');
+    const accountNumberInput = document.getElementById('account_number');
+    const bankNameInput = document.getElementById('bank_name');
+    
+    if (accountNameInput) {
+        const accountNameNote = document.getElementById('account_name_auto_note');
+        accountNameInput.addEventListener('input', function() {
+            // Clear auto-populated flag when user manually edits
+            this.dataset.autoPopulated = 'false';
+            // Hide note when manually edited
+            if (accountNameNote) accountNameNote.style.display = 'none';
+        });
+        accountNameInput.addEventListener('focus', function() {
+            // If field is empty or was auto-populated, allow user to edit
+            if (!this.value || this.dataset.autoPopulated === 'true') {
+                this.dataset.autoPopulated = 'false';
+                // Hide note when user starts editing
+                if (accountNameNote) accountNameNote.style.display = 'none';
+            }
+        });
+    }
+    
+    if (accountNumberInput) {
+        const accountNumberNote = document.getElementById('account_number_auto_note');
+        accountNumberInput.addEventListener('input', function() {
+            // Clear auto-populated flag when user manually edits
+            this.dataset.autoPopulated = 'false';
+            // Hide note when manually edited
+            if (accountNumberNote) accountNumberNote.style.display = 'none';
+        });
+        accountNumberInput.addEventListener('focus', function() {
+            // If field is empty or was auto-populated, allow user to edit
+            if (!this.value || this.dataset.autoPopulated === 'true') {
+                this.dataset.autoPopulated = 'false';
+                // Hide note when user starts editing
+                if (accountNumberNote) accountNumberNote.style.display = 'none';
+            }
+        });
+    }
+    
+    if (bankNameInput) {
+        const bankNameNote = document.getElementById('bank_name_auto_note');
+        bankNameInput.addEventListener('change', function() {
+            // Clear auto-populated flag when user manually edits
+            this.dataset.autoPopulated = 'false';
+            // Hide note when manually edited
+            if (bankNameNote) bankNameNote.style.display = 'none';
+        });
+        bankNameInput.addEventListener('focus', function() {
+            // If field is empty or was auto-populated, allow user to edit
+            if (!this.value || this.dataset.autoPopulated === 'true') {
+                this.dataset.autoPopulated = 'false';
+                // Hide note when user starts editing
+                if (bankNameNote) bankNameNote.style.display = 'none';
+            }
+        });
+    }
+    
+    // Function to clear auto-populated bank-related fields (make it globally accessible)
+    window.clearAutoPopulatedBankFields = function() {
+        const accountNameInput = document.getElementById('account_name');
+        const accountNumberInput = document.getElementById('account_number');
+        const bankNameInput = document.getElementById('bank_name');
+        const accountNameNote = document.getElementById('account_name_auto_note');
+        const accountNumberNote = document.getElementById('account_number_auto_note');
+        const bankNameNote = document.getElementById('bank_name_auto_note');
+        const personCompanyNote = document.getElementById('person_company_auto_note');
+        
+        if (accountNameInput && accountNameInput.dataset.autoPopulated === 'true') {
+            accountNameInput.value = '';
+            accountNameInput.dataset.autoPopulated = 'false';
+            if (accountNameNote) accountNameNote.style.display = 'none';
+        }
+        
+        if (accountNumberInput && accountNumberInput.dataset.autoPopulated === 'true') {
+            accountNumberInput.value = '';
+            accountNumberInput.dataset.autoPopulated = 'false';
+            if (accountNumberNote) accountNumberNote.style.display = 'none';
+        }
+        
+        if (bankNameInput && bankNameInput.dataset.autoPopulated === 'true') {
+            bankNameInput.value = '';
+            bankNameInput.dataset.autoPopulated = 'false';
+            if (bankNameNote) bankNameNote.style.display = 'none';
+            // Hide SWIFT code display if it was shown
+            if (typeof showSwiftCode === 'function') {
+                showSwiftCode();
+            }
+        }
+        
+        // Hide Person/Company Name note when fields are cleared
+        if (personCompanyNote) personCompanyNote.style.display = 'none';
+    };
+    
+    // Add event listener to person_company text input (for non-supplier request types)
+    const personCompanyInput = document.getElementById('person_company');
+    const personCompanyNote = document.getElementById('person_company_auto_note');
+    if (personCompanyInput) {
+        personCompanyInput.addEventListener('input', function() {
+            // If the field is cleared or changed, clear auto-populated bank fields
+            if (!this.value.trim()) {
+                clearAutoPopulatedBankFields();
+                // Hide note
+                if (personCompanyNote) personCompanyNote.style.display = 'none';
+            }
+        });
+        
+        personCompanyInput.addEventListener('change', function() {
+            // If the field is cleared or changed, clear auto-populated bank fields
+            if (!this.value.trim()) {
+                clearAutoPopulatedBankFields();
+                // Hide note
+                if (personCompanyNote) personCompanyNote.style.display = 'none';
+            }
+        });
+    }
+    
+    // Add event listener to person_company_search (for supplier dropdown)
+    const personCompanySearch = document.getElementById('person_company_search');
+    if (personCompanySearch) {
+        personCompanySearch.addEventListener('input', function() {
+            // If the search field is cleared, clear auto-populated bank fields
+            if (!this.value.trim()) {
+                const hiddenSelect = document.getElementById('person_company_select');
+                if (hiddenSelect && !hiddenSelect.value) {
+                    clearAutoPopulatedBankFields();
+                    // Hide note
+                    if (personCompanyNote) personCompanyNote.style.display = 'none';
+                }
+            }
+        });
+        
+        // Also listen for when the hidden select value changes
+        const personCompanySelect = document.getElementById('person_company_select');
+        if (personCompanySelect) {
+            // Store the previous value to detect changes
+            let previousValue = personCompanySelect.value;
+            
+            // Use MutationObserver to detect when the value changes
+            const observer = new MutationObserver(function() {
+                const currentValue = personCompanySelect.value;
+                if (currentValue !== previousValue) {
+                    // Value changed - if it's empty, clear auto-populated fields
+                    if (!currentValue) {
+                        clearAutoPopulatedBankFields();
+                        // Hide note
+                        if (personCompanyNote) personCompanyNote.style.display = 'none';
+                    }
+                    previousValue = currentValue;
+                }
+            });
+            
+            observer.observe(personCompanySelect, {
+                attributes: true,
+                attributeFilter: ['value']
+            });
+            
+            // Also listen for change events
+            personCompanySelect.addEventListener('change', function() {
+                if (!this.value) {
+                    clearAutoPopulatedBankFields();
+                    // Hide note
+                    if (personCompanyNote) personCompanyNote.style.display = 'none';
+                }
+            });
+        }
+    }
 });
 
 function initializeBranchSearch() {
@@ -821,20 +1009,75 @@ function initializeBranchSearch() {
             optionDiv.setAttribute('data-value', option.value);
             optionDiv.setAttribute('data-restaurant', restaurant);
             
-            // Use mousedown instead of click for better trackpad support
-            // mousedown fires before blur, ensuring selection happens on trackpad taps
-            optionDiv.addEventListener('mousedown', function(e) {
-                e.preventDefault(); // Prevent blur from firing
-                clickingOnOption = true;
-                selectBranch(option.value, option.textContent);
-            });
+            let optionHandled = false;
+            let optionTimeout = null;
             
-            // Keep click as fallback for accessibility
-            optionDiv.addEventListener('click', function(e) {
-                if (!clickingOnOption) {
-                    selectBranch(option.value, option.textContent);
+            // Function to handle option selection with debouncing
+            function handleOptionSelection(e) {
+                if (optionHandled) {
+                    return;
                 }
-            });
+                
+                e.preventDefault();
+                e.stopPropagation();
+                clickingOnOption = true;
+                optionHandled = true;
+                selectBranch(option.value, option.textContent);
+                
+                // Clear any existing timeout
+                if (optionTimeout) {
+                    clearTimeout(optionTimeout);
+                }
+                
+                // Reset flag after a delay to allow for soft touches
+                optionTimeout = setTimeout(() => {
+                    optionHandled = false;
+                }, 400);
+            }
+            
+            // Use mousedown for better trackpad support (fires before blur)
+            // This works for both mouse and most trackpad interactions
+            optionDiv.addEventListener('mousedown', handleOptionSelection, { passive: false });
+            
+            // Support for touch devices and trackpads (soft touches)
+            optionDiv.addEventListener('touchstart', handleOptionSelection, { passive: false });
+            
+            // Pointer events for better cross-device support (including soft trackpad touches)
+            optionDiv.addEventListener('pointerdown', function(e) {
+                // Handle all pointer types, including soft touches
+                handleOptionSelection(e);
+            }, { passive: false });
+            
+            // Mouseup as additional fallback for soft trackpad touches
+            // Some soft touches might not trigger mousedown but will trigger mouseup
+            optionDiv.addEventListener('mouseup', function(e) {
+                // Only handle if mousedown didn't already handle it
+                setTimeout(() => {
+                    if (!optionHandled) {
+                        handleOptionSelection(e);
+                    }
+                }, 10);
+            }, { passive: false });
+            
+            // Touchend as fallback for soft touches
+            optionDiv.addEventListener('touchend', function(e) {
+                // Only handle if touchstart didn't already handle it
+                setTimeout(() => {
+                    if (!optionHandled) {
+                        handleOptionSelection(e);
+                    }
+                }, 10);
+            }, { passive: false });
+            
+            // Keep click as final fallback for accessibility and edge cases
+            optionDiv.addEventListener('click', function(e) {
+                // Only handle if no other event handled it
+                setTimeout(() => {
+                    if (!optionHandled && !clickingOnOption) {
+                        handleOptionSelection(e);
+                    }
+                }, 50);
+            }, { passive: false });
             
             dropdown.appendChild(optionDiv);
         });
@@ -843,6 +1086,12 @@ function initializeBranchSearch() {
     }
     
     function selectBranch(value, text) {
+        // Clear any pending blur timeout
+        if (blurTimeout) {
+            clearTimeout(blurTimeout);
+            blurTimeout = null;
+        }
+        
         // Check if branch is already selected - if so, remove it (toggle behavior)
         const existingIndex = selectedBranches.findIndex(b => b.value === value);
         if (existingIndex !== -1) {
@@ -854,18 +1103,16 @@ function initializeBranchSearch() {
             // Clear search input but keep dropdown open so user can continue selecting
             searchInput.value = '';
             dropdown.style.display = 'block';
-            searchInput.focus();
+            // Re-focus after a small delay to ensure it works with soft touches
+            setTimeout(() => {
+                searchInput.focus();
+            }, 50);
             
+            // Reset flag after a delay to allow for soft trackpad touches
             setTimeout(() => {
                 clickingOnOption = false;
-            }, 100);
+            }, 200);
             return;
-        }
-        
-        // Clear any pending blur timeout
-        if (blurTimeout) {
-            clearTimeout(blurTimeout);
-            blurTimeout = null;
         }
         
         // Add to selected branches
@@ -876,12 +1123,15 @@ function initializeBranchSearch() {
         // Clear search input but keep dropdown open so user can continue selecting
         searchInput.value = '';
         dropdown.style.display = 'block';
-        searchInput.focus(); // Keep focus so user can continue typing
+        // Re-focus after a small delay to ensure it works with soft touches
+        setTimeout(() => {
+            searchInput.focus();
+        }, 50);
         
-        // Reset flag after a short delay
+        // Reset flag after a delay to allow for soft trackpad touches
         setTimeout(() => {
             clickingOnOption = false;
-        }, 100);
+        }, 200);
     }
     
     function filterBranches(searchTerm) {
@@ -944,22 +1194,43 @@ function initializeBranchSearch() {
     });
     
     searchInput.addEventListener('blur', function() {
-        // Delay hiding to allow clicks on options
+        // Delay hiding to allow clicks on options (especially for soft trackpad touches)
         // Clear any existing timeout first
         if (blurTimeout) {
             clearTimeout(blurTimeout);
         }
         blurTimeout = setTimeout(() => {
             // Only hide if not clicking on an option
+            // Give extra time for soft touches that might have delayed event firing
             if (!clickingOnOption) {
                 dropdown.style.display = 'none';
             }
             blurTimeout = null;
-        }, 200);
+        }, 300); // Increased timeout for better soft trackpad support
+    });
+    
+    // Also prevent blur on mousedown/touchstart on dropdown options
+    dropdown.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+    });
+    
+    dropdown.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+    });
+    
+    dropdown.addEventListener('pointerdown', function(e) {
+        e.preventDefault();
     });
     
     // Hide dropdown when clicking outside
     document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target) && !chipsContainer.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+    
+    // Also handle touch events for better mobile/trackpad support
+    document.addEventListener('touchend', function(e) {
         if (!searchInput.contains(e.target) && !dropdown.contains(e.target) && !chipsContainer.contains(e.target)) {
             dropdown.style.display = 'none';
         }
@@ -993,6 +1264,35 @@ function handleRequestTypeChange() {
     const personCompanyInput = document.getElementById('person_company');
     const personCompanyContainer = document.getElementById('person_company_select_container');
     const personCompanySelect = document.getElementById('person_company_select');
+    const personCompanySearch = document.getElementById('person_company_search');
+    const personCompanyNote = document.getElementById('person_company_auto_note');
+    
+    // Clear person/company name field when request type changes
+    if (personCompanyInput) {
+        personCompanyInput.value = '';
+    }
+    if (personCompanySearch) {
+        personCompanySearch.value = '';
+    }
+    if (personCompanySelect) {
+        personCompanySelect.value = '';
+    }
+    
+    // Hide Person/Company Name note
+    if (personCompanyNote) {
+        personCompanyNote.style.display = 'none';
+    }
+    
+    // Clear auto-populated bank-related fields
+    if (typeof window.clearAutoPopulatedBankFields === 'function') {
+        window.clearAutoPopulatedBankFields();
+    }
+    
+    // Reset supplier selection tracking if it exists
+    if (window.supplierSearchInitialized) {
+        // Try to access the currentSelectedSupplier from the supplier search scope
+        // We'll reset it when initializeSupplierSearch is called again
+    }
     
     // Check if this department and request type combination has supplier options from database
     if (department && requestType) {
@@ -1029,6 +1329,10 @@ function handleRequestTypeChange() {
                     const dropdown = document.getElementById('person_company_dropdown');
                     if (searchInput) searchInput.value = '';
                     if (dropdown) dropdown.style.display = 'none';
+                    
+                    // Clear person/company name and reset supplier selection
+                    if (personCompanyInput) personCompanyInput.value = '';
+                    if (personCompanySelect) personCompanySelect.value = '';
                 }
             })
             .catch(error => {
@@ -1038,6 +1342,11 @@ function handleRequestTypeChange() {
                 personCompanyInput.required = true;
                 personCompanyContainer.style.display = 'none';
                 personCompanySelect.required = false;
+                
+                // Clear person/company name
+                if (personCompanyInput) personCompanyInput.value = '';
+                if (personCompanySearch) personCompanySearch.value = '';
+                if (personCompanySelect) personCompanySelect.value = '';
             });
     } else {
         // Show text input, hide dropdown if no department/request type
@@ -1051,6 +1360,10 @@ function handleRequestTypeChange() {
         const dropdown = document.getElementById('person_company_dropdown');
         if (searchInput) searchInput.value = '';
         if (dropdown) dropdown.style.display = 'none';
+        
+        // Clear person/company name
+        if (personCompanyInput) personCompanyInput.value = '';
+        if (personCompanySelect) personCompanySelect.value = '';
     }
     
     // Show appropriate field based on request type
@@ -1078,11 +1391,30 @@ function populateSupplierOptions(department, requestType) {
             .then(data => {
                 const options = data.options || [];
                 
+                // Store options data for account auto-population
+                if (!window.supplierOptionsData) {
+                    window.supplierOptionsData = {};
+                }
+                
                 // Add options
                 options.forEach(option => {
                     const optionElement = document.createElement('option');
-                    optionElement.value = option;
-                    optionElement.textContent = option;
+                    const optionName = typeof option === 'string' ? option : option.name;
+                    optionElement.value = optionName;
+                    optionElement.textContent = optionName;
+                    
+                    // Store account information if available
+                    if (typeof option === 'object' && (option.account_name || option.account_number || option.bank_name)) {
+                        optionElement.setAttribute('data-account-name', option.account_name || '');
+                        optionElement.setAttribute('data-account-number', option.account_number || '');
+                        optionElement.setAttribute('data-bank-name', option.bank_name || '');
+                        window.supplierOptionsData[optionName] = {
+                            account_name: option.account_name || '',
+                            account_number: option.account_number || '',
+                            bank_name: option.bank_name || ''
+                        };
+                    }
+                    
                     select.appendChild(optionElement);
                 });
                 
@@ -1121,6 +1453,8 @@ function initializeSupplierSearch() {
     // Flag to track if we're clicking on an option
     let clickingOnOption = false;
     let blurTimeout = null;
+    // Track currently selected supplier
+    let currentSelectedSupplier = null;
     
     // Build dropdown from select options
     function buildSupplierDropdown() {
@@ -1136,17 +1470,34 @@ function initializeSupplierSearch() {
             optionDiv.textContent = option.textContent;
             optionDiv.setAttribute('data-value', option.value);
             
+            // Store account information if available
+            if (option.getAttribute('data-account-name')) {
+                optionDiv.setAttribute('data-account-name', option.getAttribute('data-account-name'));
+            }
+            if (option.getAttribute('data-account-number')) {
+                optionDiv.setAttribute('data-account-number', option.getAttribute('data-account-number'));
+            }
+            if (option.getAttribute('data-bank-name')) {
+                optionDiv.setAttribute('data-bank-name', option.getAttribute('data-bank-name'));
+            }
+            
             // Use mousedown instead of click for better trackpad support
             optionDiv.addEventListener('mousedown', function(e) {
                 e.preventDefault(); // Prevent blur from firing
                 clickingOnOption = true;
-                selectSupplier(option.value, option.textContent);
+                const accountName = optionDiv.getAttribute('data-account-name') || '';
+                const accountNumber = optionDiv.getAttribute('data-account-number') || '';
+                const bankName = optionDiv.getAttribute('data-bank-name') || '';
+                selectSupplier(option.value, option.textContent, accountName, accountNumber, bankName);
             });
             
             // Keep click as fallback for accessibility
             optionDiv.addEventListener('click', function(e) {
                 if (!clickingOnOption) {
-                    selectSupplier(option.value, option.textContent);
+                    const accountName = optionDiv.getAttribute('data-account-name') || '';
+                    const accountNumber = optionDiv.getAttribute('data-account-number') || '';
+                    const bankName = optionDiv.getAttribute('data-bank-name') || '';
+                    selectSupplier(option.value, option.textContent, accountName, accountNumber, bankName);
                 }
             });
             
@@ -1154,7 +1505,7 @@ function initializeSupplierSearch() {
         });
     }
     
-    function selectSupplier(value, text) {
+    function selectSupplier(value, text, accountName, accountNumber, bankName) {
         // Clear any pending blur timeout
         if (blurTimeout) {
             clearTimeout(blurTimeout);
@@ -1171,14 +1522,98 @@ function initializeSupplierSearch() {
             searchInput.value = '';
             hiddenSelect.value = '';
             document.getElementById('person_company').value = '';
+            // Clear auto-populated fields when invalid selection
+            if (typeof clearAutoPopulatedBankFields === 'function') {
+                clearAutoPopulatedBankFields();
+            }
+            currentSelectedSupplier = null;
             return;
+        }
+        
+        // If supplier changed, clear previous auto-populated fields first
+        if (currentSelectedSupplier && currentSelectedSupplier !== value) {
+            if (typeof clearAutoPopulatedBankFields === 'function') {
+                clearAutoPopulatedBankFields();
+            }
         }
         
         searchInput.value = text;
         hiddenSelect.value = value;
+        currentSelectedSupplier = value;
         
         // Update the hidden person_company input for form submission
         document.getElementById('person_company').value = value;
+        
+        // Auto-populate account fields if available
+        const accountNameInput = document.getElementById('account_name');
+        const accountNumberInput = document.getElementById('account_number');
+        const bankNameInput = document.getElementById('bank_name');
+        
+        // Get account info from stored data or from parameters
+        let finalAccountName = accountName || '';
+        let finalAccountNumber = accountNumber || '';
+        let finalBankName = bankName || '';
+        
+        // Check if we have stored account data for this supplier
+        if (window.supplierOptionsData && window.supplierOptionsData[value]) {
+            finalAccountName = window.supplierOptionsData[value].account_name || '';
+            finalAccountNumber = window.supplierOptionsData[value].account_number || '';
+            finalBankName = window.supplierOptionsData[value].bank_name || '';
+        }
+        
+        // Get note elements
+        const accountNameNote = document.getElementById('account_name_auto_note');
+        const accountNumberNote = document.getElementById('account_number_auto_note');
+        const bankNameNote = document.getElementById('bank_name_auto_note');
+        const personCompanyNote = document.getElementById('person_company_auto_note');
+        
+        // Check if any bank-related fields will be auto-populated
+        const hasBankInfo = finalAccountName || finalAccountNumber || finalBankName;
+        
+        // Show/hide Person/Company Name note based on whether bank info exists
+        if (personCompanyNote) {
+            if (hasBankInfo) {
+                personCompanyNote.style.display = 'block';
+            } else {
+                personCompanyNote.style.display = 'none';
+            }
+        }
+        
+        // Only populate if account info exists and fields are empty or were previously auto-populated
+        if (accountNameInput) {
+            // Check if the current value was auto-populated (we'll track this)
+            const wasAutoPopulated = accountNameInput.dataset.autoPopulated === 'true';
+            if (finalAccountName && (!accountNameInput.value || wasAutoPopulated)) {
+                accountNameInput.value = finalAccountName;
+                accountNameInput.dataset.autoPopulated = 'true';
+                // Show note
+                if (accountNameNote) accountNameNote.style.display = 'block';
+            }
+        }
+        
+        if (accountNumberInput) {
+            const wasAutoPopulated = accountNumberInput.dataset.autoPopulated === 'true';
+            if (finalAccountNumber && (!accountNumberInput.value || wasAutoPopulated)) {
+                accountNumberInput.value = finalAccountNumber;
+                accountNumberInput.dataset.autoPopulated = 'true';
+                // Show note
+                if (accountNumberNote) accountNumberNote.style.display = 'block';
+            }
+        }
+        
+        if (bankNameInput) {
+            const wasAutoPopulated = bankNameInput.dataset.autoPopulated === 'true';
+            if (finalBankName && (!bankNameInput.value || wasAutoPopulated)) {
+                bankNameInput.value = finalBankName;
+                bankNameInput.dataset.autoPopulated = 'true';
+                // Show note
+                if (bankNameNote) bankNameNote.style.display = 'block';
+                // Trigger change event to show SWIFT code if applicable
+                if (typeof showSwiftCode === 'function') {
+                    showSwiftCode();
+                }
+            }
+        }
         
         dropdown.style.display = 'none';
         searchInput.blur();
@@ -1249,6 +1684,11 @@ function initializeSupplierSearch() {
                     // User typed something but didn't select from dropdown - clear it
                     this.value = '';
                     document.getElementById('person_company').value = '';
+                    // Clear auto-populated fields
+                    if (typeof clearAutoPopulatedBankFields === 'function') {
+                        clearAutoPopulatedBankFields();
+                    }
+                    currentSelectedSupplier = null;
                 } else if (currentValue && hiddenSelectValue) {
                     // Ensure the displayed value matches the selected option
                     const selectedOption = hiddenSelect.querySelector(`option[value="${hiddenSelectValue}"]`);
@@ -1256,12 +1696,31 @@ function initializeSupplierSearch() {
                         // Value doesn't match - reset to selected option text
                         this.value = selectedOption.textContent;
                     }
+                } else if (!currentValue && !hiddenSelectValue) {
+                    // Both are empty - clear auto-populated fields
+                    if (typeof clearAutoPopulatedBankFields === 'function') {
+                        clearAutoPopulatedBankFields();
+                    }
+                    currentSelectedSupplier = null;
                 }
                 
                 dropdown.style.display = 'none';
             }
             blurTimeout = null;
         }, 200);
+    });
+    
+    // Listen for changes to the hidden select to clear fields when supplier is cleared
+    hiddenSelect.addEventListener('change', function() {
+        if (!this.value) {
+            // Supplier was cleared - clear auto-populated fields
+            if (typeof window.clearAutoPopulatedBankFields === 'function') {
+                window.clearAutoPopulatedBankFields();
+            }
+            currentSelectedSupplier = null;
+            searchInput.value = '';
+            document.getElementById('person_company').value = '';
+        }
     });
     
     // Prevent form submission if search input has a value that doesn't match a valid option
@@ -1286,6 +1745,11 @@ function initializeSupplierSearch() {
                 this.value = '';
                 hiddenSelect.value = '';
                 document.getElementById('person_company').value = '';
+                // Clear auto-populated fields
+                if (typeof window.clearAutoPopulatedBankFields === 'function') {
+                    window.clearAutoPopulatedBankFields();
+                }
+                currentSelectedSupplier = null;
                 this.focus();
             }
         }

@@ -334,6 +334,265 @@
     .payment-method-option input[type="checkbox"] {
         display: none;
     }
+
+    /* Inline Filters Section */
+    .inline-filters-section {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .inline-filters-header {
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #f8f9fa;
+    }
+
+    .inline-filters-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #212529;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .inline-filters-form {
+        width: 100%;
+    }
+
+    .inline-filters-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    /* Ensure date range spans 2 columns on larger screens */
+    @media (min-width: 768px) {
+        .inline-filter-group:has(.date-range-inputs) {
+            grid-column: span 2;
+        }
+    }
+
+    .inline-filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .inline-filter-group > label {
+        font-weight: 600;
+        color: #495057;
+        font-size: 14px;
+        margin-bottom: 8px;
+    }
+
+    .checkbox-group-inline {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: 150px;
+        overflow-y: auto;
+        padding: 8px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        background: #f8f9fa;
+    }
+
+    .checkbox-option-inline {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 6px;
+        cursor: pointer;
+        border-radius: 3px;
+        transition: background-color 0.2s;
+    }
+
+    .checkbox-option-inline:hover {
+        background-color: #e9ecef;
+    }
+
+    .checkbox-option-inline:has(input[type="checkbox"]:checked) {
+        background-color: #d1ecf1;
+    }
+
+    .checkbox-option-inline input[type="checkbox"] {
+        margin: 0;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    .checkbox-option-inline label {
+        margin: 0;
+        cursor: pointer;
+        font-weight: normal;
+        font-size: 13px;
+        flex: 1;
+        user-select: none;
+    }
+
+    .payment-method-options-inline {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .date-range-inputs {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: nowrap;
+    }
+
+    .date-range-inputs input[type="date"] {
+        flex: 1;
+        min-width: 150px;
+        padding: 8px 12px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .date-range-inputs span {
+        color: #6c757d;
+        font-size: 14px;
+        white-space: nowrap;
+    }
+
+    /* Make date range filter group wider in inline filters */
+    .inline-filter-group:has(.date-range-inputs) {
+        grid-column: span 2;
+    }
+
+    /* For side panel date range */
+    .filter-panel-body .form-group:has(.date-range-inputs) {
+        width: 100%;
+    }
+
+    .inline-filters-actions {
+        display: flex;
+        gap: 10px;
+        padding-top: 15px;
+        border-top: 1px solid #dee2e6;
+    }
+
+    .inline-filters-actions .btn {
+        padding: 10px 20px;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    /* Filter Dropdown with Chips (like branch selector) */
+    .filter-select-container {
+        position: relative;
+        width: 100%;
+    }
+
+    .filter-chips-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 0;
+        min-height: 0;
+    }
+
+    .filter-chips-container:not(:empty) {
+        margin-bottom: 8px;
+    }
+
+    .filter-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        background: #000;
+        color: white;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .filter-chip .remove-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        border-radius: 50%;
+        color: white;
+        cursor: pointer;
+        font-size: 12px;
+        padding: 0;
+        transition: background 0.2s;
+        line-height: 1;
+    }
+
+    .filter-chip .remove-chip:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .filter-search-input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .filter-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        display: none;
+        margin-top: 4px;
+    }
+
+    .filter-option {
+        padding: 10px 12px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        border-bottom: 1px solid #f8f9fa;
+        -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile/trackpad */
+        touch-action: manipulation; /* Optimize for touch/trackpad */
+        user-select: none; /* Prevent text selection */
+    }
+
+    .filter-option:last-child {
+        border-bottom: none;
+    }
+
+    .filter-option:hover {
+        background-color: #f8f9fa;
+    }
+
+    .filter-option:active {
+        background-color: #dee2e6; /* Visual feedback for soft touches */
+    }
+
+    .filter-option.selected {
+        background-color: #e7f3ff;
+        font-weight: 500;
+    }
+
+    .filter-option.hidden {
+        display: none;
+    }
 </style>
 <div class="dashboard-container">
     <div class="dashboard-header">
@@ -341,12 +600,8 @@
         <p>Filter and analyze payment requests</p>
     </div>
 
-    <!-- Filters Button and Active Filters -->
+    <!-- Active Filters -->
     <div class="filters-container">
-        <button type="button" class="filters-btn" onclick="openFilterPanel()">
-            <i class="fas fa-filter"></i>
-            Filters
-        </button>
         <div class="active-filters" id="active-filters">
             {% set has_filters = False %}
             {% if request.args.getlist('department') %}
@@ -429,8 +684,17 @@
         </div>
         <div class="filter-panel-body">
             <form method="GET" action="{{ url_for('reports') }}" id="filter-form">
+                <!-- Global Search Bar -->
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="filter-global-search" style="margin-bottom: 8px; display: block;">
+                        <i class="fas fa-search"></i> Search Filters
+                    </label>
+                    <input type="text" id="filter-global-search" class="form-control" placeholder="Search all filters..." autocomplete="off" style="width: 100%; padding: 10px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px;">
+                </div>
+                
                 <div class="form-group">
                     <label>Department</label>
+                    <div id="department_chips_container" class="filter-chips-container"></div>
                     <div class="checkbox-group" id="department-group">
                         {% for dept in departments %}
                         <div class="checkbox-option">
@@ -443,6 +707,7 @@
 
                 <div class="form-group">
                     <label>Request Type</label>
+                    <div id="request_type_chips_container" class="filter-chips-container"></div>
                     <div class="checkbox-group" id="request_type-group">
                         {# Non-"Others" first #}
                         {% for request_type in request_types | reject('equalto', 'Others') %}
@@ -463,6 +728,7 @@
 
                 <div class="form-group">
                     <label>Company Name</label>
+                    <div id="company_chips_container" class="filter-chips-container"></div>
                     <div class="checkbox-group" id="company-group">
                         {% for company in companies %}
                         <div class="checkbox-option">
@@ -476,6 +742,7 @@
 
                 <div class="form-group">
                     <label>Branch Name</label>
+                    <div id="branch_chips_container" class="filter-chips-container"></div>
                     <div class="checkbox-group" id="branch-group">
                         {% for branch in branches %}
                         <div class="checkbox-option">
@@ -488,6 +755,7 @@
 
                 <div class="form-group">
                     <label>Payment Type</label>
+                    <div id="payment_type_chips_container" class="filter-chips-container"></div>
                     <div class="checkbox-group" id="payment_type-group">
                         <div class="checkbox-option">
                             <input type="checkbox" name="payment_type" id="pt_onetime" value="One-Time" {% if 'One-Time' in request.args.getlist('payment_type') %}checked{% endif %}>
@@ -506,6 +774,7 @@
 
                 <div class="form-group">
                     <label>Payment Method</label>
+                    <div id="payment_method_chips_container" class="filter-chips-container"></div>
                     <div class="payment-method-options">
                         <label class="payment-method-option {% if 'Card' in request.args.getlist('payment_method') %}selected{% endif %}" onclick="togglePaymentMethod(event, 'Card')">
                             <input type="checkbox" name="payment_method" value="Card" {% if 'Card' in request.args.getlist('payment_method') %}checked{% endif %}>
@@ -520,6 +789,7 @@
 
                 <div class="form-group">
                     <label>Status</label>
+                    <div id="status_chips_container" class="filter-chips-container"></div>
                     <div class="checkbox-group" id="status-group">
                         <div class="checkbox-option">
                             <input type="checkbox" name="status" id="status_allpending" value="All Pending" {% if 'All Pending' in request.args.getlist('status') %}checked{% endif %}>
@@ -565,13 +835,12 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="date_from">Date From</label>
-                    <input type="date" name="date_from" id="date_from" value="{{ request.args.get('date_from', '') }}">
-                </div>
-
-                <div class="form-group">
-                    <label for="date_to">Date To</label>
-                    <input type="date" name="date_to" id="date_to" value="{{ request.args.get('date_to', '') }}">
+                    <label>Date Range</label>
+                    <div class="date-range-inputs">
+                        <input type="date" name="date_from" id="date_from" value="{{ request.args.get('date_from', '') }}" placeholder="From">
+                        <span>to</span>
+                        <input type="date" name="date_to" id="date_to" value="{{ request.args.get('date_to', '') }}" placeholder="To">
+                    </div>
                 </div>
             </form>
         </div>
@@ -583,6 +852,112 @@
                 <i class="fas fa-redo"></i> Clear All
             </button>
         </div>
+    </div>
+
+    <!-- Inline Filters Section -->
+    <div class="inline-filters-section">
+        <div class="inline-filters-header">
+            <h3><i class="fas fa-filter"></i> Quick Filters</h3>
+        </div>
+        <form method="GET" action="{{ url_for('reports') }}" id="inline-filter-form" class="inline-filters-form">
+            <div class="inline-filters-grid">
+                <div class="inline-filter-group">
+                    <label>Department</label>
+                    <div class="filter-select-container">
+                        <div id="inline_department_chips_container" class="filter-chips-container"></div>
+                        <input type="text" id="inline_department_search" class="filter-search-input" placeholder="Search departments..." autocomplete="off">
+                        <div id="inline_department_dropdown" class="filter-dropdown"></div>
+                        <input type="hidden" name="department" id="inline_department_hidden" value="">
+                    </div>
+                </div>
+
+                <div class="inline-filter-group">
+                    <label>Request Type</label>
+                    <div class="filter-select-container">
+                        <div id="inline_request_type_chips_container" class="filter-chips-container"></div>
+                        <input type="text" id="inline_request_type_search" class="filter-search-input" placeholder="Search request types..." autocomplete="off">
+                        <div id="inline_request_type_dropdown" class="filter-dropdown"></div>
+                        <input type="hidden" name="request_type" id="inline_request_type_hidden" value="">
+                    </div>
+                </div>
+
+                <div class="inline-filter-group">
+                    <label>Company Name</label>
+                    <div class="filter-select-container">
+                        <div id="inline_company_chips_container" class="filter-chips-container"></div>
+                        <input type="text" id="inline_company_search" class="filter-search-input" placeholder="Search companies..." autocomplete="off">
+                        <div id="inline_company_dropdown" class="filter-dropdown"></div>
+                        <input type="hidden" name="company" id="inline_company_hidden" value="">
+                    </div>
+                    <small class="form-text text-muted">Only available for approved requests</small>
+                </div>
+
+                <div class="inline-filter-group">
+                    <label>Branch Name</label>
+                    <div class="filter-select-container">
+                        <div id="inline_branch_chips_container" class="filter-chips-container"></div>
+                        <input type="text" id="inline_branch_search" class="filter-search-input" placeholder="Search branches..." autocomplete="off">
+                        <div id="inline_branch_dropdown" class="filter-dropdown"></div>
+                        <input type="hidden" name="branch" id="inline_branch_hidden" value="">
+                    </div>
+                </div>
+
+                <div class="inline-filter-group">
+                    <label>Status</label>
+                    <div class="filter-select-container">
+                        <div id="inline_status_chips_container" class="filter-chips-container"></div>
+                        <input type="text" id="inline_status_search" class="filter-search-input" placeholder="Search statuses..." autocomplete="off">
+                        <div id="inline_status_dropdown" class="filter-dropdown"></div>
+                        <input type="hidden" name="status" id="inline_status_hidden" value="">
+                    </div>
+                </div>
+
+                <div class="inline-filter-group">
+                    <label>Payment Type</label>
+                    <div class="filter-select-container">
+                        <div id="inline_payment_type_chips_container" class="filter-chips-container"></div>
+                        <input type="text" id="inline_payment_type_search" class="filter-search-input" placeholder="Search payment types..." autocomplete="off">
+                        <div id="inline_payment_type_dropdown" class="filter-dropdown"></div>
+                        <input type="hidden" name="payment_type" id="inline_payment_type_hidden" value="">
+                    </div>
+                </div>
+
+                <div class="inline-filter-group">
+                    <label>Payment Method</label>
+                    <div class="filter-select-container">
+                        <div id="inline_payment_method_chips_container" class="filter-chips-container"></div>
+                        <input type="text" id="inline_payment_method_search" class="filter-search-input" placeholder="Search payment methods..." autocomplete="off">
+                        <div id="inline_payment_method_dropdown" class="filter-dropdown"></div>
+                        <input type="hidden" name="payment_method" id="inline_payment_method_hidden" value="">
+                    </div>
+                </div>
+
+                <div class="inline-filter-group">
+                    <label>Date Range</label>
+                    <div class="date-range-inputs">
+                        <input type="date" name="date_from" id="inline_date_from" value="{{ request.args.get('date_from', '') }}" placeholder="From">
+                        <span>to</span>
+                        <input type="date" name="date_to" id="inline_date_to" value="{{ request.args.get('date_to', '') }}" placeholder="To">
+                    </div>
+                </div>
+            </div>
+            <div class="inline-filters-actions">
+                <button type="button" class="btn btn-primary" onclick="applyInlineFilters()">
+                    <i class="fas fa-search"></i> Apply Filters
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="clearAllFilters()">
+                    <i class="fas fa-redo"></i> Clear All
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Advanced Filters Button -->
+    <div style="margin-bottom: 20px;">
+        <button type="button" class="filters-btn" onclick="openFilterPanel()">
+            <i class="fas fa-filter"></i>
+            Advanced Filters
+        </button>
     </div>
 
     <div class="stats-grid">
@@ -1102,8 +1477,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Also hide any global loader that might be stuck
     hideGlobalLoader();
     
-    // Make entire checkbox option clickable
-    document.querySelectorAll('.checkbox-option').forEach(option => {
+    // Make entire checkbox option clickable (for both side panel and inline filters)
+    document.querySelectorAll('.checkbox-option, .checkbox-option-inline').forEach(option => {
         option.addEventListener('click', function(e) {
             // Don't toggle if clicking directly on the checkbox (to avoid double-toggle)
             if (e.target.tagName !== 'INPUT') {
@@ -1112,8 +1487,31 @@ document.addEventListener('DOMContentLoaded', function() {
                     checkbox.checked = !checkbox.checked;
                     // Trigger change event for any listeners
                     checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                    // Sync between side panel and inline filters
+                    syncCheckboxes(checkbox);
                 }
             }
+        });
+    });
+    
+    // Sync checkboxes between side panel and inline filters when changed
+    function syncCheckboxes(changedCheckbox) {
+        const name = changedCheckbox.name;
+        const value = changedCheckbox.value;
+        const isChecked = changedCheckbox.checked;
+        
+        // Find all checkboxes with the same name and value
+        document.querySelectorAll(`input[type="checkbox"][name="${name}"][value="${value}"]`).forEach(cb => {
+            if (cb !== changedCheckbox) {
+                cb.checked = isChecked;
+            }
+        });
+    }
+    
+    // Add change listeners to sync checkboxes
+    document.querySelectorAll('input[type="checkbox"][name="department"], input[type="checkbox"][name="status"], input[type="checkbox"][name="payment_type"], input[type="checkbox"][name="payment_method"]').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            syncCheckboxes(this);
         });
     });
 });
@@ -1132,132 +1530,140 @@ document.addEventListener('mousemove', function() {
     lastMouseMove = Date.now();
 });
 
-// Update request types when department checkboxes change (handle multiple selections)
-document.addEventListener('DOMContentLoaded', function() {
-    const departmentGroup = document.getElementById('department-group');
-    if (departmentGroup) {
-        const departmentCheckboxes = departmentGroup.querySelectorAll('input[type="checkbox"][name="department"]');
-        const requestTypeGroup = document.getElementById('request_type-group');
-        
-        if (!requestTypeGroup) return;
-        
-        function updateRequestTypes() {
-            // Get selected departments
-            const selectedDepartments = Array.from(departmentCheckboxes)
-                .filter(cb => cb.checked)
-                .map(cb => cb.value);
-            
-            // Get currently selected request types to preserve them
-            const currentRequestTypes = Array.from(requestTypeGroup.querySelectorAll('input[type="checkbox"]'))
-                .filter(cb => cb.checked)
-                .map(cb => cb.value);
-            
-            // Clear existing checkboxes
-            requestTypeGroup.innerHTML = '';
-            
-            // If no departments selected, show all request types
-            if (selectedDepartments.length === 0) {
-                // Fetch all request types
-                fetch('/api/request-types')
-                    .then(response => response.json())
-                    .then(data => {
-                        data.request_types.forEach((requestType, index) => {
-                            const optionDiv = document.createElement('div');
-                            optionDiv.className = 'checkbox-option';
-                            
-                            const checkbox = document.createElement('input');
-                            checkbox.type = 'checkbox';
-                            checkbox.name = 'request_type';
-                            checkbox.id = `rt_${index}`;
-                            checkbox.value = requestType;
-                            // Preserve checked state if it was previously selected
-                            if (currentRequestTypes.includes(requestType)) {
-                                checkbox.checked = true;
-                            }
-                            
-                            const label = document.createElement('label');
-                            label.htmlFor = `rt_${index}`;
-                            label.textContent = requestType;
-                            
-                            optionDiv.appendChild(checkbox);
-                            optionDiv.appendChild(label);
-                            requestTypeGroup.appendChild(optionDiv);
-                            
-                            // Make the entire option clickable
-                            optionDiv.addEventListener('click', function(e) {
-                                if (e.target.tagName !== 'INPUT') {
-                                    checkbox.checked = !checkbox.checked;
-                                    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-                                }
-                            });
-                        });
-                    })
-                    .catch(error => {
-                        console.error('Error fetching request types:', error);
+// Update request types when departments change (for checkboxes in side panel)
+function updateRequestTypesForDepartments() {
+    const requestTypeGroup = document.getElementById('request_type-group');
+    if (!requestTypeGroup) return;
+    
+    // Get selected departments from checkboxes
+    const selectedDeptValues = Array.from(document.querySelectorAll('input[type="checkbox"][name="department"]:checked'))
+        .map(cb => cb.value);
+    
+    // Get currently selected request types to preserve them
+    const currentRequestTypes = Array.from(requestTypeGroup.querySelectorAll('input[type="checkbox"]:checked'))
+        .map(cb => cb.value);
+    
+    // Clear existing checkboxes
+    requestTypeGroup.innerHTML = '';
+    
+    // If no departments selected, show all request types
+    if (selectedDeptValues.length === 0) {
+        fetch('/api/request-types')
+            .then(response => response.json())
+            .then(data => {
+                data.request_types.forEach((requestType, index) => {
+                    const optionDiv = document.createElement('div');
+                    optionDiv.className = 'checkbox-option';
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.name = 'request_type';
+                    checkbox.id = `rt_${index}`;
+                    checkbox.value = requestType;
+                    // Preserve checked state if it was previously selected
+                    if (currentRequestTypes.includes(requestType)) {
+                        checkbox.checked = true;
+                    }
+                    
+                    const label = document.createElement('label');
+                    label.htmlFor = `rt_${index}`;
+                    label.textContent = requestType;
+                    
+                    optionDiv.appendChild(checkbox);
+                    optionDiv.appendChild(label);
+                    requestTypeGroup.appendChild(optionDiv);
+                    
+                    // Make the entire option clickable
+                    optionDiv.addEventListener('click', function(e) {
+                        if (e.target.tagName !== 'INPUT') {
+                            checkbox.checked = !checkbox.checked;
+                            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
                     });
-            } else {
-                // Fetch request types for all selected departments
-                const promises = selectedDepartments.map(dept => 
-                    fetch(`/api/request-types?department=${encodeURIComponent(dept)}`)
-                        .then(response => response.json())
-                );
+                    
+                    // Add change listener to update chips
+                    checkbox.addEventListener('change', function() {
+                        updateChipsFromCheckboxes('request_type', 'request_type_chips_container');
+                    });
+                });
                 
-                Promise.all(promises)
-                    .then(results => {
-                        // Combine and deduplicate request types
-                        const allRequestTypes = new Set();
-                        results.forEach(data => {
-                            data.request_types.forEach(rt => allRequestTypes.add(rt));
-                        });
-                        
-                        // Sort and add checkboxes
-                        Array.from(allRequestTypes).sort().forEach((requestType, index) => {
-                            const optionDiv = document.createElement('div');
-                            optionDiv.className = 'checkbox-option';
-                            
-                            const checkbox = document.createElement('input');
-                            checkbox.type = 'checkbox';
-                            checkbox.name = 'request_type';
-                            checkbox.id = `rt_${index}`;
-                            checkbox.value = requestType;
-                            // Preserve checked state if it was previously selected
-                            if (currentRequestTypes.includes(requestType)) {
-                                checkbox.checked = true;
-                            }
-                            
-                            const label = document.createElement('label');
-                            label.htmlFor = `rt_${index}`;
-                            label.textContent = requestType;
-                            
-                            optionDiv.appendChild(checkbox);
-                            optionDiv.appendChild(label);
-                            requestTypeGroup.appendChild(optionDiv);
-                            
-                            // Make the entire option clickable
-                            optionDiv.addEventListener('click', function(e) {
-                                if (e.target.tagName !== 'INPUT') {
-                                    checkbox.checked = !checkbox.checked;
-                                    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-                                }
-                            });
-                        });
-                    })
-                    .catch(error => {
-                        console.error('Error fetching request types:', error);
+                // Update chips after rebuilding
+                updateChipsFromCheckboxes('request_type', 'request_type_chips_container');
+            })
+            .catch(error => console.error('Error fetching request types:', error));
+    } else {
+        // Fetch request types for all selected departments
+        const promises = selectedDeptValues.map(dept => 
+            fetch(`/api/request-types?department=${encodeURIComponent(dept)}`)
+                .then(response => response.json())
+        );
+        
+        Promise.all(promises)
+            .then(results => {
+                // Combine and deduplicate request types
+                const allRequestTypes = new Set();
+                results.forEach(data => {
+                    data.request_types.forEach(rt => allRequestTypes.add(rt));
+                });
+                
+                // Sort and add checkboxes
+                Array.from(allRequestTypes).sort().forEach((requestType, index) => {
+                    const optionDiv = document.createElement('div');
+                    optionDiv.className = 'checkbox-option';
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.name = 'request_type';
+                    checkbox.id = `rt_${index}`;
+                    checkbox.value = requestType;
+                    // Preserve checked state if it was previously selected
+                    if (currentRequestTypes.includes(requestType)) {
+                        checkbox.checked = true;
+                    }
+                    
+                    const label = document.createElement('label');
+                    label.htmlFor = `rt_${index}`;
+                    label.textContent = requestType;
+                    
+                    optionDiv.appendChild(checkbox);
+                    optionDiv.appendChild(label);
+                    requestTypeGroup.appendChild(optionDiv);
+                    
+                    // Make the entire option clickable
+                    optionDiv.addEventListener('click', function(e) {
+                        if (e.target.tagName !== 'INPUT') {
+                            checkbox.checked = !checkbox.checked;
+                            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
                     });
-            }
-        }
-        
-        // Add change listeners to all department checkboxes
-        departmentCheckboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', updateRequestTypes);
+                    
+                    // Add change listener to update chips
+                    checkbox.addEventListener('change', function() {
+                        updateChipsFromCheckboxes('request_type', 'request_type_chips_container');
+                    });
+                });
+                
+                // Update chips after rebuilding
+                updateChipsFromCheckboxes('request_type', 'request_type_chips_container');
+            })
+            .catch(error => console.error('Error fetching request types:', error));
+    }
+}
+
+// Monitor department checkbox changes to update request types
+document.addEventListener('DOMContentLoaded', function() {
+    // Add change listeners to all department checkboxes
+    document.querySelectorAll('input[type="checkbox"][name="department"]').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            updateRequestTypesForDepartments();
         });
-        
-        // Initialize request types on page load if departments are already selected
-        const hasSelectedDepartments = Array.from(departmentCheckboxes).some(cb => cb.checked);
-        if (hasSelectedDepartments) {
-            updateRequestTypes();
-        }
+    });
+    
+    // Initialize request types on page load if departments are already selected
+    const hasSelectedDepartments = Array.from(document.querySelectorAll('input[type="checkbox"][name="department"]'))
+        .some(cb => cb.checked);
+    if (hasSelectedDepartments) {
+        updateRequestTypesForDepartments();
     }
 });
 
@@ -1305,6 +1711,647 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// Initialize filter dropdown with chips (reusable function)
+function initializeFilterDropdown(config) {
+    const { 
+        searchInputId, 
+        dropdownId, 
+        chipsContainerId, 
+        hiddenInputId, 
+        options, 
+        selectedValues,
+        placeholder = "Search..."
+    } = config;
+    
+    const searchInput = document.getElementById(searchInputId);
+    const dropdown = document.getElementById(dropdownId);
+    const chipsContainer = document.getElementById(chipsContainerId);
+    const hiddenInput = document.getElementById(hiddenInputId);
+    
+    if (!searchInput || !dropdown || !chipsContainer || !hiddenInput) return;
+    
+    let selectedItems = [];
+    let clickingOnOption = false;
+    let blurTimeout = null;
+    
+    // Initialize with selected values from URL
+    if (selectedValues && selectedValues.length > 0) {
+        selectedValues.forEach(value => {
+            const option = options.find(opt => opt.value === value);
+            if (option) {
+                selectedItems.push({ value: option.value, text: option.text });
+            }
+        });
+        updateChips();
+    }
+    
+    // Function to update chips display
+    function updateChips() {
+        chipsContainer.innerHTML = '';
+        selectedItems.forEach((item, index) => {
+            const chip = document.createElement('div');
+            chip.className = 'filter-chip';
+            chip.innerHTML = `
+                <span>${item.text}</span>
+                <button type="button" class="remove-chip" onclick="removeFilterChip('${config.filterName}', ${index})" title="Remove">×</button>
+            `;
+            chipsContainer.appendChild(chip);
+        });
+        
+        // Update hidden input - we'll handle multiple values in form submission
+        updateHiddenInput();
+    }
+    
+    // Update hidden input for form submission
+    function updateHiddenInput() {
+        // Clear existing hidden inputs with this name (except the main one)
+        const container = hiddenInput.parentNode;
+        const existingInputs = container.querySelectorAll(`input[type="hidden"][name="${config.filterName}"]`);
+        existingInputs.forEach(input => {
+            if (input !== hiddenInput) input.remove();
+        });
+        
+        // Create multiple hidden inputs for each selected value
+        selectedItems.forEach((item, index) => {
+            if (index === 0) {
+                hiddenInput.value = item.value;
+            } else {
+                const newInput = document.createElement('input');
+                newInput.type = 'hidden';
+                newInput.name = config.filterName;
+                newInput.value = item.value;
+                container.insertBefore(newInput, hiddenInput.nextSibling);
+            }
+        });
+        
+        if (selectedItems.length === 0) {
+            hiddenInput.value = '';
+        }
+        
+        // Trigger request type update if this is a department filter
+        if (config.filterName === 'department' && typeof updateRequestTypesForDepartments === 'function') {
+            setTimeout(updateRequestTypesForDepartments, 100);
+        }
+    }
+    
+    // Store remove function globally
+    if (!window.filterChipRemovers) window.filterChipRemovers = {};
+    window.filterChipRemovers[config.filterName] = function(index) {
+        selectedItems.splice(index, 1);
+        updateChips();
+        updateDropdownSelection();
+    };
+    
+    // Function to update dropdown to show selected items
+    function updateDropdownSelection() {
+        const optionDivs = dropdown.querySelectorAll('.filter-option');
+        optionDivs.forEach(optionDiv => {
+            const value = optionDiv.getAttribute('data-value');
+            const isSelected = selectedItems.some(item => item.value === value);
+            if (isSelected) {
+                optionDiv.classList.add('selected');
+            } else {
+                optionDiv.classList.remove('selected');
+            }
+        });
+    }
+    
+    // Build dropdown from options
+    function buildDropdown(opts = options) {
+        dropdown.innerHTML = '';
+        opts.forEach(option => {
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'filter-option';
+            optionDiv.textContent = option.text;
+            optionDiv.setAttribute('data-value', option.value);
+            
+            let optionHandled = false;
+            let optionTimeout = null;
+            
+            // Function to handle option selection with debouncing
+            function handleOptionSelection(e) {
+                if (optionHandled) {
+                    return;
+                }
+                
+                e.preventDefault();
+                e.stopPropagation();
+                clickingOnOption = true;
+                optionHandled = true;
+                selectOption(option.value, option.text);
+                
+                // Clear any existing timeout
+                if (optionTimeout) {
+                    clearTimeout(optionTimeout);
+                }
+                
+                // Reset flag after a delay to allow for soft touches
+                optionTimeout = setTimeout(() => {
+                    optionHandled = false;
+                }, 400);
+            }
+            
+            // Use mousedown for better trackpad support (fires before blur)
+            // This works for both mouse and most trackpad interactions
+            optionDiv.addEventListener('mousedown', handleOptionSelection, { passive: false });
+            
+            // Support for touch devices and trackpads (soft touches)
+            optionDiv.addEventListener('touchstart', handleOptionSelection, { passive: false });
+            
+            // Pointer events for better cross-device support (including soft trackpad touches)
+            optionDiv.addEventListener('pointerdown', function(e) {
+                // Handle all pointer types, including soft touches
+                handleOptionSelection(e);
+            }, { passive: false });
+            
+            // Mouseup as additional fallback for soft trackpad touches
+            // Some soft touches might not trigger mousedown but will trigger mouseup
+            optionDiv.addEventListener('mouseup', function(e) {
+                // Only handle if mousedown didn't already handle it
+                setTimeout(() => {
+                    if (!optionHandled) {
+                        handleOptionSelection(e);
+                    }
+                }, 10);
+            }, { passive: false });
+            
+            // Touchend as fallback for soft touches
+            optionDiv.addEventListener('touchend', function(e) {
+                // Only handle if touchstart didn't already handle it
+                setTimeout(() => {
+                    if (!optionHandled) {
+                        handleOptionSelection(e);
+                    }
+                }, 10);
+            }, { passive: false });
+            
+            // Keep click as final fallback for accessibility and edge cases
+            optionDiv.addEventListener('click', function(e) {
+                // Only handle if no other event handled it
+                setTimeout(() => {
+                    if (!optionHandled && !clickingOnOption) {
+                        handleOptionSelection(e);
+                    }
+                }, 50);
+            }, { passive: false });
+            
+            dropdown.appendChild(optionDiv);
+        });
+        
+        updateDropdownSelection();
+    }
+    
+    // Function to rebuild dropdown with new options
+    function rebuildDropdown(newOptions) {
+        options = newOptions;
+        buildDropdown(newOptions);
+    }
+    
+    function selectOption(value, text) {
+        // Clear any pending blur timeout
+        if (blurTimeout) {
+            clearTimeout(blurTimeout);
+            blurTimeout = null;
+        }
+        
+        // Check if already selected - toggle behavior
+        const existingIndex = selectedItems.findIndex(item => item.value === value);
+        if (existingIndex !== -1) {
+            // Item already selected, remove it
+            selectedItems.splice(existingIndex, 1);
+            updateChips();
+            updateDropdownSelection();
+            
+            // Clear search input but keep dropdown open so user can continue selecting
+            searchInput.value = '';
+            dropdown.style.display = 'block';
+            // Re-focus after a small delay to ensure it works with soft touches
+            setTimeout(() => {
+                searchInput.focus();
+            }, 50);
+            
+            // Reset flag after a delay to allow for soft trackpad touches
+            setTimeout(() => {
+                clickingOnOption = false;
+            }, 200);
+            return;
+        }
+        
+        // Add to selected items
+        selectedItems.push({ value: value, text: text });
+        updateChips();
+        updateDropdownSelection();
+        
+        // Clear search input but keep dropdown open so user can continue selecting
+        searchInput.value = '';
+        dropdown.style.display = 'block';
+        // Re-focus after a small delay to ensure it works with soft touches
+        setTimeout(() => {
+            searchInput.focus();
+        }, 50);
+        
+        // Reset flag after a delay to allow for soft trackpad touches
+        setTimeout(() => {
+            clickingOnOption = false;
+        }, 200);
+    }
+    
+    function filterOptions(searchTerm) {
+        const optionDivs = dropdown.querySelectorAll('.filter-option');
+        let hasVisible = false;
+        
+        optionDivs.forEach(optionDiv => {
+            const text = optionDiv.textContent.toLowerCase();
+            const matches = text.includes(searchTerm.toLowerCase());
+            if (matches) {
+                optionDiv.classList.remove('hidden');
+                hasVisible = true;
+            } else {
+                optionDiv.classList.add('hidden');
+            }
+        });
+        
+        dropdown.style.display = hasVisible ? 'block' : 'none';
+    }
+    
+    // Event listeners
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.trim();
+        if (searchTerm.length > 0) {
+            filterOptions(searchTerm);
+        } else {
+            dropdown.querySelectorAll('.filter-option').forEach(opt => opt.classList.remove('hidden'));
+            dropdown.style.display = 'block';
+        }
+    });
+    
+    searchInput.addEventListener('focus', function() {
+        if (this.value.trim() === '') {
+            dropdown.style.display = 'block';
+        } else {
+            filterOptions(this.value.trim());
+        }
+    });
+    
+    searchInput.addEventListener('blur', function() {
+        // Delay hiding to allow clicks on options (especially for soft trackpad touches)
+        // Clear any existing timeout first
+        if (blurTimeout) {
+            clearTimeout(blurTimeout);
+        }
+        blurTimeout = setTimeout(() => {
+            // Only hide if not clicking on an option
+            // Give extra time for soft touches that might have delayed event firing
+            if (!clickingOnOption) {
+                dropdown.style.display = 'none';
+            }
+            blurTimeout = null;
+        }, 300); // Increased timeout for better soft trackpad support
+    });
+    
+    // Also prevent blur on mousedown/touchstart on dropdown options
+    dropdown.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+    });
+    
+    dropdown.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+    });
+    
+    dropdown.addEventListener('pointerdown', function(e) {
+        e.preventDefault();
+    });
+    
+    // Close dropdown when clicking outside (but not on chips)
+    document.addEventListener('click', function(e) {
+        const chipsContainer = document.getElementById(config.chipsContainerId);
+        if (!searchInput.contains(e.target) && 
+            !dropdown.contains(e.target) && 
+            !(chipsContainer && chipsContainer.contains(e.target))) {
+            dropdown.style.display = 'none';
+        }
+    });
+    
+    // Also handle touch events for better mobile/trackpad support
+    document.addEventListener('touchend', function(e) {
+        const chipsContainer = document.getElementById(config.chipsContainerId);
+        if (!searchInput.contains(e.target) && 
+            !dropdown.contains(e.target) && 
+            !(chipsContainer && chipsContainer.contains(e.target))) {
+            dropdown.style.display = 'none';
+        }
+    });
+    
+    // Initialize
+    buildDropdown();
+    
+    // Return the selectedItems array for external access
+    return {
+        getSelectedItems: () => selectedItems,
+        setSelectedItems: (items) => {
+            selectedItems = items;
+            updateChips();
+            updateDropdownSelection();
+        },
+        rebuildDropdown: rebuildDropdown,
+        updateChips: updateChips,
+        updateDropdownSelection: updateDropdownSelection
+    };
+}
+
+// Global function to remove filter chips
+function removeFilterChip(filterName, index) {
+    if (window.filterChipRemovers && window.filterChipRemovers[filterName]) {
+        window.filterChipRemovers[filterName](index);
+    }
+}
+
+// Initialize all filter dropdowns on page load
+// Function to update chips from checkboxes (for side panel)
+function updateChipsFromCheckboxes(filterName, chipsContainerId) {
+    const chipsContainer = document.getElementById(chipsContainerId);
+    if (!chipsContainer) return;
+    
+    // Get all checked checkboxes with this name
+    const checkboxes = document.querySelectorAll(`input[type="checkbox"][name="${filterName}"]:checked`);
+    const selectedItems = Array.from(checkboxes).map(cb => ({
+        value: cb.value,
+        text: cb.nextElementSibling ? cb.nextElementSibling.textContent.trim() : cb.value
+    }));
+    
+    // Update chips display
+    chipsContainer.innerHTML = '';
+    selectedItems.forEach((item, index) => {
+        const chip = document.createElement('div');
+        chip.className = 'filter-chip';
+        chip.innerHTML = `
+            <span>${item.text}</span>
+            <button type="button" class="remove-chip" onclick="removeFilterChipFromCheckbox('${filterName}', '${item.value.replace(/'/g, "\\'")}')" title="Remove">×</button>
+        `;
+        chipsContainer.appendChild(chip);
+    });
+}
+
+// Function to remove chip and uncheck corresponding checkbox
+function removeFilterChipFromCheckbox(filterName, value) {
+    const checkbox = document.querySelector(`input[type="checkbox"][name="${filterName}"][value="${value}"]`);
+    if (checkbox) {
+        checkbox.checked = false;
+        // Trigger change event to update chips
+        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+}
+
+// Initialize chips for side panel checkboxes
+document.addEventListener('DOMContentLoaded', function() {
+    // Update chips for all filter types in side panel
+    const filterConfigs = [
+        { name: 'department', chipsId: 'department_chips_container' },
+        { name: 'request_type', chipsId: 'request_type_chips_container' },
+        { name: 'company', chipsId: 'company_chips_container' },
+        { name: 'branch', chipsId: 'branch_chips_container' },
+        { name: 'payment_type', chipsId: 'payment_type_chips_container' },
+        { name: 'payment_method', chipsId: 'payment_method_chips_container' },
+        { name: 'status', chipsId: 'status_chips_container' }
+    ];
+    
+    // Initialize chips on page load
+    filterConfigs.forEach(config => {
+        updateChipsFromCheckboxes(config.name, config.chipsId);
+        
+        // Add change listeners to all checkboxes
+        document.querySelectorAll(`input[type="checkbox"][name="${config.name}"]`).forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                updateChipsFromCheckboxes(config.name, config.chipsId);
+            });
+        });
+    });
+    
+    // Global search for filters in side panel
+    const globalSearchInput = document.getElementById('filter-global-search');
+    if (globalSearchInput) {
+        globalSearchInput.addEventListener('input', function() {
+            filterAllFilters(this.value);
+        });
+        
+        // Clear search when panel closes
+        const filterPanel = document.getElementById('filter-panel');
+        if (filterPanel) {
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.attributeName === 'class') {
+                        if (!filterPanel.classList.contains('open')) {
+                            globalSearchInput.value = '';
+                            filterAllFilters('');
+                        }
+                    }
+                });
+            });
+            observer.observe(filterPanel, { attributes: true });
+        }
+    }
+    
+    // Function to filter all filters based on search term
+    function filterAllFilters(searchTerm) {
+        const searchLower = searchTerm.toLowerCase().trim();
+        
+        // If search is empty, show all filters
+        if (searchLower === '') {
+            document.querySelectorAll('.filter-panel-body .form-group').forEach(group => {
+                // Skip the search bar group itself
+                if (group.querySelector('#filter-global-search')) {
+                    return;
+                }
+                group.style.display = '';
+            });
+            document.querySelectorAll('.filter-panel-body .checkbox-option, .filter-panel-body .payment-method-option').forEach(option => {
+                option.style.display = '';
+            });
+            return;
+        }
+        
+        // Hide all form groups first
+        document.querySelectorAll('.filter-panel-body .form-group').forEach(group => {
+            const label = group.querySelector('label');
+            // Skip the search bar group itself
+            if (group.querySelector('#filter-global-search')) {
+                return;
+            }
+            group.style.display = 'none';
+        });
+        
+        // Search through all checkbox options and payment method options
+        let hasMatches = false;
+        
+        document.querySelectorAll('.filter-panel-body .checkbox-option, .filter-panel-body .payment-method-option').forEach(option => {
+            const label = option.querySelector('label');
+            const checkbox = option.querySelector('input[type="checkbox"]');
+            const text = label ? label.textContent.toLowerCase() : '';
+            const value = checkbox ? checkbox.value.toLowerCase() : '';
+            
+            const matches = text.includes(searchLower) || value.includes(searchLower);
+            
+            if (matches) {
+                option.style.display = '';
+                hasMatches = true;
+                
+                // Show the parent form group
+                let formGroup = option.closest('.form-group');
+                if (formGroup) {
+                    formGroup.style.display = '';
+                }
+            } else {
+                option.style.display = 'none';
+            }
+        });
+        
+        // If no matches found, show a message
+        const filterPanelBody = document.querySelector('.filter-panel-body');
+        let noResultsMsg = document.getElementById('no-filter-results');
+        if (!hasMatches && searchLower !== '') {
+            if (!noResultsMsg) {
+                noResultsMsg = document.createElement('div');
+                noResultsMsg.id = 'no-filter-results';
+                noResultsMsg.className = 'form-group';
+                noResultsMsg.style.padding = '20px';
+                noResultsMsg.style.textAlign = 'center';
+                noResultsMsg.style.color = '#6c757d';
+                filterPanelBody.appendChild(noResultsMsg);
+            }
+            noResultsMsg.innerHTML = '<i class="fas fa-search"></i> No filters found matching "' + searchTerm + '"';
+            noResultsMsg.style.display = '';
+        } else if (noResultsMsg) {
+            noResultsMsg.style.display = 'none';
+        }
+    }
+    
+    // Inline filters initialization
+    const departments = [
+        {% for dept in departments %}
+        { value: '{{ dept }}', text: '{{ dept }}' }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    const selectedDepartments = {{ request.args.getlist('department') | tojson }};
+    initializeFilterDropdown({
+        searchInputId: 'inline_department_search',
+        dropdownId: 'inline_department_dropdown',
+        chipsContainerId: 'inline_department_chips_container',
+        hiddenInputId: 'inline_department_hidden',
+        options: departments,
+        selectedValues: selectedDepartments,
+        filterName: 'department',
+        placeholder: 'Search departments...'
+    });
+    
+    const requestTypes = [
+        {% for rt in request_types %}
+        { value: '{{ rt }}', text: '{{ rt }}' }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    const selectedRequestTypes = {{ request.args.getlist('request_type') | tojson }};
+    initializeFilterDropdown({
+        searchInputId: 'inline_request_type_search',
+        dropdownId: 'inline_request_type_dropdown',
+        chipsContainerId: 'inline_request_type_chips_container',
+        hiddenInputId: 'inline_request_type_hidden',
+        options: requestTypes,
+        selectedValues: selectedRequestTypes,
+        filterName: 'request_type',
+        placeholder: 'Search request types...'
+    });
+    
+    const companies = [
+        {% for company in companies %}
+        { value: '{{ company }}', text: '{{ company }}' }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    const selectedCompanies = {{ request.args.getlist('company') | tojson }};
+    initializeFilterDropdown({
+        searchInputId: 'inline_company_search',
+        dropdownId: 'inline_company_dropdown',
+        chipsContainerId: 'inline_company_chips_container',
+        hiddenInputId: 'inline_company_hidden',
+        options: companies,
+        selectedValues: selectedCompanies,
+        filterName: 'company',
+        placeholder: 'Search companies...'
+    });
+    
+    const branches = [
+        {% for branch in branches %}
+        { value: '{{ branch.name }}', text: '{{ branch.name }}' }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    const selectedBranches = {{ request.args.getlist('branch') | tojson }};
+    initializeFilterDropdown({
+        searchInputId: 'inline_branch_search',
+        dropdownId: 'inline_branch_dropdown',
+        chipsContainerId: 'inline_branch_chips_container',
+        hiddenInputId: 'inline_branch_hidden',
+        options: branches,
+        selectedValues: selectedBranches,
+        filterName: 'branch',
+        placeholder: 'Search branches...'
+    });
+    
+    const statuses = [
+        { value: 'All Pending', text: 'All Pending' },
+        { value: 'Pending Manager Approval', text: 'Pending Manager Approval' },
+        { value: 'Pending Finance Approval', text: 'Pending Finance Approval' },
+        { value: 'Returned to Manager', text: 'Returned to Manager' },
+        { value: 'Rejected by Manager', text: 'Rejected by Manager' },
+        { value: 'Proof Pending', text: 'Proof Pending' },
+        { value: 'Proof Sent', text: 'Proof Sent' },
+        { value: 'Proof Rejected', text: 'Proof Rejected' },
+        { value: 'Recurring', text: 'Recurring' },
+        { value: 'Completed', text: 'Completed' }
+    ];
+    const selectedStatuses = {{ request.args.getlist('status') | tojson }};
+    initializeFilterDropdown({
+        searchInputId: 'inline_status_search',
+        dropdownId: 'inline_status_dropdown',
+        chipsContainerId: 'inline_status_chips_container',
+        hiddenInputId: 'inline_status_hidden',
+        options: statuses,
+        selectedValues: selectedStatuses,
+        filterName: 'status',
+        placeholder: 'Search statuses...'
+    });
+    
+    const paymentTypes = [
+        { value: 'One-Time', text: 'One-Time' },
+        { value: 'Scheduled One-Time', text: 'Scheduled One-Time' },
+        { value: 'Recurring', text: 'Recurring' }
+    ];
+    const selectedPaymentTypes = {{ request.args.getlist('payment_type') | tojson }};
+    initializeFilterDropdown({
+        searchInputId: 'inline_payment_type_search',
+        dropdownId: 'inline_payment_type_dropdown',
+        chipsContainerId: 'inline_payment_type_chips_container',
+        hiddenInputId: 'inline_payment_type_hidden',
+        options: paymentTypes,
+        selectedValues: selectedPaymentTypes,
+        filterName: 'payment_type',
+        placeholder: 'Search payment types...'
+    });
+    
+    const paymentMethods = [
+        { value: 'Card', text: 'Card' },
+        { value: 'Cheque', text: 'Cheque' }
+    ];
+    const selectedPaymentMethods = {{ request.args.getlist('payment_method') | tojson }};
+    initializeFilterDropdown({
+        searchInputId: 'inline_payment_method_search',
+        dropdownId: 'inline_payment_method_dropdown',
+        chipsContainerId: 'inline_payment_method_chips_container',
+        hiddenInputId: 'inline_payment_method_hidden',
+        options: paymentMethods,
+        selectedValues: selectedPaymentMethods,
+        filterName: 'payment_method',
+        placeholder: 'Search payment methods...'
+    });
+});
+
 // Filter Panel Functions
 function openFilterPanel() {
     const panel = document.getElementById('filter-panel');
@@ -1328,12 +2375,89 @@ function closeFilterPanel() {
 
 function applyFilters() {
     const form = document.getElementById('filter-form');
+    const inlineForm = document.getElementById('inline-filter-form');
+    
+    if (form) {
+        // Reset to page 1 when applying filters
+        const url = new URL(form.action, window.location.origin);
+        
+        // Collect filters from both forms
+        const filterData = {
+            department: [],
+            request_type: [],
+            company: [],
+            branch: [],
+            status: [],
+            payment_type: [],
+            payment_method: [],
+            date_from: '',
+            date_to: ''
+        };
+        
+        // Get filters from advanced filters form (side panel)
+        const formData = new FormData(form);
+        for (const [key, value] of formData.entries()) {
+            if (value) {
+                if (['department', 'request_type', 'company', 'branch', 'status', 'payment_type', 'payment_method'].includes(key)) {
+                    if (!filterData[key].includes(value)) {
+                        filterData[key].push(value);
+                    }
+                } else if (key === 'date_from' || key === 'date_to') {
+                    filterData[key] = value;
+                }
+            }
+        }
+        
+        // Get filters from inline quick filters form and combine
+        if (inlineForm) {
+            const inlineFormData = new FormData(inlineForm);
+            for (const [key, value] of inlineFormData.entries()) {
+                if (value) {
+                    if (['department', 'request_type', 'company', 'branch', 'status', 'payment_type', 'payment_method'].includes(key)) {
+                        if (!filterData[key].includes(value)) {
+                            filterData[key].push(value);
+                        }
+                    } else if (key === 'date_from' || key === 'date_to') {
+                        // Use inline filter date if advanced filter doesn't have one, otherwise prefer advanced filter
+                        if (!filterData[key]) {
+                            filterData[key] = value;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Build URL with combined filters
+        const multiSelectFields = ['department', 'request_type', 'company', 'branch', 'status', 'payment_type', 'payment_method'];
+        
+        for (const key of multiSelectFields) {
+            url.searchParams.delete(key);
+            filterData[key].forEach(value => {
+                url.searchParams.append(key, value);
+            });
+        }
+        
+        // Add date filters
+        if (filterData.date_from) {
+            url.searchParams.set('date_from', filterData.date_from);
+        }
+        if (filterData.date_to) {
+            url.searchParams.set('date_to', filterData.date_to);
+        }
+        
+        url.searchParams.set('page', '1');
+        window.location.href = url.toString();
+    }
+}
+
+function applyInlineFilters() {
+    const form = document.getElementById('inline-filter-form');
     if (form) {
         // Reset to page 1 when applying filters
         const url = new URL(form.action, window.location.origin);
         const formData = new FormData(form);
         
-        // Handle multiple values for multi-select fields
+        // Handle multiple values for multi-select fields (from hidden inputs)
         const multiSelectFields = ['department', 'request_type', 'company', 'branch', 'status', 'payment_type', 'payment_method'];
         const processedKeys = new Set();
         
@@ -1404,4 +2528,5 @@ function togglePaymentMethod(event, value) {
 }
 </script>
 {% endblock %}
+
 

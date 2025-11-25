@@ -41,6 +41,54 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="bank_name">Bank Name</label>
+                    <select name="bank_name" id="bank_name" class="form-control">
+                        <option value="">-- Select Bank (Optional) --</option>
+                        <option value="Bank Dhofar" {% if option.bank_name == 'Bank Dhofar' %}selected{% endif %}>Bank Dhofar</option>
+                        <option value="Bank Muscat" {% if option.bank_name == 'Bank Muscat' %}selected{% endif %}>Bank Muscat</option>
+                        <option value="National Bank of Oman" {% if option.bank_name == 'National Bank of Oman' %}selected{% endif %}>National Bank of Oman</option>
+                        <option value="Oman Arab Bank" {% if option.bank_name == 'Oman Arab Bank' %}selected{% endif %}>Oman Arab Bank</option>
+                        <option value="Bank Sohar" {% if option.bank_name == 'Bank Sohar' %}selected{% endif %}>Bank Sohar</option>
+                        <option value="HSBC Bank Oman" {% if option.bank_name == 'HSBC Bank Oman' %}selected{% endif %}>HSBC Bank Oman</option>
+                        <option value="Ahli Bank" {% if option.bank_name == 'Ahli Bank' %}selected{% endif %}>Ahli Bank</option>
+                        <option value="Oman Development Bank" {% if option.bank_name == 'Oman Development Bank' %}selected{% endif %}>Oman Development Bank</option>
+                        <option value="Oman Housing Bank" {% if option.bank_name == 'Oman Housing Bank' %}selected{% endif %}>Oman Housing Bank</option>
+                        <option value="Meethaq Islamic Banking (Bank Dhofar)" {% if option.bank_name == 'Meethaq Islamic Banking (Bank Dhofar)' %}selected{% endif %}>Meethaq Islamic Banking (Bank Dhofar)</option>
+                        <option value="Meethaq Islamic Banking (Bank Muscat)" {% if option.bank_name == 'Meethaq Islamic Banking (Bank Muscat)' %}selected{% endif %}>Meethaq Islamic Banking (Bank Muscat)</option>
+                        <option value="Muzn Islamic Banking (National Bank of Oman)" {% if option.bank_name == 'Muzn Islamic Banking (National Bank of Oman)' %}selected{% endif %}>Muzn Islamic Banking (National Bank of Oman)</option>
+                        <option value="Al Hilal Islamic Banking (Ahli Bank)" {% if option.bank_name == 'Al Hilal Islamic Banking (Ahli Bank)' %}selected{% endif %}>Al Hilal Islamic Banking (Ahli Bank)</option>
+                        <option value="National Bank of Abu Dhabi" {% if option.bank_name == 'National Bank of Abu Dhabi' %}selected{% endif %}>National Bank of Abu Dhabi</option>
+                        <option value="Qatar National Bank" {% if option.bank_name == 'Qatar National Bank' %}selected{% endif %}>Qatar National Bank</option>
+                        <option value="Standard Chartered Bank" {% if option.bank_name == 'Standard Chartered Bank' %}selected{% endif %}>Standard Chartered Bank</option>
+                        <option value="Bank of Baroda" {% if option.bank_name == 'Bank of Baroda' %}selected{% endif %}>Bank of Baroda</option>
+                        <option value="Bank of Beirut" {% if option.bank_name == 'Bank of Beirut' %}selected{% endif %}>Bank of Beirut</option>
+                        <option value="State Bank of India" {% if option.bank_name == 'State Bank of India' %}selected{% endif %}>State Bank of India</option>
+                        <option value="Habib Bank AG Zurich" {% if option.bank_name == 'Habib Bank AG Zurich' %}selected{% endif %}>Habib Bank AG Zurich</option>
+                        <option value="Alizz Islamic Bank" {% if option.bank_name == 'Alizz Islamic Bank' %}selected{% endif %}>Alizz Islamic Bank</option>
+                        <option value="Sohar Islamic (Sohar Bank)" {% if option.bank_name == 'Sohar Islamic (Sohar Bank)' %}selected{% endif %}>Sohar Islamic (Sohar Bank)</option>
+                        <option value="Al Yusr Islamic Banking Services (Oman Arab Bank)" {% if option.bank_name == 'Al Yusr Islamic Banking Services (Oman Arab Bank)' %}selected{% endif %}>Al Yusr Islamic Banking Services (Oman Arab Bank)</option>
+                        <option value="Bank Nizwa" {% if option.bank_name == 'Bank Nizwa' %}selected{% endif %}>Bank Nizwa</option>
+                    </select>
+                    <small class="form-text text-muted">Optional: Bank name that will auto-populate in payment requests</small>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="account_name">Account Name</label>
+                        <input type="text" name="account_name" id="account_name" class="form-control" 
+                               value="{{ option.account_name or '' }}" placeholder="e.g., Company Name Account">
+                        <small class="form-text text-muted">Optional: Account name that will auto-populate in payment requests</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="account_number">Account Number</label>
+                        <input type="text" name="account_number" id="account_number" class="form-control" 
+                               value="{{ option.account_number or '' }}" placeholder="e.g., 1234567890" maxlength="16">
+                        <small class="form-text text-muted">Optional: Account number that will auto-populate in payment requests (numbers only, max 16 digits)</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
                     <div class="form-check">
                         <input type="checkbox" name="is_active" id="is_active" class="form-check-input" 
                                {% if option.is_active %}checked{% endif %}>

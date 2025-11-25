@@ -3730,9 +3730,9 @@ def procurement_item_requests():
             PaymentRequest.department == 'Procurement',
             PaymentRequest.request_type == 'Bank money',
             PaymentRequest.is_archived == False
-        ).all()
-        
-        # Calculate statistics
+            ).all()
+    
+    # Calculate statistics
         completed_requests_bm = [r for r in bank_money_requests if r.status == 'Completed']
         pending_requests_bm = [r for r in bank_money_requests if r.status in ['Pending Manager Approval', 'Pending Finance Approval', 'Proof Pending', 'Proof Sent']]
         completed_amount_bm = sum(float(r.amount) for r in completed_requests_bm)
@@ -7057,6 +7057,9 @@ def add_person_company_option():
         department = request.form.get('department', '').strip()
         request_type = request.form.get('request_type', '').strip()
         is_active = request.form.get('is_active') == 'on'
+        account_name = request.form.get('account_name', '').strip() or None
+        account_number = request.form.get('account_number', '').strip() or None
+        bank_name = request.form.get('bank_name', '').strip() or None
         
         if not name or not department or not request_type:
             flash('Name, department, and request type are required.', 'danger')
@@ -7079,6 +7082,9 @@ def add_person_company_option():
                 department=department,
                 request_type=request_type,
                 is_active=is_active,
+                account_name=account_name,
+                account_number=account_number,
+                bank_name=bank_name,
                 created_by_user_id=current_user.user_id
             )
             
@@ -7140,6 +7146,9 @@ def edit_person_company_option(option_id):
         department = request.form.get('department', '').strip()
         request_type = request.form.get('request_type', '').strip()
         is_active = request.form.get('is_active') == 'on'
+        account_name = request.form.get('account_name', '').strip() or None
+        account_number = request.form.get('account_number', '').strip() or None
+        bank_name = request.form.get('bank_name', '').strip() or None
         
         if not name or not department or not request_type:
             flash('Name, department, and request type are required.', 'danger')
@@ -7166,6 +7175,9 @@ def edit_person_company_option(option_id):
             option.department = department
             option.request_type = request_type
             option.is_active = is_active
+            option.account_name = account_name
+            option.account_number = account_number
+            option.bank_name = bank_name
             option.updated_at = datetime.utcnow()
             
             db.session.commit()
@@ -9898,7 +9910,7 @@ def edit_request(request_id):
     if req.status not in ['Pending Manager Approval', 'Returned to Manager', 'Pending Finance Approval']:
         flash('This request cannot be edited in its current status.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
-    
+
     # If status is "Pending Finance Approval" but user is not Finance Admin, deny access
     if req.status == 'Pending Finance Approval' and not is_finance_admin_edit:
         flash('This request cannot be edited in its current status.', 'error')
@@ -13136,12 +13148,21 @@ def api_person_company_options():
     
     if department and request_type:
         # Get options for specific department and request type
-        options = db.session.query(PersonCompanyOption.name).filter(
+        options_query = PersonCompanyOption.query.filter(
             PersonCompanyOption.department == department,
             PersonCompanyOption.request_type == request_type,
             PersonCompanyOption.is_active == True
         ).order_by(PersonCompanyOption.name).all()
-        options = [opt[0] for opt in options]
+        
+        # Return options with account details
+        options = []
+        for opt in options_query:
+            options.append({
+                'name': opt.name,
+                'account_name': opt.account_name,
+                'account_number': opt.account_number,
+                'bank_name': opt.bank_name
+            })
     else:
         options = []
     
@@ -15541,6 +15562,31 @@ if __name__ == '__main__':
                     print(f"✓ Added '{col_name}' column to procurement_item_requests table")
                 else:
                     print(f"✓ '{col_name}' column already exists in procurement_item_requests table")
+            
+            # Migrate: Add account_name and account_number columns to person_company_options table if they don't exist
+            cursor.execute("PRAGMA table_info(person_company_options)")
+            person_company_columns = [row[1] for row in cursor.fetchall()]
+            
+            if 'account_name' not in person_company_columns:
+                cursor.execute("ALTER TABLE person_company_options ADD COLUMN account_name VARCHAR(200)")
+                conn.commit()
+                print("✓ Added 'account_name' column to person_company_options table")
+            else:
+                print("✓ 'account_name' column already exists in person_company_options table")
+            
+            if 'account_number' not in person_company_columns:
+                cursor.execute("ALTER TABLE person_company_options ADD COLUMN account_number VARCHAR(50)")
+                conn.commit()
+                print("✓ Added 'account_number' column to person_company_options table")
+            else:
+                print("✓ 'account_number' column already exists in person_company_options table")
+            
+            if 'bank_name' not in person_company_columns:
+                cursor.execute("ALTER TABLE person_company_options ADD COLUMN bank_name VARCHAR(200)")
+                conn.commit()
+                print("✓ Added 'bank_name' column to person_company_options table")
+            else:
+                print("✓ 'bank_name' column already exists in person_company_options table")
             
             conn.close()
         except Exception as e:
