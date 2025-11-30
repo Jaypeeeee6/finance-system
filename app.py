@@ -3861,10 +3861,12 @@ def view_item_request(request_id):
                 can_approve_procurement_manager = True
                 can_reject_procurement_manager = True
     
-    # Completion: All procurement staff can complete when status is 'Assigned to Procurement' (GM and Operation Manager cannot complete)
+    # Completion: Only the assigned procurement staff can complete when status is 'Assigned to Procurement' (GM and Operation Manager cannot complete)
     if current_user.role not in ['GM', 'Operation Manager']:
         if item_request.status == 'Assigned to Procurement' and current_user.department == 'Procurement':
-            can_complete = True
+            # Only allow completion if the current user is the assigned user
+            if item_request.assigned_to_user_id and item_request.assigned_to_user_id == current_user.user_id:
+                can_complete = True
     
     # Get user names safely (avoid lazy loading issues)
     assigned_to_name = None
@@ -4087,10 +4089,12 @@ def view_item_request_page(request_id):
                 can_approve_procurement_manager = True
                 can_reject_procurement_manager = True
     
-    # Completion: All procurement staff can complete when status is 'Assigned to Procurement' (GM and Operation Manager cannot complete)
+    # Completion: Only the assigned procurement staff can complete when status is 'Assigned to Procurement' (GM and Operation Manager cannot complete)
     if current_user.role not in ['GM', 'Operation Manager']:
         if item_request.status == 'Assigned to Procurement' and current_user.department == 'Procurement':
-            can_complete = True
+            # Only allow completion if the current user is the assigned user
+            if item_request.assigned_to_user_id and item_request.assigned_to_user_id == current_user.user_id:
+                can_complete = True
     
     # Authorization for scheduling payment date (similar to payment requests)
     can_schedule_payment_date = False
@@ -4904,6 +4908,11 @@ def item_request_complete(request_id):
         flash('This request is not assigned to procurement.', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
+    # Check if the current user is the assigned user
+    if not item_request.assigned_to_user_id or item_request.assigned_to_user_id != current_user.user_id:
+        flash('Only the assigned procurement staff member can complete this request.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    
     completion_notes = request.form.get('completion_notes', '').strip()
     
     # Handle receipt file upload (required, allow multiple)
@@ -5051,8 +5060,8 @@ def bulk_assign_item_requests():
             skipped_count += 1
             continue
         
-        # Only assign if status is "Assigned to Procurement" (not assigned to anyone yet)
-        if item_request.status == 'Assigned to Procurement':
+        # Only assign if status is "Assigned to Procurement" and not already assigned to someone else
+        if item_request.status == 'Assigned to Procurement' and not item_request.assigned_to_user_id:
             item_request.assigned_to_user_id = current_user.user_id
             item_request.assigned_by_user_id = current_user.user_id
             item_request.assignment_date = current_time
@@ -5100,7 +5109,7 @@ def bulk_assign_item_requests():
     if assigned_count > 0:
         flash(f'Successfully assigned {assigned_count} request(s) to {current_user.name}.', 'success')
     if skipped_count > 0:
-        flash(f'Skipped {skipped_count} request(s) that are not in "Assigned to Procurement" status.', 'info')
+        flash(f'Skipped {skipped_count} request(s) that are not in "Assigned to Procurement" status or are already assigned to someone else.', 'info')
     
     return redirect(url_for('procurement_item_requests'))
 
