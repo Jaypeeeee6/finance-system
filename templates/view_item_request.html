@@ -852,30 +852,28 @@
                     <div class="card-body">
                         {% if receipt_files %}
                         <div class="form-group">
-                            <label>Upload Receipt</label>
-                            <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
-                                {% for file in receipt_files %}
-                                <li style="margin-bottom: 6px;">
-                                    <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-sm btn-outline-info">
-                                        <i class="fas fa-file"></i> {{ file }}
-                                    </a>
-                                </li>
-                                {% endfor %}
-                            </ul>
+                            <label><i class="fas fa-check-circle"></i> Receipt (Proof of transfer made by the Procurement Manager)</label>
+                            {% for file in receipt_files %}
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
+                                    <i class="fas fa-download"></i> View Receipt {{ loop.index }}
+                                </a>
+                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                            </div>
+                            {% endfor %}
                         </div>
                         {% endif %}
                         {% if invoice_files %}
                         <div class="form-group">
-                            <label>Upload Invoice</label>
-                            <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
-                                {% for file in invoice_files %}
-                                <li style="margin-bottom: 6px;">
-                                    <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-sm btn-outline-success">
-                                        <i class="fas fa-file-invoice"></i> {{ file }}
-                                    </a>
-                                </li>
-                                {% endfor %}
-                            </ul>
+                            <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
+                            {% for file in invoice_files %}
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
+                                    <i class="fas fa-download"></i> View Invoice {{ loop.index }}
+                                </a>
+                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                            </div>
+                            {% endfor %}
                         </div>
                         {% endif %}
                     </div>
@@ -973,30 +971,28 @@
                         {% endif %}
                         {% if receipt_files %}
                         <div class="form-group">
-                            <label>Upload Receipt</label>
-                            <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
-                                {% for file in receipt_files %}
-                                <li style="margin-bottom: 6px;">
-                                    <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-sm btn-outline-info">
-                                        <i class="fas fa-file"></i> {{ file }}
-                                    </a>
-                                </li>
-                                {% endfor %}
-                            </ul>
+                            <label><i class="fas fa-check-circle"></i> Receipt (Proof of transfer made by the Procurement Manager)</label>
+                            {% for file in receipt_files %}
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
+                                    <i class="fas fa-download"></i> View Receipt {{ loop.index }}
+                                </a>
+                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                            </div>
+                            {% endfor %}
                         </div>
                         {% endif %}
                         {% if invoice_files %}
                         <div class="form-group">
-                            <label>Upload Invoice</label>
-                            <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
-                                {% for file in invoice_files %}
-                                <li style="margin-bottom: 6px;">
-                                    <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-sm btn-outline-success">
-                                        <i class="fas fa-file-invoice"></i> {{ file }}
-                                    </a>
-                                </li>
-                                {% endfor %}
-                            </ul>
+                            <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
+                            {% for file in invoice_files %}
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
+                                    <i class="fas fa-download"></i> View Invoice {{ loop.index }}
+                                </a>
+                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                            </div>
+                            {% endfor %}
                         </div>
                         {% endif %}
                     </div>
@@ -1044,30 +1040,28 @@
                         {% endif %}
                         {% if receipt_files %}
                         <div class="form-group">
-                            <label>Upload Receipt</label>
-                            <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
-                                {% for file in receipt_files %}
-                                <li style="margin-bottom: 6px;">
-                                    <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-sm btn-outline-info">
-                                        <i class="fas fa-file"></i> {{ file }}
-                                    </a>
-                                </li>
-                                {% endfor %}
-                            </ul>
+                            <label><i class="fas fa-check-circle"></i> Receipt (Proof of transfer made by the Procurement Manager)</label>
+                            {% for file in receipt_files %}
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
+                                    <i class="fas fa-download"></i> View Receipt {{ loop.index }}
+                                </a>
+                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                            </div>
+                            {% endfor %}
                         </div>
                         {% endif %}
                         {% if invoice_files %}
                         <div class="form-group">
-                            <label>Upload Invoice</label>
-                            <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
-                                {% for file in invoice_files %}
-                                <li style="margin-bottom: 6px;">
-                                    <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-sm btn-outline-success">
-                                        <i class="fas fa-file-invoice"></i> {{ file }}
-                                    </a>
-                                </li>
-                                {% endfor %}
-                            </ul>
+                            <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
+                            {% for file in invoice_files %}
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
+                                    <i class="fas fa-download"></i> View Invoice {{ loop.index }}
+                                </a>
+                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                            </div>
+                            {% endfor %}
                         </div>
                         {% endif %}
                     </div>

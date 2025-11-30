@@ -5191,6 +5191,7 @@ def bulk_upload_item_files():
     # Update all selected requests
     updated_count = 0
     skipped_count = 0
+    not_assigned_count = 0
     
     for request_id in request_ids:
         item_request = ProcurementItemRequest.query.get(request_id)
@@ -5200,6 +5201,12 @@ def bulk_upload_item_files():
         
         # Only update if status is "Assigned to Procurement"
         if item_request.status == 'Assigned to Procurement':
+            # Check if current user is assigned to this request
+            if item_request.assigned_to_user_id != current_user.user_id:
+                not_assigned_count += 1
+                skipped_count += 1
+                continue
+            
             # Merge with existing files if any
             existing_receipts = []
             existing_invoices = []
@@ -5275,8 +5282,10 @@ def bulk_upload_item_files():
     
     if updated_count > 0:
         flash(f'Successfully uploaded files and marked {updated_count} request(s) as completed.', 'success')
-    if skipped_count > 0:
-        flash(f'Skipped {skipped_count} request(s) that are not in "Assigned to Procurement" status.', 'info')
+    if not_assigned_count > 0:
+        flash(f'Skipped {not_assigned_count} request(s) that are not assigned to you. You can only bulk upload requests assigned to you.', 'warning')
+    if skipped_count > not_assigned_count:
+        flash(f'Skipped {skipped_count - not_assigned_count} request(s) that are not in "Assigned to Procurement" status.', 'info')
     
     return redirect(url_for('procurement_item_requests'))
 
