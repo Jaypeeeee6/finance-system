@@ -53,9 +53,17 @@
                 
                 <!-- Hidden field to track if we need PIN validation -->
                 <input type="hidden" id="validate_credentials" name="validate_credentials" value="true">
+                
+                <!-- Hidden field for development testing bypass -->
+                <input type="hidden" id="bypass_pin" name="bypass_pin" value="false">
 
                 <button type="button" class="btn btn-primary btn-block" id="loginButton">
                     <i class="fas fa-sign-in-alt"></i> Login
+                </button>
+                
+                <!-- TEMPORARY: Development Testing Button - Bypasses PIN -->
+                <button type="button" class="btn btn-warning btn-block" id="testLoginButton" style="margin-top: 10px; background-color: #ffc107; border-color: #ffc107; color: #000; font-weight: bold;">
+                    Login for Testing (DEV ONLY - NO PIN REQUIRED)
                 </button>
             </form>
 
@@ -383,6 +391,24 @@
             validateCredentials(email, password);
         });
 
+        // Handle test login button (bypasses PIN)
+        const testLoginButton = document.getElementById('testLoginButton');
+        testLoginButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Validate email and password first
+            const email = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                alert('Please enter your email and password first.');
+                return;
+            }
+            
+            // Validate credentials and then submit with bypass flag
+            validateCredentialsForTesting(email, password);
+        });
+
         // Show PIN modal when Enter key is pressed in email or password fields
         document.getElementById('username').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
@@ -420,6 +446,45 @@
                 validateCredentials(email, password);
             }
         });
+
+        // Function to validate credentials for testing (bypasses PIN)
+        async function validateCredentialsForTesting(email, password) {
+            // Show loading state
+            testLoginButton.disabled = true;
+            testLoginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+            
+            try {
+                const response = await fetch('{{ url_for("validate_credentials") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: email,
+                        password: password
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Set bypass flag and submit form directly
+                    document.getElementById('bypass_pin').value = 'true';
+                    hiddenPinField.value = ''; // Clear PIN field
+                    loginForm.submit();
+                } else {
+                    // Reset button
+                    testLoginButton.disabled = false;
+                    testLoginButton.innerHTML = 'Login for Testing (DEV ONLY - NO PIN REQUIRED)';
+                    alert(data.message || 'Invalid email or password.');
+                }
+            } catch (error) {
+                // Reset button
+                testLoginButton.disabled = false;
+                testLoginButton.innerHTML = '<i class="fas fa-flask"></i> Login for Testing (DEV ONLY - NO PIN REQUIRED)';
+                alert('An error occurred. Please try again.');
+            }
+        }
 
         // Function to validate credentials with server before showing PIN modal
         async function validateCredentials(email, password) {

@@ -2607,9 +2607,10 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         pin = request.form.get('pin')
+        bypass_pin = request.form.get('bypass_pin') == 'true'  # Development testing bypass
         
         # Debug logging
-        app.logger.info(f"Login attempt: username={username}, pin_provided={bool(pin)}")
+        app.logger.info(f"Login attempt: username={username}, pin_provided={bool(pin)}, bypass_pin={bypass_pin}")
         
         user = User.query.filter_by(username=username).first()
         
@@ -2624,6 +2625,29 @@ def login():
         
         # Verify password and temporary PIN
         if user and user.check_password(password):
+            # Development testing bypass - skip PIN verification
+            if bypass_pin:
+                app.logger.warning(f"⚠️ DEVELOPMENT MODE: PIN bypassed for {username} - THIS SHOULD NOT BE IN PRODUCTION!")
+                # Reset failed login attempts on successful login
+                user.reset_failed_login()
+                login_user(user, remember=False)  # Session-only: expires when browser closes
+                # Set activity timestamp and session start time (session is non-permanent, expires on browser close)
+                # Generate unique tab session ID for tab-specific session tracking
+                try:
+                    session.permanent = False  # Session cookie expires when browser closes
+                    now_ts = datetime.utcnow().timestamp()
+                    session['last_activity'] = now_ts
+                    session['session_start'] = now_ts  # Track when this session started
+                    # Generate unique tab session ID
+                    tab_session_id = f"{random.randint(100000, 999999)}{now_ts}{random.randint(100000, 999999)}"
+                    session['tab_session_id'] = tab_session_id
+                except Exception:
+                    pass
+                app.logger.warning(f"⚠️ User {username} logged in via DEVELOPMENT TESTING MODE (PIN bypassed)")
+                log_action(f"⚠️ DEVELOPMENT: User {username} logged in successfully (PIN bypassed via testing button)")
+                flash(f'⚠️ DEVELOPMENT MODE: Welcome back, {user.name}! (PIN bypassed)', 'warning')
+                return redirect(url_for('dashboard'))
+            
             # Special case: IT system account and test admin bypass PIN requirement
             if username in ['it@system.local', 'testadmin@maagroup.om']:
                 app.logger.info(f"System account bypass triggered for {username}")
