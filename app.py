@@ -12735,9 +12735,9 @@ def reports():
         status_conditions = []
         for status in status_filter:
             if status == 'All Pending':
-            # Show both pending statuses
+                # Show both pending statuses
                 status_conditions.append(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
-        else:
+            else:
                 status_conditions.append(PaymentRequest.status == status)
         if status_conditions:
             query = query.filter(db.or_(*status_conditions))
@@ -12754,7 +12754,7 @@ def reports():
         for rt in request_type_filter:
             if rt == 'Others':
                 request_type_conditions.append(PaymentRequest.request_type.like('Others%'))
-        else:
+            else:
                 request_type_conditions.append(PaymentRequest.request_type == rt)
         if request_type_conditions:
             query = query.filter(db.or_(*request_type_conditions))
@@ -12772,31 +12772,31 @@ def reports():
         all_branch_conditions = []
         for branch_name in branch_filter:
             selected_branch = Branch.query.filter_by(name=branch_name).first()
-        if selected_branch:
-            alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
-            names = [selected_branch.name] + alias_names
-            # Build OR conditions to match if any name appears in the comma-separated branch_name
-            conditions = []
-            for name in names:
-                # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
-                conditions.append(PaymentRequest.branch_name == name)  # Exact match
-                conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
-                conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
-                conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
-                conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
-                conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
+            if selected_branch:
+                alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
+                names = [selected_branch.name] + alias_names
+                # Build OR conditions to match if any name appears in the comma-separated branch_name
+                conditions = []
+                for name in names:
+                    # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
+                    conditions.append(PaymentRequest.branch_name == name)  # Exact match
+                    conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
+                    conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
+                    conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
+                    conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
+                    conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
                 all_branch_conditions.append(db.or_(*conditions))
-        else:
-            # For non-alias branches, check if branch name appears in comma-separated list
-            conditions = [
-                PaymentRequest.branch_name == branch_name,  # Exact match
-                PaymentRequest.branch_name.like(f'{branch_name},%'),  # At start
-                PaymentRequest.branch_name.like(f'%, {branch_name}'),  # At end (with space)
-                PaymentRequest.branch_name.like(f'%,{branch_name}'),  # At end (no space)
-                PaymentRequest.branch_name.like(f'%, {branch_name},%'),  # In middle (with spaces)
-                PaymentRequest.branch_name.like(f'%,{branch_name},%')  # In middle (no spaces)
-            ]
-            all_branch_conditions.append(db.or_(*conditions))
+            else:
+                # For non-alias branches, check if branch name appears in comma-separated list
+                conditions = [
+                    PaymentRequest.branch_name == branch_name,  # Exact match
+                    PaymentRequest.branch_name.like(f'{branch_name},%'),  # At start
+                    PaymentRequest.branch_name.like(f'%, {branch_name}'),  # At end (with space)
+                    PaymentRequest.branch_name.like(f'%,{branch_name}'),  # At end (no space)
+                    PaymentRequest.branch_name.like(f'%, {branch_name},%'),  # In middle (with spaces)
+                    PaymentRequest.branch_name.like(f'%,{branch_name},%')  # In middle (no spaces)
+                ]
+                all_branch_conditions.append(db.or_(*conditions))
         if all_branch_conditions:
             query = query.filter(db.or_(*all_branch_conditions))
     # Payment type filter (handle multiple values)
@@ -12850,14 +12850,9 @@ def reports():
     completed_count = len([r for r in all_filtered_requests if r.status == 'Completed'])
     pending_count = len([r for r in all_filtered_requests if r.status in ['Pending Manager Approval', 'Pending Finance Approval']])
     
-    # Calculate total amount - handle IT Staff/Department Manager special case
-    if current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT'):
-        it_requests = [r for r in all_filtered_requests if r.department == 'IT']
-        total_amount = sum(float(r.amount) for r in it_requests) if it_requests else 0
-        it_amount = total_amount
-    else:
-        total_amount = sum(float(r.amount) for r in all_filtered_requests)
-        it_amount = None
+    # Calculate total amount
+    total_amount = sum(float(r.amount) for r in all_filtered_requests)
+    it_amount = None
     
     # Paginate the query for display with the same ordering
     pagination = query.order_by(
@@ -13229,7 +13224,7 @@ def export_reports_excel():
         for status in status_filter:
             if status == 'All Pending':
                 status_conditions.append(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
-        else:
+            else:
                 status_conditions.append(PaymentRequest.status == status)
         if status_conditions:
             query = query.filter(db.or_(*status_conditions))
@@ -13246,7 +13241,7 @@ def export_reports_excel():
         for rt in request_type_filter:
             if rt == 'Others':
                 request_type_conditions.append(PaymentRequest.request_type.like('Others%'))
-        else:
+            else:
                 request_type_conditions.append(PaymentRequest.request_type == rt)
         if request_type_conditions:
             query = query.filter(db.or_(*request_type_conditions))
@@ -13263,31 +13258,31 @@ def export_reports_excel():
         all_branch_conditions = []
         for branch_name in branch_filter:
             selected_branch = Branch.query.filter_by(name=branch_name).first()
-        if selected_branch:
-            alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
-            names = [selected_branch.name] + alias_names
-            # Build OR conditions to match if any name appears in the comma-separated branch_name
-            conditions = []
-            for name in names:
-                # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
-                conditions.append(PaymentRequest.branch_name == name)  # Exact match
-                conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
-                conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
-                conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
-                conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
-                conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
+            if selected_branch:
+                alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
+                names = [selected_branch.name] + alias_names
+                # Build OR conditions to match if any name appears in the comma-separated branch_name
+                conditions = []
+                for name in names:
+                    # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
+                    conditions.append(PaymentRequest.branch_name == name)  # Exact match
+                    conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
+                    conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
+                    conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
+                    conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
+                    conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
                 all_branch_conditions.append(db.or_(*conditions))
-        else:
-            # For non-alias branches, check if branch name appears in comma-separated list
-            conditions = [
-                PaymentRequest.branch_name == branch_name,  # Exact match
-                PaymentRequest.branch_name.like(f'{branch_name},%'),  # At start
-                PaymentRequest.branch_name.like(f'%, {branch_name}'),  # At end (with space)
-                PaymentRequest.branch_name.like(f'%,{branch_name}'),  # At end (no space)
-                PaymentRequest.branch_name.like(f'%, {branch_name},%'),  # In middle (with spaces)
-                PaymentRequest.branch_name.like(f'%,{branch_name},%')  # In middle (no spaces)
-            ]
-            all_branch_conditions.append(db.or_(*conditions))
+            else:
+                # For non-alias branches, check if branch name appears in comma-separated list
+                conditions = [
+                    PaymentRequest.branch_name == branch_name,  # Exact match
+                    PaymentRequest.branch_name.like(f'{branch_name},%'),  # At start
+                    PaymentRequest.branch_name.like(f'%, {branch_name}'),  # At end (with space)
+                    PaymentRequest.branch_name.like(f'%,{branch_name}'),  # At end (no space)
+                    PaymentRequest.branch_name.like(f'%, {branch_name},%'),  # In middle (with spaces)
+                    PaymentRequest.branch_name.like(f'%,{branch_name},%')  # In middle (no spaces)
+                ]
+                all_branch_conditions.append(db.or_(*conditions))
         if all_branch_conditions:
             query = query.filter(db.or_(*all_branch_conditions))
     if payment_type_filter:
@@ -13683,7 +13678,7 @@ def export_reports_pdf():
         for status in status_filter:
             if status == 'All Pending':
                 status_conditions.append(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
-        else:
+            else:
                 status_conditions.append(PaymentRequest.status == status)
         if status_conditions:
             query = query.filter(db.or_(*status_conditions))
@@ -13700,7 +13695,7 @@ def export_reports_pdf():
         for rt in request_type_filter:
             if rt == 'Others':
                 request_type_conditions.append(PaymentRequest.request_type.like('Others%'))
-        else:
+            else:
                 request_type_conditions.append(PaymentRequest.request_type == rt)
         if request_type_conditions:
             query = query.filter(db.or_(*request_type_conditions))
@@ -13717,31 +13712,31 @@ def export_reports_pdf():
         all_branch_conditions = []
         for branch_name in branch_filter:
             selected_branch = Branch.query.filter_by(name=branch_name).first()
-        if selected_branch:
-            alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
-            names = [selected_branch.name] + alias_names
-            # Build OR conditions to match if any name appears in the comma-separated branch_name
-            conditions = []
-            for name in names:
-                # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
-                conditions.append(PaymentRequest.branch_name == name)  # Exact match
-                conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
-                conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
-                conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
-                conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
-                conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
+            if selected_branch:
+                alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
+                names = [selected_branch.name] + alias_names
+                # Build OR conditions to match if any name appears in the comma-separated branch_name
+                conditions = []
+                for name in names:
+                    # Match exact, at start (with comma after), at end (with comma before), or in middle (with commas around)
+                    conditions.append(PaymentRequest.branch_name == name)  # Exact match
+                    conditions.append(PaymentRequest.branch_name.like(f'{name},%'))  # At start
+                    conditions.append(PaymentRequest.branch_name.like(f'%, {name}'))  # At end (with space after comma)
+                    conditions.append(PaymentRequest.branch_name.like(f'%,{name}'))  # At end (no space)
+                    conditions.append(PaymentRequest.branch_name.like(f'%, {name},%'))  # In middle (with spaces)
+                    conditions.append(PaymentRequest.branch_name.like(f'%,{name},%'))  # In middle (no spaces)
                 all_branch_conditions.append(db.or_(*conditions))
-        else:
-            # For non-alias branches, check if branch name appears in comma-separated list
-            conditions = [
-                PaymentRequest.branch_name == branch_name,  # Exact match
-                PaymentRequest.branch_name.like(f'{branch_name},%'),  # At start
-                PaymentRequest.branch_name.like(f'%, {branch_name}'),  # At end (with space)
-                PaymentRequest.branch_name.like(f'%,{branch_name}'),  # At end (no space)
-                PaymentRequest.branch_name.like(f'%, {branch_name},%'),  # In middle (with spaces)
-                PaymentRequest.branch_name.like(f'%,{branch_name},%')  # In middle (no spaces)
-            ]
-            all_branch_conditions.append(db.or_(*conditions))
+            else:
+                # For non-alias branches, check if branch name appears in comma-separated list
+                conditions = [
+                    PaymentRequest.branch_name == branch_name,  # Exact match
+                    PaymentRequest.branch_name.like(f'{branch_name},%'),  # At start
+                    PaymentRequest.branch_name.like(f'%, {branch_name}'),  # At end (with space)
+                    PaymentRequest.branch_name.like(f'%,{branch_name}'),  # At end (no space)
+                    PaymentRequest.branch_name.like(f'%, {branch_name},%'),  # In middle (with spaces)
+                    PaymentRequest.branch_name.like(f'%,{branch_name},%')  # In middle (no spaces)
+                ]
+                all_branch_conditions.append(db.or_(*conditions))
         if all_branch_conditions:
             query = query.filter(db.or_(*all_branch_conditions))
     

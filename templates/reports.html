@@ -993,16 +993,7 @@
                 <i class="fas fa-money-bill-wave"></i>
             </div>
             <div class="stat-info">
-                {% if user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT') %}
-                    {% if it_amount is not none and it_amount > 0 %}
-                        <h3>OMR {{ it_amount|format_currency }}</h3>
-                        <small style="color: #666;">(IT Department Only)</small>
-                    {% else %}
-                        <h3 style="color: #999;">OMR 0.000</h3>
-                    {% endif %}
-                {% else %}
-                    <h3>OMR {{ total_amount|format_currency }}</h3>
-                {% endif %}
+                <h3>OMR {{ total_amount|format_currency }}</h3>
                 <p>Total Amount</p>
             </div>
         </div>
@@ -1125,11 +1116,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if (user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and req.department != 'IT' %}
-                                        <span style="color: #999;">***</span>
-                                    {% else %}
-                                        OMR {{ "%.3f"|format(req.amount) }}
-                                    {% endif %}
+                                    OMR {{ "%.3f"|format(req.amount) }}
                                 </td>
                                 <td>
                                     {% if req.status == 'Approved' %}

@@ -221,11 +221,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if req.department != 'IT' %}
-                                            <span style="color: #999;">***</span>
-                                        {% else %}
-                                            OMR {{ "%.3f"|format(req.amount) }}
-                                        {% endif %}
+                                        OMR {{ "%.3f"|format(req.amount) }}
                                     </td>
                                 <td>
                                     {% if req.status == 'Approved' %}
