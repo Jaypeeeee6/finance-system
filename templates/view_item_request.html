@@ -759,7 +759,7 @@
                             <form method="POST" action="{{ url_for('item_request_procurement_manager_decision', request_id=item_request.id) }}">
                                 <div class="form-group">
                                     <label for="item_procurement_approval_status">Set Status *</label>
-                                    <select name="approval_status" id="item_procurement_approval_status" required onchange="toggleItemProcurementManagerApprovalFields()">
+                                    <select name="approval_status" id="item_procurement_approval_status" required onchange="toggleItemProcurementManagerApprovalFields()" data-item-status="{{ item_request.status }}">
                                         <option value="">-- Select Status --</option>
                                         <option value="approve">Approve</option>
                                         <option value="reject">Reject</option>
@@ -768,7 +768,7 @@
                                 </div>
                                 
                                 <div id="item_procurement_approve_fields" style="display: none;">
-                                    <div class="form-group">
+                                    <div class="form-group" id="procurement_amount_group">
                                         <label for="procurement_amount">Amount (OMR) *</label>
                                         <div style="position: relative;">
                                             <span style="position: absolute; left: 12px; top: 12px; color: #666; font-weight: 600;">OMR</span>
@@ -1109,11 +1109,14 @@ function toggleItemManagerApprovalFields() {
 // Toggle fields for Procurement Manager Approval based on status selection
 function toggleItemProcurementManagerApprovalFields() {
     const status = document.getElementById('item_procurement_approval_status').value;
+    const statusSelect = document.getElementById('item_procurement_approval_status');
+    const itemStatus = statusSelect ? statusSelect.getAttribute('data-item-status') : '';
     const approveFields = document.getElementById('item_procurement_approve_fields');
     const rejectFields = document.getElementById('item_procurement_reject_fields');
     const onHoldFields = document.getElementById('item_procurement_on_hold_fields');
     const rejectionReasonField = document.getElementById('procurement_rejection_reason');
     const amountField = document.getElementById('procurement_amount');
+    const amountGroup = document.getElementById('procurement_amount_group');
     
     // Hide all fields first and remove required attributes
     approveFields.style.display = 'none';
@@ -1129,8 +1132,23 @@ function toggleItemProcurementManagerApprovalFields() {
     // Show relevant fields based on selection and add required attributes
     if (status === 'approve') {
         approveFields.style.display = 'block';
-        if (amountField) {
-            amountField.setAttribute('required', 'required');
+        
+        // Hide Amount field if status is "Pending Procurement Manager Approval" and approval status is "approve"
+        if (itemStatus === 'Pending Procurement Manager Approval') {
+            if (amountGroup) {
+                amountGroup.style.display = 'none';
+            }
+            if (amountField) {
+                amountField.removeAttribute('required');
+            }
+        } else {
+            // Show Amount field for other statuses
+            if (amountGroup) {
+                amountGroup.style.display = 'block';
+            }
+            if (amountField) {
+                amountField.setAttribute('required', 'required');
+            }
         }
     } else if (status === 'reject') {
         rejectFields.style.display = 'block';

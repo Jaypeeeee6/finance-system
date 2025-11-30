@@ -3603,7 +3603,10 @@ def procurement_item_requests():
         base_query = base_query.filter(ProcurementItemRequest.is_urgent == False)
     
     # Get all procurement item requests (after applying search and filters)
-    all_requests = base_query.order_by(ProcurementItemRequest.created_at.desc()).all()
+    # Use eager loading to avoid N+1 queries when accessing assigned_to_user
+    all_requests = base_query.options(
+        db.joinedload(ProcurementItemRequest.assigned_to_user)
+    ).order_by(ProcurementItemRequest.created_at.desc()).all()
     
     # Filter requests based on user role (after database-level filters)
     if current_user.department == 'Procurement':
@@ -4621,51 +4624,57 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
     """Handler for procurement manager approval"""
     # Get and validate amount
     amount_str = request.form.get('amount', '').strip()
-    if not amount_str:
+    
+    # Amount is optional when status is "Pending Procurement Manager Approval"
+    amount = None
+    if amount_str:
+        try:
+            amount = float(amount_str)
+            if amount < 0:
+                flash('Amount cannot be negative.', 'danger')
+                return redirect(url_for('view_item_request_page', request_id=request_id))
+        except ValueError:
+            flash('Invalid amount format.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id))
+    elif item_request.status != 'Pending Procurement Manager Approval':
+        # Amount is required for other statuses (e.g., "On Hold")
         flash('Please enter an amount.', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
-    try:
-        amount = float(amount_str)
-        if amount < 0:
-            flash('Amount cannot be negative.', 'danger')
+    # Only perform balance check if amount is provided
+    if amount is not None:
+        # Calculate available balance to check if amount exceeds it
+        # Get completed payment requests (Bank money, Procurement department)
+        bank_money_requests = PaymentRequest.query.filter(
+            PaymentRequest.department == 'Procurement',
+            PaymentRequest.request_type == 'Bank money',
+            PaymentRequest.is_archived == False
+        ).all()
+        
+        completed_requests_bm = [r for r in bank_money_requests if r.status == 'Completed']
+        completed_amount_bm = sum(float(r.amount) for r in completed_requests_bm)
+        
+        # Get item requests with status "Assigned to Procurement" (excluding current request if it's already assigned)
+        assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
+        # Exclude current request if it's already in the assigned list
+        assigned_item_requests = [r for r in assigned_item_requests if r.id != request_id]
+        item_requests_amount = sum(float(r.amount) for r in assigned_item_requests if r.amount is not None)
+        
+        # Get completed item requests
+        completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+        completed_item_requests_amount = sum(float(r.amount) for r in completed_item_requests if r.amount is not None)
+        
+        # Calculate available balance
+        # Available Balance = Completed payment requests - Assigned item requests - Completed item requests
+        available_balance = completed_amount_bm - item_requests_amount - completed_item_requests_amount
+        
+        # Check and notify if balance is low
+        check_and_notify_low_balance(available_balance)
+        
+        # Check if amount exceeds available balance
+        if amount > available_balance:
+            flash(f'Insufficient balance. Available balance is OMR {available_balance:.3f}, but the requested amount is OMR {amount:.3f}. Please put the request on hold.', 'danger')
             return redirect(url_for('view_item_request_page', request_id=request_id))
-    except ValueError:
-        flash('Invalid amount format.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
-    
-    # Calculate available balance to check if amount exceeds it
-    # Get completed payment requests (Bank money, Procurement department)
-    bank_money_requests = PaymentRequest.query.filter(
-        PaymentRequest.department == 'Procurement',
-        PaymentRequest.request_type == 'Bank money',
-        PaymentRequest.is_archived == False
-    ).all()
-    
-    completed_requests_bm = [r for r in bank_money_requests if r.status == 'Completed']
-    completed_amount_bm = sum(float(r.amount) for r in completed_requests_bm)
-    
-    # Get item requests with status "Assigned to Procurement" (excluding current request if it's already assigned)
-    assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
-    # Exclude current request if it's already in the assigned list
-    assigned_item_requests = [r for r in assigned_item_requests if r.id != request_id]
-    item_requests_amount = sum(float(r.amount) for r in assigned_item_requests if r.amount is not None)
-    
-    # Get completed item requests
-    completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
-    completed_item_requests_amount = sum(float(r.amount) for r in completed_item_requests if r.amount is not None)
-    
-    # Calculate available balance
-    # Available Balance = Completed payment requests - Assigned item requests - Completed item requests
-    available_balance = completed_amount_bm - item_requests_amount - completed_item_requests_amount
-    
-    # Check and notify if balance is low
-    check_and_notify_low_balance(available_balance)
-    
-    # Check if amount exceeds available balance
-    if amount > available_balance:
-        flash(f'Insufficient balance. Available balance is OMR {available_balance:.3f}, but the requested amount is OMR {amount:.3f}. Please put the request on hold.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
     
     current_time = datetime.utcnow()
     
@@ -4675,7 +4684,9 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
     item_request.procurement_manager_approver = current_user.name
     item_request.procurement_manager_approver_user_id = current_user.user_id
     item_request.procurement_manager_approval_reason = request.form.get('approval_reason', '').strip()
-    item_request.amount = amount
+    # Only update amount if it was provided
+    if amount is not None:
+        item_request.amount = amount
     # Don't set assigned_to_user_id - let any procurement staff member complete it
     item_request.assigned_by_user_id = current_user.user_id
     item_request.assignment_date = current_time
@@ -4698,10 +4709,11 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
     # Notify all procurement staff members
     procurement_staff = User.query.filter_by(department='Procurement').all()
     for staff_member in procurement_staff:
+        amount_text = f"OMR {amount:.3f}" if amount is not None else "Amount not specified"
         create_notification(
             user_id=staff_member.user_id,
             title="New Item Request Available",
-            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} is now available for processing. Amount: OMR {amount:.3f}",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} is now available for processing. Amount: {amount_text}",
             notification_type="item_request_assigned",
             item_request_id=request_id
         )
@@ -5069,33 +5081,48 @@ def bulk_assign_item_requests():
             
             assigned_count += 1
             
-            # Get authorized persons for notifications
-            authorized_users = []
+            # Get authorized persons for notifications - use a set to avoid duplicates
+            authorized_user_ids = set()
             
             # Add requestor
             if item_request.user_id:
-                authorized_users.append(item_request.user_id)
+                authorized_user_ids.add(item_request.user_id)
             
             # Add manager approver
             if item_request.manager_approver_user_id:
-                authorized_users.append(item_request.manager_approver_user_id)
+                authorized_user_ids.add(item_request.manager_approver_user_id)
             
             # Add procurement manager approver
             if item_request.procurement_manager_approver_user_id:
-                authorized_users.append(item_request.procurement_manager_approver_user_id)
+                authorized_user_ids.add(item_request.procurement_manager_approver_user_id)
             
             # Add all procurement staff (they should know about assignments)
             procurement_staff = User.query.filter_by(department='Procurement').all()
             for staff in procurement_staff:
-                if staff.user_id not in authorized_users:
-                    authorized_users.append(staff.user_id)
+                authorized_user_ids.add(staff.user_id)
             
-            # Send notifications to all authorized users
-            for user_id in authorized_users:
+            # Get all authorized approvers for this item request (includes GM, Operation Manager, etc.)
+            authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
+            for approver in authorized_approvers:
+                authorized_user_ids.add(approver.user_id)
+            
+            # ALWAYS add General Manager (GM) - regardless of requestor
+            gm_users = User.query.filter_by(role='GM').all()
+            for gm_user in gm_users:
+                authorized_user_ids.add(gm_user.user_id)
+            
+            # ALWAYS add Operation Manager - regardless of requestor
+            op_manager_users = User.query.filter_by(role='Operation Manager').all()
+            for op_manager in op_manager_users:
+                authorized_user_ids.add(op_manager.user_id)
+            
+            # Send notifications to all authorized users with the same notification
+            notification_message = f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been assigned to {current_user.name} by {current_user.name}."
+            for user_id in authorized_user_ids:
                 create_notification(
                     user_id=user_id,
                     title="Item Request Assigned",
-                    message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been assigned to {current_user.name} by {current_user.name}.",
+                    message=notification_message,
                     notification_type="item_request_assigned",
                     item_request_id=request_id
                 )
