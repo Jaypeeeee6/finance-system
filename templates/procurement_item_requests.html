@@ -176,7 +176,6 @@
                             <th>Requestor</th>
                             <th class="department-column">Department</th>
                             <th>Item Name</th>
-                            <th>Quantity</th>
                             <th>Branch</th>
                             <th>Amount</th>
                             <th>Status</th>
@@ -214,20 +213,7 @@
                                     {% for item in item_list %}
                                         {% set item_trimmed = item.strip() %}
                                         {% if item_trimmed %}
-                                            <span class="filter-pill" style="margin-right: 4px; margin-bottom: 4px; display: inline-block;">{{ item_trimmed }}</span>
-                                        {% endif %}
-                                    {% endfor %}
-                                {% else %}
-                                    <span style="color: #999;">-</span>
-                                {% endif %}
-                            </td>
-                            <td style="padding: 4px 8px !important; line-height: 1.4 !important; vertical-align: middle !important;">
-                                {% if req.quantity %}
-                                    {% set quantity_list = req.quantity.split(';') %}
-                                    {% for qty in quantity_list %}
-                                        {% set qty_trimmed = qty.strip() %}
-                                        {% if qty_trimmed %}
-                                            {{ qty_trimmed }}{% if not loop.last %}<br>{% endif %}
+                                            <span class="filter-pill item-chip" style="margin-bottom: 4px; display: block;">{{ item_trimmed }}</span>
                                         {% endif %}
                                     {% endfor %}
                                 {% else %}
@@ -240,7 +226,7 @@
                                     {% for branch in branch_list %}
                                         {% set branch_trimmed = branch.strip() %}
                                         {% if branch_trimmed %}
-                                            <span class="branch-chip" style="margin-right: 4px; margin-bottom: 4px;">{{ branch_trimmed }}</span>
+                                            <span class="branch-chip" style="margin-bottom: 4px; display: block;">{{ branch_trimmed }}</span>
                                         {% endif %}
                                     {% endfor %}
                                 {% else %}
@@ -976,9 +962,10 @@ document.addEventListener('DOMContentLoaded', function() {
         font-weight: 500;
     }
     
-    /* Branch name chips - separate styling with tighter padding */
+    /* Branch name chips - separate styling with tighter padding, display in separate rows */
     .branch-chip {
-        display: inline-block;
+        display: block;
+        width: fit-content;
         padding: 6px 10px;
         background: #000;
         color: white;
@@ -988,17 +975,17 @@ document.addEventListener('DOMContentLoaded', function() {
         white-space: nowrap;
     }
     
+    /* Item name chips - display in separate rows */
+    .filter-pill.item-chip {
+        display: block !important;
+        width: fit-content;
+    }
+    
     /* Adjust column widths for Item Name and Quantity */
     .data-table th:nth-child(4),
     .data-table td:nth-child(4) {
         width: 10%;
         max-width: 10%;
-    }
-    
-    .data-table th:nth-child(5),
-    .data-table td:nth-child(5) {
-        width: 14%;
-        max-width: 14%;
     }
     
     /* Reduce Department column width slightly */
