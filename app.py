@@ -2923,7 +2923,7 @@ def dashboard():
         return redirect(url_for('operation_dashboard'))
     elif role == 'Procurement Staff':
         return redirect(url_for('procurement_dashboard'))
-    elif role in ['HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 
+    elif role in ['HR Staff', 'PR Staff', 'Auditing Staff', 
                   'Customer Service Staff', 'Marketing Staff', 'Operation Staff', 
                   'Quality Control Staff', 'Research and Development Staff', 
                   'Office Staff', 'Maintenance Staff', 'Logistic Staff']:
@@ -2943,7 +2943,7 @@ def dashboard():
 @login_required
 @role_required(
     # Department-specific Staff roles (excluding Finance Staff, Project Staff, IT Staff, and Procurement Staff who have their own dashboards)
-    'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff',
+    'HR Staff', 'PR Staff', 'Auditing Staff',
     'Customer Service Staff', 'Marketing Staff', 'Operation Staff', 'Quality Control Staff',
     'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Logistic Staff',
     # Other roles that can access this dashboard
@@ -14464,7 +14464,7 @@ def debug_requests():
 
 @app.route('/notifications')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def notifications():
     """View all notifications based on RBAC permissions with pagination"""
     page = request.args.get('page', 1, type=int)
@@ -14480,7 +14480,7 @@ def notifications():
 
 @app.route('/notifications/mark_read/<int:notification_id>')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def mark_notification_read(notification_id):
     """Mark a notification as read"""
     notification = Notification.query.filter_by(notification_id=notification_id, user_id=current_user.user_id).first()
@@ -14493,7 +14493,7 @@ def mark_notification_read(notification_id):
 
 @app.route('/notifications/mark_all_read')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def mark_all_notifications_read():
     """Mark all notifications as read for current user"""
     Notification.query.filter_by(user_id=current_user.user_id, is_read=False).update({'is_read': True})
@@ -14502,7 +14502,7 @@ def mark_all_notifications_read():
 
 @app.route('/notifications/mark_paid/<int:notification_id>')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def mark_notification_paid(notification_id):
     """Mark a recurring payment notification as paid and delete it"""
     notification = Notification.query.filter_by(
@@ -14534,7 +14534,7 @@ def mark_notification_paid(notification_id):
 
 @app.route('/notifications/delete/<int:notification_id>')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def delete_notification(notification_id):
     """Delete a specific notification"""
     notification = Notification.query.filter_by(notification_id=notification_id, user_id=current_user.user_id).first()
@@ -14546,7 +14546,7 @@ def delete_notification(notification_id):
 
 @app.route('/notifications/delete_all')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def delete_all_notifications():
     """Delete all notifications for current user"""
     try:
@@ -14560,7 +14560,7 @@ def delete_all_notifications():
 
 @app.route('/api/notifications/unread_count')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def unread_notifications_count():
     """Get count of unread notifications based on RBAC"""
     count = get_unread_count_for_user(current_user)
@@ -14578,7 +14578,7 @@ def overdue_requests_count():
 
 @app.route('/api/notifications/recent')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'Purchasing Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def recent_notifications():
     """Get recent notifications for the user based on RBAC"""
     notifications = get_notifications_for_user(current_user)

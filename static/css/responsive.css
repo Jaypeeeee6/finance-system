@@ -2,7 +2,7 @@
     display: none;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1024px) {
     /* Pagination: show info above buttons on responsive */
     .pagination-container { flex-direction: column; align-items: center; gap: 0.5rem; width: 100%; }
     .pagination-info { text-align: center; width: 100%; }
@@ -907,7 +907,7 @@
 
 
 /* --- Overrides for IT dashboard layout (responsive) - only applies to .dashboard-tabs --- */
-@media (max-width: 1280px) {
+@media (max-width: 1024px) {
     /* IT Dashboard: Full-bleed even if the card is not immediately adjacent */
     .dashboard-container .dashboard-tabs ~ .card,
     .dashboard-container .dashboard-tabs ~ .tab-content {
@@ -1000,7 +1000,7 @@
 
 
 /* Full-bleed container only for IT dashboard (.dashboard-tabs) */
-@media (max-width: 1280px) {
+@media (max-width: 1024px) {
     .dashboard-container:has(> .dashboard-tabs) {
         width: 100vw !important;
         max-width: 100vw !important;
@@ -1029,7 +1029,7 @@
 }
 
 /* Make step tabs same height on responsive screens */
-@media (max-width: 1280px) {
+@media (max-width: 1024px) {
     .step-tabs {
         align-items: stretch;
     }
