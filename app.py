@@ -2170,8 +2170,8 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned',
-                        'request_on_hold'
+                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled',
+                        'item_request_assigned', 'request_returned', 'request_on_hold'
                     ]),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -2356,7 +2356,12 @@ def get_unread_count_for_user(user):
                     Notification.notification_type == 'item_request_submission',
                     Notification.notification_type == 'new_submission',  # Simplified - same as get_notifications_for_user
                     Notification.notification_type == 'recurring_due',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned', 'request_on_hold']),
+                    Notification.notification_type.in_([
+                        'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
+                        'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
+                        'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned',
+                        'request_returned', 'request_on_hold'
+                    ]),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
             )
@@ -3499,13 +3504,13 @@ def procurement_dashboard():
     pending_amount = sum(float(r.amount) for r in pending_requests_bm)
     on_hold_amount = sum(float(r.amount) for r in on_hold_requests_bm)
     
-    # Get item requests with status "Assigned to Procurement" and their amounts
+    # Get item requests with status "Assigned to Procurement" and their invoice amounts
     assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
-    item_requests_amount = sum(float(r.amount) for r in assigned_item_requests if r.amount is not None)
+    item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
     
-    # Get completed item requests and their amounts
+    # Get completed item requests and their invoice amounts
     completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
-    completed_item_requests_amount = sum(float(r.amount) for r in completed_item_requests if r.amount is not None)
+    completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
     
     # Adjust calculations: deduct from available balance, add to money spent
     # Money Spent = Assigned item requests + Completed item requests (only item requests, not payment requests)
@@ -3565,7 +3570,7 @@ def procurement_item_requests():
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
-        # Check if amount column exists
+        # Check if amount and related columns exist
         cursor.execute("PRAGMA table_info(procurement_item_requests)")
         existing_columns = [row[1] for row in cursor.fetchall()]
         
@@ -3574,11 +3579,27 @@ def procurement_item_requests():
             conn.commit()
             print("✓ Added 'amount' column to procurement_item_requests table")
         
-        # Check if payment_date column exists
         if 'payment_date' not in existing_columns:
             cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN payment_date DATE")
             conn.commit()
             print("✓ Added 'payment_date' column to procurement_item_requests table")
+
+        # Check if receipt_reference_number column exists
+        if 'receipt_reference_number' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN receipt_reference_number VARCHAR(100)")
+            conn.commit()
+            print("✓ Added 'receipt_reference_number' column to procurement_item_requests table")
+
+        # Separate receipt and invoice amounts for completion
+        if 'receipt_amount' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN receipt_amount NUMERIC(10, 3)")
+            conn.commit()
+            print("✓ Added 'receipt_amount' column to procurement_item_requests table")
+        
+        if 'invoice_amount' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN invoice_amount NUMERIC(10, 3)")
+            conn.commit()
+            print("✓ Added 'invoice_amount' column to procurement_item_requests table")
         
         conn.close()
     except Exception as e:
@@ -3836,13 +3857,13 @@ def procurement_item_requests():
         pending_amount = sum(float(r.amount) for r in pending_requests_bm)
         on_hold_amount = sum(float(r.amount) for r in on_hold_requests_bm)
         
-        # Get item requests with status "Assigned to Procurement" and their amounts
+        # Get item requests with status "Assigned to Procurement" and their invoice amounts
         assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
-        item_requests_amount = sum(float(r.amount) for r in assigned_item_requests if r.amount is not None)
+        item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
         
-        # Get completed item requests and their amounts
+        # Get completed item requests and their invoice amounts
         completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
-        completed_item_requests_amount = sum(float(r.amount) for r in completed_item_requests if r.amount is not None)
+        completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
         
         # Adjust calculations: deduct from available balance, add to money spent
         # Money Spent = Assigned item requests + Completed item requests (only item requests, not payment requests)
@@ -4731,11 +4752,11 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
         # Exclude current request if it's already in the assigned list
         assigned_item_requests = [r for r in assigned_item_requests if r.id != request_id]
-        item_requests_amount = sum(float(r.amount) for r in assigned_item_requests if r.amount is not None)
+        item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
         
         # Get completed item requests
         completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
-        completed_item_requests_amount = sum(float(r.amount) for r in completed_item_requests if r.amount is not None)
+        completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
         
         # Calculate available balance
         # Available Balance = Completed payment requests - Assigned item requests - Completed item requests
@@ -4999,6 +5020,41 @@ def item_request_complete(request_id):
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
     completion_notes = request.form.get('completion_notes', '').strip()
+
+    # Receipt Amount (required)
+    receipt_amount_str = request.form.get('receipt_amount', '').strip()
+    if not receipt_amount_str:
+        flash('Receipt amount is required.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    try:
+        receipt_amount_value = float(receipt_amount_str)
+        if receipt_amount_value <= 0:
+            raise ValueError()
+    except Exception:
+        flash('Please enter a valid positive receipt amount in OMR.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Invoice Amount (required)
+    invoice_amount_str = request.form.get('invoice_amount', '').strip()
+    if not invoice_amount_str:
+        flash('Invoice amount is required.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    try:
+        invoice_amount_value = float(invoice_amount_str)
+        if invoice_amount_value <= 0:
+            raise ValueError()
+    except Exception:
+        flash('Please enter a valid positive invoice amount in OMR.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Receipt reference number (required, alphanumeric only)
+    receipt_reference_number = request.form.get('receipt_reference_number', '').strip()
+    if not receipt_reference_number:
+        flash('Receipt reference number is required.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    if not re.match(r'^[A-Za-z0-9]+$', receipt_reference_number):
+        flash('Receipt reference number must contain only letters and numbers (no spaces or symbols).', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
     
     # Handle receipt file upload (required, allow multiple)
     receipt_files = request.files.getlist('receipt_files')
@@ -5074,6 +5130,9 @@ def item_request_complete(request_id):
     item_request.completed_by_user_id = current_user.user_id
     item_request.completion_date = current_time
     item_request.completion_notes = completion_notes
+    item_request.receipt_amount = receipt_amount_value
+    item_request.invoice_amount = invoice_amount_value
+    item_request.receipt_reference_number = receipt_reference_number
     item_request.receipt_path = json.dumps(uploaded_receipt_filenames)
     item_request.invoice_path = json.dumps(uploaded_invoice_filenames)
     item_request.updated_at = current_time
@@ -5227,6 +5286,41 @@ def bulk_upload_item_files():
         flash('No requests selected.', 'danger')
         return redirect(url_for('procurement_item_requests'))
     
+    # Receipt Amount (required, applied to all selected requests)
+    receipt_amount_str = request.form.get('receipt_amount', '').strip()
+    if not receipt_amount_str:
+        flash('Receipt amount is required.', 'danger')
+        return redirect(url_for('procurement_item_requests'))
+    try:
+        receipt_amount_value = float(receipt_amount_str)
+        if receipt_amount_value <= 0:
+            raise ValueError()
+    except Exception:
+        flash('Please enter a valid positive receipt amount in OMR.', 'danger')
+        return redirect(url_for('procurement_item_requests'))
+
+    # Invoice Amount (required, applied to all selected requests)
+    invoice_amount_str = request.form.get('invoice_amount', '').strip()
+    if not invoice_amount_str:
+        flash('Invoice amount is required.', 'danger')
+        return redirect(url_for('procurement_item_requests'))
+    try:
+        invoice_amount_value = float(invoice_amount_str)
+        if invoice_amount_value <= 0:
+            raise ValueError()
+    except Exception:
+        flash('Please enter a valid positive invoice amount in OMR.', 'danger')
+        return redirect(url_for('procurement_item_requests'))
+
+    # Receipt reference number (required, alphanumeric only)
+    receipt_reference_number = request.form.get('receipt_reference_number', '').strip()
+    if not receipt_reference_number:
+        flash('Receipt reference number is required.', 'danger')
+        return redirect(url_for('procurement_item_requests'))
+    if not re.match(r'^[A-Za-z0-9]+$', receipt_reference_number):
+        flash('Receipt reference number must contain only letters and numbers (no spaces or symbols).', 'danger')
+        return redirect(url_for('procurement_item_requests'))
+
     try:
         request_ids = [int(rid.strip()) for rid in request_ids_str.split(',')]
     except ValueError:
@@ -5342,6 +5436,9 @@ def bulk_upload_item_files():
             
             item_request.receipt_path = json.dumps(all_receipts) if all_receipts else None
             item_request.invoice_path = json.dumps(all_invoices) if all_invoices else None
+            item_request.receipt_amount = receipt_amount_value
+            item_request.invoice_amount = invoice_amount_value
+            item_request.receipt_reference_number = receipt_reference_number
             
             # Mark request as completed
             current_time = datetime.utcnow()

@@ -679,8 +679,11 @@ class ProcurementItemRequest(db.Model):
     completed_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
     completion_date = db.Column(db.DateTime, nullable=True)
     completion_notes = db.Column(db.Text, nullable=True)
+    receipt_amount = db.Column(db.Numeric(10, 3), nullable=True)  # Amount transferred to procurement staff
+    invoice_amount = db.Column(db.Numeric(10, 3), nullable=True)  # Amount paid on the supplier invoice
     receipt_path = db.Column(db.String(255), nullable=True)  # Receipt file path for completed item requests
     invoice_path = db.Column(db.String(255), nullable=True)  # Invoice file path for completed item requests
+    receipt_reference_number = db.Column(db.String(100), nullable=True)  # Reference number for the receipt/transfer
     
     # Relationships
     manager_approver_user = db.relationship('User', foreign_keys=[manager_approver_user_id], backref='approved_item_requests_as_manager')

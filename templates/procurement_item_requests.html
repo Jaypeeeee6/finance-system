@@ -234,8 +234,8 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if req.amount %}
-                                    OMR {{ "%.3f"|format(req.amount) }}
+                                {% if req.invoice_amount %}
+                                    OMR {{ "%.3f"|format(req.invoice_amount) }}
                                 {% else %}
                                     <span style="color: #999;">-</span>
                                 {% endif %}
@@ -373,6 +373,32 @@
                      data-help-text="Required (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
                 </div>
             </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="bulk_receipt_amount">Receipt Amount (OMR) <span style="color: red;">*</span></label>
+                <input type="number"
+                       name="receipt_amount"
+                       id="bulk_receipt_amount"
+                       class="form-control"
+                       step="0.001"
+                       min="0"
+                       placeholder="Enter amount transferred to procurement staff in OMR"
+                       required>
+                <small class="form-text text-muted">This receipt amount will be applied to all selected item requests.</small>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="bulk_receipt_reference_number">Receipt Reference Number <span style="color: red;">*</span></label>
+                <input type="text"
+                       name="receipt_reference_number"
+                       id="bulk_receipt_reference_number"
+                       class="form-control"
+                       placeholder="Enter the bank transfer or receipt reference number (letters and numbers only)"
+                       pattern="[A-Za-z0-9]+"
+                       oninput="this.value = this.value.replace(/[^a-zA-Z0-9]/g, '')"
+                       required>
+                <small class="form-text text-muted">Reference number related to the uploaded receipt.</small>
+            </div>
             
             <div class="form-group" style="margin-bottom: 20px;">
                 <p style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem;">
@@ -388,6 +414,19 @@
                      data-label="Upload Invoice"
                      data-help-text="Required (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
                 </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="bulk_invoice_amount">Invoice Amount (OMR) <span style="color: red;">*</span></label>
+                <input type="number"
+                       name="invoice_amount"
+                       id="bulk_invoice_amount"
+                       class="form-control"
+                       step="0.001"
+                       min="0"
+                       placeholder="Enter invoice amount paid to supplier in OMR"
+                       required>
+                <small class="form-text text-muted">This invoice amount will be applied to all selected item requests.</small>
             </div>
             
             <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">

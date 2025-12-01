@@ -959,6 +959,32 @@
                                          data-help-text="Required for Finance Admin approval (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)">
                                     </div>
                                 </div>
+
+                                <div class="form-group">
+                                    <label for="completion_receipt_amount">Receipt Amount (OMR) <span style="color: red;">*</span></label>
+                                    <input type="number"
+                                           name="receipt_amount"
+                                           id="completion_receipt_amount"
+                                           class="form-control"
+                                           step="0.001"
+                                           min="0"
+                                           placeholder="Enter amount transferred to procurement staff in OMR"
+                                           value="{% if item_request.receipt_amount is not none %}{{ '%.3f'|format(item_request.receipt_amount) }}{% endif %}"
+                                           required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="completion_receipt_reference_number">Receipt Reference Number <span style="color: red;">*</span></label>
+                                    <input type="text"
+                                           name="receipt_reference_number"
+                                           id="completion_receipt_reference_number"
+                                           class="form-control"
+                                           placeholder="Enter the bank transfer or receipt reference number (letters and numbers only)"
+                                           pattern="[A-Za-z0-9]+"
+                                           oninput="this.value = this.value.replace(/[^a-zA-Z0-9]/g, '')"
+                                           value="{{ item_request.receipt_reference_number or '' }}"
+                                           required>
+                                </div>
                                 
                                 <div class="form-group">
                                     <p style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem;">
@@ -974,6 +1000,18 @@
                                          data-label="Upload Invoice"
                                          data-help-text="Required for Finance Admin approval (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)">
                                     </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="completion_invoice_amount">Invoice Amount (OMR) <span style="color: red;">*</span></label>
+                                    <input type="number"
+                                           name="invoice_amount"
+                                           id="completion_invoice_amount"
+                                           class="form-control"
+                                           step="0.001"
+                                           min="0"
+                                           placeholder="Enter invoice amount paid to supplier in OMR"
+                                           value="{% if item_request.invoice_amount is not none %}{{ '%.3f'|format(item_request.invoice_amount) }}{% endif %}"
+                                           required>
                                 </div>
                                 
                                 <div class="form-group">
@@ -1026,6 +1064,24 @@
                             {% endfor %}
                         </div>
                         {% endif %}
+
+                        {% if item_request.receipt_amount is not none or item_request.receipt_reference_number %}
+                        <div class="form-group">
+                            <label>Receipt Amount (OMR)</label>
+                            <input type="text"
+                                   value="{% if item_request.receipt_amount is not none %}{{ '%.3f'|format(item_request.receipt_amount) }}{% else %}-{% endif %}"
+                                   readonly
+                                   style="background: #f5f5f5;">
+                        </div>
+                        <div class="form-group">
+                            <label>Receipt Reference Number</label>
+                            <input type="text"
+                                   value="{{ item_request.receipt_reference_number or '-' }}"
+                                   readonly
+                                   style="background: #f5f5f5;">
+                        </div>
+                        {% endif %}
+
                         {% if invoice_files %}
                         <div class="form-group">
                             <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
@@ -1037,6 +1093,16 @@
                                 <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
                             </div>
                             {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        {% if item_request.invoice_amount is not none %}
+                        <div class="form-group">
+                            <label>Invoice Amount (OMR)</label>
+                            <input type="text"
+                                   value="{{ '%.3f'|format(item_request.invoice_amount) }}"
+                                   readonly
+                                   style="background: #f5f5f5;">
                         </div>
                         {% endif %}
                     </div>
@@ -1106,6 +1172,30 @@
                                 <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
                             </div>
                             {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        {% if item_request.receipt_amount is not none or item_request.invoice_amount is not none or item_request.receipt_reference_number %}
+                        <div class="form-group">
+                            <label>Receipt Amount (OMR)</label>
+                            <input type="text"
+                                   value="{% if item_request.receipt_amount is not none %}{{ '%.3f'|format(item_request.receipt_amount) }}{% else %}-{% endif %}"
+                                   readonly
+                                   style="background: #f5f5f5;">
+                        </div>
+                        <div class="form-group">
+                            <label>Invoice Amount (OMR)</label>
+                            <input type="text"
+                                   value="{% if item_request.invoice_amount is not none %}{{ '%.3f'|format(item_request.invoice_amount) }}{% else %}-{% endif %}"
+                                   readonly
+                                   style="background: #f5f5f5;">
+                        </div>
+                        <div class="form-group">
+                            <label>Receipt Reference Number</label>
+                            <input type="text"
+                                   value="{{ item_request.receipt_reference_number or '-' }}"
+                                   readonly
+                                   style="background: #f5f5f5;">
                         </div>
                         {% endif %}
                     </div>
