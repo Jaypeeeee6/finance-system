@@ -19,12 +19,14 @@
                 <a href="{{ url_for('new_request') }}">
                     <i class="fas fa-credit-card"></i> Payment Request for Finance
                 </a>
-                <a href="#" onclick="return false;" style="opacity: 0.6; cursor: not-allowed; pointer-events: none;">
-                    <i class="fas fa-boxes"></i> Item Request for Procurement (COMING SOON)
+                <a href="{{ url_for('procurement_request_item') }}">
+                    <i class="fas fa-boxes"></i> Item Request for Procurement
                 </a>
             </div>
         </div>
-        <!-- Item Requests button temporarily hidden -->
+        <a href="{{ url_for('procurement_item_requests') }}" class="btn btn-secondary">
+            <i class="fas fa-shopping-cart"></i> Item Requests
+        </a>
         {% if current_user.role in ['Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager'] %}
         <a href="{{ url_for('reports') }}" class="btn btn-secondary">
             <i class="fas fa-chart-bar"></i> Reports
@@ -35,8 +37,8 @@
     <!-- Current Money Summary -->
     {% if current_user.role == 'Department Manager' and current_user.department == 'Procurement' %}
     <div class="card" style="margin-bottom: 30px; background: #f8f9fa;">
-        <!-- Low Balance Warning - TEMPORARILY HIDDEN -->
-        {% if False and available_balance is not none and available_balance <= 2500 %}
+        <!-- Low Balance Warning -->
+        {% if available_balance is not none and available_balance <= 2500 %}
         <div class="alert alert-danger alert-persistent" style="margin: 20px; padding: 15px 20px; background-color: #dc3545; color: white; border-radius: 8px; border: none; display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; animation: none !important; transition: none !important;">
             <i class="fas fa-exclamation-triangle" style="font-size: 24px;"></i>
             <div style="flex: 1;">

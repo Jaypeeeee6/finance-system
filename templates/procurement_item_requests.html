@@ -51,8 +51,8 @@
     </div>
     {% endif %}
 
-    <!-- Low Balance Warning (for Procurement Manager, GM, and Operation Manager) - TEMPORARILY HIDDEN -->
-    {% if False and available_balance is not none and available_balance <= 2500 %}
+    <!-- Low Balance Warning (for Procurement Manager, GM, and Operation Manager) -->
+    {% if available_balance is not none and available_balance <= 2500 %}
     <div class="alert alert-danger alert-persistent" style="margin-bottom: 20px; padding: 15px 20px; background-color: #dc3545; color: white; border-radius: 8px; border: none; display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; animation: none !important; transition: none !important;">
         <i class="fas fa-exclamation-triangle" style="font-size: 24px;"></i>
         <div style="flex: 1;">

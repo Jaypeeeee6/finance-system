@@ -19,12 +19,14 @@
                 <a href="{{ url_for('new_request') }}">
                     <i class="fas fa-credit-card"></i> Payment Request for Finance
                 </a>
-                <a href="#" onclick="return false;" style="opacity: 0.6; cursor: not-allowed; pointer-events: none;">
-                    <i class="fas fa-boxes"></i> Item Request for Procurement (COMING SOON)
+                <a href="{{ url_for('procurement_request_item') }}">
+                    <i class="fas fa-boxes"></i> Item Request for Procurement
                 </a>
             </div>
         </div>
-        <!-- Item Requests button temporarily hidden -->
+        <a href="{{ url_for('procurement_item_requests') }}" class="btn btn-secondary">
+            <i class="fas fa-shopping-cart"></i> Item Requests
+        </a>
     </div>
 
     <!-- Status Tab Navigation -->
@@ -144,11 +146,11 @@
                                 <td>
                                     {% if req.status == 'Approved' %}
                                         <span class="badge badge-success">✓ {{ req.status }}</span>
-                                     {% elif req.status == 'Completed' %}
-                                         <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
+                                    {% elif req.status == 'Completed' %}
+                                        <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
                                      {% elif req.status == 'On Hold' %}
                                          <span class="badge" style="background: #ffc107; color: #212529;">⏸ On Hold</span>
-                                     {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
+                                    {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
                                         <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
                                     {% elif req.status == 'Payment Pending' %}
                                         <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
@@ -356,11 +358,11 @@
                                     <td>
                                         {% if req.status == 'Approved' %}
                                             <span class="badge badge-success">✓ {{ req.status }}</span>
-                                     {% elif req.status == 'Completed' %}
-                                         <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
+                                        {% elif req.status == 'Completed' %}
+                                            <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
                                      {% elif req.status == 'On Hold' %}
                                          <span class="badge" style="background: #ffc107; color: #212529;">⏸ On Hold</span>
-                                     {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
+                                        {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
                                             <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
                                         {% elif req.status == 'Returned to Manager' %}
                                             <span class="badge" style="background: #2196F3; color: white;">↩ {{ req.status }}</span>

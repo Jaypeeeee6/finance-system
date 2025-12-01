@@ -19,12 +19,14 @@
                 <a href="{{ url_for('new_request') }}">
                     <i class="fas fa-credit-card"></i> Payment Request for Finance
                 </a>
-                <a href="#" onclick="return false;" style="opacity: 0.6; cursor: not-allowed; pointer-events: none;">
-                    <i class="fas fa-boxes"></i> Item Request for Procurement (COMING SOON)
+                <a href="{{ url_for('procurement_request_item') }}">
+                    <i class="fas fa-boxes"></i> Item Request for Procurement
                 </a>
             </div>
         </div>
-        <!-- Item Requests button temporarily hidden -->
+        <a href="{{ url_for('procurement_item_requests') }}" class="btn btn-secondary">
+            <i class="fas fa-shopping-cart"></i> Item Requests
+        </a>
         <a href="{{ url_for('archives') }}" class="btn btn-secondary">
             <i class="fas fa-archive"></i> Archives
         </a>
@@ -324,7 +326,7 @@
                                             {% endif %}
                                         </td>
                                         <td>
-                                            OMR {{ "%.3f"|format(req.amount) }}
+                                                OMR {{ "%.3f"|format(req.amount) }}
                                         </td>
                                         <td>
                                             {% if req.status == 'Approved' %}
@@ -406,7 +408,7 @@
                                             {% endif %}
                                         </td>
                                         <td>
-                                            OMR {{ "%.3f"|format(req.amount) }}
+                                                OMR {{ "%.3f"|format(req.amount) }}
                                         </td>
                                         <td>
                                             <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
@@ -472,7 +474,7 @@
                                         <td>{{ req.department }}</td>
                                         <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
                                         <td>
-                                            OMR {{ "%.3f"|format(req.amount) }}
+                                                OMR {{ "%.3f"|format(req.amount) }}
                                         </td>
                                         <td>
                                             {% if req.status == 'Approved' %}
@@ -554,7 +556,7 @@
                                             {% endif %}
                                         </td>
                                         <td>
-                                            OMR {{ "%.3f"|format(req.amount) }}
+                                                OMR {{ "%.3f"|format(req.amount) }}
                                         </td>
                                         <td>
                                             <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
