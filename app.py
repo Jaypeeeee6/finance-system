@@ -3512,7 +3512,7 @@ def procurement_dashboard():
     available_balance = completed_amount - item_requests_amount - completed_item_requests_amount
     
     # Check and notify if balance is low
-    check_and_notify_low_balance(available_balance)
+    # TEMPORARILY DISABLED: check_and_notify_low_balance(available_balance)
     
     return render_template('procurement_dashboard.html', 
                          requests=requests_pagination.items, 
@@ -3801,7 +3801,7 @@ def procurement_item_requests():
         available_balance = completed_amount_bm - item_requests_amount - completed_item_requests_amount
         
         # Check and notify if balance is low
-        check_and_notify_low_balance(available_balance)
+        # TEMPORARILY DISABLED: check_and_notify_low_balance(available_balance)
     
     return render_template('procurement_item_requests.html',
                          user=current_user,
@@ -4690,7 +4690,7 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         available_balance = completed_amount_bm - item_requests_amount - completed_item_requests_amount
         
         # Check and notify if balance is low
-        check_and_notify_low_balance(available_balance)
+        # TEMPORARILY DISABLED: check_and_notify_low_balance(available_balance)
         
         # Check if amount exceeds available balance
         if amount > available_balance:
