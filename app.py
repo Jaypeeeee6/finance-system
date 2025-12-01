@@ -442,25 +442,28 @@ def get_status_priority_order():
     """
     Returns SQLAlchemy case expression for ordering payment requests by status priority.
     Priority order:
-    1. Pending Manager Approval, On Hold (same priority)
-    2. Pending Finance Approval
-    3. Proof Pending
-    4. Proof Sent
-    5. Proof Rejected
-    6. Recurring
-    7. Completed
-    8. Rejected (Rejected by Manager, Rejected by Finance, Proof Rejected)
+    1. Returned to Manager
+    2. Pending Manager Approval
+    3. On Hold
+    4. Pending Finance Approval
+    5. Proof Pending
+    6. Proof Sent
+    7. Proof Rejected
+    8. Recurring
+    9. Completed
+    10. Rejected (Rejected by Manager, Rejected by Finance, Proof Rejected)
     """
     return db.case(
-        (PaymentRequest.status == 'Pending Manager Approval', 1),
-        (PaymentRequest.status == 'On Hold', 1),  # Same priority as Pending Manager Approval
-        (PaymentRequest.status == 'Pending Finance Approval', 2),
-        (PaymentRequest.status == 'Proof Pending', 3),
-        (PaymentRequest.status == 'Proof Sent', 4),
-        (PaymentRequest.status == 'Proof Rejected', 5),
-        (PaymentRequest.status == 'Recurring', 6),
-        (PaymentRequest.status == 'Completed', 7),
-        (PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']), 8),
+        (PaymentRequest.status == 'Returned to Manager', 1),
+        (PaymentRequest.status == 'Pending Manager Approval', 2),
+        (PaymentRequest.status == 'On Hold', 3),
+        (PaymentRequest.status == 'Pending Finance Approval', 4),
+        (PaymentRequest.status == 'Proof Pending', 5),
+        (PaymentRequest.status == 'Proof Sent', 6),
+        (PaymentRequest.status == 'Proof Rejected', 7),
+        (PaymentRequest.status == 'Recurring', 8),
+        (PaymentRequest.status == 'Completed', 9),
+        (PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']), 10),
         else_=99  # Any other status goes to the end
     )
 
