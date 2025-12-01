@@ -379,8 +379,8 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 </span>
             {% endif %}
         </h1>
-        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
-            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        <a href="{{ url_for('dashboard') }}" id="back-to-dashboard-btn" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back
         </a>
     </div>
 
@@ -4517,6 +4517,42 @@ document.addEventListener('DOMContentLoaded', function() {
             childList: true,
             subtree: true
         });
+    }
+});
+
+// Go back to the previous page (reports, dashboard, etc.) with all parameters preserved
+document.addEventListener('DOMContentLoaded', function() {
+    const backButton = document.getElementById('back-to-dashboard-btn');
+    if (backButton) {
+        // Check if return_url parameter is in current URL (explicit return URL)
+        const urlParams = new URLSearchParams(window.location.search);
+        const returnUrl = urlParams.get('return_url');
+        
+        if (returnUrl) {
+            // Use the explicit return_url parameter
+            try {
+                const decodedUrl = decodeURIComponent(returnUrl);
+                backButton.href = decodedUrl;
+            } catch (e) {
+                console.log('Could not decode return_url');
+            }
+        } else if (document.referrer) {
+            // Use the referrer URL if it's from the same origin
+            try {
+                const referrerUrl = new URL(document.referrer);
+                const currentUrl = new URL(window.location.href);
+                
+                // Only use referrer if it's from the same origin (same domain)
+                if (referrerUrl.origin === currentUrl.origin) {
+                    // Use the full referrer URL with all its parameters preserved
+                    backButton.href = document.referrer;
+                }
+            } catch (e) {
+                // If referrer URL parsing fails, use default dashboard URL
+                console.log('Could not parse referrer URL');
+            }
+        }
+        // If no referrer or return_url, the button will use the default dashboard URL
     }
 });
 </script>
