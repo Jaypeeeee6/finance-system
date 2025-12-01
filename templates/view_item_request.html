@@ -481,6 +481,28 @@
                                 <input type="text" value="{{ item_request.manager_approval_date.strftime('%Y-%m-%d') }}" readonly style="background: #f5f5f5;">
                             </div>
                             {% endif %}
+                            
+                            <!-- Show on-hold history if request was previously put on hold by manager -->
+                            {% if item_request.manager_on_hold_by %}
+                            <div class="form-group" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid #dee2e6;">
+                                <label style="color: #856404; font-weight: bold;"><i class="fas fa-pause-circle"></i> On Hold History</label>
+                                <div style="background: #fff9e6; border: 1px solid #ffc107; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                    <div style="margin-bottom: 8px;">
+                                        <strong style="color: #856404;">Put on hold by:</strong> 
+                                        <span style="color: #856404;">{{ item_request.manager_on_hold_by }}</span>
+                                        {% if item_request.manager_on_hold_date %}
+                                        <span style="color: #856404; margin-left: 10px;">on {{ item_request.manager_on_hold_date.strftime('%Y-%m-%d') }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if item_request.manager_on_hold_reason %}
+                                    <div style="margin-top: 8px;">
+                                        <strong style="color: #856404;">Reason:</strong>
+                                        <p style="color: #856404; margin: 5px 0 0 0; white-space: pre-wrap;">{{ item_request.manager_on_hold_reason }}</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
                         {% endif %}
                     </div>
                 </div>
@@ -693,6 +715,28 @@
                             <div class="form-group">
                                 <label>Assigned To</label>
                                 <input type="text" value="{{ assigned_to_name }}" readonly style="background: #f5f5f5;">
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Show on-hold history if request was previously put on hold by procurement manager -->
+                            {% if item_request.procurement_manager_on_hold_by %}
+                            <div class="form-group" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid #dee2e6;">
+                                <label style="color: #856404; font-weight: bold;"><i class="fas fa-pause-circle"></i> On Hold History</label>
+                                <div style="background: #fff9e6; border: 1px solid #ffc107; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                    <div style="margin-bottom: 8px;">
+                                        <strong style="color: #856404;">Put on hold by:</strong> 
+                                        <span style="color: #856404;">{{ item_request.procurement_manager_on_hold_by }}</span>
+                                        {% if item_request.procurement_manager_on_hold_date %}
+                                        <span style="color: #856404; margin-left: 10px;">on {{ item_request.procurement_manager_on_hold_date.strftime('%Y-%m-%d') }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if item_request.procurement_manager_on_hold_reason %}
+                                    <div style="margin-top: 8px;">
+                                        <strong style="color: #856404;">Reason:</strong>
+                                        <p style="color: #856404; margin: 5px 0 0 0; white-space: pre-wrap;">{{ item_request.procurement_manager_on_hold_reason }}</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
                             </div>
                             {% endif %}
                         {% endif %}

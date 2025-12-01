@@ -1123,6 +1123,8 @@
                                         <span class="badge badge-success">✓ {{ req.status }}</span>
                                     {% elif req.status == 'Completed' %}
                                         <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
+                                    {% elif req.status == 'On Hold' %}
+                                        <span class="badge" style="background: #ffc107; color: #212529;">⏸ On Hold</span>
                                     {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
                                         <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
                                     {% elif req.status == 'Returned to Manager' %}
@@ -2284,6 +2286,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const statuses = [
         { value: 'All Pending', text: 'All Pending' },
         { value: 'Pending Manager Approval', text: 'Pending Manager Approval' },
+        { value: 'On Hold', text: 'On Hold' },
         { value: 'Pending Finance Approval', text: 'Pending Finance Approval' },
         { value: 'Returned to Manager', text: 'Returned to Manager' },
         { value: 'Rejected by Manager', text: 'Rejected by Manager' },

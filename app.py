@@ -442,7 +442,7 @@ def get_status_priority_order():
     """
     Returns SQLAlchemy case expression for ordering payment requests by status priority.
     Priority order:
-    1. Pending Manager Approval
+    1. Pending Manager Approval, On Hold (same priority)
     2. Pending Finance Approval
     3. Proof Pending
     4. Proof Sent
@@ -453,6 +453,7 @@ def get_status_priority_order():
     """
     return db.case(
         (PaymentRequest.status == 'Pending Manager Approval', 1),
+        (PaymentRequest.status == 'On Hold', 1),  # Same priority as Pending Manager Approval
         (PaymentRequest.status == 'Pending Finance Approval', 2),
         (PaymentRequest.status == 'Proof Pending', 3),
         (PaymentRequest.status == 'Proof Sent', 4),
@@ -502,6 +503,13 @@ def get_all_tab_datetime_order():
             PaymentRequest.status == 'Pending Manager Approval',
             db.func.coalesce(
                 PaymentRequest.manager_approval_start_time,
+                PaymentRequest.updated_at,
+                PaymentRequest.created_at
+            )
+        ),
+        (
+            PaymentRequest.status == 'On Hold',
+            db.func.coalesce(
                 PaymentRequest.updated_at,
                 PaymentRequest.created_at
             )
@@ -1953,7 +1961,8 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned'
+                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned',
+                        'request_on_hold'
                     ])
                 )
             )
@@ -1976,7 +1985,8 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         Notification.notification_type.in_([
                             'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                             'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                            'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned'
+                            'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned',
+                            'request_on_hold'
                         ])
                     )
                 )
@@ -1996,7 +2006,8 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         Notification.notification_type.in_([
                             'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                             'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                            'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned'
+                            'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned',
+                            'request_on_hold'
                         ]),
                         # new_submission only for GM, Operation Manager, Finance Staff, or CEO (his assigned managers)
                         db.and_(
@@ -2021,7 +2032,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited',
                         'finance_approval_timing_alert', 'finance_approval_timing_recurring',
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
-                            'admin_announcement', 'one_time_payment_scheduled', 'request_returned'
+                            'admin_announcement', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold'
                     ])
                 )
             ).order_by(Notification.created_at.desc())
@@ -2037,7 +2048,8 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned'
+                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned',
+                        'request_on_hold'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -2059,7 +2071,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid', 'one_time_payment_scheduled', 'request_returned'
+                        'installment_paid', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -2100,7 +2112,8 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'request_rejected', 'request_approved', 'proof_uploaded', 'status_changed',
                         'proof_required', 'recurring_approved', 'request_completed', 'installment_paid',
                         'user_created', 'user_updated', 'user_deleted', 'finance_note_added',
-                        'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned'
+                        'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned',
+                        'request_on_hold'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -2123,7 +2136,8 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'request_rejected', 'request_approved', 'proof_uploaded', 'status_changed',
                         'proof_required', 'recurring_approved', 'request_completed', 'installment_paid',
                         'user_created', 'user_updated', 'user_deleted', 'finance_note_added',
-                        'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned'
+                        'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned',
+                        'request_on_hold'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -2153,7 +2167,8 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned'
+                        'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned',
+                        'request_on_hold'
                     ]),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -2169,7 +2184,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                     'status_changed', 'recurring_due', 'proof_required', 'recurring_approved',
                     'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled',
-                    'item_request_assigned', 'request_returned'
+                    'item_request_assigned', 'request_returned', 'request_on_hold'
                 ])
             )
         ).order_by(Notification.created_at.desc())
@@ -2192,7 +2207,7 @@ def get_unread_count_for_user(user):
                 Notification.is_read == False,
                 db.or_(
                     Notification.notification_type == 'recurring_due',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned'])
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned', 'request_on_hold'])
                 )
             )
         ).count()
@@ -2207,7 +2222,7 @@ def get_unread_count_for_user(user):
                     Notification.is_read == False,
                     db.or_(
                         Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned'])
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned', 'request_on_hold'])
                     )
                 )
             ).count()
@@ -2219,7 +2234,7 @@ def get_unread_count_for_user(user):
                     Notification.is_read == False,
                     db.or_(
                         Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned']),
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned', 'request_on_hold']),
                         # new_submission only for GM, Operation Manager, Finance Staff, or CEO (his assigned managers)
                         db.and_(
                             Notification.notification_type == 'new_submission',
@@ -2241,8 +2256,8 @@ def get_unread_count_for_user(user):
                     Notification.user_id == user.user_id,
                     Notification.is_read == False,
                     db.or_(
-                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned'])
+                        Notification.notification_type.in_(['ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited', 'finance_approval_timing_alert', 'finance_approval_timing_recurring', 'system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement', 'request_on_hold']),
+                        Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned', 'request_on_hold'])
                     )
                 )
             ).count()
@@ -2256,7 +2271,7 @@ def get_unread_count_for_user(user):
                 db.or_(
                     Notification.notification_type == 'item_request_submission',
                     Notification.notification_type == 'new_submission',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -2272,7 +2287,7 @@ def get_unread_count_for_user(user):
                 db.or_(
                     Notification.notification_type == 'item_request_submission',
                     Notification.notification_type == 'new_submission',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned', 'request_on_hold']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -2306,7 +2321,7 @@ def get_unread_count_for_user(user):
                             Notification.message.contains('IT')
                         )
                     ),
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -2322,7 +2337,7 @@ def get_unread_count_for_user(user):
                 db.or_(
                     # Item request submissions (for procurement item requests)
                     Notification.notification_type == 'item_request_submission',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
                 )
             )
@@ -2338,7 +2353,7 @@ def get_unread_count_for_user(user):
                     Notification.notification_type == 'item_request_submission',
                     Notification.notification_type == 'new_submission',  # Simplified - same as get_notifications_for_user
                     Notification.notification_type == 'recurring_due',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned', 'request_on_hold']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
             )
@@ -2350,7 +2365,7 @@ def get_unread_count_for_user(user):
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
-                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'request_returned'])
+                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'request_returned', 'request_on_hold'])
             )
         ).count()
 
@@ -3476,8 +3491,10 @@ def procurement_dashboard():
     total_amount = sum(float(r.amount) for r in bank_money_requests)
     completed_requests_bm = [r for r in bank_money_requests if r.status == 'Completed']
     pending_requests_bm = [r for r in bank_money_requests if r.status in ['Pending Manager Approval', 'Pending Finance Approval', 'Proof Pending', 'Proof Sent']]
+    on_hold_requests_bm = [r for r in bank_money_requests if r.status == 'On Hold']
     completed_amount = sum(float(r.amount) for r in completed_requests_bm)
     pending_amount = sum(float(r.amount) for r in pending_requests_bm)
+    on_hold_amount = sum(float(r.amount) for r in on_hold_requests_bm)
     
     # Get item requests with status "Assigned to Procurement" and their amounts
     assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
@@ -3514,7 +3531,8 @@ def procurement_dashboard():
                          total_amount=total_amount,
                          completed_amount=money_spent,
                          available_balance=available_balance,
-                         pending_amount=pending_amount)
+                         pending_amount=pending_amount,
+                         on_hold_amount=on_hold_amount)
 
 
 @app.route('/procurement/item-requests')
@@ -3762,8 +3780,10 @@ def procurement_item_requests():
     # Calculate statistics
         completed_requests_bm = [r for r in bank_money_requests if r.status == 'Completed']
         pending_requests_bm = [r for r in bank_money_requests if r.status in ['Pending Manager Approval', 'Pending Finance Approval', 'Proof Pending', 'Proof Sent']]
+        on_hold_requests_bm = [r for r in bank_money_requests if r.status == 'On Hold']
         completed_amount_bm = sum(float(r.amount) for r in completed_requests_bm)
         pending_amount = sum(float(r.amount) for r in pending_requests_bm)
+        on_hold_amount = sum(float(r.amount) for r in on_hold_requests_bm)
         
         # Get item requests with status "Assigned to Procurement" and their amounts
         assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
@@ -3801,7 +3821,8 @@ def procurement_item_requests():
                          departments=departments,
                          available_balance=available_balance,
                          completed_amount=completed_amount,
-                         pending_amount=pending_amount)
+                         pending_amount=pending_amount,
+                         on_hold_amount=on_hold_amount)
 
 
 @app.route('/procurement/item-request/<int:request_id>')
@@ -11853,15 +11874,136 @@ def manager_approve_request(request_id):
         return redirect(url_for('dashboard'))
     
     # Check if request is in correct status
-    # Allow approval when status is "Pending Manager Approval" or "Returned to Manager"
-    if req.status not in ['Pending Manager Approval', 'Returned to Manager']:
+    # Allow approval when status is "Pending Manager Approval", "Returned to Manager", or "On Hold" (if put on hold by manager)
+    if req.status not in ['Pending Manager Approval', 'Returned to Manager', 'On Hold']:
         flash('This request is not pending manager approval.', 'error')
         return redirect(url_for('dashboard'))
+    
+    # If status is "On Hold", verify it was put on hold by a manager (not finance)
+    if req.status == 'On Hold' and not req.manager_on_hold_by_user_id:
+        flash('This request is on hold but not by a manager. You cannot take action on it.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
     
     # Get form data
     approval_status = request.form.get('approval_status')
     
-    if approval_status == 'approve':
+    if approval_status == 'on_hold':
+        # Manager puts request on hold
+        on_hold_reason = request.form.get('on_hold_reason', '').strip()
+        if not on_hold_reason:
+            flash('Please provide a reason for putting this request on hold.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
+        current_time = datetime.utcnow()
+        
+        # Update request - change status to 'On Hold'
+        req.status = 'On Hold'
+        req.manager_on_hold_date = current_time.date()
+        req.manager_on_hold_by = current_user.name
+        req.manager_on_hold_by_user_id = current_user.user_id
+        req.manager_on_hold_reason = on_hold_reason
+        req.updated_at = current_time
+        
+        db.session.commit()
+        
+        log_action(f"Manager put payment request #{request_id} on hold")
+        
+        # Build message
+        message_base = f"Payment request #{request_id} has been put on hold by {current_user.name}."
+        if on_hold_reason:
+            message_base += f" Reason: {on_hold_reason}"
+        
+        # Notify requestor
+        if req.user_id:
+            create_notification(
+                user_id=req.user_id,
+                title="Payment Request On Hold",
+                message=f"Your {message_base.lower()}",
+                notification_type="request_on_hold",
+                request_id=request_id
+            )
+        
+        # Notify all authorized managers (including temporary managers, Operation Manager, GM)
+        authorized_approvers = get_authorized_manager_approvers(req)
+        for approver in authorized_approvers:
+            if approver.user_id != current_user.user_id:  # Don't notify the person who put it on hold
+                create_notification(
+                    user_id=approver.user_id,
+                    title="Payment Request On Hold",
+                    message=message_base,
+                    notification_type="request_on_hold",
+                    request_id=request_id
+                )
+        
+        # Notify IT Department (all IT Staff and IT Department Manager)
+        it_users = User.query.filter(
+            User.department == 'IT'
+        ).filter(
+            User.role.in_(['IT Staff', 'Department Manager'])
+        ).all()
+        
+        for it_user in it_users:
+            create_notification(
+                user_id=it_user.user_id,
+                title="Payment Request On Hold",
+                message=message_base,
+                notification_type="request_on_hold",
+                request_id=request_id
+            )
+        
+        # Notify General Managers (ALL GMs) - always notified when any payment request is put on hold
+        try:
+            gm_users = User.query.filter_by(role='GM').all()
+        except Exception as e:
+            gm_users = []
+            print(f"DEBUG: querying GM users failed in manager_approve_request (on_hold): {e}")
+        for gm in gm_users:
+            if gm and gm.user_id != current_user.user_id:  # Don't notify the person who put it on hold
+                create_notification(
+                    user_id=gm.user_id,
+                    title="Payment Request On Hold",
+                    message=message_base,
+                    notification_type="request_on_hold",
+                    request_id=request_id
+                )
+        
+        # Notify Operation Managers (ALL Operation Managers) - always notified when any payment request is put on hold
+        try:
+            op_manager_users = User.query.filter_by(role='Operation Manager').all()
+        except Exception as e:
+            op_manager_users = []
+            print(f"DEBUG: querying Operation Managers failed in manager_approve_request (on_hold): {e}")
+        for opm in op_manager_users:
+            if opm and opm.user_id != current_user.user_id:  # Don't notify the person who put it on hold
+                create_notification(
+                    user_id=opm.user_id,
+                    title="Payment Request On Hold",
+                    message=message_base,
+                    notification_type="request_on_hold",
+                    request_id=request_id
+                )
+        
+        # Emit real-time update
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'On Hold',
+            'manager_on_hold': True
+        })
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'On Hold',
+            'manager_on_hold': True
+        }, room='gm')
+        socketio.emit('request_updated', {
+            'request_id': request_id,
+            'status': 'On Hold',
+            'manager_on_hold': True
+        }, room='operation_manager')
+        
+        flash(f'Payment request #{request_id} has been put on hold.', 'warning')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    elif approval_status == 'approve':
         # Manager approves - move to Finance for final approval
         current_time = datetime.utcnow()
         
@@ -12804,7 +12946,7 @@ def reports():
         status_conditions = []
         for status in status_filter:
             if status == 'All Pending':
-                # Show both pending statuses
+                # Show both pending statuses (excluding On Hold)
                 status_conditions.append(PaymentRequest.status.in_(['Pending Manager Approval', 'Pending Finance Approval']))
             else:
                 status_conditions.append(PaymentRequest.status == status)
@@ -12918,6 +13060,7 @@ def reports():
     total_requests = len(all_filtered_requests)
     completed_count = len([r for r in all_filtered_requests if r.status == 'Completed'])
     pending_count = len([r for r in all_filtered_requests if r.status in ['Pending Manager Approval', 'Pending Finance Approval']])
+    on_hold_count = len([r for r in all_filtered_requests if r.status == 'On Hold'])
     
     # Calculate total amount
     total_amount = sum(float(r.amount) for r in all_filtered_requests)
@@ -13000,6 +13143,7 @@ def reports():
                          total_requests=total_requests,
                          completed_count=completed_count,
                          pending_count=pending_count,
+                         on_hold_count=on_hold_count,
                          total_amount=total_amount,
                          it_amount=it_amount,
                          user=current_user)
@@ -15651,6 +15795,25 @@ if __name__ == '__main__':
                 print("✓ Added 'bank_name' column to person_company_options table")
             else:
                 print("✓ 'bank_name' column already exists in person_company_options table")
+            
+            # Migrate: Add on_hold columns to payment_requests table if they don't exist
+            cursor.execute("PRAGMA table_info(payment_requests)")
+            payment_request_columns = [row[1] for row in cursor.fetchall()]
+            
+            payment_on_hold_columns = [
+                ('manager_on_hold_date', 'DATE'),
+                ('manager_on_hold_by', 'VARCHAR(100)'),
+                ('manager_on_hold_by_user_id', 'INTEGER'),
+                ('manager_on_hold_reason', 'TEXT')
+            ]
+            
+            for col_name, col_type in payment_on_hold_columns:
+                if col_name not in payment_request_columns:
+                    cursor.execute(f"ALTER TABLE payment_requests ADD COLUMN {col_name} {col_type}")
+                    conn.commit()
+                    print(f"✓ Added '{col_name}' column to payment_requests table")
+                else:
+                    print(f"✓ '{col_name}' column already exists in payment_requests table")
             
             conn.close()
         except Exception as e:

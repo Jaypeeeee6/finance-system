@@ -162,6 +162,10 @@ class PaymentRequest(db.Model):
     manager_rejector = db.Column(db.String(100))  # Name of the user who actually rejected as manager
     manager_rejector_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)  # ID of the user who actually rejected as manager
     rejection_reason = db.Column(db.Text)  # Reason for manager rejection
+    manager_on_hold_date = db.Column(db.Date, nullable=True)  # Date when manager put request on hold
+    manager_on_hold_by = db.Column(db.String(100), nullable=True)  # Name of the user who put request on hold
+    manager_on_hold_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)  # ID of the user who put request on hold
+    manager_on_hold_reason = db.Column(db.Text, nullable=True)  # Reason for putting request on hold
     is_urgent = db.Column(db.Boolean, default=False)  # Whether request is marked as urgent
     manager_approval_reason = db.Column(db.Text)  # Manager's notes when approving
     finance_admin_note = db.Column(db.Text)  # Finance admin's note when reviewing

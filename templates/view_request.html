@@ -392,7 +392,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     Submit Request
                 </div>
             </li>
-            <li class="step-tab {% if request.status == 'Rejected by Manager' %}rejected{% elif request.status in ['Pending Manager Approval', 'Returned to Manager'] %}warning{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="manager">
+            <li class="step-tab {% if request.status == 'Rejected by Manager' %}rejected{% elif request.status in ['Pending Manager Approval', 'Returned to Manager', 'On Hold'] %}warning{% elif request.status in ['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="manager">
                 <div class="step-tab-content">
                     Manager Approval
                 </div>
@@ -1013,6 +1013,29 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                 <label>Manager Approval Date</label>
                                 <input type="text" value="{{ request.manager_approval_date.strftime('%Y-%m-%d') if request.manager_approval_date else 'N/A' }}" readonly style="background: #f5f5f5;">
                             </div>
+                            
+                            <!-- Show on-hold history if request was previously put on hold by manager -->
+                            {% if request.manager_on_hold_by %}
+                            <div class="form-group" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid #dee2e6;">
+                                <label style="color: #856404; font-weight: bold;"><i class="fas fa-pause-circle"></i> On Hold History</label>
+                                <div style="background: #fff9e6; border: 1px solid #ffc107; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                    <div style="margin-bottom: 8px;">
+                                        <strong style="color: #856404;">Put on hold by:</strong> 
+                                        <span style="color: #856404;">{{ request.manager_on_hold_by }}</span>
+                                        {% if request.manager_on_hold_date %}
+                                        <span style="color: #856404; margin-left: 10px;">on {{ request.manager_on_hold_date.strftime('%Y-%m-%d') }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if request.manager_on_hold_reason %}
+                                    <div style="margin-top: 8px;">
+                                        <strong style="color: #856404;">Reason:</strong>
+                                        <p style="color: #856404; margin: 5px 0 0 0; white-space: pre-wrap;">{{ request.manager_on_hold_reason }}</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            
                             {% if request.rejection_reason %}
                             <div class="form-group">
                                 <label style="color: #856404;"><i class="fas fa-undo"></i> Current Return Reason (from Finance Admin)</label>
@@ -1046,6 +1069,29 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                 <label>Manager Approval Date</label>
                                 <input type="text" value="{{ request.manager_approval_date.strftime('%Y-%m-%d') if request.manager_approval_date else 'N/A' }}" readonly style="background: #f5f5f5;">
                             </div>
+                            
+                            <!-- Show on-hold history if request was previously put on hold by manager -->
+                            {% if request.manager_on_hold_by %}
+                            <div class="form-group" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid #dee2e6;">
+                                <label style="color: #856404; font-weight: bold;"><i class="fas fa-pause-circle"></i> On Hold History</label>
+                                <div style="background: #fff9e6; border: 1px solid #ffc107; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                    <div style="margin-bottom: 8px;">
+                                        <strong style="color: #856404;">Put on hold by:</strong> 
+                                        <span style="color: #856404;">{{ request.manager_on_hold_by }}</span>
+                                        {% if request.manager_on_hold_date %}
+                                        <span style="color: #856404; margin-left: 10px;">on {{ request.manager_on_hold_date.strftime('%Y-%m-%d') }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if request.manager_on_hold_reason %}
+                                    <div style="margin-top: 8px;">
+                                        <strong style="color: #856404;">Reason:</strong>
+                                        <p style="color: #856404; margin: 5px 0 0 0; white-space: pre-wrap;">{{ request.manager_on_hold_reason }}</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            
                             {# Show return reason if request was previously returned by Finance Admin and is now pending finance approval again #}
                             {% if request.status == 'Pending Finance Approval' and request.rejection_reason and request.manager_rejector and request.manager_approver %}
                             <div class="form-group">
@@ -1099,6 +1145,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                             <option value="">-- Select Status --</option>
                                             <option value="approve">Approve</option>
                                             <option value="reject">Reject</option>
+                                            <option value="on_hold">On Hold</option>
                                         </select>
                                     </div>
                                     
@@ -1122,6 +1169,13 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                         </div>
                                     </div>
                                     
+                                    <div id="manager_on_hold_fields_returned" style="display: none;">
+                                        <div class="form-group">
+                                            <label for="manager_on_hold_reason_returned">On Hold Reason *</label>
+                                            <textarea name="on_hold_reason" id="manager_on_hold_reason_returned" rows="3" placeholder="Please provide a reason for putting this request on hold..." required></textarea>
+                                        </div>
+                                    </div>
+                                    
                                     <div class="step-actions">
                                         <button type="submit" class="btn btn-success">
                                             <i class="fas fa-check"></i> Submit Decision
@@ -1132,17 +1186,41 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         </div>
                     {% endif %}
                 {% endif %}
-            {% elif request.status == 'Pending Manager Approval' %}
+            {% elif request.status in ['Pending Manager Approval', 'On Hold'] %}
                 <!-- Static message for non-managers -->
                 <div class="card manager-approval-required" style="margin-bottom: 1.5rem;">
                     <div class="card-header">
                         <h4><i class="fas fa-user-tie"></i> Manager Approval Required</h4>
                     </div>
                     <div class="card-body">
+                        <!-- Status Display for On Hold -->
+                        {% if request.status == 'On Hold' and request.manager_on_hold_by_user_id %}
+                        <div class="status-display" style="margin-bottom: 1.5rem;">
+                            <div style="font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 0.5rem;">Status</div>
+                            <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 12px 20px; text-align: center;">
+                                <span style="color: #856404; font-weight: bold; font-size: 1.1rem;">ON HOLD UNTIL FURTHER NOTICE</span>
+                            </div>
+                            {% if request.manager_on_hold_by %}
+                            <div style="text-align: center; margin-top: 0.5rem; color: #666; font-size: 0.9rem;">
+                                <strong>Put on hold by:</strong> {{ request.manager_on_hold_by }}
+                                {% if request.manager_on_hold_date %}
+                                <span style="margin-left: 10px;">on {{ request.manager_on_hold_date.strftime('%Y-%m-%d') }}</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            {% if request.manager_on_hold_reason %}
+                            <div style="margin-top: 0.5rem; padding: 10px; background: #fff9e6; border: 1px solid #ffc107; border-radius: 6px;">
+                                <strong style="color: #856404;">Reason:</strong>
+                                <p style="color: #856404; margin: 5px 0 0 0; white-space: pre-wrap;">{{ request.manager_on_hold_reason }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
                         <div class="row">
                             <div class="col-md-8">
                                 <p style="margin-bottom: 0.5rem; font-size: 1.1rem;">
-                                    <strong>Status:</strong> {% if request.status == 'Returned to Manager' %}Returned to Manager for Review{% else %}Waiting for Manager Approval{% endif %}
+                                    <strong>Status:</strong> {% if request.status == 'Returned to Manager' %}Returned to Manager for Review{% elif request.status == 'On Hold' %}On Hold Until Further Notice{% else %}Waiting for Manager Approval{% endif %}
                                 </p>
                                 {% if request.status == 'Returned to Manager' and request.rejection_reason %}
                                 <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
@@ -1231,6 +1309,8 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 </div>
 
                 <!-- Manager approval form (visible to authorized managers, including temporary manager) -->
+                <!-- Allow managers to act on requests that are "Pending Manager Approval", "Returned to Manager", or "On Hold" (if put on hold by manager) -->
+{% if request.status in ['Pending Manager Approval', 'Returned to Manager'] or (request.status == 'On Hold' and request.manager_on_hold_by_user_id) %}
 {% if (request.temporary_manager_id and user.user_id == request.temporary_manager_id) or (not request.temporary_manager_id and ((user.role == 'Department Manager' and user.department == request.department and user.user_id != request.user_id) or (user.role == 'Finance Admin' and request.department == 'Finance' and user.user_id != request.user_id) or ((user.role in ['GM', 'Operation Manager']) and user.user_id != request.user_id and request.user.role not in ['GM','CEO','Operation Manager']) or (user.name == 'Abdalaziz Al-Brashdi' and request.user.role in ['GM', 'CEO', 'Finance Staff', 'Operation Manager']))) %}
                     <div class="card your-approval-required">
                         <div class="card-header">
@@ -1255,6 +1335,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                         <option value="">-- Select Status --</option>
                                         <option value="approve">Approve</option>
                                         <option value="reject">Reject</option>
+                                        <option value="on_hold">On Hold</option>
                                     </select>
                                 </div>
                                 
@@ -1278,6 +1359,13 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                     </div>
                                 </div>
                                 
+                                <div id="manager_on_hold_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="manager_on_hold_reason">On Hold Reason *</label>
+                                        <textarea name="on_hold_reason" id="manager_on_hold_reason" rows="3" placeholder="Please provide a reason for putting this request on hold..." required></textarea>
+                                    </div>
+                                </div>
+                                
                                 <div class="step-actions">
                                     <button type="submit" class="btn btn-success">
                                         <i class="fas fa-check"></i> Submit Decision
@@ -1287,9 +1375,10 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         </div>
                     </div>
                 {% endif %}
+                {% endif %}
                 
                 <!-- IT Department manager reassignment section -->
-                {% if user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager'] %}
+                {% if user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager', 'On Hold'] %}
                     <div class="card" style="margin-top: 1.5rem; border-left: 4px solid #17a2b8;">
                         <div class="card-header" style="background: #e7f3f5; border-bottom: 1px solid #b8daff;">
                             <h4><i class="fas fa-user-cog"></i> Manager Reassignment (IT Only)</h4>
@@ -2844,11 +2933,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // Default behavior: go to submit tab
         initialStep = 'submit';
         
-        // Exception 1: Assigned managers viewing "Pending Manager Approval" → Manager tab
-        if (requestStatus === 'Pending Manager Approval' && 
+        // Exception 1: Assigned managers viewing "Pending Manager Approval" or "On Hold" → Manager tab
+        if ((requestStatus === 'Pending Manager Approval' || requestStatus === 'On Hold') && 
             ((user.role === 'Department Manager' && user.department === request.department) || 
              (user.role === 'Operation Manager' && request.department === 'Operation') ||
              (user.role === 'Finance Admin' && request.department === 'Finance'))) {
+            initialStep = 'manager';
+        }
+        // Exception 1b: Any authorized manager viewing "On Hold" → Manager tab
+        else if (requestStatus === 'On Hold') {
             initialStep = 'manager';
         }
         // Exception 2: Finance admins viewing "Pending Finance Approval" → Finance tab
@@ -2880,7 +2973,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Set manager tab
     if (managerTab) {
-        if (requestStatus === 'Pending Manager Approval' || requestStatus === 'Returned to Manager') {
+        if (requestStatus === 'Pending Manager Approval' || requestStatus === 'Returned to Manager' || requestStatus === 'On Hold') {
             managerTab.classList.add('warning');
             // Hide request details section when manager tab is active
             const requestDetailsSection = document.querySelector('.request-details-section');
@@ -3751,34 +3844,19 @@ function toggleManagerApprovalFields() {
     const status = document.getElementById('manager_approval_status').value;
     const approveFields = document.getElementById('manager_approve_fields');
     const rejectFields = document.getElementById('manager_reject_fields');
+    const onHoldFields = document.getElementById('manager_on_hold_fields');
     const rejectionReasonField = document.getElementById('manager_rejection_reason');
+    const onHoldReasonField = document.getElementById('manager_on_hold_reason');
     
     // Hide all fields first and remove required attributes
     approveFields.style.display = 'none';
     rejectFields.style.display = 'none';
-    rejectionReasonField.removeAttribute('required');
-    
-    // Show relevant fields based on selection and add required attributes
-    if (status === 'approve') {
-        approveFields.style.display = 'block';
-    } else if (status === 'reject') {
-        rejectFields.style.display = 'block';
-        rejectionReasonField.setAttribute('required', 'required');
-    }
-}
-
-// Toggle approval fields for manager approval when status is "Returned to Manager"
-function toggleManagerApprovalFieldsReturned() {
-    const status = document.getElementById('manager_approval_status_returned').value;
-    const approveFields = document.getElementById('manager_approve_fields_returned');
-    const rejectFields = document.getElementById('manager_reject_fields_returned');
-    const rejectionReasonField = document.getElementById('manager_rejection_reason_returned');
-    
-    // Hide all fields first and remove required attributes
-    approveFields.style.display = 'none';
-    rejectFields.style.display = 'none';
+    onHoldFields.style.display = 'none';
     if (rejectionReasonField) {
         rejectionReasonField.removeAttribute('required');
+    }
+    if (onHoldReasonField) {
+        onHoldReasonField.removeAttribute('required');
     }
     
     // Show relevant fields based on selection and add required attributes
@@ -3788,6 +3866,47 @@ function toggleManagerApprovalFieldsReturned() {
         rejectFields.style.display = 'block';
         if (rejectionReasonField) {
             rejectionReasonField.setAttribute('required', 'required');
+        }
+    } else if (status === 'on_hold') {
+        onHoldFields.style.display = 'block';
+        if (onHoldReasonField) {
+            onHoldReasonField.setAttribute('required', 'required');
+        }
+    }
+}
+
+// Toggle approval fields for manager approval when status is "Returned to Manager"
+function toggleManagerApprovalFieldsReturned() {
+    const status = document.getElementById('manager_approval_status_returned').value;
+    const approveFields = document.getElementById('manager_approve_fields_returned');
+    const rejectFields = document.getElementById('manager_reject_fields_returned');
+    const onHoldFields = document.getElementById('manager_on_hold_fields_returned');
+    const rejectionReasonField = document.getElementById('manager_rejection_reason_returned');
+    const onHoldReasonField = document.getElementById('manager_on_hold_reason_returned');
+    
+    // Hide all fields first and remove required attributes
+    approveFields.style.display = 'none';
+    rejectFields.style.display = 'none';
+    onHoldFields.style.display = 'none';
+    if (rejectionReasonField) {
+        rejectionReasonField.removeAttribute('required');
+    }
+    if (onHoldReasonField) {
+        onHoldReasonField.removeAttribute('required');
+    }
+    
+    // Show relevant fields based on selection and add required attributes
+    if (status === 'approve') {
+        approveFields.style.display = 'block';
+    } else if (status === 'reject') {
+        rejectFields.style.display = 'block';
+        if (rejectionReasonField) {
+            rejectionReasonField.setAttribute('required', 'required');
+        }
+    } else if (status === 'on_hold') {
+        onHoldFields.style.display = 'block';
+        if (onHoldReasonField) {
+            onHoldReasonField.setAttribute('required', 'required');
         }
     }
 }
