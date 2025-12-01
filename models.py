@@ -625,6 +625,8 @@ class ProcurementItemRequest(db.Model):
     category = db.Column(db.String(100), nullable=True)  # Category of the item
     item_name = db.Column(db.String(200), nullable=False)
     quantity = db.Column(db.String(100), nullable=True)  # Can be "10 units", "5 boxes", etc.
+    # Quantities adjusted by assigned procurement staff (per-item, does NOT overwrite original requestor quantity)
+    procurement_quantities = db.Column(db.Text, nullable=True)
     purpose = db.Column(db.Text, nullable=False)
     branch_name = db.Column(db.String(100), nullable=False)
     request_date = db.Column(db.Date, nullable=False)

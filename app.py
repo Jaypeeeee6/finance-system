@@ -3295,7 +3295,7 @@ def department_dashboard():
 @login_required
 def procurement_dashboard():
     """Dashboard for Procurement department users"""
-    # Migrate: Add amount and receipt_path columns to procurement_item_requests if they don't exist
+    # Migrate: Add amount, receipt_path, and procurement_quantities columns to procurement_item_requests if they don't exist
     try:
         import sqlite3
         db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
@@ -3318,6 +3318,11 @@ def procurement_dashboard():
             cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN receipt_path VARCHAR(255)")
             conn.commit()
             print("✓ Added 'receipt_path' column to procurement_item_requests table")
+
+        if 'procurement_quantities' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN procurement_quantities TEXT")
+            conn.commit()
+            print("✓ Added 'procurement_quantities' column to procurement_item_requests table")
         
         conn.close()
     except Exception as e:
@@ -3560,7 +3565,7 @@ def procurement_item_requests():
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
     
-    # Migrate: Add amount column to procurement_item_requests if it doesn't exist
+    # Migrate: Add amount and procurement_quantities columns to procurement_item_requests if they don't exist
     try:
         import sqlite3
         db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
@@ -3578,6 +3583,11 @@ def procurement_item_requests():
             cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN amount NUMERIC(10, 3)")
             conn.commit()
             print("✓ Added 'amount' column to procurement_item_requests table")
+
+        if 'procurement_quantities' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN procurement_quantities TEXT")
+            conn.commit()
+            print("✓ Added 'procurement_quantities' column to procurement_item_requests table")
         
         if 'payment_date' not in existing_columns:
             cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN payment_date DATE")
@@ -4038,6 +4048,28 @@ def view_item_request(request_id):
 @login_required
 def view_item_request_page(request_id):
     """View a specific item request in full page format"""
+    # Safety migration: ensure new procurement_quantities column exists before querying
+    try:
+        import sqlite3
+        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+        if os.name == 'nt':  # Windows
+            db_path = db_path.replace('/', '\\')
+
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("PRAGMA table_info(procurement_item_requests)")
+        existing_columns = [row[1] for row in cursor.fetchall()]
+
+        if 'procurement_quantities' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN procurement_quantities TEXT")
+            conn.commit()
+            print("✓ Added 'procurement_quantities' column to procurement_item_requests table (view_item_request_page)")
+
+        conn.close()
+    except Exception as e:
+        print(f"Warning: Could not ensure procurement_quantities column exists: {e}")
+
     item_request = ProcurementItemRequest.query.get_or_404(request_id)
     
     # Check access permissions
@@ -5020,7 +5052,7 @@ def item_request_complete(request_id):
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
     completion_notes = request.form.get('completion_notes', '').strip()
-
+    
     # Receipt Amount (required)
     receipt_amount_str = request.form.get('receipt_amount', '').strip()
     if not receipt_amount_str:
@@ -5033,7 +5065,7 @@ def item_request_complete(request_id):
     except Exception:
         flash('Please enter a valid positive receipt amount in OMR.', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
-
+    
     # Invoice Amount (required)
     invoice_amount_str = request.form.get('invoice_amount', '').strip()
     if not invoice_amount_str:
@@ -5046,7 +5078,7 @@ def item_request_complete(request_id):
     except Exception:
         flash('Please enter a valid positive invoice amount in OMR.', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
-
+    
     # Receipt reference number (required, alphanumeric only)
     receipt_reference_number = request.form.get('receipt_reference_number', '').strip()
     if not receipt_reference_number:
@@ -5172,6 +5204,59 @@ def item_request_complete(request_id):
         )
     
     flash('Item request marked as completed!', 'success')
+    return redirect(url_for('view_item_request_page', request_id=request_id))
+
+
+@app.route('/procurement/item-request/<int:request_id>/update_quantities', methods=['POST'])
+@login_required
+def update_item_request_quantities(request_id):
+    """Update per-item quantities for multi-item requests (assigned procurement staff only).
+
+    NOTE: This should NOT modify the original quantity entered by the requestor.
+    Values are stored in ProcurementItemRequest.procurement_quantities instead.
+    """
+    item_request = ProcurementItemRequest.query.get_or_404(request_id)
+
+    # Only allow updates while request is assigned to procurement
+    if item_request.status != 'Assigned to Procurement':
+        flash('Quantities can only be updated when the request is assigned to procurement.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Must be Procurement department and not GM / Operation Manager
+    if current_user.department != 'Procurement' or current_user.role in ['GM', 'Operation Manager']:
+        flash('You do not have permission to update quantities for this request.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Only the assigned procurement staff member can edit
+    if not item_request.assigned_to_user_id or item_request.assigned_to_user_id != current_user.user_id:
+        flash('Only the assigned procurement staff member can update quantities for this request.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Parse the posted quantities list
+    raw_quantities = request.form.getlist('quantities[]')
+    cleaned_quantities = [q.strip() for q in raw_quantities]
+
+    # Ensure alignment with existing item list
+    item_names = [name.strip() for name in (item_request.item_name or '').split(',') if name.strip()]
+    if not item_names:
+        flash('No item names found for this request.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Normalise quantity list length to match items
+    if len(cleaned_quantities) < len(item_names):
+        cleaned_quantities += [''] * (len(item_names) - len(cleaned_quantities))
+    elif len(cleaned_quantities) > len(item_names):
+        cleaned_quantities = cleaned_quantities[:len(item_names)]
+
+    # Join using ";" separator (same convention used when displaying multiple quantities)
+    # Store in dedicated field so original requestor quantity remains unchanged
+    item_request.procurement_quantities = ';'.join(cleaned_quantities)
+    item_request.updated_at = datetime.utcnow()
+
+    db.session.commit()
+
+    log_action(f"Updated item quantities for procurement item request #{request_id}")
+    flash('Item quantities updated successfully.', 'success')
     return redirect(url_for('view_item_request_page', request_id=request_id))
 
 
