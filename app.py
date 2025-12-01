@@ -3543,11 +3543,17 @@ def procurement_dashboard():
 def procurement_item_requests():
     """Item Requests page - shows requests based on user role"""
     # Get filter parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
     tab = request.args.get('tab', 'all')
     department_filter = request.args.get('department', None)
     status_filter = request.args.get('status', None)
     urgent_filter = request.args.get('urgent', None)
     search_query = request.args.get('search', None)
+    
+    # Validate per_page to prevent abuse
+    if per_page not in [10, 20, 50, 100]:
+        per_page = 10
     
     # Migrate: Add amount column to procurement_item_requests if it doesn't exist
     try:
@@ -3721,6 +3727,47 @@ def procurement_item_requests():
     
     item_requests.sort(key=sort_key, reverse=False)
     
+    # Apply pagination to the sorted list (similar behavior to payment requests pagination)
+    total_requests_for_page = len(item_requests)
+    
+    # Clamp page within valid range
+    if page < 1:
+        page = 1
+    total_pages = (total_requests_for_page + per_page - 1) // per_page if per_page > 0 else 0
+    if total_pages and page > total_pages:
+        page = total_pages
+    
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    paginated_items = item_requests[start_idx:end_idx]
+    
+    class SimplePagination:
+        def __init__(self, items, page, per_page, total):
+            self.items = items
+            self.page = page
+            self.per_page = per_page
+            self.total = total
+            self.pages = (total + per_page - 1) // per_page if per_page > 0 else 0
+            self.has_prev = self.page > 1
+            self.has_next = self.page < self.pages
+            self.prev_num = self.page - 1 if self.has_prev else None
+            self.next_num = self.page + 1 if self.has_next else None
+        
+        def iter_pages(self, left_edge=2, left_current=2, right_current=5, right_edge=2):
+            last = 0
+            for num in range(1, self.pages + 1):
+                if (
+                    num <= left_edge
+                    or (num > self.page - left_current - 1 and num < self.page + right_current)
+                    or num > self.pages - right_edge
+                ):
+                    if last + 1 != num:
+                        yield None
+                    yield num
+                    last = num
+    
+    pagination = SimplePagination(paginated_items, page, per_page, total_requests_for_page)
+    
     # Calculate statistics (before filtering for display)
     all_item_requests_for_stats = ProcurementItemRequest.query.all()
     # Filter stats based on user role (same logic as above)
@@ -3809,7 +3856,7 @@ def procurement_item_requests():
     
     return render_template('procurement_item_requests.html',
                          user=current_user,
-                         item_requests=item_requests,
+                         item_requests=pagination.items,
                          total_requests=total_requests,
                          pending_requests=pending_requests,
                          completed_requests=completed_requests,
@@ -3823,6 +3870,7 @@ def procurement_item_requests():
                          urgent_filter=urgent_filter,
                          search_query=search_query,
                          departments=departments,
+                         pagination=pagination,
                          available_balance=available_balance,
                          completed_amount=completed_amount,
                          pending_amount=pending_amount,
