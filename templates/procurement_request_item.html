@@ -19,14 +19,14 @@
             <form method="POST" action="{{ url_for('procurement_request_item') }}" id="itemRequestForm" novalidate>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="requestor_name">Requestor Name *</label>
+                        <label for="requestor_name">Requestor Name <span class="required-star">*</span></label>
                         <input type="text" name="requestor_name" id="requestor_name" 
                                value="{{ user.name if user else '' }}" required 
                                placeholder="Enter your name">
                     </div>
 
                     <div class="form-group">
-                        <label for="department">Department *</label>
+                        <label for="department">Department <span class="required-star">*</span></label>
                         <input type="text" name="department" id="department" 
                                value="{{ user.department if user else '' }}" 
                                readonly style="background-color: #e9ecef;">
@@ -36,7 +36,46 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="category">Category *</label>
+                        <label for="branch_name">Branch Name <span class="required-star">*</span></label>
+                        <div class="branch-select-container">
+                            <div id="branch_chips_container" class="branch-chips-container"></div>
+                            <input type="text" id="branch_search" class="form-control" placeholder="Search branches..." autocomplete="off">
+                            <select name="branch_name" id="branch_name" class="form-control" style="display: none;">
+                                <option value="">-- Select Branch --</option>
+                                {% if available_branches %}
+                                    {% set current_restaurant = "" %}
+                                    {% for branch in available_branches %}
+                                        {% set restaurant = branch.restaurant %}
+                                        {% if restaurant != current_restaurant %}
+                                            {% if current_restaurant != "" %}
+                                                </optgroup>
+                                            {% endif %}
+                                            <optgroup label="{{ restaurant }} (Location)" data-restaurant="{{ restaurant }}">
+                                            {% set current_restaurant = restaurant %}
+                                        {% endif %}
+                                        <option value="{{ branch.name }}" data-restaurant="{{ restaurant }}">{{ branch.name }}</option>
+                                    {% endfor %}
+                                    {% if current_restaurant != "" %}
+                                        </optgroup>
+                                    {% endif %}
+                                {% endif %}
+                            </select>
+                            <input type="hidden" name="branch_names" id="branch_names" value="">
+                            <div id="branch_dropdown" class="branch-dropdown" style="display: none;"></div>
+                        </div>
+                        <small class="form-text text-muted">Choose which branches the items are for</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="date">Date of Submission</label>
+                        <input type="text" name="date" id="date" value="{{ today }}" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                        <small style="color: #666;">Automatically set to today's date</small>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="category">Category <span class="required-star">*</span></label>
                         <select name="category" id="category" required>
                             <option value="">-- Select Category --</option>
                             {% if procurement_categories %}
@@ -50,7 +89,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="item_name">Item Name/Description *</label>
+                        <label for="item_name">Item Name/Description <span class="required-star">*</span></label>
                         <div class="item-select-container">
                             <input type="text" id="item_search" class="form-control" 
                                    placeholder="{% if user and user.department == 'Operation' %}Search items...{% elif user and user.department == 'HR' %}Search items...{% else %}Enter item name...{% endif %}" 
@@ -85,47 +124,8 @@
                 </div>
 
                 <div class="form-row">
-                    <div class="form-group">
-                        <label for="branch_name">Branch Name *</label>
-                        <div class="branch-select-container">
-                            <div id="branch_chips_container" class="branch-chips-container"></div>
-                            <input type="text" id="branch_search" class="form-control" placeholder="Search branches..." autocomplete="off">
-                            <select name="branch_name" id="branch_name" class="form-control" style="display: none;">
-                                <option value="">-- Select Branch --</option>
-                                {% if available_branches %}
-                                    {% set current_restaurant = "" %}
-                                    {% for branch in available_branches %}
-                                        {% set restaurant = branch.restaurant %}
-                                        {% if restaurant != current_restaurant %}
-                                            {% if current_restaurant != "" %}
-                                                </optgroup>
-                                            {% endif %}
-                                            <optgroup label="{{ restaurant }} (Location)" data-restaurant="{{ restaurant }}">
-                                            {% set current_restaurant = restaurant %}
-                                        {% endif %}
-                                        <option value="{{ branch.name }}" data-restaurant="{{ restaurant }}">{{ branch.name }}</option>
-                                    {% endfor %}
-                                    {% if current_restaurant != "" %}
-                                        </optgroup>
-                                    {% endif %}
-                                {% endif %}
-                            </select>
-                            <input type="hidden" name="branch_names" id="branch_names" value="">
-                            <div id="branch_dropdown" class="branch-dropdown" style="display: none;"></div>
-                        </div>
-                        <small class="form-text text-muted">Type to search or select the branch location for this request</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="date">Date of Submission</label>
-                        <input type="text" name="date" id="date" value="{{ today }}" readonly style="background: #f5f5f5; cursor: not-allowed;">
-                        <small style="color: #666;">Automatically set to today's date</small>
-                    </div>
-                </div>
-
-                <div class="form-row">
                     <div class="form-group" style="flex: 1;">
-                        <label for="purpose">Purpose/Description *</label>
+                        <label for="purpose">Purpose/Description <span class="required-star">*</span></label>
                         <textarea name="purpose" id="purpose" rows="4" required 
                                   placeholder="Describe why you need this item and how it will be used"></textarea>
                         <small class="form-text text-muted">Provide details about the purpose and usage of the requested item</small>
@@ -171,6 +171,10 @@
     margin-bottom: 8px;
     font-weight: 500;
     color: #333;
+}
+
+.required-star {
+    color: #dc3545;
 }
 
 .form-group input[type="text"],
@@ -924,7 +928,11 @@ function initializeItemSearch() {
         categorySelect.addEventListener('change', function() {
             const selectedCategory = this.value;
             
-            // Don't clear selected items when category changes - just filter the dropdown
+            // When category changes, clear any previously selected items and their quantities
+            selectedItems = [];
+            updateChips();
+            updateDropdownSelection();
+            
             // Check if user is from Operation department (has predefined items)
             const hasPredefinedItems = hiddenSelect.options.length > 1; // More than just the placeholder option
             
