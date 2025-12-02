@@ -592,10 +592,8 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         <label for="account_name">Account Name {% if 'account_name' in edited_fields %}<span class="edited-badge" data-field="account_name" role="button" tabindex="0">Edited</span>{% endif %}</label>
                         {% set is_editable = (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') %}
                         {% if is_editable %}
-                            {# Show actual value when editable, even for IT users #}
+                            {# Show actual value when editable #}
                             <input type="text" id="account_name" name="account_name" value="{{ request.account_name }}" style="background: #ffffff;">
-                        {% elif (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                            <input type="text" id="account_name" name="account_name" value="***" readonly style="background: #f5f5f5; color: #999;">
                         {% else %}
                             <input type="text" id="account_name" name="account_name" value="{{ request.account_name }}" readonly style="background: #f5f5f5;">
                         {% endif %}
@@ -605,10 +603,8 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     <div class="form-group">
                         <label for="account_number">Account Number {% if 'account_number' in edited_fields %}<span class="edited-badge" data-field="account_number" role="button" tabindex="0">Edited</span>{% endif %}</label>
                         {% if is_editable %}
-                            {# Show actual value when editable, even for IT users #}
+                            {# Show actual value when editable #}
                             <input type="text" id="account_number" name="account_number" value="{{ request.account_number }}" style="background: #ffffff;">
-                        {% elif (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                            <input type="text" id="account_number" name="account_number" value="********" readonly style="background: #f5f5f5; color: #999; letter-spacing: 2px;">
                         {% else %}
                             <input type="text" id="account_number" name="account_number" value="{{ request.account_number }}" readonly style="background: #f5f5f5;">
                         {% endif %}
@@ -619,13 +615,11 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 <div class="form-group">
                     <label for="amount">Amount (OMR) {% if 'amount' in edited_fields %}<span class="edited-badge" data-field="amount" role="button" tabindex="0">Edited</span>{% endif %}</label>
                     {% if is_editable %}
-                        {# Show actual value when editable, even for IT users #}
+                        {# Show actual value when editable #}
                         <div style="position: relative;">
                             <span style="position: absolute; left: 12px; top: 12px; color: #666; font-weight: 600;">OMR</span>
                             <input type="number" id="amount" name="amount" step="0.001" min="0" value="{{ '%.3f'|format(request.amount|float) }}" style="background: #ffffff; padding-left: 55px; font-weight: bold;">
                         </div>
-                    {% elif (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                        <input type="text" id="amount" value="***" readonly style="background: #f5f5f5; color: #999; font-size: 1.2rem;">
                     {% else %}
                         <div style="position: relative;">
                             <span style="position: absolute; left: 12px; top: 12px; color: #666; font-weight: 600;">OMR</span>
@@ -791,13 +785,9 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                     </div>
                                     
                                     <div class="installment-amount">
-                                        {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                                            <div style="font-size: 1.1rem; font-weight: bold; color: #999;">***</div>
-                                        {% else %}
-                                            <div class="installment-amount-value">
-                                                OMR {{ '%.3f'|format(installment.amount) }}
-                                            </div>
-                                        {% endif %}
+                                        <div class="installment-amount-value">
+                                            OMR {{ '%.3f'|format(installment.amount) }}
+                                        </div>
                                         
                                         {% if installment.is_paid %}
                                             <div class="installment-status paid">
@@ -821,16 +811,11 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                             <div class="installments-summary">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                     <span style="font-weight: 600; color: #495057;">Total Amount:</span>
-                                    {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                                        <span style="font-weight: bold; color: #999;">***</span>
-                                    {% else %}
-                                        <span style="font-weight: bold; color: #007bff; font-size: 1.1rem;">
-                                            OMR {{ '%.3f'|format(request.amount|float) }}
-                                        </span>
-                                    {% endif %}
+                                    <span style="font-weight: bold; color: #007bff; font-size: 1.1rem;">
+                                        OMR {{ '%.3f'|format(request.amount|float) }}
+                                    </span>
                                 </div>
                                 
-                                {% if not ((user.role == 'IT Staff' or (user.role == 'Department Manager' and user.department == 'IT')) and request.department != 'IT') %}
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                     <span style="font-weight: 600; color: #28a745;">Amount Paid:</span>
                                     <span style="font-weight: bold; color: #28a745; font-size: 1.1rem;">
@@ -844,7 +829,6 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                         OMR {{ '%.3f'|format(request.amount|float - total_paid_amount) }}
                                     </span>
                                 </div>
-                                {% endif %}
                             </div>
                         {% else %}
                             <!-- For recurring payments without variable amounts -->
@@ -854,11 +838,9 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                 <div style="font-size: 0.9rem;">
                                     This is a recurring monthly payment. Payment amounts will be due each month according to the schedule.
                                 </div>
-                                {% if user.role != 'IT Staff' %}
                                 <div style="margin-top: 10px; font-weight: bold; color: #007bff;">
                                     Monthly Amount: OMR {{ '%.3f'|format(request.amount|float) }}
                                 </div>
-                                {% endif %}
                             </div>
                         {% endif %}
                     </div>
@@ -1552,15 +1534,9 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                         </div>
                                         
                                         <div class="installment-amount">
-                                            {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                                            <div class="installment-amount-value">
-                                                ***
-                                            </div>
-                                            {% else %}
                                             <div class="installment-amount-value">
                                                 OMR {{ '%.3f'|format(installment.amount) }}
                                             </div>
-                                            {% endif %}
                                             
                                             {% if installment.is_paid %}
                                                 <div class="installment-status paid">
@@ -1705,35 +1681,23 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                 <div class="installments-summary">
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                         <span style="font-weight: 600; color: #495057;">Total Amount:</span>
-                                        {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                                        <span style="font-weight: bold; color: #007bff; font-size: 1.1rem;">***</span>
-                                        {% else %}
                                         <span style="font-weight: bold; color: #007bff; font-size: 1.1rem;">
                                             OMR {{ '%.3f'|format(request.amount|float) }}
                                         </span>
-                                        {% endif %}
                                     </div>
                                     
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                         <span style="font-weight: 600; color: #28a745;">Amount Paid:</span>
-                                        {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                                        <span style="font-weight: bold; color: #28a745; font-size: 1.1rem;">***</span>
-                                        {% else %}
                                         <span style="font-weight: bold; color: #28a745; font-size: 1.1rem;">
                                             OMR {{ '%.3f'|format(total_paid_amount) }}
                                         </span>
-                                        {% endif %}
                                     </div>
                                     
                                     <div style="display: flex; justify-content: space-between; align-items: center;">
                                         <span style="font-weight: 600; color: #dc3545;">Remaining:</span>
-                                        {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                                        <span style="font-weight: bold; color: #dc3545; font-size: 1.1rem;">***</span>
-                                        {% else %}
                                         <span style="font-weight: bold; color: #dc3545; font-size: 1.1rem;">
                                             OMR {{ '%.3f'|format(request.amount|float - total_paid_amount) }}
                                         </span>
-                                        {% endif %}
                                     </div>
                                 </div>
                             {% else %}
@@ -1744,15 +1708,9 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                     <div style="font-size: 0.9rem;">
                                         This is a recurring monthly payment. Payment amounts will be due each month according to the schedule.
                                     </div>
-                                    {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                                    <div style="margin-top: 10px; font-weight: bold; color: #007bff;">
-                                        Monthly Amount: ***
-                                    </div>
-                                    {% else %}
                                     <div style="margin-top: 10px; font-weight: bold; color: #007bff;">
                                         Monthly Amount: OMR {{ '%.3f'|format(request.amount|float) }}
                                     </div>
-                                    {% endif %}
                                 </div>
                             {% endif %}
                         </div>
@@ -1816,11 +1774,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                         </div>
 
                                         <div class="installment-amount">
-                                            {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                                            <div class="installment-amount-value">***</div>
-                                            {% else %}
                                             <div class="installment-amount-value">OMR {{ '%.3f'|format(installment.amount) }}</div>
-                                            {% endif %}
 
                                             {% if installment.is_paid %}
                                                 <div class="installment-status paid"><i class="fas fa-check-circle"></i> Paid</div>
@@ -1859,27 +1813,15 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                 <div class="installments-summary">
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                         <span style="font-weight: 600; color: #495057;">Total Amount:</span>
-                                        {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                                        <span style="font-weight: bold; color: #495057; font-size: 1.1rem;">***</span>
-                                        {% else %}
                                         <span style="font-weight: bold; color: #495057; font-size: 1.1rem;">OMR {{ '%.3f'|format(request.amount|float) }}</span>
-                                        {% endif %}
                                     </div>
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                         <span style="font-weight: 600; color: #28a745;">Amount Paid:</span>
-                                        {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                                        <span style="font-weight: bold; color: #28a745; font-size: 1.1rem;">***</span>
-                                        {% else %}
                                         <span style="font-weight: bold; color: #28a745; font-size: 1.1rem;">OMR {{ '%.3f'|format(total_paid_amount) }}</span>
-                                        {% endif %}
                                     </div>
                                     <div style="display: flex; justify-content: space-between; align-items: center;">
                                         <span style="font-weight: 600; color: #dc3545;">Remaining:</span>
-                                        {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                                        <span style="font-weight: bold; color: #dc3545; font-size: 1.1rem;">***</span>
-                                        {% else %}
                                         <span style="font-weight: bold; color: #dc3545; font-size: 1.1rem;">OMR {{ '%.3f'|format(request.amount|float - total_paid_amount) }}</span>
-                                        {% endif %}
                                     </div>
                                 </div>
                             {% else %}
@@ -1887,11 +1829,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                     <i class="fas fa-calendar-check" style="font-size: 2rem; margin-bottom: 10px; color: #6c757d;"></i>
                                     <div style="font-weight: 600; margin-bottom: 5px;">Monthly Recurring Payment</div>
                                     <div style="font-size: 0.9rem;">This is a recurring monthly payment. Payment amounts will be due each month according to the schedule.</div>
-                                    {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and request.department != 'IT' %}
-                                    <div style="margin-top: 10px; font-weight: bold; color: #6c757d;">Monthly Amount: ***</div>
-                                    {% else %}
                                     <div style="margin-top: 10px; font-weight: bold; color: #6c757d;">Monthly Amount: OMR {{ '%.3f'|format(request.amount|float) }}</div>
-                                    {% endif %}
                                 </div>
                             {% endif %}
                         </div>
