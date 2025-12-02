@@ -1030,13 +1030,25 @@
 
 /* Make step tabs same height on responsive screens */
 @media (max-width: 1024px) {
+    /* Container should NOT scroll - only the tabs list */
+    .step-tabs-container {
+        overflow: visible !important;
+    }
+    
+    /* Allow horizontal scrolling for tabs list ONLY - just like dashboard tabs */
     .step-tabs {
         align-items: stretch;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 0.25rem;
     }
     
     .step-tab {
         display: flex;
         align-items: stretch;
+        flex: 0 0 auto;
+        white-space: nowrap;
     }
     
     .step-tab-content {
@@ -1046,6 +1058,34 @@
         justify-content: center;
         min-height: 60px;
         height: 100%;
+        white-space: nowrap;
+    }
+    
+    /* Optional slimmer scrollbar for tabs */
+    .step-tabs::-webkit-scrollbar {
+        height: 6px;
+    }
+    .step-tabs::-webkit-scrollbar-thumb {
+        background: #dee2e6;
+        border-radius: 3px;
+    }
+    .step-tabs::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    
+    /* Item Request Page: Position tab icons on upper left and make smaller */
+    .view-request-page .step-tab-content {
+        position: relative;
+    }
+    
+    .view-request-page .step-tab.completed .step-tab-content::before,
+    .view-request-page .step-tab.warning .step-tab-content::before,
+    .view-request-page .step-tab.rejected .step-tab-content::before {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        margin-right: 0 !important;
+        font-size: 0.9rem !important;
     }
 }
 

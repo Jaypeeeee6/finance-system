@@ -15964,6 +15964,41 @@ if __name__ == '__main__':
             else:
                 print("✓ 'invoice_path' column already exists in procurement_item_requests table")
             
+            if 'receipt_amount' not in existing_columns:
+                cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN receipt_amount NUMERIC(10, 3)")
+                conn.commit()
+                print("✓ Added 'receipt_amount' column to procurement_item_requests table")
+            else:
+                print("✓ 'receipt_amount' column already exists in procurement_item_requests table")
+            
+            if 'invoice_amount' not in existing_columns:
+                cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN invoice_amount NUMERIC(10, 3)")
+                conn.commit()
+                print("✓ Added 'invoice_amount' column to procurement_item_requests table")
+            else:
+                print("✓ 'invoice_amount' column already exists in procurement_item_requests table")
+            
+            if 'receipt_reference_number' not in existing_columns:
+                cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN receipt_reference_number VARCHAR(100)")
+                conn.commit()
+                print("✓ Added 'receipt_reference_number' column to procurement_item_requests table")
+            else:
+                print("✓ 'receipt_reference_number' column already exists in procurement_item_requests table")
+            
+            if 'procurement_quantities' not in existing_columns:
+                cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN procurement_quantities TEXT")
+                conn.commit()
+                print("✓ Added 'procurement_quantities' column to procurement_item_requests table")
+            else:
+                print("✓ 'procurement_quantities' column already exists in procurement_item_requests table")
+            
+            if 'payment_date' not in existing_columns:
+                cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN payment_date DATE")
+                conn.commit()
+                print("✓ Added 'payment_date' column to procurement_item_requests table")
+            else:
+                print("✓ 'payment_date' column already exists in procurement_item_requests table")
+            
             if 'category' not in existing_columns:
                 cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN category VARCHAR(100)")
                 conn.commit()
