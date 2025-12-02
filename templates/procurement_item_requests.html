@@ -102,9 +102,6 @@
         <button class="tab-button {% if active_tab == 'completed' %}active{% endif %}" onclick="switchTab('completed')" id="tab-completed">
             <i class="fas fa-check-circle"></i> Completed
         </button>
-        <button class="tab-button {% if active_tab == 'returned' %}active{% endif %}" onclick="switchTab('returned')" id="tab-returned">
-            <i class="fas fa-undo"></i> Returned Items
-        </button>
         <div class="tab-search">
             <input type="text" id="tabSearchInput" placeholder="Search by request #, requestor, item, purpose..." class="tab-search-input" value="{{ search_query or '' }}">
             <button type="button" class="tab-search-btn" onclick="performSearch()">
