@@ -3937,6 +3937,9 @@ def view_item_request(request_id):
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager can view all requests (view-only)
         can_view = True
+    elif current_user.department == 'IT':
+        # IT department can view all item requests (view-only, consistent with item requests listing)
+        can_view = True
     elif current_user.department == 'Auditing' and item_request.status == 'Completed':
         # Auditing department can view all completed item requests for auditing purposes
         can_view = True
@@ -4094,6 +4097,9 @@ def view_item_request_page(request_id):
             can_view = True
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager can view all requests (view-only)
+        can_view = True
+    elif current_user.department == 'IT':
+        # IT department can view all item requests (view-only, consistent with item requests listing)
         can_view = True
     elif current_user.department == 'Auditing' and item_request.status == 'Completed':
         # Auditing department can view all completed item requests for auditing purposes
