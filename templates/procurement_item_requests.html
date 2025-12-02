@@ -90,15 +90,23 @@
     </div>
     {% endif %}
 
-    <!-- Tab Navigation (only for Procurement department users) -->
-    {% if user.department == 'Procurement' %}
+    <!-- Tab Navigation (for Procurement and IT department users) -->
+    {% if user.department == 'Procurement' or user.department == 'IT' %}
     <div class="tab-navigation">
         <button class="tab-button {% if active_tab == 'all' %}active{% endif %}" onclick="switchTab('all')" id="tab-all">
             <i class="fas fa-list"></i> All Item Requests
         </button>
+
+        {% if user.department == 'Procurement' %}
         <button class="tab-button {% if active_tab == 'assigned_to_self' %}active{% endif %}" onclick="switchTab('assigned_to_self')" id="tab-assigned_to_self">
             <i class="fas fa-user"></i> Assigned to Self
         </button>
+        {% elif user.department == 'IT' %}
+        <button class="tab-button {% if active_tab == 'my_requests' %}active{% endif %}" onclick="switchTab('my_requests')" id="tab-my_requests">
+            <i class="fas fa-user"></i> My Item Requests
+        </button>
+        {% endif %}
+
         <button class="tab-button {% if active_tab == 'completed' %}active{% endif %}" onclick="switchTab('completed')" id="tab-completed">
             <i class="fas fa-check-circle"></i> Completed
         </button>
@@ -116,12 +124,15 @@
         <div class="card-header">
             <div class="header-top">
                 <div class="filter-controls">
+                    {# Hide department filter specifically for IT department on My Item Requests tab #}
+                    {% if not (user.department == 'IT' and active_tab == 'my_requests') %}
                     <select id="departmentFilter" onchange="applyDepartmentFilter()" class="form-select">
                         <option value="">All Departments</option>
                         {% for dept in departments %}
                         <option value="{{ dept }}" {% if department_filter == dept %}selected{% endif %}>{{ dept }}</option>
                         {% endfor %}
                     </select>
+                    {% endif %}
                     <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
                         <option value="">All Statuses</option>
                         <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
@@ -151,7 +162,7 @@
                         {% if search_query %}{{ filters.append('Search: ' + search_query) or '' }}{% endif %}
                         {{ filters|join(' | ') }}
                     </span>
-                    <a href="{{ url_for('procurement_item_requests', tab=active_tab if user.department == 'Procurement' else 'all') }}" class="btn btn-sm btn-outline">
+                    <a href="{{ url_for('procurement_item_requests', tab=active_tab if (user.department == 'Procurement' or user.department == 'IT') else 'all') }}" class="btn btn-sm btn-outline">
                         <i class="fas fa-times"></i> Clear All
                     </a>
                 </div>
@@ -272,7 +283,7 @@
             </div>
             
             <!-- Pagination Controls -->
-            {% if user.department == 'Procurement' and active_tab == 'all' and pagination %}
+            {% if (user.department == 'Procurement' or user.department == 'IT') and active_tab == 'all' and pagination %}
             <div class="pagination-container">
                 <div class="pagination-left">
                     <div class="pagination-info">
@@ -638,6 +649,12 @@ let searchDebounceTimer = null;
 function switchTab(tab) {
     const url = new URL(window.location);
     url.searchParams.set('tab', tab);
+    
+    // For My Item Requests tab, clear department filter so results are based only on the current user's items
+    if (tab === 'my_requests') {
+        url.searchParams.delete('department');
+    }
+    
     // Preserve other filters
     const searchInput = document.getElementById('tabSearchInput');
     if (searchInput && searchInput.value.trim()) {

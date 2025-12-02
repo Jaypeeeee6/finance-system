@@ -3675,11 +3675,14 @@ def procurement_item_requests():
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager see all requests (view-only, same as Procurement Manager)
         base_item_requests = all_requests
+    elif current_user.department == 'IT':
+        # IT department can see all item requests (view-only, similar to payment requests visibility)
+        base_item_requests = all_requests
     elif current_user.department == 'Auditing':
         # Auditing department can see all completed item requests for auditing purposes
         base_item_requests = [r for r in all_requests if r.status == 'Completed']
     else:
-        # Managers see requests from their department
+        # Managers see requests from their department or requests they created
         authorized_approvers_ids = set()
         for req in all_requests:
             approvers = get_authorized_manager_approvers_for_item_request(req)
@@ -3692,7 +3695,7 @@ def procurement_item_requests():
         visible_request_ids = authorized_approvers_ids.union(my_requests)
         base_item_requests = [r for r in all_requests if r.id in visible_request_ids]
     
-    # Apply tab-based filtering (only for Procurement department users)
+    # Apply tab-based filtering
     if current_user.department == 'Procurement':
         if tab == 'assigned_to_self':
             # Show requests assigned to current user
@@ -3706,8 +3709,17 @@ def procurement_item_requests():
         else:  # tab == 'all'
             # Show all requests (default)
             item_requests = base_item_requests
+    elif current_user.department == 'IT':
+        if tab == 'my_requests':
+            # IT: show only item requests created by the current IT user
+            item_requests = [r for r in base_item_requests if r.user_id == current_user.user_id]
+        elif tab == 'completed':
+            # IT: show all completed item requests
+            item_requests = [r for r in base_item_requests if r.status == 'Completed']
+        else:  # tab == 'all' or any other value
+            item_requests = base_item_requests
     else:
-        # For non-procurement users, don't apply tab filtering
+        # For other non-procurement users, don't apply tab filtering
         item_requests = base_item_requests
     
     # Sort item requests: first by status priority, then by datetime (most recent first)
