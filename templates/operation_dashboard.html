@@ -498,7 +498,54 @@
             </div>
             
             <!-- Pagination Controls -->
-            {% if active_tab == 'all' and pagination %}
+            {% if active_tab == 'my_requests' and my_pagination %}
+            <div class="pagination-container">
+                <div class="pagination-left">
+                    <div class="pagination-info">
+                        Showing {{ my_pagination.per_page * (my_pagination.page - 1) + 1 }} to 
+                        {{ my_pagination.per_page * (my_pagination.page - 1) + my_pagination.items|length }} 
+                        of {{ my_pagination.total }} requests
+                    </div>
+                    <div class="items-per-page">
+                        <label for="per_page">Show:</label>
+                        <select id="per_page" onchange="changeItemsPerPage(this.value)">
+                            <option value="10" {% if my_pagination.per_page == 10 %}selected{% endif %}>10</option>
+                            <option value="20" {% if my_pagination.per_page == 20 %}selected{% endif %}>20</option>
+                            <option value="50" {% if my_pagination.per_page == 50 %}selected{% endif %}>50</option>
+                            <option value="100" {% if my_pagination.per_page == 100 %}selected{% endif %}>100</option>
+                        </select>
+                        <span>per page</span>
+                    </div>
+                </div>
+                {% if my_pagination.pages > 1 %}
+                <div class="pagination">
+                    {% if my_pagination.has_prev %}
+                        <a href="{{ url_for('operation_dashboard', page=my_pagination.prev_num, per_page=my_pagination.per_page, status=status_filter, tab=active_tab, department=department_filter, urgent=urgent_filter, search=search_query) }}" class="btn btn-sm btn-secondary">
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </a>
+                    {% endif %}
+                    
+                    {% for page_num in my_pagination.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != my_pagination.page %}
+                                <a href="{{ url_for('operation_dashboard', page=page_num, per_page=my_pagination.per_page, status=status_filter, tab=active_tab, department=department_filter, urgent=urgent_filter, search=search_query) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
+                            {% else %}
+                                <span class="btn btn-sm btn-primary">{{ page_num }}</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="pagination-ellipsis">...</span>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if my_pagination.has_next %}
+                        <a href="{{ url_for('operation_dashboard', page=my_pagination.next_num, per_page=my_pagination.per_page, status=status_filter, tab=active_tab, department=department_filter, urgent=urgent_filter, search=search_query) }}" class="btn btn-sm btn-secondary">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% elif pagination %}
             <div class="pagination-container">
                 <div class="pagination-left">
                     <div class="pagination-info">
