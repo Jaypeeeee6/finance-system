@@ -160,19 +160,32 @@
                     </div>
                 </li>
                 <li class="nav-user">
-                    <span class="user-info">
+                    <span class="user-info" {% if current_user.department == 'IT' %}onclick="toggleUserSettingsDropdown()" style="cursor: pointer;"{% endif %}>
                         <i class="fas fa-user-circle"></i>
                         <span>{{ current_user.name }}</span>
                         <span class="user-role">{{ current_user.role }}</span>
+                        {% if current_user.department == 'IT' %}
+                        <i class="fas fa-caret-down user-dropdown-caret"></i>
+                        {% endif %}
                     </span>
+                    {% if current_user.department == 'IT' %}
+                    <div class="notification-dropdown user-settings-dropdown" id="user-settings-dropdown">
+                        <div class="notification-dropdown-content">
+                            <button id="maintenance-toggle" class="btn btn-sm btn-warning" type="button" style="width: 100%; margin-bottom: 0.5rem;">
+                                <i class="fas fa-tools"></i> Enable Maintenance
+                            </button>
+                            <button class="btn btn-sm btn-secondary" type="button" style="width: 100%; margin-bottom: 0.35rem;" onclick="toggleItemRequests()">
+                                <i class="fas fa-boxes"></i>
+                                {% if show_item_requests_flag %}Hide Item Requests{% else %}Show Item Requests{% endif %}
+                            </button>
+                            <button class="btn btn-sm btn-secondary" type="button" style="width: 100%;" onclick="toggleLoginTesting()">
+                                <i class="fas fa-flask"></i>
+                                {% if show_test_login_flag %}Hide Login for Testing{% else %}Show Login for Testing{% endif %}
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
                 </li>
-                {% if current_user.is_authenticated and current_user.department == 'IT' %}
-                <li>
-                    <button id="maintenance-toggle" class="nav-link" style="cursor: pointer;">
-                        <i class="fas fa-tools"></i> Maintenance
-                    </button>
-                </li>
-                {% endif %}
                 <li><a href="{{ url_for('logout') }}" class="nav-link logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
             </ul>
         </div>
@@ -343,6 +356,7 @@
     <!-- Notification Bell JavaScript -->
     <script>
     let notificationDropdownOpen = false;
+    let userSettingsDropdownOpen = false;
     
     function getResponsiveMode() {
         return window.innerWidth <= 1024;
@@ -387,6 +401,64 @@
         
         // Stop dynamic time updates when dropdown is closed
         stopDynamicTimeUpdates();
+    }
+    
+    function toggleUserSettingsDropdown() {
+        const dropdown = document.getElementById('user-settings-dropdown');
+        if (!dropdown) return;
+        const isOpen = dropdown.classList.contains('show');
+        closeUserSettingsDropdown();
+        if (!isOpen) {
+            dropdown.classList.add('show');
+            userSettingsDropdownOpen = true;
+        }
+    }
+    
+    function closeUserSettingsDropdown() {
+        const dropdown = document.getElementById('user-settings-dropdown');
+        if (dropdown) dropdown.classList.remove('show');
+        userSettingsDropdownOpen = false;
+    }
+
+    async function toggleItemRequests() {
+        if (!confirm('Toggle visibility of Item Requests buttons and New Item Request?')) return;
+        try {
+            const resp = await fetch('/it/tools/toggle_item_requests', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'fetch' }
+            });
+            const data = await resp.json();
+            if (data && data.success) {
+                alert(data.message || 'Item Requests visibility updated.');
+                location.reload();
+            } else {
+                alert(data.message || 'Failed to toggle Item Requests visibility.');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error toggling Item Requests visibility. Please try again.');
+        }
+    }
+
+    async function toggleLoginTesting() {
+        if (!confirm('Toggle visibility of the Login for Testing button on the login page?')) return;
+        try {
+            const resp = await fetch('/it/tools/toggle_login_testing', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'fetch' }
+            });
+            const data = await resp.json();
+            if (data && data.success) {
+                alert(data.message || 'Login for Testing visibility updated.');
+                // No need to reload current page unless on login; but safe to reload
+                location.reload();
+            } else {
+                alert(data.message || 'Failed to toggle Login for Testing visibility.');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error toggling Login for Testing visibility. Please try again.');
+        }
     }
     
     function loadNotifications(contentId) {
@@ -552,6 +624,15 @@
         if (responsiveDropdown && responsiveDropdown.contains(event.target)) { isClickInside = true; }
         bells.forEach(b => { if (b.contains(event.target)) { isClickOnBell = true; } });
         if (notificationDropdownOpen && !isClickInside && !isClickOnBell) { closeNotificationDropdown(); }
+        
+        // Close user settings dropdown when clicking outside
+        const userDropdown = document.getElementById('user-settings-dropdown');
+        const userInfo = document.querySelector('.nav-user .user-info');
+        const isClickInsideUserDropdown = userDropdown && userDropdown.contains(event.target);
+        const isClickOnUserInfo = userInfo && userInfo.contains(event.target);
+        if (userSettingsDropdownOpen && !isClickInsideUserDropdown && !isClickOnUserInfo) {
+            closeUserSettingsDropdown();
+        }
     });
     
     document.addEventListener('DOMContentLoaded', function() {

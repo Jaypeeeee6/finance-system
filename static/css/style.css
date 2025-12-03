@@ -826,15 +826,24 @@ body {
 }
 
 .nav-user {
-    border-left: 2px solid var(--border-color);
-    padding-left: 1rem;
     margin-left: 0.5rem;
+    position: relative;
 }
 
 .user-info {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    padding: 0.4rem 1rem;
+    border-radius: 999px;
+    background: #f4f5f7;
+    border: 1px solid var(--border-color);
+}
+
+.user-dropdown-caret {
+    font-size: 0.7rem;
+    color: #777;
+    margin-left: 0.1rem;
 }
 
 .user-role {
@@ -914,6 +923,19 @@ body {
     border-bottom: 1px solid var(--border-color);
     background: var(--light-color);
     border-radius: 10px 10px 0 0;
+}
+
+/* User settings dropdown (under user info pill) */
+.user-settings-dropdown {
+    width: 260px;
+}
+
+.user-settings-dropdown .notification-dropdown-content {
+    padding: 0.9rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
 }
 
 .notification-dropdown-header h3 {

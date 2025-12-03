@@ -23,6 +23,8 @@ import base64
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_INSTANCE_DIR = os.path.join(BASE_DIR, 'instance')
 MAINTENANCE_FILE_PATH = os.path.join(DEFAULT_INSTANCE_DIR, 'maintenance.json')
+# Feature flags file (for IT-only temporary toggles)
+FEATURE_FLAGS_FILE_PATH = os.path.join(DEFAULT_INSTANCE_DIR, 'feature_flags.json')
 
 def read_maintenance_state():
     try:
@@ -40,16 +42,40 @@ def write_maintenance_state(enabled: bool, message: str = None):
     with open(MAINTENANCE_FILE_PATH, 'w', encoding='utf-8') as f:
         json.dump(state, f)
 
+
+def read_feature_flags():
+    """Read feature flags used for IT-only temporary toggles."""
+    try:
+        with open(FEATURE_FLAGS_FILE_PATH, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                return data
+            return {}
+    except Exception:
+        # Default: all flags off
+        return {}
+
+
+def write_feature_flags(**kwargs):
+    """Update feature flags (stored as JSON in the instance folder)."""
+    flags = read_feature_flags()
+    flags.update({k: bool(v) for k, v in kwargs.items()})
+    os.makedirs(os.path.dirname(FEATURE_FLAGS_FILE_PATH), exist_ok=True)
+    with open(FEATURE_FLAGS_FILE_PATH, 'w', encoding='utf-8') as f:
+        json.dump(flags, f)
+
 # Initialize Flask app
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Initialize maintenance path now that app is created
+# Initialize maintenance and feature flags paths now that app is created
 try:
     MAINTENANCE_FILE_PATH = os.path.join(app.instance_path, 'maintenance.json')
+    FEATURE_FLAGS_FILE_PATH = os.path.join(app.instance_path, 'feature_flags.json')
 except Exception:
     # Fallback to default path if app.instance_path not available
     MAINTENANCE_FILE_PATH = os.path.join(DEFAULT_INSTANCE_DIR, 'maintenance.json')
+    FEATURE_FLAGS_FILE_PATH = os.path.join(DEFAULT_INSTANCE_DIR, 'feature_flags.json')
 
 # Make timedelta available in templates
 from datetime import timedelta
@@ -83,6 +109,16 @@ def format_currency_filter(value):
         return f"{num:,.3f}"
     except (ValueError, TypeError):
         return str(value) if value else "0.000"
+
+
+@app.context_processor
+def inject_feature_flags():
+    """Expose IT-only feature flags to all templates."""
+    flags = read_feature_flags()
+    return {
+        'show_item_requests_flag': bool(flags.get('show_item_requests')),
+        'show_test_login_flag': bool(flags.get('show_test_login')),
+    }
 
 def format_recurring_schedule(interval, payment_schedule=None):
     """Format recurring interval into human-readable text"""
@@ -409,6 +445,46 @@ def maintenance_disable():
         pass
     flash('Maintenance mode disabled.', 'success')
     return redirect(request.referrer or url_for('dashboard'))
+
+
+@app.route('/it/tools/toggle_item_requests', methods=['POST'])
+@login_required
+@it_department_required
+def it_toggle_item_requests():
+    """IT-only toggle for showing/hiding Item Requests buttons and New Item Request."""
+    flags = read_feature_flags()
+    current = bool(flags.get('show_item_requests'))
+    new_value = not current
+    write_feature_flags(show_item_requests=new_value)
+    message = (
+        'Item Requests buttons are now visible for testing.'
+        if new_value else
+        'Item Requests buttons are now hidden.'
+    )
+    if request.is_json or request.headers.get('X-Requested-With') == 'fetch':
+        return jsonify({'success': True, 'enabled': new_value, 'message': message})
+    flash(message, 'success')
+    return redirect(request.referrer or url_for('it_dashboard'))
+
+
+@app.route('/it/tools/toggle_login_testing', methods=['POST'])
+@login_required
+@it_department_required
+def it_toggle_login_testing():
+    """IT-only toggle for showing/hiding the Login for Testing button on the login page."""
+    flags = read_feature_flags()
+    current = bool(flags.get('show_test_login'))
+    new_value = not current
+    write_feature_flags(show_test_login=new_value)
+    message = (
+        'Login for Testing button is now visible on the login page.'
+        if new_value else
+        'Login for Testing button is now hidden on the login page.'
+    )
+    if request.is_json or request.headers.get('X-Requested-With') == 'fetch':
+        return jsonify({'success': True, 'enabled': new_value, 'message': message})
+    flash(message, 'success')
+    return redirect(request.referrer or url_for('it_dashboard'))
 
 
 def role_required(*roles):
