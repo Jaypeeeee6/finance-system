@@ -5280,6 +5280,55 @@ def update_item_request_quantities(request_id):
     return redirect(url_for('view_item_request_page', request_id=request_id))
 
 
+@app.route('/procurement/item-request/<int:request_id>/update_quantities_manager', methods=['POST'])
+@login_required
+def update_item_request_quantities_manager(request_id):
+    """Allow authorized managers to adjust per-item quantities during Manager Approval.
+
+    This uses the same procurement_quantities field so that Procurement staff
+    see the manager-approved quantities, while the original requested quantity
+    remains unchanged in the quantity column.
+    """
+    item_request = ProcurementItemRequest.query.get_or_404(request_id)
+
+    # Only allow updates while request is awaiting (or on) Manager Approval
+    if item_request.status not in ['Pending Manager Approval', 'On Hold']:
+        flash('Quantities can only be updated while the request is pending manager approval or on hold by manager.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Authorization: same approvers as Manager Approval
+    approvers = get_authorized_manager_approvers_for_item_request(item_request)
+    if current_user not in approvers:
+        flash('You do not have permission to update quantities for this request at the manager stage.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Parse the posted quantities list
+    raw_quantities = request.form.getlist('quantities[]')
+    cleaned_quantities = [q.strip() for q in raw_quantities]
+
+    # Ensure alignment with existing item list
+    item_names = [name.strip() for name in (item_request.item_name or '').split(',') if name.strip()]
+    if not item_names:
+        flash('No item names found for this request.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Normalise quantity list length to match items
+    if len(cleaned_quantities) < len(item_names):
+        cleaned_quantities += [''] * (len(item_names) - len(cleaned_quantities))
+    elif len(cleaned_quantities) > len(item_names):
+        cleaned_quantities = cleaned_quantities[:len(item_names)]
+
+    # Store manager-approved quantities in the same field used by Procurement
+    item_request.procurement_quantities = ';'.join(cleaned_quantities)
+    item_request.updated_at = datetime.utcnow()
+
+    db.session.commit()
+
+    log_action(f"Manager-stage quantities updated for item request #{request_id}")
+    flash('Item quantities updated successfully for manager approval.', 'success')
+    return redirect(url_for('view_item_request_page', request_id=request_id))
+
+
 @app.route('/procurement/item-requests/bulk-assign', methods=['POST'])
 @login_required
 def bulk_assign_item_requests():
