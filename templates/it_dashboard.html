@@ -194,6 +194,7 @@
                                     <td>
                                         <span>#{{ req.request_id }}</span>
                                         {% if req.is_urgent %}
+                                            <br>
                                             <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
                                         {% endif %}
                                     </td>
@@ -367,7 +368,7 @@
                 
                 <!-- Completed Tab -->
                 <div id="tab-content-completed" class="tab-content {% if active_tab == 'completed' %}active{% endif %}">
-                    {% if completed_requests %}
+                    {% if requests %}
                         <div class="table-responsive">
                             <table class="data-table">
                                 <thead>
@@ -384,11 +385,12 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for req in completed_requests %}
+                                    {% for req in requests %}
                                     <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
                                         <td>
                                         <span>#{{ req.request_id }}</span>
                                         {% if req.is_urgent %}
+                                            <br>
                                             <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
                                         {% endif %}
                                     </td>
@@ -431,7 +433,7 @@
                 
                 <!-- Recurring Tab -->
                 <div id="tab-content-recurring" class="tab-content {% if active_tab == 'recurring' %}active{% endif %}">
-                    {% if recurring_requests %}
+                    {% if requests %}
                         <div class="table-responsive">
                             <table class="data-table">
                                 <thead>
@@ -449,11 +451,12 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for req in recurring_requests %}
+                                    {% for req in requests %}
                                     <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
                                         <td>
                                             <span>#{{ req.request_id }}</span>
                                             {% if req.is_urgent %}
+                                                <br>
                                                 <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
                                             {% endif %}
                                         </td>
@@ -515,7 +518,7 @@
                 
                 <!-- Rejected Tab -->
                 <div id="tab-content-rejected" class="tab-content {% if active_tab == 'rejected' %}active{% endif %}">
-                    {% if rejected_requests %}
+                    {% if requests %}
                         <div class="table-responsive">
                             <table class="data-table">
                                 <thead>
@@ -532,11 +535,12 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for req in rejected_requests %}
+                                    {% for req in requests %}
                                     <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
                                         <td>
                                         <span>#{{ req.request_id }}</span>
                                         {% if req.is_urgent %}
+                                            <br>
                                             <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
                                         {% endif %}
                                     </td>

@@ -3264,6 +3264,15 @@ def department_dashboard():
         PaymentRequest.user_id == current_user.user_id,
         PaymentRequest.is_archived == False
     )
+    # Apply department filter to my_requests_query
+    if department_filter:
+        my_requests_query = my_requests_query.filter(PaymentRequest.department == department_filter)
+    # Apply urgent filter to my_requests_query
+    if urgent_filter:
+        if urgent_filter == 'urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == True)
+        elif urgent_filter == 'not_urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == False)
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -3483,6 +3492,15 @@ def procurement_dashboard():
         PaymentRequest.user_id == current_user.user_id,
         PaymentRequest.is_archived == False
     )
+    # Apply department filter to my_requests_query
+    if department_filter:
+        my_requests_query = my_requests_query.filter(PaymentRequest.department == department_filter)
+    # Apply urgent filter to my_requests_query
+    if urgent_filter:
+        if urgent_filter == 'urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == True)
+        elif urgent_filter == 'not_urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == False)
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -6102,6 +6120,15 @@ def admin_dashboard():
         PaymentRequest.user_id == current_user.user_id,
         PaymentRequest.is_archived == False
     )
+    # Apply department filter to my_requests_query
+    if department_filter:
+        my_requests_query = my_requests_query.filter(PaymentRequest.department == department_filter)
+    # Apply urgent filter to my_requests_query
+    if urgent_filter:
+        if urgent_filter == 'urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == True)
+        elif urgent_filter == 'not_urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == False)
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -6255,6 +6282,15 @@ def finance_dashboard():
         PaymentRequest.user_id == current_user.user_id,
         PaymentRequest.is_archived == False
     )
+    # Apply department filter to my_requests_query
+    if department_filter:
+        my_requests_query = my_requests_query.filter(PaymentRequest.department == department_filter)
+    # Apply urgent filter to my_requests_query
+    if urgent_filter:
+        if urgent_filter == 'urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == True)
+        elif urgent_filter == 'not_urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == False)
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -6391,6 +6427,15 @@ def gm_dashboard():
         PaymentRequest.user_id == current_user.user_id,
         PaymentRequest.is_archived == False
     )
+    # Apply department filter to my_requests_query
+    if department_filter:
+        my_requests_query = my_requests_query.filter(PaymentRequest.department == department_filter)
+    # Apply urgent filter to my_requests_query
+    if urgent_filter:
+        if urgent_filter == 'urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == True)
+        elif urgent_filter == 'not_urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == False)
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -6514,6 +6559,15 @@ def ceo_dashboard():
         PaymentRequest.user_id == current_user.user_id,
         PaymentRequest.is_archived == False
     )
+    # Apply department filter to my_requests_query
+    if department_filter:
+        my_requests_query = my_requests_query.filter(PaymentRequest.department == department_filter)
+    # Apply urgent filter to my_requests_query
+    if urgent_filter:
+        if urgent_filter == 'urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == True)
+        elif urgent_filter == 'not_urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == False)
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -6665,6 +6719,15 @@ def it_dashboard():
         PaymentRequest.user_id == current_user.user_id,
         PaymentRequest.is_archived == False
     )
+    # Apply department filter to my_requests_query
+    if department_filter:
+        my_requests_query = my_requests_query.filter(PaymentRequest.department == department_filter)
+    # Apply urgent filter to my_requests_query
+    if urgent_filter:
+        if urgent_filter == 'urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == True)
+        elif urgent_filter == 'not_urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == False)
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -9028,6 +9091,15 @@ def operation_dashboard():
         PaymentRequest.user_id == current_user.user_id,
         PaymentRequest.is_archived == False
     )
+    # Apply department filter to my_requests_query
+    if department_filter:
+        my_requests_query = my_requests_query.filter(PaymentRequest.department == department_filter)
+    # Apply urgent filter to my_requests_query
+    if urgent_filter:
+        if urgent_filter == 'urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == True)
+        elif urgent_filter == 'not_urgent':
+            my_requests_query = my_requests_query.filter(PaymentRequest.is_urgent == False)
     my_requests_pagination = my_requests_query.order_by(PaymentRequest.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
