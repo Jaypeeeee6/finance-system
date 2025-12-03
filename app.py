@@ -861,7 +861,8 @@ def check_and_notify_low_balance(available_balance):
                         'user_id': manager.user_id
                     }, room=f'user_{manager.user_id}')
                 except Exception as e:
-                    log_action(f"Error broadcasting low balance notification via WebSocket: {str(e)}")
+                    # Silently handle WebSocket errors - don't log to audit
+                    pass
 
 def get_authorized_manager_approvers(request):
     """Get all users who are authorized to approve this request at the manager stage.
@@ -983,9 +984,6 @@ def get_authorized_manager_approvers_for_item_request(item_request):
         log_action(f"WARNING: User not found for item request #{item_request.id} with user_id {item_request.user_id}")
         return authorized_users
     
-    # Debug logging
-    log_action(f"DEBUG: get_authorized_manager_approvers_for_item_request - Requestor: {requestor.name}, Role: {requestor.role}, Department: {requestor.department}, Manager ID: {requestor.manager_id}")
-    
     # Hard rule: Requests submitted by GM/CEO/Operation Manager can ONLY be approved by Abdalaziz
     if requestor.role in ['GM', 'CEO', 'Operation Manager']:
         abdalaziz = User.query.filter_by(name='Abdalaziz Al-Brashdi').first()
@@ -1050,22 +1048,18 @@ def get_authorized_manager_approvers_for_item_request(item_request):
                 role='Department Manager',
                 department='IT'
             ).all()
-            log_action(f"DEBUG: Found {len(it_managers)} IT Department Managers for IT Staff request")
             for user in it_managers:
                 if user.user_id != requestor.user_id and user not in authorized_users:
                     authorized_users.append(user)
-                    log_action(f"DEBUG: Added IT Department Manager: {user.name} (ID: {user.user_id})")
         
         # Special case: Department Manager can approve same department requests
         dept_managers = User.query.filter_by(
             role='Department Manager',
             department=requestor.department
         ).all()
-        log_action(f"DEBUG: Found {len(dept_managers)} Department Managers for department '{requestor.department}'")
         for user in dept_managers:
             if user.user_id != requestor.user_id and user not in authorized_users:
                 authorized_users.append(user)
-                log_action(f"DEBUG: Added Department Manager: {user.name} (ID: {user.user_id}, Dept: {user.department})")
     
     # Remove duplicates
     seen = set()
@@ -1075,7 +1069,6 @@ def get_authorized_manager_approvers_for_item_request(item_request):
             seen.add(user.user_id)
             unique_authorized.append(user)
     
-    log_action(f"DEBUG: get_authorized_manager_approvers_for_item_request returning {len(unique_authorized)} unique authorized users")
     return unique_authorized
 
 def notify_users_by_role(request, notification_type, title, message, request_id=None):
@@ -5746,20 +5739,11 @@ def procurement_request_item():
             # Get manager approvers - ensure we reload the item_request with user relationship
             item_request = ProcurementItemRequest.query.get(item_request.id)
             
-            # Debug logging
-            log_action(f"DEBUG: Getting authorized approvers for item request #{item_request.id} from user_id {item_request.user_id}, department: {item_request.department}")
-            
             authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
-            
-            log_action(f"DEBUG: Found {len(authorized_approvers)} authorized approvers for item request #{item_request.id}")
             
             if not authorized_approvers:
                 # Log warning if no approvers found with more details
                 log_action(f"WARNING: No authorized approvers found for item request #{item_request.id} from {requestor_name} ({item_request.department}), user_id: {item_request.user_id}, role: {current_user.role if current_user else 'Unknown'}")
-            else:
-                # Log each approver found
-                for approver in authorized_approvers:
-                    log_action(f"DEBUG: Notifying approver: {approver.name} (ID: {approver.user_id}, Role: {approver.role}, Dept: {approver.department})")
             
             for approver in authorized_approvers:
                 try:
@@ -5770,9 +5754,9 @@ def procurement_request_item():
                         notification_type="item_request_submission",
                         item_request_id=item_request.id
                     )
-                    log_action(f"DEBUG: Notification created successfully for user_id {approver.user_id}")
                 except Exception as e:
-                    log_action(f"ERROR: Failed to create notification for user_id {approver.user_id}: {str(e)}")
+                    # Silently handle notification errors - don't log to audit
+                    pass
         
         # Notify IT department users about new item request (all IT Staff and IT Department Manager)
         it_users = User.query.filter(
@@ -5790,9 +5774,10 @@ def procurement_request_item():
                     notification_type="item_request_submission",
                     item_request_id=item_request.id
                 )
-                log_action(f"DEBUG: Notification sent to IT user {it_user.name} (ID: {it_user.user_id}) about new item request #{item_request.id}")
+                pass
             except Exception as e:
-                log_action(f"ERROR: Failed to create notification for IT user {it_user.user_id}: {str(e)}")
+                # Silently handle notification errors - don't log to audit
+                pass
         
         flash(f'Item request submitted successfully! Item: {item_name}, Quantity: {quantity or "N/A"}', 'success')
         
