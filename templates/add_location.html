@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Add Location{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-plus"></i> Add Location</h1>
+        <p>Add a new location priority</p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('add_location') }}">
+                <div class="form-group">
+                    <label for="location_name">Location Name *</label>
+                    <input type="text" name="location_name" id="location_name" class="form-control" required 
+                           value="{{ request.args.get('location_name', '') }}"
+                           placeholder="e.g., Office, Kucu, Boom, Thoum, Kitchen">
+                    <small class="form-text text-muted">Enter the location name (this will be used to group branches)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="priority">Priority *</label>
+                    <input type="number" name="priority" id="priority" class="form-control" required 
+                           value="{{ next_priority }}" min="1">
+                    <small class="form-text text-muted">Lower numbers appear first in branch dropdowns. Suggested: {{ next_priority }}</small>
+                </div>
+
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" name="is_active" id="is_active" class="form-check-input" checked>
+                        <label for="is_active" class="form-check-label">
+                            Active
+                        </label>
+                    </div>
+                    <small class="form-text text-muted">Active locations will be available for branch assignment</small>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Add Location
+                    </button>
+                    <a href="{{ url_for('manage_locations') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Help Section -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-info-circle"></i> Location Priority Guidelines</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Priority System:</h5>
+                    <ul>
+                        <li>Lower priority numbers appear first in branch dropdowns</li>
+                        <li>Priority 1 appears first, Priority 2 appears second, etc.</li>
+                        <li>You can reorder locations later by dragging them in the management page</li>
+                        <li>Locations without a priority entry will appear last</li>
+                    </ul>
+                    
+                    <h5>Location Names:</h5>
+                    <ul>
+                        <li>Use clear, consistent names</li>
+                        <li>Location names should match the "restaurant" field in branches</li>
+                        <li>Examples: Office, Kucu, Boom, Thoum, Kitchen</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-lightbulb"></i>
+                <strong>Tip:</strong> After adding a location, you can assign branches to it when creating or editing branches.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const locationNameInput = document.getElementById('location_name');
+    const priorityInput = document.getElementById('priority');
+    
+    form.addEventListener('submit', function(e) {
+        const locationName = locationNameInput.value.trim();
+        const priority = parseInt(priorityInput.value);
+        
+        if (!locationName) {
+            e.preventDefault();
+            alert('Please enter a location name.');
+            locationNameInput.focus();
+            return;
+        }
+        
+        if (isNaN(priority) || priority < 1) {
+            e.preventDefault();
+            alert('Please enter a valid priority number (1 or higher).');
+            priorityInput.focus();
+            return;
+        }
+    });
+});
+</script>
+{% endblock %}
+

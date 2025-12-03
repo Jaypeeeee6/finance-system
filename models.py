@@ -543,6 +543,37 @@ class BranchAlias(db.Model):
         return f"<BranchAlias {self.id} - {self.alias_name} (branch_id={self.branch_id})>"
 
 
+class LocationPriority(db.Model):
+    """Location priority for ordering location groups in branch dropdowns"""
+    __tablename__ = 'location_priorities'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    location_name = db.Column(db.String(100), nullable=False, unique=True)  # e.g., "Office", "Kucu", "Boom"
+    priority = db.Column(db.Integer, nullable=False)  # Lower number = higher priority (appears first)
+    is_active = db.Column(db.Boolean, default=True)  # Whether this location is currently available
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    
+    # Relationship to User who created this location
+    created_by = db.relationship('User', backref='created_location_priorities')
+    
+    def to_dict(self):
+        """Convert location priority to dictionary"""
+        return {
+            'id': self.id,
+            'location_name': self.location_name,
+            'priority': self.priority,
+            'is_active': self.is_active,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'created_by': self.created_by.name if self.created_by else 'System'
+        }
+    
+    def __repr__(self):
+        return f'<LocationPriority {self.id} - {self.location_name} (priority={self.priority})>'
+
+
 class FinanceAdminNote(db.Model):
     """Model for storing multiple finance admin notes for payment requests"""
     __tablename__ = 'finance_admin_notes'

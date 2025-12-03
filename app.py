@@ -12,7 +12,7 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, PersonCompanyOption, ProcurementCategory, ProcurementItem
+from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority
 from config import Config
 import json
 from playwright.sync_api import sync_playwright
@@ -5802,17 +5802,8 @@ def procurement_request_item():
         return redirect(url_for('procurement_item_requests'))
     
     # GET request - show the form
-    # Get available branches with custom order: Office first, then Kucu, Boom, Thoum, Kitchen
-    from sqlalchemy import case
-    location_order = case(
-        (Branch.restaurant == 'Office', 1),
-        (Branch.restaurant == 'Kucu', 2),
-        (Branch.restaurant == 'Boom', 3),
-        (Branch.restaurant == 'Thoum', 4),
-        (Branch.restaurant == 'Kitchen', 5),
-        else_=6
-    )
-    available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+    # Get available branches ordered by location priority from database
+    available_branches = get_branches_ordered_by_location()
     
     # Get categories and items from database based on user's department
     user_department = current_user.department if current_user else None
@@ -6767,6 +6758,12 @@ def it_dashboard():
         d = dept[0]
         departments.append('Management' if d == 'General Manager' else d)
     
+    # Get available locations for the filter dropdown
+    available_locations = get_location_priorities()
+    
+    # Get all location priorities for the branches tab
+    location_priorities = LocationPriority.query.order_by(LocationPriority.priority, LocationPriority.location_name).all()
+    
     return render_template('it_dashboard.html', 
                          requests=requests_pagination.items, 
                          my_requests=my_requests_pagination.items,
@@ -6791,6 +6788,8 @@ def it_dashboard():
                          request_types_search=request_types_search,
                          person_company_search=person_company_search,
                          location_filter=location_filter,
+                         available_locations=available_locations,
+                         location_priorities=location_priorities,
                          urgent_filter=urgent_filter,
                          completed_requests=completed_requests,
                          rejected_requests=rejected_requests,
@@ -8146,7 +8145,14 @@ def add_branch():
             flash(f'Error adding branch: {str(e)}', 'danger')
             return redirect(url_for('add_branch'))
     
-    return render_template('add_branch.html', user=current_user)
+    # Get all available locations from LocationPriority (show all locations in dropdown)
+    available_locations = get_location_priorities()
+    # Also get any locations that exist in branches but don't have a priority entry yet
+    all_branch_locations = get_all_locations()
+    existing_location_names = {lp.location_name for lp in available_locations}
+    unprioritized_locations = [loc for loc in all_branch_locations if loc not in existing_location_names]
+    
+    return render_template('add_branch.html', user=current_user, available_locations=available_locations, unprioritized_locations=unprioritized_locations)
 
 
 @app.route('/it/branches/edit/<int:branch_id>', methods=['GET', 'POST'])
@@ -8202,7 +8208,14 @@ def edit_branch(branch_id):
             flash(f'Error updating branch: {str(e)}', 'danger')
             return redirect(url_for('edit_branch', branch_id=branch_id))
     
-    return render_template('edit_branch.html', branch=branch, user=current_user)
+    # Get all available locations from LocationPriority (show all locations in dropdown)
+    available_locations = get_location_priorities()
+    # Also get any locations that exist in branches but don't have a priority entry yet
+    all_branch_locations = get_all_locations()
+    existing_location_names = {lp.location_name for lp in available_locations}
+    unprioritized_locations = [loc for loc in all_branch_locations if loc not in existing_location_names]
+    
+    return render_template('edit_branch.html', branch=branch, user=current_user, available_locations=available_locations, unprioritized_locations=unprioritized_locations)
 
 
 @app.route('/it/branches/<int:branch_id>/aliases/add', methods=['POST'])
@@ -8364,6 +8377,325 @@ def toggle_branch(branch_id):
         flash(f'Error updating branch: {str(e)}', 'danger')
     
     return redirect(url_for('manage_branches'))
+
+
+# ==================== LOCATION PRIORITY MANAGEMENT ROUTES ====================
+
+def get_location_priorities():
+    """Helper function to get location priorities ordered by priority (for filters - includes all locations)"""
+    return LocationPriority.query.order_by(LocationPriority.priority, LocationPriority.location_name).all()
+
+def get_active_location_priorities():
+    """Helper function to get only active location priorities ordered by priority"""
+    return LocationPriority.query.filter_by(is_active=True).order_by(LocationPriority.priority, LocationPriority.location_name).all()
+
+def get_all_locations():
+    """Helper function to get all unique location names from branches"""
+    locations = db.session.query(Branch.restaurant).distinct().all()
+    return [loc[0] for loc in locations]
+
+def get_branches_ordered_by_location():
+    """Helper function to get branches ordered by location priority from database"""
+    from sqlalchemy import case
+    
+    # Get all location priorities from database
+    location_priorities = LocationPriority.query.filter_by(is_active=True).all()
+    
+    # Build a mapping of location name to priority
+    location_priority_map = {lp.location_name: lp.priority for lp in location_priorities}
+    
+    # Get the maximum priority to use as default for locations without priority
+    max_priority = max([lp.priority for lp in location_priorities] + [999]) if location_priorities else 999
+    
+    # Build CASE statement dynamically
+    when_conditions = []
+    for location_name, priority in location_priority_map.items():
+        when_conditions.append((Branch.restaurant == location_name, priority))
+    
+    # If we have priorities, use them; otherwise fall back to alphabetical
+    if when_conditions:
+        # Build case statement with proper syntax - unpack when_conditions as *args
+        location_order = case(*when_conditions, else_=max_priority + 1)
+        return Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+    else:
+        # Fallback: if no priorities exist, order alphabetically by restaurant then name
+        return Branch.query.filter_by(is_active=True).order_by(Branch.restaurant, Branch.name).all()
+
+def shift_location_priorities(new_priority, exclude_location_id=None):
+    """
+    Shift all locations with priority >= new_priority down by 1.
+    Used when adding/editing a location to insert it at a specific priority.
+    
+    Args:
+        new_priority: The priority value to insert at
+        exclude_location_id: Location ID to exclude from shifting (for edit operations)
+    """
+    # Get all locations with priority >= new_priority
+    # Exclude the location being edited if provided
+    query = LocationPriority.query.filter(LocationPriority.priority >= new_priority)
+    if exclude_location_id:
+        query = query.filter(LocationPriority.id != exclude_location_id)
+    
+    locations_to_shift = query.order_by(LocationPriority.priority.desc()).all()
+    
+    # Shift each location down by 1 (increase priority by 1)
+    for location in locations_to_shift:
+        location.priority += 1
+        location.updated_at = datetime.utcnow()
+    
+    return len(locations_to_shift)
+
+@app.route('/it/locations')
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def manage_locations():
+    """Manage location priorities - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # Get all location priorities
+    location_priorities = LocationPriority.query.order_by(LocationPriority.priority, LocationPriority.location_name).all()
+    
+    # Get all unique locations from branches that don't have a priority entry yet
+    existing_location_names = {lp.location_name for lp in location_priorities}
+    all_branch_locations = get_all_locations()
+    unprioritized_locations = [loc for loc in all_branch_locations if loc not in existing_location_names]
+    
+    return render_template('manage_locations.html',
+                         location_priorities=location_priorities,
+                         unprioritized_locations=unprioritized_locations,
+                         user=current_user)
+
+
+@app.route('/it/locations/add', methods=['GET', 'POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def add_location():
+    """Add new location priority - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        location_name = request.form.get('location_name', '').strip()
+        priority = request.form.get('priority', type=int)
+        # Default to active=True so new locations appear in filters immediately
+        is_active = request.form.get('is_active', 'on') == 'on'
+        
+        if not location_name:
+            flash('Location name is required.', 'danger')
+            return redirect(url_for('add_location'))
+        
+        if priority is None:
+            flash('Priority is required.', 'danger')
+            return redirect(url_for('add_location'))
+        
+        # Check if location already exists
+        existing = LocationPriority.query.filter_by(location_name=location_name).first()
+        if existing:
+            flash(f'Location "{location_name}" already exists. Please edit the existing entry instead.', 'danger')
+            return redirect(url_for('manage_locations'))
+        
+        try:
+            # Check if priority already exists - if so, shift existing locations down
+            priority_exists = LocationPriority.query.filter_by(priority=priority).first()
+            if priority_exists:
+                shifted_count = shift_location_priorities(priority)
+                if shifted_count > 0:
+                    log_action(f'Shifted {shifted_count} location priority/priorities down to make room for new location at priority {priority}')
+            
+            location_priority = LocationPriority(
+                location_name=location_name,
+                priority=priority,
+                is_active=is_active,
+                created_by_user_id=current_user.user_id
+            )
+            
+            db.session.add(location_priority)
+            db.session.commit()
+            
+            log_action(f'Added location priority: {location_name} (priority={priority})')
+            
+            if priority_exists:
+                flash(f'Location "{location_name}" added successfully with priority {priority}. {shifted_count} existing location(s) were shifted down.', 'success')
+            else:
+                flash(f'Location "{location_name}" added successfully with priority {priority}.', 'success')
+            return redirect(url_for('manage_locations'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding location: {str(e)}', 'danger')
+            return redirect(url_for('add_location'))
+    
+    # Get the next available priority (highest priority + 1)
+    max_priority = db.session.query(db.func.max(LocationPriority.priority)).scalar()
+    next_priority = (max_priority or 0) + 1
+    
+    return render_template('add_location.html', user=current_user, next_priority=next_priority)
+
+
+@app.route('/it/locations/edit/<int:location_id>', methods=['GET', 'POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def edit_location(location_id):
+    """Edit location priority - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    location_priority = LocationPriority.query.get_or_404(location_id)
+    
+    if request.method == 'POST':
+        location_name = request.form.get('location_name', '').strip()
+        priority = request.form.get('priority', type=int)
+        is_active = request.form.get('is_active') == 'on'
+        
+        if not location_name:
+            flash('Location name is required.', 'danger')
+            return redirect(url_for('edit_location', location_id=location_id))
+        
+        if priority is None:
+            flash('Priority is required.', 'danger')
+            return redirect(url_for('edit_location', location_id=location_id))
+        
+        # Check if another location with same name exists
+        existing = LocationPriority.query.filter(
+            LocationPriority.location_name == location_name,
+            LocationPriority.id != location_id
+        ).first()
+        if existing:
+            flash(f'Location "{location_name}" already exists.', 'danger')
+            return redirect(url_for('edit_location', location_id=location_id))
+        
+        try:
+            old_name = location_priority.location_name
+            old_priority = location_priority.priority
+            
+            # If priority is changing, shift priorities accordingly
+            if priority != old_priority:
+                if priority < old_priority:
+                    # Moving to a lower priority number (e.g., 5 -> 1)
+                    # Shift locations between new and old priority up by 1 (1,2,3,4 -> 2,3,4,5)
+                    locations_to_shift = LocationPriority.query.filter(
+                        LocationPriority.priority >= priority,
+                        LocationPriority.priority < old_priority,
+                        LocationPriority.id != location_id
+                    ).all()
+                    
+                    for location in locations_to_shift:
+                        location.priority += 1
+                        location.updated_at = datetime.utcnow()
+                    
+                    if locations_to_shift:
+                        log_action(f'Shifted {len(locations_to_shift)} location priority/priorities up to make room for location at priority {priority}')
+                else:
+                    # Moving to a higher priority number (e.g., 1 -> 5)
+                    # Shift locations between old and new priority down by 1 (2,3,4,5 -> 1,2,3,4)
+                    locations_to_shift = LocationPriority.query.filter(
+                        LocationPriority.priority > old_priority,
+                        LocationPriority.priority <= priority,
+                        LocationPriority.id != location_id
+                    ).all()
+                    
+                    for location in locations_to_shift:
+                        location.priority -= 1
+                        location.updated_at = datetime.utcnow()
+                    
+                    if locations_to_shift:
+                        log_action(f'Shifted {len(locations_to_shift)} location priority/priorities down to make room for location at priority {priority}')
+            
+            location_priority.location_name = location_name
+            location_priority.priority = priority
+            location_priority.is_active = is_active
+            location_priority.updated_at = datetime.utcnow()
+            
+            db.session.commit()
+            
+            log_action(f'Updated location priority: {old_name} (priority {old_priority}) -> {location_name} (priority {priority})')
+            
+            if priority != old_priority:
+                flash(f'Location "{location_name}" updated successfully. Priorities have been adjusted.', 'success')
+            else:
+                flash(f'Location "{location_name}" updated successfully.', 'success')
+            return redirect(url_for('manage_locations'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating location: {str(e)}', 'danger')
+            return redirect(url_for('edit_location', location_id=location_id))
+    
+    return render_template('edit_location.html', location_priority=location_priority, user=current_user)
+
+
+@app.route('/it/locations/delete/<int:location_id>', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def delete_location(location_id):
+    """Delete location priority - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    location_priority = LocationPriority.query.get_or_404(location_id)
+    
+    # Check if any branches are using this location
+    branches_using_location = Branch.query.filter_by(restaurant=location_priority.location_name).count()
+    if branches_using_location > 0:
+        flash(f'Cannot delete location "{location_priority.location_name}" because {branches_using_location} branch(es) are using it. Please update or delete those branches first.', 'danger')
+        return redirect(url_for('manage_locations'))
+    
+    try:
+        location_name = location_priority.location_name
+        db.session.delete(location_priority)
+        db.session.commit()
+        
+        log_action(f'Deleted location priority: {location_name}')
+        
+        flash(f'Location "{location_name}" deleted successfully.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting location: {str(e)}', 'danger')
+    
+    return redirect(url_for('manage_locations'))
+
+
+@app.route('/it/locations/reorder', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def reorder_locations():
+    """Reorder location priorities via AJAX - IT only"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    try:
+        data = request.get_json()
+        location_orders = data.get('orders', [])  # List of {id: int, priority: int}
+        
+        for order_item in location_orders:
+            location_id = order_item.get('id')
+            new_priority = order_item.get('priority')
+            
+            if location_id and new_priority is not None:
+                location = LocationPriority.query.get(location_id)
+                if location:
+                    location.priority = new_priority
+                    location.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        log_action('Reordered location priorities')
+        
+        return jsonify({'success': True, 'message': 'Location priorities updated successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
 
 
 @app.route('/it/backup-database')
@@ -8799,17 +9131,7 @@ def new_request():
         if not branch_name:
             flash('At least one branch name is required.', 'error')
             available_request_types = get_available_request_types()
-            # Custom order: Office, Kucu, Boom, Thoum, Kitchen
-            from sqlalchemy import case
-            location_order = case(
-                (Branch.restaurant == 'Office', 1),
-                (Branch.restaurant == 'Kucu', 2),
-                (Branch.restaurant == 'Boom', 3),
-                (Branch.restaurant == 'Thoum', 4),
-                (Branch.restaurant == 'Kitchen', 5),
-                else_=6
-            )
-            available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+            available_branches = get_branches_ordered_by_location()
             return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         account_name = request.form.get('account_name')
         account_number = request.form.get('account_number')
@@ -8826,67 +9148,28 @@ def new_request():
             if not account_number:
                 flash('Account number is required when payment method is Card.', 'error')
                 available_request_types = get_available_request_types()
-                from sqlalchemy import case
-                location_order = case(
-                    (Branch.restaurant == 'Office', 1),
-                    (Branch.restaurant == 'Kucu', 2),
-                    (Branch.restaurant == 'Boom', 3),
-                    (Branch.restaurant == 'Thoum', 4),
-                    (Branch.restaurant == 'Kitchen', 5),
-                    else_=6
-                )
-                available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+                available_branches = get_branches_ordered_by_location()
                 return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         
         # Validate account number length (maximum 16 digits) - only if payment method is Card
         if payment_method == 'Card' and account_number and len(account_number) > 16:
             flash('Account number cannot exceed 16 digits.', 'error')
             available_request_types = get_available_request_types()
-            # Custom order: Office, Kucu, Boom, Thoum, Kitchen
-            from sqlalchemy import case
-            location_order = case(
-                (Branch.restaurant == 'Office', 1),
-                (Branch.restaurant == 'Kucu', 2),
-                (Branch.restaurant == 'Boom', 3),
-                (Branch.restaurant == 'Thoum', 4),
-                (Branch.restaurant == 'Kitchen', 5),
-                else_=6
-            )
-            available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+            available_branches = get_branches_ordered_by_location()
             return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         
         # Validate account number contains only digits - only if payment method is Card
         if payment_method == 'Card' and account_number and not account_number.isdigit():
             flash('Account number must contain only numbers.', 'error')
             available_request_types = get_available_request_types()
-            # Custom order: Office, Kucu, Boom, Thoum, Kitchen
-            from sqlalchemy import case
-            location_order = case(
-                (Branch.restaurant == 'Office', 1),
-                (Branch.restaurant == 'Kucu', 2),
-                (Branch.restaurant == 'Boom', 3),
-                (Branch.restaurant == 'Thoum', 4),
-                (Branch.restaurant == 'Kitchen', 5),
-                else_=6
-            )
-            available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+            available_branches = get_branches_ordered_by_location()
             return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         
         # Validate bank name is selected
         if not bank_name:
             flash('Please select a bank name.', 'error')
             available_request_types = get_available_request_types()
-            # Custom order: Office, Kucu, Boom, Thoum, Kitchen
-            from sqlalchemy import case
-            location_order = case(
-                (Branch.restaurant == 'Office', 1),
-                (Branch.restaurant == 'Kucu', 2),
-                (Branch.restaurant == 'Boom', 3),
-                (Branch.restaurant == 'Thoum', 4),
-                (Branch.restaurant == 'Kitchen', 5),
-                else_=6
-            )
-            available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+            available_branches = get_branches_ordered_by_location()
             return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         
         # Validate "Others" description if "Others" is selected
@@ -9167,17 +9450,7 @@ def new_request():
     
     # Get available request types and branches for the New Request page
     available_request_types = get_available_request_types()
-    # Custom order: Office, Kucu, Boom, Thoum, Kitchen
-    from sqlalchemy import case
-    location_order = case(
-        (Branch.restaurant == 'Office', 1),
-        (Branch.restaurant == 'Kucu', 2),
-        (Branch.restaurant == 'Boom', 3),
-        (Branch.restaurant == 'Thoum', 4),
-        (Branch.restaurant == 'Kitchen', 5),
-        else_=6
-    )
-    available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+    available_branches = get_branches_ordered_by_location()
     today = datetime.utcnow().date().strftime('%Y-%m-%d')
     return render_template('new_request.html', user=current_user, today=today, available_request_types=available_request_types, available_branches=available_branches)
 
@@ -10058,17 +10331,7 @@ def view_request(request_id):
     # Map Office → Management for request type catalog
     effective_department = 'Management' if req.department == 'Office' else req.department
     available_request_types = RequestType.query.filter_by(department=effective_department, is_active=True).order_by(RequestType.name).all()
-    # Custom order: Office, Kucu, Boom, Thoum, Kitchen
-    from sqlalchemy import case
-    location_order = case(
-        (Branch.restaurant == 'Office', 1),
-        (Branch.restaurant == 'Kucu', 2),
-        (Branch.restaurant == 'Boom', 3),
-        (Branch.restaurant == 'Thoum', 4),
-        (Branch.restaurant == 'Kitchen', 5),
-        else_=6
-    )
-    available_branches = Branch.query.filter_by(is_active=True).order_by(location_order, Branch.name).all()
+    available_branches = get_branches_ordered_by_location()
 
     was_just_edited = request.args.get('edited') == '1'
     edited_fields_param = request.args.get('edited_fields', '')
@@ -16162,6 +16425,73 @@ if __name__ == '__main__':
             conn.close()
         except Exception as e:
             print(f"Warning: Could not migrate columns: {e}")
+        
+        # Automatically initialize location priorities from existing branches
+        # This is SAFE: Only reads from branches table and inserts into location_priorities table
+        # Does NOT modify branches or payment_requests tables - existing requests are unaffected
+        try:
+            from models import LocationPriority, Branch
+            
+            # Default priorities matching the old hardcoded order
+            default_priorities = {
+                'Office': 1,
+                'Kucu': 2,
+                'Boom': 3,
+                'Thoum': 4,
+                'Kitchen': 5
+            }
+            
+            # Get all unique location names from branches table (READ ONLY - no modifications)
+            all_locations = db.session.query(Branch.restaurant).distinct().all()
+            location_names = [loc[0] for loc in all_locations if loc[0]]  # Filter out None/empty values
+            
+            if location_names:
+                created_count = 0
+                skipped_count = 0
+                
+                for location_name in location_names:
+                    # Check if location priority already exists (idempotent - safe to run multiple times)
+                    existing = LocationPriority.query.filter_by(location_name=location_name).first()
+                    
+                    if existing:
+                        skipped_count += 1
+                        continue
+                    
+                    # Get priority from defaults, or use a high number for new locations
+                    priority = default_priorities.get(location_name, 999)
+                    
+                    try:
+                        location_priority = LocationPriority(
+                            location_name=location_name,
+                            priority=priority,
+                            is_active=True,
+                            created_by_user_id=None  # System initialization
+                        )
+                        
+                        db.session.add(location_priority)
+                        created_count += 1
+                        
+                    except Exception as e:
+                        print(f"Warning: Could not create location priority for '{location_name}': {e}")
+                        db.session.rollback()
+                        continue
+                
+                # Commit all new location priorities
+                if created_count > 0:
+                    try:
+                        db.session.commit()
+                        print(f"✓ Auto-initialized {created_count} location priorit{'y' if created_count == 1 else 'ies'} from existing branches")
+                        if skipped_count > 0:
+                            print(f"  (Skipped {skipped_count} location{'s' if skipped_count != 1 else ''} that already had priorities)")
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"Warning: Could not commit location priorities: {e}")
+                elif skipped_count > 0:
+                    print(f"✓ All {skipped_count} location{'s' if skipped_count != 1 else ''} already have priorities configured")
+        except Exception as e:
+            # Don't break app startup if location initialization fails
+            print(f"Warning: Could not auto-initialize location priorities: {e}")
+            print("  (This is non-critical - you can manually add location priorities later)")
         
         # Check for timing alerts on startup
         try:

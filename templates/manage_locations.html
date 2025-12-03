@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Locations{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-map-marker-alt"></i> Manage Location Priorities</h1>
+        <p>Manage location priorities for branch ordering in payment requests</p>
+    </div>
+
+    <div class="dashboard-actions">
+        <a href="{{ url_for('add_location') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add Location
+        </a>
+        <a href="{{ url_for('it_dashboard', tab='branches') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to IT Dashboard
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-list-ol"></i> Location Priorities</h2>
+            <p class="text-muted">Lower priority numbers appear first in branch dropdowns. Drag to reorder or edit to change priority.</p>
+        </div>
+        <div class="card-body">
+            {% if location_priorities %}
+                <div class="table-responsive">
+                    <table class="data-table" id="locationsTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">Priority</th>
+                                <th>Location Name</th>
+                                <th>Status</th>
+                                <th>Created By</th>
+                                <th>Created Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="locationsTableBody">
+                            {% for location in location_priorities %}
+                            <tr data-location-id="{{ location.id }}" data-priority="{{ location.priority }}">
+                                <td>
+                                    <span class="badge badge-info">{{ location.priority }}</span>
+                                </td>
+                                <td><strong>{{ location.location_name }}</strong></td>
+                                <td>
+                                    {% if location.is_active %}
+                                        <span class="badge badge-success">
+                                            <i class="fas fa-check-circle"></i> Active
+                                        </span>
+                                    {% else %}
+                                        <span class="badge badge-danger">
+                                            <i class="fas fa-times-circle"></i> Inactive
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ location.created_by.name if location.created_by else 'System' }}</td>
+                                <td>{{ location.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <a href="{{ url_for('edit_location', location_id=location.id) }}" class="btn btn-sm btn-outline" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form method="POST" action="{{ url_for('delete_location', location_id=location.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete location \"{{ location.location_name }}\"? This will only work if no branches are using this location.')">
+                                            <button type="submit" class="btn btn-sm btn-danger" title="Delete">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Note:</strong> You can drag rows to reorder priorities, or edit individual locations to set specific priority numbers.
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <h3>No Locations Found</h3>
+                    <p>No location priorities have been configured yet. Click "Add Location" to create the first location.</p>
+                    <a href="{{ url_for('add_location') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add First Location
+                    </a>
+                </div>
+            {% endif %}
+            
+            {% if unprioritized_locations %}
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h3><i class="fas fa-exclamation-triangle"></i> Unprioritized Locations</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>The following locations are used by branches but don't have priority entries yet. Add them to control their order in dropdowns:</p>
+                        <ul>
+                            {% for location in unprioritized_locations %}
+                            <li>
+                                <strong>{{ location }}</strong>
+                                <a href="{{ url_for('add_location') }}?location_name={{ location }}" class="btn btn-sm btn-primary ml-2">
+                                    <i class="fas fa-plus"></i> Add Priority
+                                </a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tableBody = document.getElementById('locationsTableBody');
+    if (tableBody) {
+        const sortable = Sortable.create(tableBody, {
+            handle: '.badge-info',
+            animation: 150,
+            onEnd: function(evt) {
+                // Update priorities based on new order
+                const rows = tableBody.querySelectorAll('tr');
+                const orders = [];
+                
+                rows.forEach((row, index) => {
+                    const locationId = row.getAttribute('data-location-id');
+                    const newPriority = index + 1; // Start from 1
+                    orders.push({
+                        id: parseInt(locationId),
+                        priority: newPriority
+                    });
+                });
+                
+                // Send update to server
+                fetch('{{ url_for("reorder_locations") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ orders: orders })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update priority badges
+                        rows.forEach((row, index) => {
+                            const badge = row.querySelector('.badge-info');
+                            if (badge) {
+                                badge.textContent = index + 1;
+                            }
+                            row.setAttribute('data-priority', index + 1);
+                        });
+                        
+                        // Show success message
+                        const alert = document.createElement('div');
+                        alert.className = 'alert alert-success alert-dismissible fade show';
+                        alert.innerHTML = '<i class="fas fa-check-circle"></i> Location priorities updated successfully!';
+                        alert.style.position = 'fixed';
+                        alert.style.top = '20px';
+                        alert.style.right = '20px';
+                        alert.style.zIndex = '9999';
+                        document.body.appendChild(alert);
+                        
+                        setTimeout(() => {
+                            alert.remove();
+                        }, 3000);
+                    } else {
+                        alert('Error updating priorities: ' + (data.error || 'Unknown error'));
+                        location.reload(); // Reload to restore original order
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error updating priorities. Please refresh the page.');
+                    location.reload();
+                });
+            }
+        });
+    }
+});
+</script>
+
+<style>
+#locationsTableBody tr {
+    cursor: move;
+}
+
+#locationsTableBody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.badge-info {
+    cursor: grab;
+}
+
+.badge-info:active {
+    cursor: grabbing;
+}
+</style>
+{% endblock %}
+

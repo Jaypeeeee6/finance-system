@@ -16,13 +16,18 @@
                     <label for="restaurant">Location *</label>
                     <select name="restaurant" id="restaurant" class="form-control" required>
                         <option value="">-- Select Location --</option>
-                        <option value="Kucu" {% if branch.restaurant == 'Kucu' %}selected{% endif %}>Kucu</option>
-                        <option value="Boom" {% if branch.restaurant == 'Boom' %}selected{% endif %}>Boom</option>
-                        <option value="Thoum" {% if branch.restaurant == 'Thoum' %}selected{% endif %}>Thoum</option>
-                        <option value="Kitchen" {% if branch.restaurant == 'Kitchen' %}selected{% endif %}>Kitchen</option>
-                        <option value="Office" {% if branch.restaurant == 'Office' %}selected{% endif %}>Office</option>
+                        {% if available_locations %}
+                            {% for location in available_locations %}
+                                <option value="{{ location.location_name }}" {% if branch.restaurant == location.location_name %}selected{% endif %}>{{ location.location_name }}</option>
+                            {% endfor %}
+                        {% endif %}
+                        {% if unprioritized_locations %}
+                            {% for location in unprioritized_locations %}
+                                <option value="{{ location }}" {% if branch.restaurant == location %}selected{% endif %}>{{ location }}</option>
+                            {% endfor %}
+                        {% endif %}
                     </select>
-                    <small class="form-text text-muted">Select the location for grouping branches</small>
+                    <small class="form-text text-muted">Select the location for grouping branches. <a href="{{ url_for('manage_locations') }}" target="_blank">Manage locations</a></small>
                 </div>
 
                 <div class="form-group">

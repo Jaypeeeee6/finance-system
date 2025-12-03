@@ -49,7 +49,7 @@
             <i class="fas fa-shopping-cart"></i> Procurement Categories/Items
         </button>
         <button class="tab-btn {% if active_tab == 'branches' %}active{% endif %}" onclick="showTab('branches')">
-            <i class="fas fa-building"></i> Branches
+            <i class="fas fa-building"></i> Branches/Locations
         </button>
         <button class="tab-btn {% if active_tab == 'logs' %}active{% endif %}" onclick="showTab('logs')">
             <i class="fas fa-history"></i> Audit Logs
@@ -680,25 +680,28 @@
     </div>
     </div>
 
-    <!-- Branches Tab -->
+    <!-- Branches/Locations Tab -->
     <div id="branches-tab" class="tab-content {% if active_tab == 'branches' %}active{% endif %}">
         <div class="card">
             <div class="card-header">
-                <h2><i class="fas fa-building"></i> Branches Management</h2>
+                <h2><i class="fas fa-building"></i> Branches/Locations Management</h2>
                 <div class="header-buttons">
                     <a href="{{ url_for('add_branch') }}" class="btn btn-primary">
                         <i class="fas fa-plus"></i> Add Branch
                     </a>
+                    <a href="{{ url_for('add_location') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add Location
+                    </a>
                     <a href="{{ url_for('manage_branches') }}" class="btn btn-secondary">
-                        <i class="fas fa-cog"></i> Manage All Branches
+                        <i class="fas fa-cog"></i> Manage All Branches/Locations
                     </a>
                 </div>
             </div>
             <div class="card-body">
                 <div class="alert alert-info alert-persistent">
                     <i class="fas fa-info-circle"></i>
-                    <span><strong>Branches Management:</strong> Manage company branch locations. 
-                    These branches will appear in the dropdown when users create new payment requests.</span>
+                    <span><strong>Branches/Locations Management:</strong> Manage company branch locations and location priorities. 
+                    These branches will appear in the dropdown when users create new payment requests. Location priorities control the order of location groups in branch dropdowns.</span>
                 </div>
                 
                 <!-- Location Filter -->
@@ -712,16 +715,16 @@
                                 </label>
                                 <select name="location" id="location_filter" class="form-control filter-select" onchange="this.form.submit()">
                                     <option value="" {% if not location_filter %}selected{% endif %}>All Locations</option>
-                                    <option value="Kucu" {% if location_filter == 'Kucu' %}selected{% endif %}>Kucu</option>
-                                    <option value="Boom" {% if location_filter == 'Boom' %}selected{% endif %}>Boom</option>
-                                    <option value="Thoum" {% if location_filter == 'Thoum' %}selected{% endif %}>Thoum</option>
-                                    <option value="Kitchen" {% if location_filter == 'Kitchen' %}selected{% endif %}>Kitchen</option>
-                                    <option value="Office" {% if location_filter == 'Office' %}selected{% endif %}>Office</option>
+                                    {% if available_locations %}
+                                        {% for location in available_locations %}
+                                            <option value="{{ location.location_name }}" {% if location_filter == location.location_name %}selected{% endif %}>{{ location.location_name }}</option>
+                                        {% endfor %}
+                                    {% endif %}
                                 </select>
                             </div>
                             <div class="filter-actions">
                                 <a href="{{ url_for('it_dashboard', tab='branches') }}" class="btn btn-outline-secondary btn-sm">
-                                    <i class="fas fa-times"></i> Clear Filter
+                                    <i class="fas fa-times"></i> Clear
                                 </a>
                             </div>
                         </div>
@@ -734,15 +737,84 @@
                         <i class="fas fa-info-circle"></i>
                         <span>
                             {% if location_filter %}
-                                Showing {{ branches|length }} branch{{ 'es' if branches|length != 1 else '' }} for <strong>{{ location_filter }}</strong> location
+                                Showing {{ branches|length }} branch{{ 'es' if branches|length != 1 else '' }} and {{ location_priorities|length }} location{{ 's' if location_priorities|length != 1 else '' }} for <strong>{{ location_filter }}</strong> location
                             {% else %}
-                                Showing all {{ branches|length }} branches across all locations
+                                Showing all {{ branches|length }} branch{{ 'es' if branches|length != 1 else '' }} and {{ location_priorities|length }} location{{ 's' if location_priorities|length != 1 else '' }} across all locations
                             {% endif %}
                         </span>
                     </div>
                 </div>
                 
-                {% if branches %}
+                <!-- Locations Section -->
+                <div class="mb-4">
+                    <h3><i class="fas fa-map-marker-alt"></i> Locations</h3>
+                    <div class="alert alert-info mb-3" style="font-size: 0.9em;">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Note:</strong> You can drag rows by the priority badge to reorder locations, or edit individual locations to set specific priority numbers. Lower priority numbers appear first in branch dropdowns.
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table" id="locationsTable">
+                            <thead>
+                                <tr>
+                                    <th style="width: 120px; min-width: 120px;">Priority</th>
+                                    <th>Location Name</th>
+                                    <th>Status</th>
+                                    <th>Created By</th>
+                                    <th>Created Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="locationsTableBody">
+                                {% if location_priorities %}
+                                    {% for location in location_priorities %}
+                                    <tr data-location-id="{{ location.id }}" data-priority="{{ location.priority }}">
+                                        <td>
+                                            <span class="badge badge-info">{{ location.priority }}</span>
+                                        </td>
+                                        <td><strong>{{ location.location_name }}</strong></td>
+                                        <td>
+                                            {% if location.is_active %}
+                                                <span class="badge badge-success">Active</span>
+                                            {% else %}
+                                                <span class="badge badge-danger">Inactive</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ location.created_by.name if location.created_by else 'System' }}</td>
+                                        <td>{{ location.created_at.strftime('%Y-%m-%d') if location.created_at else 'N/A' }}</td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <a href="{{ url_for('edit_location', location_id=location.id) }}" class="btn btn-sm btn-info" title="Edit">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <form method="POST" action="{{ url_for('delete_location', location_id=location.id) }}" style="display: inline;">
+                                                    <button type="submit" class="btn btn-sm btn-danger" 
+                                                            title="Delete"
+                                                            onclick="return confirm('Are you sure you want to delete location \"{{ location.location_name }}\"? This will only work if no branches are using this location.')">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center">
+                                            <div class="empty-state">
+                                                <i class="fas fa-map-marker-alt"></i>
+                                                <p>No locations found. <a href="{{ url_for('add_location') }}">Add the first location</a></p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Branches Section -->
+                <div>
+                    <h3><i class="fas fa-building"></i> Branches</h3>
                     <div class="table-responsive">
                         <table class="data-table">
                             <thead>
@@ -757,60 +829,55 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for branch in branches %}
-                                <tr>
-                                    <td>{{ branch.id }}</td>
-                                    <td><strong>{{ branch.name }}</strong></td>
-                                    <td>
-                                        <span class="badge badge-info">
-                                            <i class="fas fa-map-marker-alt"></i> {{ branch.restaurant }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        {% if branch.is_active %}
-                                            <span class="badge badge-success">
-                                                <i class="fas fa-check-circle"></i> Active
+                                {% if branches %}
+                                    {% for branch in branches %}
+                                    <tr>
+                                        <td>{{ branch.id }}</td>
+                                        <td><strong>{{ branch.name }}</strong></td>
+                                        <td>
+                                            <span class="badge badge-info">
+                                                <i class="fas fa-map-marker-alt"></i> {{ branch.restaurant }}
                                             </span>
-                                        {% else %}
-                                            <span class="badge badge-danger">
-                                                <i class="fas fa-times-circle"></i> Inactive
-                                            </span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ branch.created_by.name if branch.created_by else 'System' }}</td>
-                                    <td>{{ branch.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                                    <td>
-                                        <div class="action-buttons">
-                                            <a href="{{ url_for('edit_branch', branch_id=branch.id) }}" class="btn btn-sm btn-outline" title="Edit">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            <form method="POST" action="{{ url_for('toggle_branch', branch_id=branch.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to {% if branch.is_active %}deactivate{% else %}activate{% endif %} this branch?')">
-                                                <button type="submit" class="btn btn-sm btn-outline" title="{% if branch.is_active %}Deactivate{% else %}Activate{% endif %}">
-                                                    <i class="fas fa-{% if branch.is_active %}pause{% else %}play{% endif %}"></i>
-                                                </button>
-                                            </form>
-                                            <form method="POST" action="{{ url_for('delete_branch', branch_id=branch.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this branch? This action cannot be undone.')">
-                                                <button type="submit" class="btn btn-sm btn-danger" title="Delete">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% if branch.is_active %}
+                                                <span class="badge badge-success">Active</span>
+                                            {% else %}
+                                                <span class="badge badge-danger">Inactive</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ branch.created_by.name if branch.created_by else 'System' }}</td>
+                                        <td>{{ branch.created_at.strftime('%Y-%m-%d') if branch.created_at else 'N/A' }}</td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <a href="{{ url_for('edit_branch', branch_id=branch.id) }}" class="btn btn-sm btn-info" title="Edit">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <form method="POST" action="{{ url_for('toggle_branch', branch_id=branch.id) }}" style="display: inline;">
+                                                    <button type="submit" class="btn btn-sm {% if branch.is_active %}btn-warning{% else %}btn-success{% endif %}" 
+                                                            title="{% if branch.is_active %}Deactivate{% else %}Activate{% endif %}"
+                                                            onclick="return confirm('Are you sure you want to {% if branch.is_active %}deactivate{% else %}activate{% endif %} this branch?')">
+                                                        <i class="fas fa-{% if branch.is_active %}pause{% else %}play{% endif %}"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="7" class="text-center">
+                                            <div class="empty-state">
+                                                <i class="fas fa-building"></i>
+                                                <p>No branches found. <a href="{{ url_for('add_branch') }}">Add the first branch</a></p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endif %}
                             </tbody>
                         </table>
                     </div>
-                {% else %}
-                    <div class="empty-state">
-                        <i class="fas fa-building"></i>
-                        <h3>No Branches Found</h3>
-                        <p>No branches have been created yet. Click "Add Branch" to create the first branch.</p>
-                        <a href="{{ url_for('add_branch') }}" class="btn btn-primary">
-                            <i class="fas fa-plus"></i> Add First Branch
-                        </a>
-                    </div>
-                {% endif %}
+                </div>
             </div>
         </div>
     </div>
@@ -2163,8 +2230,173 @@ document.addEventListener('DOMContentLoaded', function() {
             tab.style.display = 'block';
         }
     });
+    
+    // Initialize drag-and-drop for location priorities
+    const locationsTableBody = document.getElementById('locationsTableBody');
+    if (locationsTableBody) {
+        // Load SortableJS if not already loaded
+        if (typeof Sortable !== 'undefined') {
+            const sortable = Sortable.create(locationsTableBody, {
+                handle: '.badge-info',
+                animation: 150,
+                onEnd: function(evt) {
+                    // Update priorities based on new order
+                    const rows = locationsTableBody.querySelectorAll('tr');
+                    const orders = [];
+                    
+                    rows.forEach((row, index) => {
+                        const locationId = row.getAttribute('data-location-id');
+                        if (locationId) {
+                            const newPriority = index + 1; // Start from 1
+                            orders.push({
+                                id: parseInt(locationId),
+                                priority: newPriority
+                            });
+                        }
+                    });
+                    
+                    // Send update to server
+                    fetch('{{ url_for("reorder_locations") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ orders: orders })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update priority badges
+                            rows.forEach((row, index) => {
+                                const badge = row.querySelector('.badge-info');
+                                if (badge) {
+                                    badge.textContent = index + 1;
+                                }
+                                row.setAttribute('data-priority', index + 1);
+                            });
+                            
+                            // Show success message
+                            const alert = document.createElement('div');
+                            alert.className = 'alert alert-success alert-dismissible fade show';
+                            alert.innerHTML = '<i class="fas fa-check-circle"></i> Location priorities updated successfully!';
+                            alert.style.position = 'fixed';
+                            alert.style.top = '20px';
+                            alert.style.right = '20px';
+                            alert.style.zIndex = '9999';
+                            document.body.appendChild(alert);
+                            
+                            setTimeout(() => {
+                                alert.remove();
+                            }, 3000);
+                        } else {
+                            alert('Error updating priorities: ' + (data.error || 'Unknown error'));
+                            location.reload(); // Reload to restore original order
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error updating priorities. Please refresh the page.');
+                        location.reload();
+                    });
+                }
+            });
+        } else {
+            // Load SortableJS dynamically
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js';
+            script.onload = function() {
+                const sortable = Sortable.create(locationsTableBody, {
+                    handle: '.badge-info',
+                    animation: 150,
+                    onEnd: function(evt) {
+                        const rows = locationsTableBody.querySelectorAll('tr');
+                        const orders = [];
+                        
+                        rows.forEach((row, index) => {
+                            const locationId = row.getAttribute('data-location-id');
+                            if (locationId) {
+                                orders.push({
+                                    id: parseInt(locationId),
+                                    priority: index + 1
+                                });
+                            }
+                        });
+                        
+                        fetch('{{ url_for("reorder_locations") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ orders: orders })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                rows.forEach((row, index) => {
+                                    const badge = row.querySelector('.badge-info');
+                                    if (badge) badge.textContent = index + 1;
+                                    row.setAttribute('data-priority', index + 1);
+                                });
+                                
+                                const alert = document.createElement('div');
+                                alert.className = 'alert alert-success alert-dismissible fade show';
+                                alert.innerHTML = '<i class="fas fa-check-circle"></i> Location priorities updated successfully!';
+                                alert.style.position = 'fixed';
+                                alert.style.top = '20px';
+                                alert.style.right = '20px';
+                                alert.style.zIndex = '9999';
+                                document.body.appendChild(alert);
+                                setTimeout(() => alert.remove(), 3000);
+                            } else {
+                                alert('Error updating priorities: ' + (data.error || 'Unknown error'));
+                                location.reload();
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('Error updating priorities. Please refresh the page.');
+                            location.reload();
+                        });
+                    }
+                });
+            };
+            document.head.appendChild(script);
+        }
+    }
 });
 
 </script>
+
+<style>
+/* Drag and drop styling for location priorities */
+#locationsTableBody tr {
+    cursor: move;
+}
+
+#locationsTableBody tr:hover {
+    background-color: #f8f9fa;
+}
+
+#locationsTableBody .badge-info {
+    cursor: grab;
+}
+
+#locationsTableBody .badge-info:active {
+    cursor: grabbing;
+}
+
+#locationsTableBody tr.sortable-ghost {
+    opacity: 0.4;
+    background-color: #e9ecef;
+}
+
+/* Ensure priority column is wider */
+#locationsTable th:first-child,
+#locationsTable td:first-child {
+    width: 120px !important;
+    min-width: 120px !important;
+    max-width: 120px !important;
+}
+</style>
 {% endblock %}
 
