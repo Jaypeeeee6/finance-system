@@ -365,6 +365,146 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
     border-left: 4px solid #2196f3 !important;
     border-top: none !important;
 }
+
+/* Manager Verification Checkboxes */
+.field-verification-checkbox {
+    margin-left: 8px;
+    margin-right: 4px;
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    vertical-align: middle;
+}
+
+.verification-required-notice {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 20px;
+    color: #856404;
+    font-size: 0.95rem;
+}
+
+.verification-required-notice strong {
+    display: block;
+    margin-bottom: 6px;
+    color: #856404;
+}
+
+/* Verification Error Modal - Matching screenshot design */
+.verification-error-modal {
+    position: fixed !important;
+    inset: 0 !important;
+    display: none !important;
+    z-index: 9999 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: transparent !important;
+}
+
+.verification-error-modal[style*="flex"] {
+    display: flex !important;
+}
+
+.verification-error-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.verification-error-container {
+    position: relative;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    max-width: 450px;
+    width: 90%;
+    overflow: hidden;
+}
+
+.verification-error-header {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.verification-error-icon {
+    width: 24px;
+    height: 24px;
+    background: #dc3545;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.verification-error-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+    color: #dc3545;
+}
+
+.verification-error-body {
+    padding: 20px;
+    color: #212529;
+}
+
+.verification-error-message {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 12px;
+    color: #212529;
+}
+
+.verification-error-fields-list {
+    color: #212529;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+}
+
+.verification-error-fields-list li {
+    margin-bottom: 4px;
+}
+
+.verification-error-footer {
+    padding: 12px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.verification-error-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    text-transform: uppercase;
+}
+
+.verification-error-btn:hover {
+    background: #c82333;
+}
+
+.verification-error-btn:active {
+    background: #bd2130;
+}
 </style>
 {% endblock %}
 
@@ -416,12 +556,23 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 <i class="fas fa-info-circle"></i>
                 <span>Request submitted successfully. This step is always completed.</span>
             </div>
+            
+            {% set can_manager_approve = request.status == 'Pending Manager Approval' and ((request.temporary_manager_id and user.user_id == request.temporary_manager_id) or (not request.temporary_manager_id and ((user.role == 'Department Manager' and user.department == request.department and user.user_id != request.user_id) or (user.role == 'Finance Admin' and request.department == 'Finance' and user.user_id != request.user_id) or ((user.role in ['GM', 'Operation Manager']) and user.user_id != request.user_id and request.user.role not in ['GM','CEO','Operation Manager']) or (user.name == 'Abdalaziz Al-Brashdi' and request.user.role in ['GM', 'CEO', 'Finance Staff', 'Operation Manager'])))) %}
+            {% if can_manager_approve %}
+            <div class="verification-required-notice">
+                <strong><i class="fas fa-exclamation-triangle"></i> Verification Required</strong>
+                <div>Please verify all fields below by checking the boxes before approving this request. You can reject without verifying all fields.</div>
+            </div>
+            {% endif %}
 
             <!-- Request Details Form -->
             <form method="POST" action="{{ url_for('edit_request', request_id=request.request_id) }}" enctype="multipart/form-data">
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="request_type">Request Type {% if 'request_type' in edited_fields %}<span class="edited-badge" data-field="request_type" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                        <label for="request_type">
+                            {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="request_type" required>{% endif %}
+                            Request Type {% if 'request_type' in edited_fields %}<span class="edited-badge" data-field="request_type" role="button" tabindex="0">Edited</span>{% endif %}
+                        </label>
                         {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') or (user and user.role == 'Finance Admin' and request.status == 'Pending Finance Approval') %}
                         {% set is_others = request.request_type.startswith('Others:') %}
                         {% set others_spec = is_others and request.request_type.split(':', 1)[1].strip() or '' %}
@@ -476,20 +627,29 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 {% endif %}
 
                 <div class="form-group">
-                    <label for="branch_name">Branch Name {% if 'branch_name' in edited_fields %}<span class="edited-badge" data-field="branch_name" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                    <label for="branch_name">
+                        {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="branch_name" required>{% endif %}
+                        Branch Name {% if 'branch_name' in edited_fields %}<span class="edited-badge" data-field="branch_name" role="button" tabindex="0">Edited</span>{% endif %}
+                    </label>
                     <input type="text" id="branch_name" value="{{ request.branch_name|replace(',', ', ') }}" readonly style="background: #f5f5f5; cursor: not-allowed;">
                 </div>
 
                 <!-- Dynamic fields based on request type -->
                 {% if request.item_name %}
                 <div class="form-group">
-                    <label for="item_name">Item Name {% if 'item_name' in edited_fields %}<span class="edited-badge" data-field="item_name" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                    <label for="item_name">
+                        {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="item_name" required>{% endif %}
+                        Item Name {% if 'item_name' in edited_fields %}<span class="edited-badge" data-field="item_name" role="button" tabindex="0">Edited</span>{% endif %}
+                    </label>
                     <input type="text" id="item_name" name="item_name" value="{{ request.item_name }}" readonly style="background: #f5f5f5;">
                 </div>
                 {% endif %}
 
                 <div class="form-group" id="personCompanyGroupView">
-                    <label for="person_company">Person/Company Name {% if 'person_company' in edited_fields %}<span class="edited-badge" data-field="person_company" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                    <label for="person_company">
+                        {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="person_company" required>{% endif %}
+                        Person/Company Name {% if 'person_company' in edited_fields %}<span class="edited-badge" data-field="person_company" role="button" tabindex="0">Edited</span>{% endif %}
+                    </label>
                     <!-- Base text input (always holds the actual value saved to the backend) -->
                     <input type="text" id="person_company" name="person_company" value="{{ request.person_company or '' }}" readonly style="background: #f5f5f5;">
                     
@@ -503,14 +663,20 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 
                 {% if request.company_name %}
                 <div class="form-group">
-                    <label for="company_name">Company Name {% if 'company_name' in edited_fields %}<span class="edited-badge" data-field="company_name" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                    <label for="company_name">
+                        {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="company_name" required>{% endif %}
+                        Company Name {% if 'company_name' in edited_fields %}<span class="edited-badge" data-field="company_name" role="button" tabindex="0">Edited</span>{% endif %}
+                    </label>
                     <input type="text" id="company_name" name="company_name" value="{{ request.company_name }}" readonly style="background: #f5f5f5;">
                 </div>
                 {% endif %}
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="department">Department {% if 'department' in edited_fields %}<span class="edited-badge" data-field="department" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                        <label for="department">
+                            {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="department" required>{% endif %}
+                            Department {% if 'department' in edited_fields %}<span class="edited-badge" data-field="department" role="button" tabindex="0">Edited</span>{% endif %}
+                        </label>
                         {% if can_edit_department_only and request.status == 'Pending Manager Approval' %}
                         <select id="department" name="department" class="form-control" style="background: #ffffff;">
                             <option value="">-- Select Department --</option>
@@ -531,12 +697,18 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 </div>
 
                 <div class="form-group">
-                    <label for="purpose">Purpose/Description {% if 'purpose' in edited_fields %}<span class="edited-badge" data-field="purpose" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                    <label for="purpose">
+                        {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="purpose" required>{% endif %}
+                        Purpose/Description {% if 'purpose' in edited_fields %}<span class="edited-badge" data-field="purpose" role="button" tabindex="0">Edited</span>{% endif %}
+                    </label>
                     <textarea id="purpose" name="purpose" rows="4" readonly style="background: #f5f5f5;">{{ request.purpose }}</textarea>
                 </div>
 
                 <div class="form-group">
-                    <label for="payment_method">Payment Method {% if 'payment_method' in edited_fields %}<span class="edited-badge" data-field="payment_method" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                    <label for="payment_method">
+                        {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="payment_method" required>{% endif %}
+                        Payment Method {% if 'payment_method' in edited_fields %}<span class="edited-badge" data-field="payment_method" role="button" tabindex="0">Edited</span>{% endif %}
+                    </label>
                     {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') %}
                     <select id="payment_method" name="payment_method" class="form-control" style="background: #ffffff;">
                         <option value="Card" {% if (request.payment_method or 'Card') == 'Card' %}selected{% endif %}>Card</option>
@@ -548,7 +720,10 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 </div>
 
                 <div class="form-group">
-                    <label for="bank_name">Bank Name {% if 'bank_name' in edited_fields %}<span class="edited-badge" data-field="bank_name" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                    <label for="bank_name">
+                        {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="bank_name" required>{% endif %}
+                        Bank Name {% if 'bank_name' in edited_fields %}<span class="edited-badge" data-field="bank_name" role="button" tabindex="0">Edited</span>{% endif %}
+                    </label>
                     {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') %}
                     <select id="bank_name" name="bank_name">
                         <option value="">-- Select Bank --</option>
@@ -614,7 +789,10 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="account_name">Account Name {% if 'account_name' in edited_fields %}<span class="edited-badge" data-field="account_name" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                        <label for="account_name">
+                            {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="account_name" required>{% endif %}
+                            Account Name {% if 'account_name' in edited_fields %}<span class="edited-badge" data-field="account_name" role="button" tabindex="0">Edited</span>{% endif %}
+                        </label>
                         {% set is_editable = (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') %}
                         {% if is_editable %}
                             {# Show actual value when editable #}
@@ -626,7 +804,10 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 
                     {% if request.payment_method != 'Cheque' %}
                     <div class="form-group">
-                        <label for="account_number">Account Number {% if 'account_number' in edited_fields %}<span class="edited-badge" data-field="account_number" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                        <label for="account_number">
+                            {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="account_number" required>{% endif %}
+                            Account Number {% if 'account_number' in edited_fields %}<span class="edited-badge" data-field="account_number" role="button" tabindex="0">Edited</span>{% endif %}
+                        </label>
                         {% if is_editable %}
                             {# Show actual value when editable #}
                             <input type="text" id="account_number" name="account_number" value="{{ request.account_number }}" style="background: #ffffff;">
@@ -638,7 +819,10 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 </div>
 
                 <div class="form-group">
-                    <label for="amount">Amount (OMR) {% if 'amount' in edited_fields %}<span class="edited-badge" data-field="amount" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                    <label for="amount">
+                        {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="amount" required>{% endif %}
+                        Amount (OMR) {% if 'amount' in edited_fields %}<span class="edited-badge" data-field="amount" role="button" tabindex="0">Edited</span>{% endif %}
+                    </label>
                     {% if is_editable %}
                         {# Show actual value when editable #}
                         <div style="position: relative;">
@@ -656,7 +840,10 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 <!-- Payment Type Display -->
                 {% if request.recurring or request.payment_date %}
                 <div class="form-group">
-                    <label for="payment_type">Payment Type</label>
+                    <label for="payment_type">
+                        {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="payment_type" required>{% endif %}
+                        Payment Type
+                    </label>
                     {% if request.recurring == 'Recurring' %}
                         <input type="text" id="payment_type" value="{{ request.recurring }}" readonly style="background: #f5f5f5; font-weight: bold; color: #007bff;">
                     {% elif request.payment_date %}
@@ -721,7 +908,10 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 
       <!-- Requestor Receipt Files Section -->
        <div class="form-group">
-           <label><i class="fas fa-upload"></i> Receipt/Proof of Payment (Uploaded by Requestor)</label>
+           <label>
+               {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="receipt_files" required>{% endif %}
+               <i class="fas fa-upload"></i> Receipt/Proof of Payment (Uploaded by Requestor)
+           </label>
            {% if requestor_receipts and requestor_receipts|length > 0 %}
                {% for receipt_file in requestor_receipts %}
                <div style="margin-bottom: 10px; padding: 8px; background: #e7f3ff; border-radius: 4px; border: 1px solid #b3d9ff; display: flex; align-items: center; gap: 10px;">
@@ -2489,6 +2679,26 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
     </div>
 </div>
 
+<!-- Verification Error Modal - Placed outside containers to avoid CSS conflicts -->
+<div id="verificationErrorModal" class="verification-error-modal" style="display: none;">
+    <div class="verification-error-overlay" onclick="closeVerificationErrorModal()"></div>
+    <div class="verification-error-container">
+        <div class="verification-error-header">
+            <div class="verification-error-icon">!</div>
+            <h3 class="verification-error-title">Error</h3>
+        </div>
+        <div class="verification-error-body">
+            <div class="verification-error-message" id="verificationErrorMainMessage">
+                Please check all the fields on the request submitted (0) uncheck left:
+            </div>
+            <ul class="verification-error-fields-list" id="verificationErrorFieldsList"></ul>
+        </div>
+        <div class="verification-error-footer">
+            <button type="button" class="verification-error-btn" onclick="closeVerificationErrorModal()">OK</button>
+        </div>
+    </div>
+</div>
+
 <!-- Pre-Approval Notes Modal -->
 <div id="preApprovalNotesModal" class="modal-overlay" style="display: none;">
     <div class="modal-container">
@@ -2658,7 +2868,9 @@ document.addEventListener('DOMContentLoaded', function() {
             fields.forEach((el) => {
                 const id = el.id || '';
                 const isMasked = typeof el.value === 'string' && /^\*+$/.test(el.value.trim());
-                if (!excludedIds.has(id) && !isMasked) {
+                // Exclude verification checkboxes from triggering Save Edits
+                const isVerificationCheckbox = el.classList.contains('field-verification-checkbox');
+                if (!excludedIds.has(id) && !isMasked && !isVerificationCheckbox) {
                     if (el.hasAttribute('readonly')) {
                         el.removeAttribute('readonly');
                     }
@@ -2796,7 +3008,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         deleteCheckboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', showSaveForFiles);
+            // Exclude verification checkboxes - they should not trigger Save Edits
+            if (!checkbox.classList.contains('field-verification-checkbox')) {
+                checkbox.addEventListener('change', showSaveForFiles);
+            }
         });
     }
 
@@ -3188,19 +3403,137 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('DOMContentLoaded', function() {
 });
 
+// Verification Error Modal Functions - Define globally so it's accessible
+window.showVerificationErrorModal = function(uncheckedFields) {
+    console.log('showVerificationErrorModal called with:', uncheckedFields);
+    const modal = document.getElementById('verificationErrorModal');
+    const mainMessage = document.getElementById('verificationErrorMainMessage');
+    const fieldsListEl = document.getElementById('verificationErrorFieldsList');
+    
+    console.log('Modal elements:', { modal: !!modal, mainMessage: !!mainMessage, fieldsListEl: !!fieldsListEl });
+    
+    if (!modal) {
+        console.error('Modal element not found!');
+        // Fallback to alert
+        alert(`Please check all the fields on the request submitted (${uncheckedFields.length}) uncheck left:\n\n${uncheckedFields.join(', ')}`);
+        return;
+    }
+    
+    if (!mainMessage) {
+        console.error('Main message element not found!');
+        return;
+    }
+    
+    if (!fieldsListEl) {
+        console.error('Fields list element not found!');
+        return;
+    }
+    
+    // Update main message with count
+    const uncheckedCount = uncheckedFields.length;
+    mainMessage.textContent = `Please check all the fields on the request submitted (${uncheckedCount}) uncheck left:`;
+    
+    // Clear previous list
+    fieldsListEl.innerHTML = '';
+    
+    // Add each unchecked field as a list item
+    uncheckedFields.forEach(fieldName => {
+        const li = document.createElement('li');
+        li.textContent = fieldName + '.';
+        fieldsListEl.appendChild(li);
+    });
+    
+    // Show modal
+    console.log('Showing modal...');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    console.log('Modal display set to:', modal.style.display);
+};
+
+window.closeVerificationErrorModal = function() {
+    const modal = document.getElementById('verificationErrorModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+};
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('verificationErrorModal');
+        if (modal && modal.style.display === 'flex') {
+            closeVerificationErrorModal();
+        }
+    }
+});
+
+// Field name mapping for verification checkboxes
+function getFieldDisplayName(fieldKey) {
+    const map = {
+        request_type: 'Request Type',
+        branch_name: 'Branch Name',
+        item_name: 'Item Name',
+        person_company: 'Person/Company Name',
+        company_name: 'Company Name',
+        department: 'Department',
+        purpose: 'Purpose/Description',
+        payment_method: 'Payment Method',
+        bank_name: 'Bank Name',
+        account_name: 'Account Name',
+        account_number: 'Account Number',
+        amount: 'Amount (OMR)',
+        payment_type: 'Payment Type',
+        receipt_files: 'Receipt/Proof of Payment'
+    };
+    return map[fieldKey] || fieldKey;
+}
+
 // Debug form submission
 document.addEventListener('DOMContentLoaded', function() {
-    const managerForm = document.querySelector('form[action*="manager_approve"]');
-    if (managerForm) {
-        console.log('Manager approval form found:', managerForm);
-        
+    // Restore verification checkbox states from localStorage
+    const requestId = {{ request.request_id }};
+    const storageKey = `verification_checkboxes_${requestId}`;
+    const savedStates = localStorage.getItem(storageKey);
+    if (savedStates) {
+        try {
+            const states = JSON.parse(savedStates);
+            Object.keys(states).forEach(fieldKey => {
+                const checkbox = document.querySelector(`.field-verification-checkbox[data-field="${fieldKey}"]`);
+                if (checkbox) {
+                    checkbox.checked = states[fieldKey];
+                }
+            });
+        } catch (e) {
+            console.error('Error restoring checkbox states:', e);
+        }
+    }
+    
+    // Save checkbox states to localStorage when changed
+    document.querySelectorAll('.field-verification-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const requestId = {{ request.request_id }};
+            const storageKey = `verification_checkboxes_${requestId}`;
+            const checkboxes = document.querySelectorAll('.field-verification-checkbox');
+            const states = {};
+            checkboxes.forEach(cb => {
+                states[cb.getAttribute('data-field')] = cb.checked;
+            });
+            localStorage.setItem(storageKey, JSON.stringify(states));
+        });
+    });
+    
+    // Handle manager approval form submissions (both regular and returned)
+    const managerForms = document.querySelectorAll('form[action*="manager_approve"]');
+    managerForms.forEach(managerForm => {
         managerForm.addEventListener('submit', function(e) {
             console.log('Form submission triggered');
             console.log('Form action:', this.action);
             console.log('Form method:', this.method);
             
             // Check if required fields are filled
-            const approvalStatus = document.getElementById('manager_approval_status').value;
+            const approvalStatus = document.getElementById('manager_approval_status')?.value || 
+                                 document.getElementById('manager_approval_status_returned')?.value;
             console.log('Approval status:', approvalStatus);
             
             if (!approvalStatus) {
@@ -3211,13 +3544,51 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Check for required fields based on status
             if (approvalStatus === 'reject') {
-                const rejectionReason = document.getElementById('manager_rejection_reason').value;
-                if (!rejectionReason.trim()) {
+                const rejectionReason = document.getElementById('manager_rejection_reason')?.value || 
+                                       document.getElementById('manager_rejection_reason_returned')?.value;
+                if (!rejectionReason || !rejectionReason.trim()) {
                     e.preventDefault();
                     alert('Please provide a reason for rejection');
                     return false;
                 }
             }
+            
+            // Validate that all verification checkboxes are checked before approval
+            if (approvalStatus === 'approve') {
+                // Get all verification checkboxes
+                const verificationCheckboxes = document.querySelectorAll('.field-verification-checkbox');
+                
+                if (verificationCheckboxes.length > 0) {
+                    const uncheckedCheckboxes = Array.from(verificationCheckboxes).filter(cb => !cb.checked);
+                    
+                    if (uncheckedCheckboxes.length > 0) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        // Get field names for unchecked checkboxes
+                        const uncheckedFields = uncheckedCheckboxes.map(cb => {
+                            const fieldKey = cb.getAttribute('data-field');
+                            return getFieldDisplayName(fieldKey);
+                        });
+                        
+                        // Show error modal
+                        showVerificationErrorModal(uncheckedFields);
+                        
+                        // Scroll to first unchecked checkbox
+                        if (uncheckedCheckboxes.length > 0) {
+                            uncheckedCheckboxes[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            setTimeout(() => uncheckedCheckboxes[0].focus(), 100);
+                        }
+                        
+                        return false;
+                    }
+                }
+            }
+            
+            // Clear localStorage on successful submission
+            const requestId = {{ request.request_id }};
+            const storageKey = `verification_checkboxes_${requestId}`;
+            localStorage.removeItem(storageKey);
             
             console.log('Form validation passed, submitting...');
             
@@ -3228,7 +3599,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
             }
         });
-    }
+    });
 });
 
 // Update notification count when viewing a request
