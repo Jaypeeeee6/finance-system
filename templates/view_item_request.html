@@ -194,6 +194,130 @@
     margin-top: 8px;
 }
 
+.edited-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    vertical-align: middle;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.edited-badge:hover {
+    background: #ffe69c;
+}
+
+/* Field History Modal Styles */
+.field-history-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    z-index: 2000;
+}
+
+.field-history-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.field-history-container {
+    position: relative;
+    max-width: 720px;
+    margin: 8vh auto;
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.field-history-header {
+    background: linear-gradient(45deg, #007bff, #6f42c1);
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.field-history-header h4 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.field-history-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    line-height: 1;
+}
+
+.field-history-close:hover {
+    opacity: 0.8;
+}
+
+.field-history-body {
+    padding: 25px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.history-row {
+    border-bottom: 1px solid #e9ecef;
+    padding: 15px 0;
+}
+
+.history-row:last-child {
+    border-bottom: none;
+}
+
+.history-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+
+.history-user {
+    font-weight: 600;
+    color: #495057;
+}
+
+.history-time {
+    color: #6c757d;
+}
+
+.history-values {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.history-values div {
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.history-values div:first-child {
+    background: #fff3cd;
+    border: 1px solid #ffeeba;
+}
+
+.history-values div:last-child {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+}
+
 .item-chip-row {
     display: flex;
     align-items: center;
@@ -313,12 +437,98 @@
 
 /* Highlight when procurement quantity is less than original requested quantity */
 .qty-less-than-original {
-    background: #ffe5e5;
-    border: 1px solid #dc3545;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+}
+
+.previously-rejected-by-manager {
+    background-color: #ffe5e5 !important;
+    border-left: 4px solid #dc3545 !important;
+}
+
+.previously-rejected-by-manager .procurement-cart-item-name {
+    color: #dc3545;
+    font-weight: 500;
+}
+
+/* Custom tooltip for info icons */
+.tooltip-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip-wrapper .tooltip-icon {
+    color: #dc3545;
+    margin-left: 8px;
+    cursor: help;
+    font-size: 0.9em;
+}
+
+.tooltip-wrapper .tooltip-text {
+    visibility: hidden;
+    width: 280px;
+    background-color: #333;
+    color: #fff;
+    text-align: left;
+    border-radius: 6px;
+    padding: 8px 12px;
+    position: absolute;
+    z-index: 1000;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -140px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 0.875rem;
+    font-weight: normal;
+    line-height: 1.4;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.tooltip-wrapper .tooltip-text::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
+}
+
+.tooltip-wrapper:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
 }
 
 .procurement-cart-note.initially-hidden {
     display: none;
+}
+
+.quantity-readonly-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.edit-qty-btn {
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+.edit-qty-btn:hover {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.edit-qty-btn i {
+    font-size: 0.875rem;
 }
 </style>
 {% endblock %}
@@ -403,41 +613,90 @@
             {% endif %}
 
             {% if item_request.item_name and ',' in item_request.item_name %}
-                {# Multiple items - display as chips (ALWAYS show original requestor quantity here) #}
-                <div class="form-group">
-                    <label>Item Name & Quantity</label>
-                    <div class="item-chips-container">
+                {# Multiple items - display as chips (show procurement manager quantities if exist, otherwise manager-approved quantities, otherwise original) #}
                         {% set item_list = item_request.item_name.split(',') %}
-                        {% set quantity_list = (item_request.quantity or '').split(';') if item_request.quantity else [] %}
+                {# Use procurement manager quantities if they exist, otherwise manager-approved quantities, otherwise original requested quantities #}
+                {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                        {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
+                {# Filter out items with quantity 0 #}
+                {% set items_to_display = [] %}
                         {% for item in item_list %}
                             {% set item_trimmed = item.strip() %}
                             {% if item_trimmed %}
-                                <div class="item-chip-row">
-                                    <span class="filter-pill">{{ item_trimmed }}</span>
+                        {% set qty_value = '' %}
                                     {% if loop.index0 < quantity_list|length %}
-                                        {% set qty_trimmed = quantity_list[loop.index0].strip() %}
-                                        {% if qty_trimmed %}
-                                            <span class="item-quantity-chip">Qty: {{ qty_trimmed }}</span>
+                            {% set qty_raw = quantity_list[loop.index0].strip() %}
+                            {% if qty_raw %}
+                                                {# Quantities may be stored as "Item Name: 2"; extract numeric part #}
+                                {% if ':' in qty_raw %}
+                                    {% set parts = qty_raw.split(':', 1) %}
+                                    {% if parts|length > 1 %}
+                                        {% set qty_value = parts[1].strip() %}
+                                    {% else %}
+                                        {% set qty_value = qty_raw %}
                                         {% endif %}
+                                {% else %}
+                                    {% set qty_value = qty_raw %}
                                     {% endif %}
-                                </div>
+                            {% endif %}
+                        {% endif %}
+                        {% set qty_num = qty_value|int(0) %}
+                        {# Only include items with quantity > 0 #}
+                        {% if qty_num > 0 %}
+                            {% set _ = items_to_display.append({'name': item_trimmed, 'qty': qty_value, 'index': loop.index0}) %}
+                        {% endif %}
                             {% endif %}
                         {% endfor %}
+                {% if items_to_display|length > 0 %}
+                <div class="form-group">
+                    <label>Item Name & Quantity {% if quantities_edited %}<span class="edited-badge" data-field="quantities" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                    <div class="item-chips-container">
+                        {% for item_data in items_to_display %}
+                            <div class="item-chip-row">
+                                <span class="filter-pill">{{ item_data.name }}</span>
+                                {% if item_data.qty %}
+                                    <span class="item-quantity-chip">Qty: {{ item_data.qty }}</span>
+                                {% endif %}
                     </div>
+                        {% endfor %}
                 </div>
+                </div>
+                {% endif %}
             {% else %}
-                {# Single item - display as normal input fields #}
+                {# Single item - display as normal input fields (show procurement manager quantities if exist, otherwise manager-approved quantity) #}
+                {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                {% set qty = (raw_quantity_source or '0') %}
+                {% if ';' in qty %}
+                    {% set qty = qty.split(';')[0] %}
+                {% endif %}
+                {# Extract numeric quantity for comparison #}
+                {% set qty_num = qty|int(0) %}
+                {# Only display if quantity > 0 #}
+                {% if qty_num > 0 %}
                 <div class="form-row">
                     <div class="form-group">
                         <label>Item Name</label>
                         <input type="text" value="{{ item_request.item_name }}" readonly style="background: #f5f5f5;">
                     </div>
                     <div class="form-group">
-                        <label>Quantity</label>
-                        <input type="text" value="{{ item_request.quantity or 'Not specified' }}" readonly style="background: #f5f5f5;">
+                        <label>Quantity {% if quantities_edited %}<span class="edited-badge" data-field="quantities" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                        <input type="text" value="{{ qty }}" readonly style="background: #f5f5f5;">
                     </div>
                 </div>
+                {% endif %}
             {% endif %}
+
+            <!-- Field History Modal for Quantity Edits -->
+            <div id="fieldHistoryModal" class="field-history-modal" style="display:none;">
+                <div class="field-history-overlay" onclick="closeFieldHistoryModal()"></div>
+                <div class="field-history-container">
+                    <div class="field-history-header">
+                        <h4 id="fieldHistoryTitle">Edit History</h4>
+                        <button type="button" class="field-history-close" onclick="closeFieldHistoryModal()">&times;</button>
+                    </div>
+                    <div class="field-history-body" id="fieldHistoryBody"></div>
+                </div>
+            </div>
 
             <div class="form-row">
                 <div class="form-group">
@@ -627,6 +886,240 @@
                         {% endif %}
                     </div>
                 </div>
+                
+                {# Show Item Quantities section after manager approval (read-only) #}
+                {% if item_request.item_name %}
+                    {% set manager_can_edit_quantities_after = False %}
+                    
+                    {# Multi-item requests: item_name is a comma-separated list #}
+                    {% if ',' in item_request.item_name %}
+                    <div class="card assigned-section procurement-cart-card" style="margin-top: 1.5rem;">
+                        <div class="card-header">
+                            <h4><i class="fas fa-shopping-cart"></i> Item Quantities for Manager Approval</h4>
+                        </div>
+                        <div class="card-body">
+                            <p style="color: #6b7280; font-size: 0.95rem; font-weight: 500; margin-bottom: 0.85rem;">
+                                <strong>Note:</strong> These are the manager-approved quantities (read-only).
+                            </p>
+                            {% set item_list = item_request.item_name.split(',') %}
+                            {% set raw_quantity_source = item_request.procurement_quantities or item_request.quantity %}
+                            {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
+                            {% set original_source = item_request.quantity %}
+                            {% set original_list = (original_source or '').split(';') if original_source else [] %}
+                            {# Filter out items with quantity 0 #}
+                            {% set items_to_display = [] %}
+                            {% for item in item_list %}
+                                {% set item_trimmed = item.strip() %}
+                                {% if item_trimmed %}
+                                    {% set qty = '' %}
+                                    {% if loop.index0 < quantity_list|length %}
+                                        {% set qty_raw = quantity_list[loop.index0] | trim %}
+                                        {% if qty_raw %}
+                                            {% if ':' in qty_raw %}
+                                                {% set parts = qty_raw.split(':', 1) %}
+                                                {% if parts|length > 1 %}
+                                                    {% set qty = parts[1].strip() %}
+                                                {% else %}
+                                                    {% set qty = qty_raw %}
+                                                {% endif %}
+                                            {% else %}
+                                                {% set qty = qty_raw %}
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                    {% set qty_num = qty|int(0) %}
+                                    {# Only include items with quantity > 0 #}
+                                    {% if qty_num > 0 %}
+                                        {% set orig_qty_raw = '' %}
+                                        {% if loop.index0 < original_list|length %}
+                                            {% set oq = original_list[loop.index0] | trim %}
+                                            {% if oq %}
+                                                {% if ':' in oq %}
+                                                    {% set o_parts = oq.split(':', 1) %}
+                                                    {% if o_parts|length > 1 %}
+                                                        {% set orig_qty_raw = o_parts[1].strip() %}
+                                                    {% else %}
+                                                        {% set orig_qty_raw = oq %}
+                                                    {% endif %}
+                                                {% else %}
+                                                    {% set orig_qty_raw = oq %}
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endif %}
+                                        {% set orig_qty_num = orig_qty_raw|int(0) %}
+                                        {% set mgr_qty_num = qty|int(0) %}
+                                        {% set is_less = mgr_qty_num < orig_qty_num %}
+                                        {% set _ = items_to_display.append({'name': item_trimmed, 'qty': qty, 'is_less': is_less}) %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if items_to_display|length > 0 %}
+                            <div class="procurement-cart-table">
+                                <div class="procurement-cart-header-row">
+                                    <div>Item</div>
+                                    <div style="text-align: right;">Quantity</div>
+                                </div>
+                                
+                                {% for item_data in items_to_display %}
+                                    <div class="procurement-cart-row {% if item_data.is_less %}qty-less-than-original{% endif %}">
+                                        <div class="procurement-cart-item-name">
+                                            {{ item_data.name }}
+                                        </div>
+                                        <div class="procurement-cart-qty">
+                                            <span class="readonly-qty-pill">
+                                                {{ item_data.qty }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p style="color: #6b7280; font-style: italic;">No items to display (all items were rejected with quantity 0).</p>
+                            {% endif %}
+
+                            {% if item_request.manager_quantity_rejection_reason %}
+                            <div class="form-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Reason for Rejecting Item(s)</label>
+                                <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                    {# Find items with quantity 0 #}
+                                    {% set rejected_items = [] %}
+                                    {% for item in item_list %}
+                                        {% set item_trimmed = item.strip() %}
+                                        {% if item_trimmed %}
+                                            {% set qty = '' %}
+                                            {% if loop.index0 < quantity_list|length %}
+                                                {% set qty_raw = quantity_list[loop.index0] | trim %}
+                                                {% if qty_raw %}
+                                                    {% if ':' in qty_raw %}
+                                                        {% set parts = qty_raw.split(':', 1) %}
+                                                        {% if parts|length > 1 %}
+                                                            {% set qty = parts[1].strip() %}
+                                                        {% else %}
+                                                            {% set qty = qty_raw %}
+                                                        {% endif %}
+                                                    {% else %}
+                                                        {% set qty = qty_raw %}
+                                                    {% endif %}
+                                                {% endif %}
+                                            {% endif %}
+                                            {% set qty_num = qty|int(0) %}
+                                            {% if qty_num == 0 %}
+                                                {% set _ = rejected_items.append(item_trimmed) %}
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if rejected_items|length > 0 %}
+                                    <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #fecaca;">
+                                        <strong style="color: #991b1b;">Rejected Items (Quantity set to 0):</strong>
+                                        <ul style="color: #991b1b; margin: 5px 0 0 20px; padding: 0;">
+                                            {% for rejected_item in rejected_items %}
+                                            <li>{{ rejected_item }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                    <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.manager_quantity_rejection_reason }}</p>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {# Show legend only if there are items highlighted yellow #}
+                            {% set has_highlighted_items = false %}
+                            {% for item_data in items_to_display %}
+                                {% if item_data.is_less %}
+                                    {% set has_highlighted_items = true %}
+                                {% endif %}
+                            {% endfor %}
+                            {% if has_highlighted_items %}
+                            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: #6b7280;">
+                                    <span style="display: inline-block; width: 12px; height: 12px; background-color: #ffc107; border: 1px solid #ffc107; border-radius: 50%;"></span>
+                                    <span>Edited by Manager (see Request Details for Edit History)</span>
+                                </div>
+                            </div>
+                            {% endif %}
+                            <p style="margin-top: 0.75rem; font-size: 0.9rem; color: #6b7280;">
+                                Quantities shown here reflect the manager-approved amounts and are read-only.
+                            </p>
+                        </div>
+                    </div>
+
+                    {# Single-item requests: item_name is a single string #}
+                    {% else %}
+                    {% set raw_quantity_source = item_request.procurement_quantities or item_request.quantity %}
+                    {% set qty = (raw_quantity_source or '0') %}
+                    {% if ';' in qty %}
+                        {% set qty = qty.split(';')[0] %}
+                    {% endif %}
+                    {% set qty_num = qty|int(0) %}
+                    {# Only display if quantity > 0 #}
+                    {% if qty_num > 0 %}
+                    {% set orig_qty_raw = (item_request.quantity or '').strip() %}
+                    {% set orig_qty_num = orig_qty_raw|int(0) %}
+                    {% set mgr_qty_num = qty|int(0) %}
+                    {% set is_less = mgr_qty_num < orig_qty_num %}
+
+                    <div class="card assigned-section procurement-cart-card" style="margin-top: 1.5rem;">
+                        <div class="card-header">
+                            <h4><i class="fas fa-shopping-cart"></i> Item Quantity for Manager Approval</h4>
+                        </div>
+                        <div class="card-body">
+                            <p style="color: #6b7280; font-size: 0.95rem; font-weight: 500; margin-bottom: 0.85rem;">
+                                <strong>Note:</strong> This is the manager-approved quantity (read-only).
+                            </p>
+
+                            <div class="procurement-cart-table">
+                                <div class="procurement-cart-header-row">
+                                    <div>Item</div>
+                                    <div style="text-align: right;">Quantity</div>
+                                </div>
+
+                                <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %}">
+                                    <div class="procurement-cart-item-name">
+                                        {{ item_request.item_name }}
+                                    </div>
+                                    <div class="procurement-cart-qty">
+                                        <span class="readonly-qty-pill">
+                                            {{ qty }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {% if item_request.manager_quantity_rejection_reason %}
+                            <div class="form-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Reason for Rejecting Item</label>
+                                <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                    {% set qty_num = qty|int(0) %}
+                                    {% if qty_num == 0 %}
+                                    <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #fecaca;">
+                                        <strong style="color: #991b1b;">Rejected Item (Quantity set to 0):</strong>
+                                        <p style="color: #991b1b; margin: 5px 0 0 0;">{{ item_request.item_name }}</p>
+                                    </div>
+                                    {% endif %}
+                                    <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.manager_quantity_rejection_reason }}</p>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {# Show legend only if item is highlighted yellow #}
+                            {% if is_less %}
+                            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: #6b7280;">
+                                    <span style="display: inline-block; width: 12px; height: 12px; background-color: #ffc107; border: 1px solid #ffc107; border-radius: 50%;"></span>
+                                    <span>Edited by Manager (see Request Details for Edit History)</span>
+                                </div>
+                            </div>
+                            {% endif %}
+                            <p style="margin-top: 0.75rem; font-size: 0.9rem; color: #6b7280;">
+                                Quantity shown here reflects the manager-approved amount and is read-only.
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                {% endif %}
             {% elif item_request.status in ['Pending Manager Approval', 'On Hold'] and not (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) %}
                 <!-- Manager approval required or On Hold -->
                 <div class="card manager-approval-required" style="margin-bottom: 1.5rem;">
@@ -831,8 +1324,23 @@
                                         </div>
 
                                         {% if manager_can_edit_quantities %}
+                                        {% if item_request.manager_quantity_rejection_reason %}
+                                        <div class="form-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                            <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Previously Saved Reason for Rejecting Item(s)</label>
+                                            <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                                <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.manager_quantity_rejection_reason }}</p>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        <div id="manager_rejection_reason_group" style="display: none; margin-top: 1rem;">
+                                            <div class="form-group">
+                                                <label for="manager_quantity_rejection_reason">Reason for Rejecting Item(s) *</label>
+                                                <textarea name="quantity_rejection_reason" id="manager_quantity_rejection_reason" rows="3" placeholder="Please provide a reason for rejecting the item(s) with quantity set to 0..." style="width: 100%;">{{ item_request.manager_quantity_rejection_reason or '' }}</textarea>
+                                                <small class="form-text text-muted">This field is required when at least one item quantity is set to 0.</small>
+                                            </div>
+                                        </div>
                                         <div class="step-actions" style="margin-top: 1rem;">
-                                            <button type="submit" class="btn btn-primary">
+                                            <button type="submit" class="btn btn-primary" id="manager_save_quantities_btn">
                                                 <i class="fas fa-save"></i> Save Quantities
                                             </button>
                                         </div>
@@ -934,8 +1442,23 @@
                                         </div>
 
                                         {% if manager_can_edit_quantities %}
+                                        {% if item_request.manager_quantity_rejection_reason %}
+                                        <div class="form-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                            <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Previously Saved Reason for Rejecting Item</label>
+                                            <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                                <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.manager_quantity_rejection_reason }}</p>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        <div id="manager_rejection_reason_group_single" style="display: none; margin-top: 1rem;">
+                                            <div class="form-group">
+                                                <label for="manager_quantity_rejection_reason_single">Reason for Rejecting Item *</label>
+                                                <textarea name="quantity_rejection_reason" id="manager_quantity_rejection_reason_single" rows="3" placeholder="Please provide a reason for rejecting this item..." style="width: 100%;">{{ item_request.manager_quantity_rejection_reason or '' }}</textarea>
+                                                <small class="form-text text-muted">This field is required when the quantity is set to 0.</small>
+                                            </div>
+                                        </div>
                                         <div class="step-actions" style="margin-top: 1rem;">
-                                            <button type="submit" class="btn btn-primary">
+                                            <button type="submit" class="btn btn-primary" id="manager_save_quantity_btn">
                                                 <i class="fas fa-save"></i> Save Quantity
                                             </button>
                                         </div>
@@ -1116,6 +1639,243 @@
                         {% endif %}
                     </div>
                 </div>
+                
+                {# Show Item Quantities section after procurement manager approval (read-only) #}
+                {% if item_request.item_name %}
+                    {# Multi-item requests: item_name is a comma-separated list #}
+                    {% if ',' in item_request.item_name %}
+                    <div class="card assigned-section procurement-cart-card" style="margin-top: 1.5rem;">
+                        <div class="card-header">
+                            <h4><i class="fas fa-shopping-cart"></i> Item Quantities for Procurement Manager Approval</h4>
+                        </div>
+                        <div class="card-body">
+                            <p style="color: #6b7280; font-size: 0.95rem; font-weight: 500; margin-bottom: 0.85rem;">
+                                <strong>Note:</strong> These are the procurement manager-approved quantities (read-only).
+                            </p>
+                            {% set item_list = item_request.item_name.split(',') %}
+                            {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                            {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
+                            {# Manager-approved quantities for comparison #}
+                            {% set manager_quantity_source = item_request.procurement_quantities or item_request.quantity %}
+                            {% set manager_quantity_list = (manager_quantity_source or '').split(';') if manager_quantity_source else [] %}
+                            {# Filter out items with quantity 0 #}
+                            {% set items_to_display = [] %}
+                            {% for item in item_list %}
+                                {% set item_trimmed = item.strip() %}
+                                {% if item_trimmed %}
+                                    {% set qty = '' %}
+                                    {% if loop.index0 < quantity_list|length %}
+                                        {% set qty_raw = quantity_list[loop.index0] | trim %}
+                                        {% if qty_raw %}
+                                            {% if ':' in qty_raw %}
+                                                {% set parts = qty_raw.split(':', 1) %}
+                                                {% if parts|length > 1 %}
+                                                    {% set qty = parts[1].strip() %}
+                                                {% else %}
+                                                    {% set qty = qty_raw %}
+                                                {% endif %}
+                                            {% else %}
+                                                {% set qty = qty_raw %}
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                    {% set qty_num = qty|int(0) %}
+                                    {# Only include items with quantity > 0 #}
+                                    {% if qty_num > 0 %}
+                                        {# Compare with manager-approved quantity #}
+                                        {% set mgr_qty = '' %}
+                                        {% if loop.index0 < manager_quantity_list|length %}
+                                            {% set mgr_qty_raw = manager_quantity_list[loop.index0] | trim %}
+                                            {% if mgr_qty_raw %}
+                                                {% if ':' in mgr_qty_raw %}
+                                                    {% set mgr_parts = mgr_qty_raw.split(':', 1) %}
+                                                    {% if mgr_parts|length > 1 %}
+                                                        {% set mgr_qty = mgr_parts[1].strip() %}
+                                                    {% else %}
+                                                        {% set mgr_qty = mgr_qty_raw %}
+                                                    {% endif %}
+                                                {% else %}
+                                                    {% set mgr_qty = mgr_qty_raw %}
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endif %}
+                                        {% set mgr_qty_num = mgr_qty|int(0) %}
+                                        {# Highlight if procurement manager reduced quantity OR if manager rejected (0) but procurement manager re-enabled it #}
+                                        {% set is_less = (qty_num < mgr_qty_num) or (mgr_qty_num == 0 and qty_num > 0) %}
+                                        {% set _ = items_to_display.append({'name': item_trimmed, 'qty': qty, 'is_less': is_less}) %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if items_to_display|length > 0 %}
+                            <div class="procurement-cart-table">
+                                <div class="procurement-cart-header-row">
+                                    <div>Item</div>
+                                    <div style="text-align: right;">Quantity</div>
+                                </div>
+                                
+                                {% for item_data in items_to_display %}
+                                    <div class="procurement-cart-row {% if item_data.is_less %}qty-less-than-original{% endif %}">
+                                        <div class="procurement-cart-item-name">
+                                            {{ item_data.name }}
+                                        </div>
+                                        <div class="procurement-cart-qty">
+                                            <span class="readonly-qty-pill">
+                                                {{ item_data.qty }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p style="color: #6b7280; font-style: italic;">No items to display (all items were rejected with quantity 0).</p>
+                            {% endif %}
+
+                            {% if item_request.procurement_manager_quantity_rejection_reason %}
+                            <div class="form-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Reason for Rejecting Item(s)</label>
+                                <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                    {# Find items with quantity 0 #}
+                                    {% set rejected_items = [] %}
+                                    {% for item in item_list %}
+                                        {% set item_trimmed = item.strip() %}
+                                        {% if item_trimmed %}
+                                            {% set qty = '' %}
+                                            {% if loop.index0 < quantity_list|length %}
+                                                {% set qty_raw = quantity_list[loop.index0] | trim %}
+                                                {% if qty_raw %}
+                                                    {% if ':' in qty_raw %}
+                                                        {% set parts = qty_raw.split(':', 1) %}
+                                                        {% if parts|length > 1 %}
+                                                            {% set qty = parts[1].strip() %}
+                                                        {% else %}
+                                                            {% set qty = qty_raw %}
+                                                        {% endif %}
+                                                    {% else %}
+                                                        {% set qty = qty_raw %}
+                                                    {% endif %}
+                                                {% endif %}
+                                            {% endif %}
+                                            {% set qty_num = qty|int(0) %}
+                                            {% if qty_num == 0 %}
+                                                {% set _ = rejected_items.append(item_trimmed) %}
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if rejected_items|length > 0 %}
+                                    <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #fecaca;">
+                                        <strong style="color: #991b1b;">Rejected Items (Quantity set to 0):</strong>
+                                        <ul style="color: #991b1b; margin: 5px 0 0 20px; padding: 0;">
+                                            {% for rejected_item in rejected_items %}
+                                            <li>{{ rejected_item }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                    <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.procurement_manager_quantity_rejection_reason }}</p>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {# Show legend only if there are items highlighted yellow #}
+                            {% set has_highlighted_items = false %}
+                            {% for item_data in items_to_display %}
+                                {% if item_data.is_less %}
+                                    {% set has_highlighted_items = true %}
+                                {% endif %}
+                            {% endfor %}
+                            {% if has_highlighted_items %}
+                            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: #6b7280;">
+                                    <span style="display: inline-block; width: 12px; height: 12px; background-color: #ffc107; border: 1px solid #ffc107; border-radius: 50%;"></span>
+                                    <span>Edited by Procurement Manager (see Request Details for Edit History)</span>
+                                </div>
+                            </div>
+                            {% endif %}
+                            <p style="margin-top: 0.75rem; font-size: 0.9rem; color: #6b7280;">
+                                Quantities shown here reflect the procurement manager-approved amounts and are read-only.
+                            </p>
+                        </div>
+                    </div>
+
+                    {# Single-item requests: item_name is a single string #}
+                    {% else %}
+                    {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                    {% set qty = (raw_quantity_source or '0') %}
+                    {% if ';' in qty %}
+                        {% set qty = qty.split(';')[0] %}
+                    {% endif %}
+                    {% set qty_num = qty|int(0) %}
+                    {# Manager-approved quantity for comparison #}
+                    {% set mgr_qty_raw = (item_request.procurement_quantities or item_request.quantity or '').strip() %}
+                    {% if ';' in mgr_qty_raw %}
+                        {% set mgr_qty_raw = mgr_qty_raw.split(';')[0] %}
+                    {% endif %}
+                    {% set mgr_qty_num = mgr_qty_raw|int(0) %}
+                    {# Highlight if procurement manager reduced quantity OR if manager rejected (0) but procurement manager re-enabled it #}
+                    {% set is_less = (qty_num < mgr_qty_num) or (mgr_qty_num == 0 and qty_num > 0) %}
+                    {# Only display if quantity > 0 #}
+                    {% if qty_num > 0 %}
+                    <div class="card assigned-section procurement-cart-card" style="margin-top: 1.5rem;">
+                        <div class="card-header">
+                            <h4><i class="fas fa-shopping-cart"></i> Item Quantity for Procurement Manager Approval</h4>
+                        </div>
+                        <div class="card-body">
+                            <p style="color: #6b7280; font-size: 0.95rem; font-weight: 500; margin-bottom: 0.85rem;">
+                                <strong>Note:</strong> This is the procurement manager-approved quantity (read-only).
+                            </p>
+
+                            <div class="procurement-cart-table">
+                                <div class="procurement-cart-header-row">
+                                    <div>Item</div>
+                                    <div style="text-align: right;">Quantity</div>
+                                </div>
+
+                                <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %}">
+                                    <div class="procurement-cart-item-name">
+                                        {{ item_request.item_name }}
+                                    </div>
+                                    <div class="procurement-cart-qty">
+                                        <span class="readonly-qty-pill">
+                                            {{ qty }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {% if item_request.procurement_manager_quantity_rejection_reason %}
+                            <div class="form-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Reason for Rejecting Item</label>
+                                <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                    {% set qty_num = qty|int(0) %}
+                                    {% if qty_num == 0 %}
+                                    <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #fecaca;">
+                                        <strong style="color: #991b1b;">Rejected Item (Quantity set to 0):</strong>
+                                        <p style="color: #991b1b; margin: 5px 0 0 0;">{{ item_request.item_name }}</p>
+                                    </div>
+                                    {% endif %}
+                                    <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.procurement_manager_quantity_rejection_reason }}</p>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {# Show legend only if item is highlighted yellow #}
+                            {% if is_less %}
+                            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: #6b7280;">
+                                    <span style="display: inline-block; width: 12px; height: 12px; background-color: #ffc107; border: 1px solid #ffc107; border-radius: 50%;"></span>
+                                    <span>Edited by Procurement Manager (see Request Details for Edit History)</span>
+                                </div>
+                            </div>
+                            {% endif %}
+                            <p style="margin-top: 0.75rem; font-size: 0.9rem; color: #6b7280;">
+                                Quantity shown here reflects the procurement manager-approved amount and is read-only.
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                {% endif %}
             {% elif item_request.status in ['Pending Procurement Manager Approval', 'On Hold'] %}
                 <!-- Procurement Manager approval required or On Hold -->
                 <div class="card procurement-approval-required" style="margin-bottom: 1.5rem;">
@@ -1166,12 +1926,420 @@
                     </div>
                 </div>
 
+                        {# Procurement Manager-stage quantity adjustment (for multi-item and single-item requests) #}
+                        {% if item_request.item_name %}
+                            {% set procurement_manager_can_edit_quantities = can_approve_procurement_manager %}
+
+                            {# Multi-item requests: item_name is a comma-separated list #}
+                            {% if ',' in item_request.item_name %}
+                            <div class="card assigned-section procurement-cart-card" style="margin-top: 1.5rem;">
+                                <div class="card-header">
+                                    <h4><i class="fas fa-shopping-cart"></i> Item Quantities for Procurement Manager Approval</h4>
+                                </div>
+                                <div class="card-body">
+                                    <p style="color: #dc3545; font-size: 1rem; font-weight: 500; margin-bottom: 0.85rem;">
+                                        <strong>Note:</strong> If you do not want to approve an item, set its quantity to <strong>0</strong>. Adjust the quantities below as part of your procurement manager approval.
+                                    </p>
+                                    {% set item_list = item_request.item_name.split(',') %}
+                                    {# Use procurement manager quantities if they exist; otherwise use manager-approved quantities; otherwise original requested quantities #}
+                                    {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                                    {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
+                                    {# Manager-approved quantities (for comparison - this is the "original" for procurement manager) #}
+                                    {% set original_source = item_request.procurement_quantities or item_request.quantity %}
+                                    {% set original_list = (original_source or '').split(';') if original_source else [] %}
+                                    
+                                    {% if procurement_manager_can_edit_quantities %}
+                                    <form method="POST" action="{{ url_for('update_item_request_quantities_procurement_manager', request_id=item_request.id) }}">
+                                    {% endif %}
+                                        <div class="procurement-cart-table">
+                                            <div class="procurement-cart-header-row">
+                                                <div>Item</div>
+                                                <div style="text-align: right;">Quantity</div>
+                                            </div>
+                                            
+                                            {% for item in item_list %}
+                                                {% set item_trimmed = item.strip() %}
+                                                {% if item_trimmed %}
+                                                    {% set qty = '' %}
+                                                    {% if loop.index0 < quantity_list|length %}
+                                                        {% set qty_raw = quantity_list[loop.index0] | trim %}
+                                                        {% if qty_raw %}
+                                                            {# Quantities may be stored as "Item Name: 2"; extract numeric part #}
+                                                            {% if ':' in qty_raw %}
+                                                                {% set parts = qty_raw.split(':', 1) %}
+                                                                {% if parts|length > 1 %}
+                                                                    {% set qty = parts[1].strip() %}
+                                                                {% else %}
+                                                                    {% set qty = qty_raw %}
+                                                                {% endif %}
+                                                            {% else %}
+                                                                {% set qty = qty_raw %}
+                                                            {% endif %}
+                                                        {% endif %}
+                                                    {% endif %}
+
+                                                    {# Derive original numeric quantity for comparison #}
+                                                    {% set orig_qty_raw = '' %}
+                                                    {% if loop.index0 < original_list|length %}
+                                                        {% set oq = original_list[loop.index0] | trim %}
+                                                        {% if oq %}
+                                                            {% if ':' in oq %}
+                                                                {% set o_parts = oq.split(':', 1) %}
+                                                                {% if o_parts|length > 1 %}
+                                                                    {% set orig_qty_raw = o_parts[1].strip() %}
+                                                                {% else %}
+                                                                    {% set orig_qty_raw = oq %}
+                                                                {% endif %}
+                                                            {% else %}
+                                                                {% set orig_qty_raw = oq %}
+                                                            {% endif %}
+                                                        {% endif %}
+                                                    {% endif %}
+                                                    {% set orig_qty_num = orig_qty_raw|int(0) %}
+                                                    {% set mgr_qty_num = qty|int(0) %}
+                                                    {% set is_less = mgr_qty_num < orig_qty_num %}
+                                                    {% set diff = mgr_qty_num - orig_qty_num %}
+                                                    {% set diff_abs = diff|abs %}
+                                                    {% set was_previously_rejected = orig_qty_num == 0 %}
+
+                                                    <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %} {% if was_previously_rejected %}previously-rejected-by-manager{% endif %}"
+                                                         id="procurement_cart_row_{{ loop.index0 }}"
+                                                         data-orig-qty="{{ orig_qty_num }}"
+                                                         data-orig-display="{{ orig_qty_raw or '0' }}">
+                                                        <div class="procurement-cart-item-name">
+                                                            {{ item_trimmed }}
+                                                            {% if was_previously_rejected %}
+                                                            <span class="tooltip-wrapper">
+                                                                <i class="fas fa-info-circle tooltip-icon"></i>
+                                                                <span class="tooltip-text">This item was previously rejected by the manager but is kept in case you want to edit it again</span>
+                                                            </span>
+                                                            {% endif %}
+                                                        </div>
+                                                        <div class="procurement-cart-qty">
+                                                            {% if procurement_manager_can_edit_quantities %}
+                                                                {% if was_previously_rejected %}
+                                                                {# Read-only display with edit icon for previously rejected items #}
+                                                                <div class="quantity-readonly-display" id="procurement_qty_readonly_{{ loop.index0 }}">
+                                                                    <span class="readonly-qty-pill">
+                                                                        {{ qty or 0 }} / {{ orig_qty_raw or '0' }}
+                                                                    </span>
+                                                                    <button type="button"
+                                                                            class="edit-qty-btn"
+                                                                            data-index="{{ loop.index0 }}"
+                                                                            onclick="enableProcurementQuantityEdit(this.dataset.index)"
+                                                                            title="Edit quantity">
+                                                                        <i class="fas fa-edit"></i>
+                                                                    </button>
+                                                                </div>
+                                                                {# Editable quantity control with cancel button (hidden by default for previously rejected items) #}
+                                                                <div id="procurement_qty_editable_wrapper_{{ loop.index0 }}" style="display: none; align-items: center; gap: 8px; justify-content: flex-end;">
+                                                                    <div class="quantity-control" id="procurement_qty_editable_{{ loop.index0 }}">
+                                                                        <button type="button"
+                                                                                class="qty-btn minus"
+                                                                                data-index="{{ loop.index0 }}"
+                                                                                onclick="adjustProcurementCartQuantity(this.dataset.index, -1)">
+                                                                            -
+                                                                        </button>
+                                                                        <input type="number"
+                                                                               name="quantities[]"
+                                                                               id="procurement_cart_qty_{{ loop.index0 }}"
+                                                                               min="0"
+                                                                               step="1"
+                                                                               value="{{ qty or 0 }}"
+                                                                               data-index="{{ loop.index0 }}"
+                                                                               data-original-value="{{ qty or 0 }}"
+                                                                               oninput="updateProcurementCartQuantityState(this.dataset.index)">
+                                                                        <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
+                                                                        <button type="button"
+                                                                                class="qty-btn plus"
+                                                                                data-index="{{ loop.index0 }}"
+                                                                                onclick="adjustProcurementCartQuantity(this.dataset.index, 1)">
+                                                                            +
+                                                                        </button>
+                                                                    </div>
+                                                                    <button type="button"
+                                                                            class="edit-qty-btn"
+                                                                            data-index="{{ loop.index0 }}"
+                                                                            onclick="cancelProcurementQuantityEdit(this.dataset.index)"
+                                                                            title="Cancel editing">
+                                                                        <i class="fas fa-times"></i>
+                                                                    </button>
+                                                                </div>
+                                                                {% else %}
+                                                                {# Normal editable quantity control for non-rejected items #}
+                                                                <div class="quantity-control">
+                                                                    <button type="button"
+                                                                            class="qty-btn minus"
+                                                                            data-index="{{ loop.index0 }}"
+                                                                            onclick="adjustProcurementCartQuantity(this.dataset.index, -1)">
+                                                                        -
+                                                                    </button>
+                                                                    <input type="number"
+                                                                           name="quantities[]"
+                                                                           id="procurement_cart_qty_{{ loop.index0 }}"
+                                                                           min="0"
+                                                                           step="1"
+                                                                           value="{{ qty or 0 }}"
+                                                                           data-index="{{ loop.index0 }}"
+                                                                           oninput="updateProcurementCartQuantityState(this.dataset.index)">
+                                                                    <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
+                                                                    <button type="button"
+                                                                            class="qty-btn plus"
+                                                                            data-index="{{ loop.index0 }}"
+                                                                            onclick="adjustProcurementCartQuantity(this.dataset.index, 1)">
+                                                                        +
+                                                                    </button>
+                                                                </div>
+                                                                {% endif %}
+                                                            {% else %}
+                                                            <span class="readonly-qty-pill">
+                                                                {{ qty or '0' }} / {{ orig_qty_raw or '0' }}
+                                                            </span>
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                    <div id="procurement_cart_note_{{ loop.index0 }}"
+                                                         class="procurement-cart-note {% if mgr_qty_num == orig_qty_num %}initially-hidden{% endif %}"
+                                                         style="grid-column: 1 / -1; font-size: 0.85rem; color: #6b7280; margin: 2px 4px 10px 4px;">
+                                                        {% if mgr_qty_num != orig_qty_num %}
+                                                            Manager approved <strong>{{ orig_qty_raw or '0' }}</strong> of this item.
+                                                            You have currently set <strong>{{ diff_abs }}</strong>
+                                                            {% if diff > 0 %}more{% else %}less{% endif %} than manager approved.
+                                                        {% endif %}
+                                                    </div>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </div>
+
+                                        {% if procurement_manager_can_edit_quantities %}
+                                        {# Previously saved reason display - only shown when editing is enabled and quantity is 0 #}
+                                        {% if item_request.procurement_manager_quantity_rejection_reason %}
+                                        <div id="procurement_manager_saved_rejection_reason_group" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                            <div class="form-group">
+                                                <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Previously Saved Reason for Rejecting Item(s)</label>
+                                                <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                                    <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.procurement_manager_quantity_rejection_reason }}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        <div id="procurement_manager_rejection_reason_group" style="display: none; margin-top: 1rem;">
+                                            <div class="form-group">
+                                                <label for="procurement_manager_quantity_rejection_reason">Reason for Rejecting Item(s) *</label>
+                                                <textarea name="quantity_rejection_reason" id="procurement_manager_quantity_rejection_reason" rows="3" placeholder="Please provide a reason for rejecting the item(s) with quantity set to 0..." style="width: 100%;">{{ item_request.procurement_manager_quantity_rejection_reason or '' }}</textarea>
+                                                <small class="form-text text-muted">This field is required when at least one item quantity is set to 0.</small>
+                                            </div>
+                                        </div>
+                                        <div class="step-actions" style="margin-top: 1rem;">
+                                            <button type="submit" class="btn btn-primary" id="procurement_manager_save_quantities_btn">
+                                                <i class="fas fa-save"></i> Save Quantities
+                                            </button>
+                                        </div>
+                                        {% endif %}
+                                    {% if procurement_manager_can_edit_quantities %}
+                                    </form>
+                                    {% endif %}
+
+                                    <p style="margin-top: 0.75rem; font-size: 0.9rem; color: #6b7280;">
+                                        {% if procurement_manager_can_edit_quantities %}
+                                            Any quantity changes you make here will be visible to all authorized users who can view this item request, including Procurement staff.
+                                        {% else %}
+                                            Quantities shown here reflect the latest procurement manager-approved amounts and are read-only for you.
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {# Single-item requests: item_name is a single string #}
+                            {% else %}
+                            {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                            {% set qty = (raw_quantity_source or '0') %}
+                            {% if ';' in qty %}
+                                {% set qty = qty.split(';')[0] %}
+                            {% endif %}
+                            {% set orig_qty_raw = (item_request.procurement_quantities or item_request.quantity or '').strip() %}
+                            {% if ';' in orig_qty_raw %}
+                                {% set orig_qty_raw = orig_qty_raw.split(';')[0] %}
+                            {% endif %}
+                            {% set orig_qty_num = orig_qty_raw|int(0) %}
+                            {% set mgr_qty_num = qty|int(0) %}
+                            {% set is_less = mgr_qty_num < orig_qty_num %}
+                            {% set diff = mgr_qty_num - orig_qty_num %}
+                            {% set diff_abs = diff|abs %}
+                            {% set was_previously_rejected = orig_qty_num == 0 %}
+
+                            <div class="card assigned-section procurement-cart-card" style="margin-top: 1.5rem;">
+                                <div class="card-header">
+                                    <h4><i class="fas fa-shopping-cart"></i> Item Quantity for Procurement Manager Approval</h4>
+                                </div>
+                                <div class="card-body">
+                                    <p style="color: #dc3545; font-size: 1rem; font-weight: 500; margin-bottom: 0.85rem;">
+                                        <strong>Note:</strong> If you do not want to approve this item, set the quantity to <strong>0</strong>. Adjust the quantity below as part of your procurement manager approval.
+                                    </p>
+
+                                    {% if procurement_manager_can_edit_quantities %}
+                                    <form method="POST" action="{{ url_for('update_item_request_quantities_procurement_manager', request_id=item_request.id) }}">
+                                    {% endif %}
+                                        <div class="procurement-cart-table">
+                                            <div class="procurement-cart-header-row">
+                                                <div>Item</div>
+                                                <div style="text-align: right;">Quantity</div>
+                                            </div>
+
+                                            <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %} {% if was_previously_rejected %}previously-rejected-by-manager{% endif %}"
+                                                 id="procurement_cart_row_0"
+                                                 data-orig-qty="{{ orig_qty_num }}"
+                                                 data-orig-display="{{ orig_qty_raw or '0' }}">
+                                                <div class="procurement-cart-item-name">
+                                                    {{ item_request.item_name }}
+                                                    {% if was_previously_rejected %}
+                                                    <span class="tooltip-wrapper">
+                                                        <i class="fas fa-info-circle tooltip-icon"></i>
+                                                        <span class="tooltip-text">This item was previously rejected by the manager but is kept in case you want to edit it again</span>
+                                                    </span>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="procurement-cart-qty">
+                                                    {% if procurement_manager_can_edit_quantities %}
+                                                        {% if was_previously_rejected %}
+                                                        {# Read-only display with edit icon for previously rejected items #}
+                                                        <div class="quantity-readonly-display" id="procurement_qty_readonly_0">
+                                                            <span class="readonly-qty-pill">
+                                                                {{ qty or 0 }} / {{ orig_qty_raw or '0' }}
+                                                            </span>
+                                                            <button type="button"
+                                                                    class="edit-qty-btn"
+                                                                    data-index="0"
+                                                                    onclick="enableProcurementQuantityEdit(this.dataset.index)"
+                                                                    title="Edit quantity">
+                                                                <i class="fas fa-edit"></i>
+                                                            </button>
+                                                        </div>
+                                                        {# Editable quantity control with cancel button (hidden by default for previously rejected items) #}
+                                                        <div id="procurement_qty_editable_wrapper_0" style="display: none; align-items: center; gap: 8px; justify-content: flex-end;">
+                                                            <div class="quantity-control" id="procurement_qty_editable_0">
+                                                                <button type="button"
+                                                                        class="qty-btn minus"
+                                                                        data-index="0"
+                                                                        onclick="adjustProcurementCartQuantity(this.dataset.index, -1)">
+                                                                    -
+                                                                </button>
+                                                                <input type="number"
+                                                                       name="quantities[]"
+                                                                       id="procurement_cart_qty_0"
+                                                                       min="0"
+                                                                       step="1"
+                                                                       value="{{ qty or 0 }}"
+                                                                       data-index="0"
+                                                                       data-original-value="{{ qty or 0 }}"
+                                                                       oninput="updateProcurementCartQuantityState(this.dataset.index)">
+                                                                <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
+                                                                <button type="button"
+                                                                        class="qty-btn plus"
+                                                                        data-index="0"
+                                                                        onclick="adjustProcurementCartQuantity(this.dataset.index, 1)">
+                                                                    +
+                                                                </button>
+                                                            </div>
+                                                            <button type="button"
+                                                                    class="edit-qty-btn"
+                                                                    data-index="0"
+                                                                    onclick="cancelProcurementQuantityEdit(this.dataset.index)"
+                                                                    title="Cancel editing">
+                                                                <i class="fas fa-times"></i>
+                                                            </button>
+                                                        </div>
+                                                        {% else %}
+                                                        {# Normal editable quantity control for non-rejected items #}
+                                                        <div class="quantity-control">
+                                                            <button type="button"
+                                                                    class="qty-btn minus"
+                                                                    data-index="0"
+                                                                    onclick="adjustProcurementCartQuantity(this.dataset.index, -1)">
+                                                                -
+                                                            </button>
+                                                            <input type="number"
+                                                                   name="quantities[]"
+                                                                   id="procurement_cart_qty_0"
+                                                                   min="0"
+                                                                   step="1"
+                                                                   value="{{ qty or 0 }}"
+                                                                   data-index="0"
+                                                                   oninput="updateProcurementCartQuantityState(this.dataset.index)">
+                                                            <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
+                                                            <button type="button"
+                                                                    class="qty-btn plus"
+                                                                    data-index="0"
+                                                                    onclick="adjustProcurementCartQuantity(this.dataset.index, 1)">
+                                                                +
+                                                            </button>
+                                                        </div>
+                                                        {% endif %}
+                                                    {% else %}
+                                                    <span class="readonly-qty-pill">
+                                                        {{ qty or '0' }} / {{ orig_qty_raw or '0' }}
+                                                    </span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <div id="procurement_cart_note_0"
+                                                 class="procurement-cart-note {% if mgr_qty_num == orig_qty_num %}initially-hidden{% endif %}"
+                                                 style="grid-column: 1 / -1; font-size: 0.85rem; color: #6b7280; margin: 2px 4px 10px 4px;">
+                                                {% if mgr_qty_num != orig_qty_num %}
+                                                    Manager approved <strong>{{ orig_qty_raw or '0' }}</strong> of this item.
+                                                    You have currently set <strong>{{ diff_abs }}</strong>
+                                                    {% if diff > 0 %}more{% else %}less{% endif %} than manager approved.
+                                                {% endif %}
+                                            </div>
+                                        </div>
+
+                                        {% if procurement_manager_can_edit_quantities %}
+                                        {# Previously saved reason display - only shown when editing is enabled and quantity is 0 #}
+                                        {% if item_request.procurement_manager_quantity_rejection_reason %}
+                                        <div id="procurement_manager_saved_rejection_reason_group_single" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                            <div class="form-group">
+                                                <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Previously Saved Reason for Rejecting Item</label>
+                                                <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                                    <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.procurement_manager_quantity_rejection_reason }}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        <div id="procurement_manager_rejection_reason_group_single" style="display: none; margin-top: 1rem;">
+                                            <div class="form-group">
+                                                <label for="procurement_manager_quantity_rejection_reason_single">Reason for Rejecting Item *</label>
+                                                <textarea name="quantity_rejection_reason" id="procurement_manager_quantity_rejection_reason_single" rows="3" placeholder="Please provide a reason for rejecting this item..." style="width: 100%;">{{ item_request.procurement_manager_quantity_rejection_reason or '' }}</textarea>
+                                                <small class="form-text text-muted">This field is required when the quantity is set to 0.</small>
+                                            </div>
+                                        </div>
+                                        <div class="step-actions" style="margin-top: 1rem;">
+                                            <button type="submit" class="btn btn-primary" id="procurement_manager_save_quantity_btn">
+                                                <i class="fas fa-save"></i> Save Quantity
+                                            </button>
+                                        </div>
+                                        {% endif %}
+                                    {% if procurement_manager_can_edit_quantities %}
+                                    </form>
+                                    {% endif %}
+
+                                    <p style="margin-top: 0.75rem; font-size: 0.9rem; color: #6b7280;">
+                                        {% if procurement_manager_can_edit_quantities %}
+                                            Any quantity changes you make here will be visible to all authorized users who can view this item request, including Procurement staff.
+                                        {% else %}
+                                            Quantity shown here reflects the latest procurement manager-approved amount and is read-only for you.
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% endif %}
+
                 <!-- Procurement Manager approval form (visible to Procurement Manager) -->
                 {% if can_approve_procurement_manager or can_reject_procurement_manager %}
                     <div class="card procurement-approval-form">
                         <div class="card-header">
                             <h4><i class="fas fa-check-circle"></i> Your Approval Required</h4>
-                            <p>As the Procurement Manager{% if requestor_user %} of {{ requestor_user.name }}{% endif %}, please review, approve, and assign this request.</p>
+                            <p>As the Procurement Manager, please review, approve, and assign this request.</p>
                         </div>
                         <div class="card-body">
                             <form method="POST" action="{{ url_for('item_request_procurement_manager_decision', request_id=item_request.id) }}">
@@ -1273,11 +2441,11 @@
                                 <strong>Note:</strong> If the item is not bought, set quantity to <strong>0</strong>.
                             </p>
                             {% set item_list = item_request.item_name.split(',') %}
-                            {# Use procurement-adjusted quantities in this cart; if none yet, fall back to original quantity #}
-                            {% set raw_quantity_source = item_request.procurement_quantities or item_request.quantity %}
+                            {# Use procurement manager-approved quantities (final approved quantities); fall back to manager-approved, then original #}
+                            {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
                             {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
-                            {# Original requestor quantities (never changed) for comparison #}
-                            {% set original_source = item_request.quantity %}
+                            {# Procurement manager-approved quantities for comparison (this is the baseline for assigned procurement) #}
+                            {% set original_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
                             {% set original_list = (original_source or '').split(';') if original_source else [] %}
                             
                             {% if can_complete %}
@@ -1332,42 +2500,122 @@
                                             {% set is_less = proc_qty_num < orig_qty_num %}
                                             {% set diff = proc_qty_num - orig_qty_num %}
                                             {% set diff_abs = diff|abs %}
+                                            
+                                            {# Check if procurement manager set quantity to 0 #}
+                                            {% set procurement_manager_qty_raw = '' %}
+                                            {% if item_request.procurement_manager_quantities %}
+                                                {% set pm_quantity_list = (item_request.procurement_manager_quantities or '').split(';') %}
+                                                {% if loop.index0 < pm_quantity_list|length %}
+                                                    {% set pm_qty_raw = pm_quantity_list[loop.index0] | trim %}
+                                                    {% if pm_qty_raw %}
+                                                        {% if ':' in pm_qty_raw %}
+                                                            {% set pm_parts = pm_qty_raw.split(':', 1) %}
+                                                            {% if pm_parts|length > 1 %}
+                                                                {% set procurement_manager_qty_raw = pm_parts[1].strip() %}
+                                                            {% else %}
+                                                                {% set procurement_manager_qty_raw = pm_qty_raw %}
+                                                            {% endif %}
+                                                        {% else %}
+                                                            {% set procurement_manager_qty_raw = pm_qty_raw %}
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endif %}
+                                            {% endif %}
+                                            {% set procurement_manager_qty_num = procurement_manager_qty_raw|int(0) %}
+                                            {% set was_set_to_zero_by_procurement_manager = item_request.procurement_manager_quantities and procurement_manager_qty_num == 0 %}
 
-                                            <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %}"
+                                            <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %} {% if was_set_to_zero_by_procurement_manager %}previously-rejected-by-manager{% endif %}"
                                                  id="cart_row_{{ loop.index0 }}"
                                                  data-orig-qty="{{ orig_qty_num }}"
                                                  data-orig-display="{{ orig_qty_raw or '0' }}">
                                                 <div class="procurement-cart-item-name">
                                                     {{ item_trimmed }}
+                                                    {% if was_set_to_zero_by_procurement_manager %}
+                                                    <span class="tooltip-wrapper">
+                                                        <i class="fas fa-info-circle tooltip-icon"></i>
+                                                        <span class="tooltip-text">This item was set to 0 by the Procurement Manager but is kept in case you want to edit it again</span>
+                                                    </span>
+                                                    {% endif %}
                                                 </div>
                                                 <div class="procurement-cart-qty">
                                                     {% if can_complete %}
-                                                    <div class="quantity-control">
-                                                        <button type="button"
-                                                                class="qty-btn minus"
-                                                                data-index="{{ loop.index0 }}"
-                                                                onclick="adjustCartQuantity(this.dataset.index, -1)">
-                                                            -
-                                                        </button>
-                                                        <input type="number"
-                                                               name="quantities[]"
-                                                               id="cart_qty_{{ loop.index0 }}"
-                                                               min="0"
-                                                               step="1"
-                                                               value="{{ qty or 0 }}"
-                                                               data-index="{{ loop.index0 }}"
-                                                               oninput="updateCartQuantityState(this.dataset.index)">
-                                                        <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
-                                                        <button type="button"
-                                                                class="qty-btn plus"
-                                                                data-index="{{ loop.index0 }}"
-                                                                onclick="adjustCartQuantity(this.dataset.index, 1)">
-                                                            +
-                                                        </button>
-                                                    </div>
+                                                        {% if was_set_to_zero_by_procurement_manager %}
+                                                        {# Read-only display with edit icon for items set to 0 by procurement manager #}
+                                                        <div class="quantity-readonly-display" id="cart_qty_readonly_{{ loop.index0 }}">
+                                                            <span class="readonly-qty-pill">
+                                                                {{ qty or 0 }} / {{ orig_qty_raw or '0' }}
+                                                            </span>
+                                                            <button type="button"
+                                                                    class="edit-qty-btn"
+                                                                    data-index="{{ loop.index0 }}"
+                                                                    onclick="enableCartQuantityEdit(this.dataset.index)"
+                                                                    title="Edit quantity">
+                                                                <i class="fas fa-edit"></i>
+                                                            </button>
+                                                        </div>
+                                                        {# Editable quantity control with cancel button (hidden by default for items set to 0) #}
+                                                        <div id="cart_qty_editable_wrapper_{{ loop.index0 }}" style="display: none; align-items: center; gap: 8px; justify-content: flex-end;">
+                                                            <div class="quantity-control" id="cart_qty_editable_{{ loop.index0 }}">
+                                                                <button type="button"
+                                                                        class="qty-btn minus"
+                                                                        data-index="{{ loop.index0 }}"
+                                                                        onclick="adjustCartQuantity(this.dataset.index, -1)">
+                                                                    -
+                                                                </button>
+                                                                <input type="number"
+                                                                       name="quantities[]"
+                                                                       id="cart_qty_{{ loop.index0 }}"
+                                                                       min="0"
+                                                                       step="1"
+                                                                       value="{{ qty or 0 }}"
+                                                                       data-index="{{ loop.index0 }}"
+                                                                       data-original-value="{{ qty or 0 }}"
+                                                                       oninput="updateCartQuantityState(this.dataset.index)">
+                                                                <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
+                                                                <button type="button"
+                                                                        class="qty-btn plus"
+                                                                        data-index="{{ loop.index0 }}"
+                                                                        onclick="adjustCartQuantity(this.dataset.index, 1)">
+                                                                    +
+                                                                </button>
+                                                            </div>
+                                                            <button type="button"
+                                                                    class="edit-qty-btn"
+                                                                    data-index="{{ loop.index0 }}"
+                                                                    onclick="cancelCartQuantityEdit(this.dataset.index)"
+                                                                    title="Cancel editing">
+                                                                <i class="fas fa-times"></i>
+                                                            </button>
+                                                        </div>
+                                                        {% else %}
+                                                        {# Normal editable quantity control for non-zero items #}
+                                                        <div class="quantity-control">
+                                                            <button type="button"
+                                                                    class="qty-btn minus"
+                                                                    data-index="{{ loop.index0 }}"
+                                                                    onclick="adjustCartQuantity(this.dataset.index, -1)">
+                                                                -
+                                                            </button>
+                                                            <input type="number"
+                                                                   name="quantities[]"
+                                                                   id="cart_qty_{{ loop.index0 }}"
+                                                                   min="0"
+                                                                   step="1"
+                                                                   value="{{ qty or 0 }}"
+                                                                   data-index="{{ loop.index0 }}"
+                                                                   oninput="updateCartQuantityState(this.dataset.index)">
+                                                            <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
+                                                            <button type="button"
+                                                                    class="qty-btn plus"
+                                                                    data-index="{{ loop.index0 }}"
+                                                                    onclick="adjustCartQuantity(this.dataset.index, 1)">
+                                                                +
+                                                            </button>
+                                                        </div>
+                                                        {% endif %}
                                                     {% else %}
                                                     <span class="readonly-qty-pill">
-                                                        {{ qty or '0' }} / {{ orig_qty_raw or '0' }}
+                                                        {{ qty or '0' }}
                                                     </span>
                                                     {% endif %}
                                                 </div>
@@ -1415,15 +2663,43 @@
                             <p style="color: #dc3545; font-size: 1rem; font-weight: 500; margin-bottom: 0.85rem;">
                                 <strong>Note:</strong> If the item is not bought, set quantity to <strong>0</strong>.
                             </p>
-                            {% set raw_quantity_source = item_request.procurement_quantities or item_request.quantity %}
+                            {# Use procurement manager-approved quantities (final approved quantities); fall back to manager-approved, then original #}
+                            {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
                             {% set current_raw = (raw_quantity_source or '').split(';')[0] %}
                             {% set qty = (current_raw or '').strip() %}
-                            {% set orig_qty_raw = (item_request.quantity or '').strip() %}
+                            {# Procurement manager-approved quantity for comparison (this is the baseline for assigned procurement) #}
+                            {% set orig_qty_raw = (item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity or '').strip() %}
+                            {% if ';' in orig_qty_raw %}
+                                {% set orig_qty_raw = orig_qty_raw.split(';')[0] %}
+                            {% endif %}
                             {% set orig_qty_num = orig_qty_raw|int(0) %}
                             {% set proc_qty_num = qty|int(0) %}
                             {% set is_less = proc_qty_num < orig_qty_num %}
                             {% set diff = proc_qty_num - orig_qty_num %}
                             {% set diff_abs = diff|abs %}
+                            
+                            {# Check if procurement manager set quantity to 0 #}
+                            {% set procurement_manager_qty_raw = '' %}
+                            {% if item_request.procurement_manager_quantities %}
+                                {% set pm_quantity_list = (item_request.procurement_manager_quantities or '').split(';') %}
+                                {% if pm_quantity_list|length > 0 %}
+                                    {% set pm_qty_raw = pm_quantity_list[0] | trim %}
+                                    {% if pm_qty_raw %}
+                                        {% if ':' in pm_qty_raw %}
+                                            {% set pm_parts = pm_qty_raw.split(':', 1) %}
+                                            {% if pm_parts|length > 1 %}
+                                                {% set procurement_manager_qty_raw = pm_parts[1].strip() %}
+                                            {% else %}
+                                                {% set procurement_manager_qty_raw = pm_qty_raw %}
+                                            {% endif %}
+                                        {% else %}
+                                            {% set procurement_manager_qty_raw = pm_qty_raw %}
+                                        {% endif %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endif %}
+                            {% set procurement_manager_qty_num = procurement_manager_qty_raw|int(0) %}
+                            {% set was_set_to_zero_by_procurement_manager = item_request.procurement_manager_quantities and procurement_manager_qty_num == 0 %}
 
                             {% if can_complete %}
                             <form method="POST" action="{{ url_for('update_item_request_quantities', request_id=item_request.id) }}">
@@ -1434,34 +2710,90 @@
                                         <div style="text-align: right;">Quantity</div>
                                     </div>
 
-                                    <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %}"
+                                    <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %} {% if was_set_to_zero_by_procurement_manager %}previously-rejected-by-manager{% endif %}"
                                          id="cart_row_0"
                                          data-orig-qty="{{ orig_qty_num }}"
                                          data-orig-display="{{ orig_qty_raw or '0' }}">
                                         <div class="procurement-cart-item-name">
                                             {{ item_request.item_name }}
+                                            {% if was_set_to_zero_by_procurement_manager %}
+                                            <span class="tooltip-wrapper">
+                                                <i class="fas fa-info-circle tooltip-icon"></i>
+                                                <span class="tooltip-text">This item was set to 0 by the Procurement Manager but is kept in case you want to edit it again</span>
+                                            </span>
+                                            {% endif %}
                                         </div>
                                         <div class="procurement-cart-qty">
                                             {% if can_complete %}
-                                            <div class="quantity-control">
-                                                <button type="button"
-                                                        class="qty-btn minus"
-                                                        onclick="adjustCartQuantity(0, -1)">
-                                                    -
-                                                </button>
-                                                <input type="number"
-                                                       name="quantities[]"
-                                                       id="cart_qty_0"
-                                                       min="0"
-                                                       step="1"
-                                                       value="{{ qty or 0 }}"
-                                                       oninput="updateCartQuantityState(0)">
-                                                <button type="button"
-                                                        class="qty-btn plus"
-                                                        onclick="adjustCartQuantity(0, 1)">
-                                                    +
-                                                </button>
-                                            </div>
+                                                {% if was_set_to_zero_by_procurement_manager %}
+                                                {# Read-only display with edit icon for items set to 0 by procurement manager #}
+                                                <div class="quantity-readonly-display" id="cart_qty_readonly_0">
+                                                    <span class="readonly-qty-pill">
+                                                        {{ qty or 0 }} / {{ orig_qty_raw or '0' }}
+                                                    </span>
+                                                    <button type="button"
+                                                            class="edit-qty-btn"
+                                                            data-index="0"
+                                                            onclick="enableCartQuantityEdit(this.dataset.index)"
+                                                            title="Edit quantity">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                </div>
+                                                {# Editable quantity control with cancel button (hidden by default for items set to 0) #}
+                                                <div id="cart_qty_editable_wrapper_0" style="display: none; align-items: center; gap: 8px; justify-content: flex-end;">
+                                                    <div class="quantity-control" id="cart_qty_editable_0">
+                                                        <button type="button"
+                                                                class="qty-btn minus"
+                                                                onclick="adjustCartQuantity(0, -1)">
+                                                            -
+                                                        </button>
+                                                        <input type="number"
+                                                               name="quantities[]"
+                                                               id="cart_qty_0"
+                                                               min="0"
+                                                               step="1"
+                                                               value="{{ qty or 0 }}"
+                                                               data-index="0"
+                                                               data-original-value="{{ qty or 0 }}"
+                                                               oninput="updateCartQuantityState(0)">
+                                                        <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
+                                                        <button type="button"
+                                                                class="qty-btn plus"
+                                                                onclick="adjustCartQuantity(0, 1)">
+                                                            +
+                                                        </button>
+                                                    </div>
+                                                    <button type="button"
+                                                            class="edit-qty-btn"
+                                                            data-index="0"
+                                                            onclick="cancelCartQuantityEdit(this.dataset.index)"
+                                                            title="Cancel editing">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                                {% else %}
+                                                {# Normal editable quantity control for non-zero items #}
+                                                <div class="quantity-control">
+                                                    <button type="button"
+                                                            class="qty-btn minus"
+                                                            onclick="adjustCartQuantity(0, -1)">
+                                                        -
+                                                    </button>
+                                                    <input type="number"
+                                                           name="quantities[]"
+                                                           id="cart_qty_0"
+                                                           min="0"
+                                                           step="1"
+                                                           value="{{ qty or 0 }}"
+                                                           oninput="updateCartQuantityState(0)">
+                                                    <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
+                                                    <button type="button"
+                                                            class="qty-btn plus"
+                                                            onclick="adjustCartQuantity(0, 1)">
+                                                        +
+                                                    </button>
+                                                </div>
+                                                {% endif %}
                                             {% else %}
                                             <span class="readonly-qty-pill">
                                                 {{ qty or '0' }}
@@ -1501,6 +2833,22 @@
                         </div>
                     </div>
                     {% endif %}
+                {% endif %}
+
+                {# Button to assign request to self (only if not already assigned and user is procurement staff) #}
+                {% if not item_request.assigned_to_user_id and user.department == 'Procurement' and user.role not in ['GM', 'Operation Manager'] %}
+                <div class="card assigned-section" style="margin-bottom: 1.5rem;">
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('assign_item_request_to_self', request_id=item_request.id) }}" style="display: inline-block;">
+                            <button type="submit" class="btn btn-primary" onclick="return confirm('Are you sure you want to assign this request to yourself?');">
+                                <i class="fas fa-user-plus"></i> Assign to Myself
+                            </button>
+                        </form>
+                        <p style="margin-top: 0.75rem; font-size: 0.9rem; color: #6b7280;">
+                            Click this button to assign this request to yourself for processing.
+                        </p>
+                    </div>
+                </div>
                 {% endif %}
 
                 <!-- Display uploaded files (if any) -->
@@ -1548,21 +2896,10 @@
                             <p>Complete this item request once the item has been procured and delivered.</p>
                         </div>
                         <div class="card-body">
-                            <!-- Procurement Member Name Display (similar to Finance Admin) -->
-                            {% if user.department == 'Procurement' %}
-                            <div class="form-group">
-                                <label>Procurement Member</label>
-                                <div class="form-control" style="background-color: #f8f9fa; border: 1px solid #ced4da; padding: 0.375rem 0.75rem;">
-                                    <strong>{{ user.name }}</strong>
-                                    <small class="text-muted d-block">Automatically assigned as the procurement member</small>
-                                </div>
-                            </div>
-                            {% endif %}
-                            
                             <form method="POST" action="{{ url_for('item_request_complete', request_id=item_request.id) }}" enctype="multipart/form-data" id="item-request-complete-form">
                                 <div class="form-group">
                                     <p style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem;">
-                                        <strong>Upload Receipt:</strong> This is for the proof of transfer made by the Procurement Manager to the assigned Procurement Staff.
+                                        <strong>Upload Receipt:</strong> This is for the proof of transfer made by the Procurement Manager to the assigned procurement staff member (see Assignment Details section above).
                                     </p>
                                     <div id="item-receipt-upload-container" 
                                          data-multiple-file-upload
@@ -1945,10 +3282,49 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
+    // Check for URL parameter to set initial active tab
+    const urlParams = new URLSearchParams(window.location.search);
+    const requestedTab = urlParams.get('tab');
+    
+    if (requestedTab) {
+        // Remove active class from all tabs and contents
+        stepTabs.forEach(t => t.classList.remove('active'));
+        stepContents.forEach(c => c.classList.remove('active'));
+        
+        // Activate the requested tab
+        const requestedTabElement = document.querySelector(`[data-step="${requestedTab}"]`);
+        const requestedContent = document.getElementById(`step-${requestedTab}`);
+        
+        if (requestedTabElement && requestedContent && !requestedTabElement.classList.contains('disabled')) {
+            requestedTabElement.classList.add('active');
+            requestedContent.classList.add('active');
+            
+            // Show/hide request details section based on active tab
+            const requestDetailsSection = document.querySelector('.request-details-section');
+            if (requestDetailsSection) {
+                if (requestedTab === 'submit') {
+                    requestDetailsSection.style.display = 'block';
+                } else {
+                    requestDetailsSection.style.display = 'none';
+                }
+            }
+        }
+    }
+    
     // Handle item request completion form submission with multiple file upload components
     const itemRequestCompleteForm = document.getElementById('item-request-complete-form');
     if (itemRequestCompleteForm) {
+        // Store original values for assigned procurement quantities before adding validation
+        ensureOriginalValuesStored();
+        
         itemRequestCompleteForm.addEventListener('submit', function(e) {
+            // Check for unsaved quantity edits first
+            if (hasUnsavedQuantityEdits()) {
+                e.preventDefault();
+                showQuantityEditErrorDialog();
+                return false;
+            }
+            
             e.preventDefault();
             
             // Get both upload components
@@ -2052,6 +3428,794 @@ function updateCartQuantityState(index) {
             '</strong> of this item. You have currently set to <strong>' +
             diffAbs + '</strong> ' + moreOrLess + ' than requested.';
     }
+}
+
+// Quantity controls for Procurement Manager cart
+function adjustProcurementCartQuantity(index, delta) {
+    index = parseInt(index, 10) || 0;
+    const input = document.getElementById('procurement_cart_qty_' + index);
+    if (!input) return;
+
+    let current = parseInt(input.value || '0', 10);
+    if (isNaN(current)) current = 0;
+
+    current += delta;
+    if (current < 0) current = 0;
+
+    input.value = current;
+
+    // Update row highlight and note in real-time
+    updateProcurementCartQuantityState(index);
+}
+
+function updateProcurementCartQuantityState(index) {
+    index = parseInt(index, 10) || 0;
+    const input = document.getElementById('procurement_cart_qty_' + index);
+    const row = document.getElementById('procurement_cart_row_' + index);
+    const note = document.getElementById('procurement_cart_note_' + index);
+    if (!input || !row || !note) return;
+
+    const origQty = parseInt(row.getAttribute('data-orig-qty') || '0', 10);
+    let current = parseInt(input.value || '0', 10);
+    if (isNaN(current)) current = 0;
+
+    const diff = current - origQty;
+    const diffAbs = Math.abs(diff);
+
+    // Row highlight when less than original
+    if (current < origQty) {
+        row.classList.add('qty-less-than-original');
+    } else {
+        row.classList.remove('qty-less-than-original');
+    }
+
+    // Update note
+    if (current === origQty) {
+        note.style.display = 'none';
+        note.innerHTML = '';
+    } else {
+        const origDisplay = row.getAttribute('data-orig-display') || String(origQty);
+        const moreOrLess = diff > 0 ? 'more' : 'less';
+        note.style.display = 'block';
+        // Check if this is a procurement manager cart (has procurement_cart prefix)
+        const isProcurementCart = input.id && input.id.startsWith('procurement_cart');
+        if (isProcurementCart) {
+            note.innerHTML =
+                'Manager approved <strong>' + origDisplay +
+                '</strong> of this item. You have currently set <strong>' +
+                diffAbs + '</strong> ' + moreOrLess + ' than manager approved.';
+        } else {
+            note.innerHTML =
+                'Requestor requested <strong>' + origDisplay +
+                '</strong> of this item. You have currently set <strong>' +
+                diffAbs + '</strong> ' + moreOrLess + ' than requested.';
+        }
+    }
+    
+    // Check if any quantity is 0 and show/hide rejection reason field
+    checkProcurementManagerRejectionReasonRequired();
+}
+
+// Enable editing for procurement manager quantity (for previously rejected items)
+function enableProcurementQuantityEdit(index) {
+    index = parseInt(index, 10) || 0;
+    const readonlyDiv = document.getElementById('procurement_qty_readonly_' + index);
+    const editableWrapper = document.getElementById('procurement_qty_editable_wrapper_' + index);
+    
+    if (readonlyDiv && editableWrapper) {
+        // Store the current value as the original value for cancel functionality
+        const input = document.getElementById('procurement_cart_qty_' + index);
+        if (input) {
+            // Store the current value before editing
+            input.setAttribute('data-original-value', input.value || '0');
+        }
+        
+        // Hide read-only display
+        readonlyDiv.style.display = 'none';
+        // Show editable wrapper (contains quantity-control and X button)
+        editableWrapper.style.display = 'flex';
+        // Focus on the input
+        if (input) {
+            input.focus();
+            input.select();
+        }
+        
+        // Check if rejection reason field should be shown (based on current quantity)
+        checkProcurementManagerRejectionReasonRequired();
+    }
+}
+
+// Cancel editing for procurement manager quantity (for previously rejected items)
+function cancelProcurementQuantityEdit(index) {
+    index = parseInt(index, 10) || 0;
+    const readonlyDiv = document.getElementById('procurement_qty_readonly_' + index);
+    const editableWrapper = document.getElementById('procurement_qty_editable_wrapper_' + index);
+    const note = document.getElementById('procurement_cart_note_' + index);
+    
+    if (readonlyDiv && editableWrapper) {
+        // Restore the original value
+        const input = document.getElementById('procurement_cart_qty_' + index);
+        if (input) {
+            const originalValue = input.getAttribute('data-original-value') || '0';
+            input.value = originalValue;
+        }
+        
+        // Hide the note
+        if (note) {
+            note.style.display = 'none';
+            note.innerHTML = '';
+        }
+        
+        // Hide editable wrapper
+        editableWrapper.style.display = 'none';
+        // Show read-only display
+        readonlyDiv.style.display = 'inline-flex';
+        
+        // Check if rejection reason field should be hidden (based on restored quantity)
+        checkProcurementManagerRejectionReasonRequired();
+    }
+}
+
+// Enable editing for assigned procurement quantity (for items set to 0 by procurement manager)
+function enableCartQuantityEdit(index) {
+    index = parseInt(index, 10) || 0;
+    const readonlyDiv = document.getElementById('cart_qty_readonly_' + index);
+    const editableWrapper = document.getElementById('cart_qty_editable_wrapper_' + index);
+    
+    if (readonlyDiv && editableWrapper) {
+        // Store the current value as the original value for cancel functionality
+        const input = document.getElementById('cart_qty_' + index);
+        if (input) {
+            // Store the current value before editing
+            input.setAttribute('data-original-value', input.value || '0');
+        }
+        
+        // Hide read-only display
+        readonlyDiv.style.display = 'none';
+        // Show editable wrapper (contains quantity-control and X button)
+        editableWrapper.style.display = 'flex';
+        // Focus on the input
+        if (input) {
+            input.focus();
+            input.select();
+        }
+        
+        // Update quantity state
+        updateCartQuantityState(index);
+    }
+}
+
+// Cancel editing for assigned procurement quantity (for items set to 0 by procurement manager)
+function cancelCartQuantityEdit(index) {
+    index = parseInt(index, 10) || 0;
+    const readonlyDiv = document.getElementById('cart_qty_readonly_' + index);
+    const editableWrapper = document.getElementById('cart_qty_editable_wrapper_' + index);
+    const note = document.getElementById('cart_note_' + index);
+    
+    if (readonlyDiv && editableWrapper) {
+        // Restore the original value
+        const input = document.getElementById('cart_qty_' + index);
+        if (input) {
+            const originalValue = input.getAttribute('data-original-value') || '0';
+            input.value = originalValue;
+        }
+        
+        // Hide the note
+        if (note) {
+            note.style.display = 'none';
+            note.innerHTML = '';
+        }
+        
+        // Hide editable wrapper
+        editableWrapper.style.display = 'none';
+        // Show read-only display
+        readonlyDiv.style.display = 'inline-flex';
+        
+        // Update quantity state
+        updateCartQuantityState(index);
+    }
+}
+
+// Check if manager rejection reason is required (when any quantity is 0)
+function checkManagerRejectionReasonRequired() {
+    // Check multi-item form
+    const multiRejectionGroup = document.getElementById('manager_rejection_reason_group');
+    const multiRejectionField = document.getElementById('manager_quantity_rejection_reason');
+    const multiSaveBtn = document.getElementById('manager_save_quantities_btn');
+    
+    if (multiRejectionGroup && multiRejectionField && multiSaveBtn) {
+        let hasZero = false;
+        const quantityInputs = document.querySelectorAll('input[name="quantities[]"]');
+        quantityInputs.forEach(input => {
+            if (input.id && input.id.startsWith('cart_qty_')) {
+                const qty = parseInt(input.value || '0', 10);
+                if (qty === 0) {
+                    hasZero = true;
+                }
+            }
+        });
+        
+        // Show editable field only if any quantity is 0 (don't show based on saved value)
+        if (hasZero) {
+            multiRejectionGroup.style.display = 'block';
+            multiRejectionField.setAttribute('required', 'required');
+        } else {
+            multiRejectionGroup.style.display = 'none';
+            multiRejectionField.removeAttribute('required');
+            // Don't clear the value - keep it for when they show the field again
+        }
+    }
+    
+    // Check single-item form
+    const singleRejectionGroup = document.getElementById('manager_rejection_reason_group_single');
+    const singleRejectionField = document.getElementById('manager_quantity_rejection_reason_single');
+    const singleSaveBtn = document.getElementById('manager_save_quantity_btn');
+    
+    if (singleRejectionGroup && singleRejectionField && singleSaveBtn) {
+        const quantityInput = document.getElementById('cart_qty_0');
+        if (quantityInput) {
+            const qty = parseInt(quantityInput.value || '0', 10);
+            // Show editable field only if quantity is 0
+            if (qty === 0) {
+                singleRejectionGroup.style.display = 'block';
+                singleRejectionField.setAttribute('required', 'required');
+            } else {
+                singleRejectionGroup.style.display = 'none';
+                singleRejectionField.removeAttribute('required');
+                // Don't clear the value - keep it for when they show the field again
+            }
+        }
+    }
+}
+
+// Check if procurement manager rejection reason is required (when any quantity is 0)
+function checkProcurementManagerRejectionReasonRequired() {
+    // Check multi-item form
+    const multiRejectionGroup = document.getElementById('procurement_manager_rejection_reason_group');
+    const multiRejectionField = document.getElementById('procurement_manager_quantity_rejection_reason');
+    const multiSavedReasonGroup = document.getElementById('procurement_manager_saved_rejection_reason_group');
+    const multiSaveBtn = document.getElementById('procurement_manager_save_quantities_btn');
+    
+    if (multiRejectionGroup && multiRejectionField && multiSaveBtn) {
+        let hasZero = false;
+        let hasEditableVisible = false;
+        const quantityInputs = document.querySelectorAll('input[name="quantities[]"]');
+        quantityInputs.forEach(input => {
+            if (input.id && input.id.startsWith('procurement_cart_qty_')) {
+                // Check if this input's editable wrapper is visible (editing is enabled)
+                const editableWrapper = document.getElementById('procurement_qty_editable_wrapper_' + input.dataset.index);
+                if (editableWrapper && editableWrapper.style.display !== 'none') {
+                    hasEditableVisible = true;
+                    const qty = parseInt(input.value || '0', 10);
+                    if (qty === 0) {
+                        hasZero = true;
+                    }
+                }
+            }
+        });
+        
+        // Show rejection reason field only if editing is enabled AND any quantity is 0
+        if (hasEditableVisible && hasZero) {
+            multiRejectionGroup.style.display = 'block';
+            multiRejectionField.setAttribute('required', 'required');
+            // Show previously saved reason if it exists
+            if (multiSavedReasonGroup) {
+                multiSavedReasonGroup.style.display = 'block';
+            }
+        } else {
+            multiRejectionGroup.style.display = 'none';
+            multiRejectionField.removeAttribute('required');
+            // Hide previously saved reason
+            if (multiSavedReasonGroup) {
+                multiSavedReasonGroup.style.display = 'none';
+            }
+            // Don't clear the value - keep it for when they show the field again
+        }
+    }
+    
+    // Check single-item form
+    const singleRejectionGroup = document.getElementById('procurement_manager_rejection_reason_group_single');
+    const singleRejectionField = document.getElementById('procurement_manager_quantity_rejection_reason_single');
+    const singleSavedReasonGroup = document.getElementById('procurement_manager_saved_rejection_reason_group_single');
+    const singleSaveBtn = document.getElementById('procurement_manager_save_quantity_btn');
+    
+    if (singleRejectionGroup && singleRejectionField && singleSaveBtn) {
+        const quantityInput = document.getElementById('procurement_cart_qty_0');
+        const editableWrapper = document.getElementById('procurement_qty_editable_wrapper_0');
+        const isEditableVisible = editableWrapper && editableWrapper.style.display !== 'none';
+        
+        if (quantityInput && isEditableVisible) {
+            const qty = parseInt(quantityInput.value || '0', 10);
+            // Show editable field only if editing is enabled AND quantity is 0
+            if (qty === 0) {
+                singleRejectionGroup.style.display = 'block';
+                singleRejectionField.setAttribute('required', 'required');
+                // Show previously saved reason if it exists
+                if (singleSavedReasonGroup) {
+                    singleSavedReasonGroup.style.display = 'block';
+                }
+            } else {
+                singleRejectionGroup.style.display = 'none';
+                singleRejectionField.removeAttribute('required');
+                // Hide previously saved reason
+                if (singleSavedReasonGroup) {
+                    singleSavedReasonGroup.style.display = 'none';
+                }
+                // Don't clear the value - keep it for when they show the field again
+            }
+        } else {
+            // If editing is not enabled, hide the rejection reason fields
+            singleRejectionGroup.style.display = 'none';
+            singleRejectionField.removeAttribute('required');
+            if (singleSavedReasonGroup) {
+                singleSavedReasonGroup.style.display = 'none';
+            }
+        }
+    }
+}
+
+// Store original quantity values for unsaved edits detection
+let originalQuantityValues = {};
+
+// Function to ensure original values are stored (call this before checking)
+function ensureOriginalValuesStored() {
+    // Store assigned procurement quantity values if not already stored
+    const allQuantityForms = document.querySelectorAll('form[action*="update_item_request_quantities"]');
+    for (let form of allQuantityForms) {
+        const action = form.getAttribute('action') || '';
+        // Skip manager and procurement manager forms
+        if (action.includes('update_item_request_quantities_manager') || 
+            action.includes('update_item_request_quantities_procurement_manager')) {
+            continue;
+        }
+        // This is the assigned procurement form
+        const quantityInputs = form.querySelectorAll('input[name="quantities[]"]');
+        quantityInputs.forEach(input => {
+            const index = input.getAttribute('data-index') || input.id.replace('cart_qty_', '');
+            if (originalQuantityValues['assigned_' + index] === undefined) {
+                originalQuantityValues['assigned_' + index] = parseInt(input.value || '0', 10);
+            }
+        });
+        break;
+    }
+    
+    // Also check inputs directly by ID (fallback)
+    let index = 0;
+    while (true) {
+        const input = document.getElementById('cart_qty_' + index);
+        if (!input) break;
+        const form = input.closest('form');
+        if (form) {
+            const action = form.getAttribute('action') || '';
+            if (action.includes('update_item_request_quantities_manager') || 
+                action.includes('update_item_request_quantities_procurement_manager')) {
+                index++;
+                continue;
+            }
+        }
+        if (input.name === 'quantities[]' && originalQuantityValues['assigned_' + index] === undefined) {
+            originalQuantityValues['assigned_' + index] = parseInt(input.value || '0', 10);
+        }
+        index++;
+    }
+}
+
+// Function to show error dialog (similar to flash error modal)
+function showQuantityEditErrorDialog() {
+    // Create error modal if it doesn't exist
+    let errorModal = document.getElementById('quantity-edit-error-modal');
+    if (!errorModal) {
+        errorModal = document.createElement('div');
+        errorModal.id = 'quantity-edit-error-modal';
+        errorModal.className = 'flash-error-modal';
+        errorModal.style.display = 'flex';
+        errorModal.innerHTML = `
+            <div class="flash-error-backdrop"></div>
+            <div class="flash-error-dialog">
+                <h3 class="flash-error-title"><i class="fas fa-exclamation-circle"></i> Error</h3>
+                <div class="flash-error-body">
+                    You have unsaved quantity edits. Please save your quantity edits before approving, rejecting, or marking the request as completed.
+                </div>
+                <div class="flash-error-actions">
+                    <button type="button" class="flash-error-ok-btn" onclick="closeQuantityEditErrorDialog()">OK</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(errorModal);
+        document.body.classList.add('flash-error-open');
+    } else {
+        errorModal.style.display = 'flex';
+        document.body.classList.add('flash-error-open');
+    }
+}
+
+// Function to close error dialog
+function closeQuantityEditErrorDialog() {
+    const errorModal = document.getElementById('quantity-edit-error-modal');
+    if (errorModal) {
+        errorModal.style.display = 'none';
+        document.body.classList.remove('flash-error-open');
+    }
+}
+
+// Function to check if there are unsaved quantity edits
+function hasUnsavedQuantityEdits() {
+    // Ensure original values are stored before checking
+    ensureOriginalValuesStored();
+    
+    // Check manager quantity form
+    const managerForm = document.querySelector('form[action*="update_item_request_quantities_manager"]');
+    if (managerForm) {
+        const quantityInputs = managerForm.querySelectorAll('input[name="quantities[]"]');
+        for (let input of quantityInputs) {
+            const index = input.getAttribute('data-index') || input.id.replace('cart_qty_', '');
+            const currentValue = parseInt(input.value || '0', 10);
+            const originalValue = originalQuantityValues['manager_' + index];
+            if (originalValue !== undefined && currentValue !== originalValue) {
+                return true;
+            }
+        }
+    }
+    
+    // Check procurement manager quantity form
+    const procurementManagerForm = document.querySelector('form[action*="update_item_request_quantities_procurement_manager"]');
+    if (procurementManagerForm) {
+        const quantityInputs = procurementManagerForm.querySelectorAll('input[name="quantities[]"]');
+        for (let input of quantityInputs) {
+            const index = input.getAttribute('data-index') || input.id.replace('procurement_cart_qty_', '');
+            const currentValue = parseInt(input.value || '0', 10);
+            const originalValue = originalQuantityValues['procurement_manager_' + index];
+            if (originalValue !== undefined && currentValue !== originalValue) {
+                return true;
+            }
+        }
+    }
+    
+    // Check assigned procurement quantity form (for assigned procurement staff)
+    // This form has action containing "update_item_request_quantities" but NOT "manager" or "procurement_manager"
+    const allForms = document.querySelectorAll('form[action*="update_item_request_quantities"]');
+    for (let form of allForms) {
+        const action = form.getAttribute('action') || '';
+        // Skip manager and procurement manager forms
+        if (action.includes('update_item_request_quantities_manager') || 
+            action.includes('update_item_request_quantities_procurement_manager')) {
+            continue;
+        }
+        // This is the assigned procurement form
+        // Check ALL inputs (including those in editable wrappers that might be hidden)
+        const quantityInputs = form.querySelectorAll('input[name="quantities[]"]');
+        for (let input of quantityInputs) {
+            const index = input.getAttribute('data-index') || input.id.replace('cart_qty_', '');
+            const currentValue = parseInt(input.value || '0', 10);
+            const originalValue = originalQuantityValues['assigned_' + index];
+            // Check if value has changed from original
+            if (originalValue !== undefined && currentValue !== originalValue) {
+                return true;
+            }
+        }
+    }
+    
+    // Also check inputs directly by ID pattern (fallback if form not found)
+    // This handles cases where form might not be found or inputs are outside form context
+    let index = 0;
+    while (true) {
+        const input = document.getElementById('cart_qty_' + index);
+        if (!input) break;
+        // Make sure it's not in a manager or procurement manager form
+        const form = input.closest('form');
+        if (form) {
+            const action = form.getAttribute('action') || '';
+            if (action.includes('update_item_request_quantities_manager') || 
+                action.includes('update_item_request_quantities_procurement_manager')) {
+                index++;
+                continue;
+            }
+        }
+        // Check if this input is for assigned procurement (has name="quantities[]" and is in assigned procurement form)
+        if (input.name === 'quantities[]') {
+            const currentValue = parseInt(input.value || '0', 10);
+            const originalValue = originalQuantityValues['assigned_' + index];
+            if (originalValue !== undefined && currentValue !== originalValue) {
+                return true;
+            }
+        }
+        index++;
+    }
+    
+    return false;
+}
+
+// Handle Edited badge click for quantity edits and form validation
+document.addEventListener('DOMContentLoaded', function() {
+    // Store original quantity values on page load
+    // Manager quantities
+    const managerForm = document.querySelector('form[action*="update_item_request_quantities_manager"]');
+    if (managerForm) {
+        const quantityInputs = managerForm.querySelectorAll('input[name="quantities[]"]');
+        quantityInputs.forEach(input => {
+            const index = input.getAttribute('data-index') || input.id.replace('cart_qty_', '');
+            originalQuantityValues['manager_' + index] = parseInt(input.value || '0', 10);
+        });
+        
+        managerForm.addEventListener('submit', function(e) {
+            // Check if any quantity is 0
+            const quantityInputs = this.querySelectorAll('input[name="quantities[]"]');
+            let hasZero = false;
+            quantityInputs.forEach(input => {
+                const qty = parseInt(input.value || '0', 10);
+                if (qty === 0) {
+                    hasZero = true;
+                }
+            });
+            
+            if (hasZero) {
+                const rejectionField = this.querySelector('textarea[name="quantity_rejection_reason"]');
+                if (rejectionField && !rejectionField.value.trim()) {
+                    e.preventDefault();
+                    alert('Please provide a reason for rejecting the item(s) with quantity set to 0.');
+                    rejectionField.focus();
+                    return false;
+                }
+            }
+            
+            // Update original values after successful save
+            quantityInputs.forEach(input => {
+                const index = input.getAttribute('data-index') || input.id.replace('cart_qty_', '');
+                originalQuantityValues['manager_' + index] = parseInt(input.value || '0', 10);
+            });
+        });
+    }
+    
+    // Procurement manager quantity form validation
+    const procurementManagerForm = document.querySelector('form[action*="update_item_request_quantities_procurement_manager"]');
+    if (procurementManagerForm) {
+        const quantityInputs = procurementManagerForm.querySelectorAll('input[name="quantities[]"]');
+        quantityInputs.forEach(input => {
+            const index = input.getAttribute('data-index') || input.id.replace('procurement_cart_qty_', '');
+            originalQuantityValues['procurement_manager_' + index] = parseInt(input.value || '0', 10);
+        });
+        
+        procurementManagerForm.addEventListener('submit', function(e) {
+            // Check if any quantity is 0
+            const quantityInputs = this.querySelectorAll('input[name="quantities[]"]');
+            let hasZero = false;
+            quantityInputs.forEach(input => {
+                const qty = parseInt(input.value || '0', 10);
+                if (qty === 0) {
+                    hasZero = true;
+                }
+            });
+            
+            if (hasZero) {
+                const rejectionField = this.querySelector('textarea[name="quantity_rejection_reason"]');
+                if (rejectionField && !rejectionField.value.trim()) {
+                    e.preventDefault();
+                    alert('Please provide a reason for rejecting the item(s) with quantity set to 0.');
+                    rejectionField.focus();
+                    return false;
+                }
+            }
+            
+            // Update original values after successful save
+            quantityInputs.forEach(input => {
+                const index = input.getAttribute('data-index') || input.id.replace('procurement_cart_qty_', '');
+                originalQuantityValues['procurement_manager_' + index] = parseInt(input.value || '0', 10);
+            });
+        });
+    }
+    
+    // Store original values for assigned procurement quantities
+    // Find the form that has "update_item_request_quantities" but NOT "manager" or "procurement_manager"
+    const allQuantityForms = document.querySelectorAll('form[action*="update_item_request_quantities"]');
+    for (let form of allQuantityForms) {
+        const action = form.getAttribute('action') || '';
+        // Skip manager and procurement manager forms
+        if (action.includes('update_item_request_quantities_manager') || 
+            action.includes('update_item_request_quantities_procurement_manager')) {
+            continue;
+        }
+        // This is the assigned procurement form
+        // Get all quantity inputs, including those in editable wrappers
+        const quantityInputs = form.querySelectorAll('input[name="quantities[]"]');
+        quantityInputs.forEach(input => {
+            const index = input.getAttribute('data-index') || input.id.replace('cart_qty_', '');
+            const value = parseInt(input.value || '0', 10);
+            // Store original value (only if not already stored)
+            if (originalQuantityValues['assigned_' + index] === undefined) {
+                originalQuantityValues['assigned_' + index] = value;
+            }
+        });
+        
+        form.addEventListener('submit', function(e) {
+            // Update original values after successful save
+            const quantityInputs = this.querySelectorAll('input[name="quantities[]"]');
+            quantityInputs.forEach(input => {
+                const index = input.getAttribute('data-index') || input.id.replace('cart_qty_', '');
+                originalQuantityValues['assigned_' + index] = parseInt(input.value || '0', 10);
+            });
+        });
+        break; // Only process the first matching form
+    }
+    
+    // Also store values by checking inputs directly (fallback)
+    let index = 0;
+    while (true) {
+        const input = document.getElementById('cart_qty_' + index);
+        if (!input) break;
+        // Make sure it's not in a manager or procurement manager form
+        const form = input.closest('form');
+        if (form) {
+            const action = form.getAttribute('action') || '';
+            if (action.includes('update_item_request_quantities_manager') || 
+                action.includes('update_item_request_quantities_procurement_manager')) {
+                index++;
+                continue;
+            }
+        }
+        // Store original value if not already stored
+        if (originalQuantityValues['assigned_' + index] === undefined) {
+            originalQuantityValues['assigned_' + index] = parseInt(input.value || '0', 10);
+        }
+        index++;
+    }
+    
+    // Validate manager decision form
+    const managerDecisionForm = document.querySelector('form[action*="item_request_manager_decision"]');
+    if (managerDecisionForm) {
+        managerDecisionForm.addEventListener('submit', function(e) {
+            if (hasUnsavedQuantityEdits()) {
+                e.preventDefault();
+                showQuantityEditErrorDialog();
+                return false;
+            }
+        });
+    }
+    
+    // Validate procurement manager decision form
+    const procurementManagerDecisionForm = document.querySelector('form[action*="item_request_procurement_manager_decision"]');
+    if (procurementManagerDecisionForm) {
+        procurementManagerDecisionForm.addEventListener('submit', function(e) {
+            if (hasUnsavedQuantityEdits()) {
+                e.preventDefault();
+                showQuantityEditErrorDialog();
+                return false;
+            }
+        });
+    }
+    
+    // Validate complete form
+    const itemRequestCompleteForm = document.getElementById('item-request-complete-form');
+    if (itemRequestCompleteForm) {
+        const originalSubmitHandler = itemRequestCompleteForm.onsubmit;
+        itemRequestCompleteForm.addEventListener('submit', function(e) {
+            if (hasUnsavedQuantityEdits()) {
+                e.preventDefault();
+                showQuantityEditErrorDialog();
+                return false;
+            }
+        });
+    }
+    
+    // Initialize rejection reason fields on page load
+    checkManagerRejectionReasonRequired();
+    checkProcurementManagerRejectionReasonRequired();
+    
+    // Edited badge click -> fetch quantity history
+    document.addEventListener('click', function(e) {
+        const badge = e.target.closest('.edited-badge');
+        if (!badge) return;
+        const field = badge.getAttribute('data-field');
+        if (field !== 'quantities') return;
+        
+        const requestId = {{ item_request.id }};
+        fetch(`/api/item-request/${requestId}/quantity-history`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    alert(data.error || 'Failed to load history');
+                    return;
+                }
+                openFieldHistoryModal('quantities', data.history || []);
+            })
+            .catch(() => alert('Failed to load history'));
+    });
+});
+
+function openFieldHistoryModal(field, history) {
+    const modal = document.getElementById('fieldHistoryModal');
+    const title = document.getElementById('fieldHistoryTitle');
+    const body = document.getElementById('fieldHistoryBody');
+    title.textContent = 'Edit History — Item Quantities';
+    if (!history.length) {
+        body.innerHTML = '<p style="margin:0; color:#666;">No edits recorded for quantities.</p>';
+    } else {
+        body.innerHTML = history.map(h => {
+            // Parse old and new values to find changed items
+            const oldLines = (h.old_value || '').split('\n');
+            const newLines = (h.new_value || '').split('\n');
+            
+            // Create a map of item name to quantities for comparison
+            const oldMap = {};
+            const newMap = {};
+            
+            oldLines.forEach(line => {
+                if (line.trim()) {
+                    const match = line.match(/^(.+?):\s*(.+)$/);
+                    if (match) {
+                        oldMap[match[1].trim()] = match[2].trim();
+                    }
+                }
+            });
+            
+            newLines.forEach(line => {
+                if (line.trim()) {
+                    const match = line.match(/^(.+?):\s*(.+)$/);
+                    if (match) {
+                        newMap[match[1].trim()] = match[2].trim();
+                    }
+                }
+            });
+            
+            // Format old value with red highlighting for changed items
+            const oldValueFormatted = oldLines.map(line => {
+                if (!line.trim()) return '<br>';
+                const match = line.match(/^(.+?):\s*(.+)$/);
+                if (match) {
+                    const itemName = match[1].trim();
+                    const qty = match[2].trim();
+                    // Check if this item changed
+                    if (newMap[itemName] && newMap[itemName] !== qty) {
+                        return `<span style="color: #dc3545; font-weight: 600;">${escapeHtml(line)}</span><br>`;
+                    }
+                }
+                return escapeHtml(line) + '<br>';
+            }).join('');
+            
+            // Format new value with red highlighting for changed items
+            const newValueFormatted = newLines.map(line => {
+                if (!line.trim()) return '<br>';
+                const match = line.match(/^(.+?):\s*(.+)$/);
+                if (match) {
+                    const itemName = match[1].trim();
+                    const qty = match[2].trim();
+                    // Check if this item changed
+                    if (oldMap[itemName] && oldMap[itemName] !== qty) {
+                        return `<span style="color: #dc3545; font-weight: 600;">${escapeHtml(line)}</span><br>`;
+                    }
+                }
+                return escapeHtml(line) + '<br>';
+            }).join('');
+            
+            return `
+                <div class="history-row">
+                    <div class="history-meta">
+                        <span class="history-user">${escapeHtml(h.edited_by || 'Unknown')}</span>
+                        <span class="history-time">${escapeHtml(h.edited_at || '')}</span>
+                    </div>
+                    <div class="history-values">
+                        <div><strong>From:</strong><br>${oldValueFormatted}</div>
+                        <div><strong>To:</strong><br>${newValueFormatted}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeFieldHistoryModal() {
+    const modal = document.getElementById('fieldHistoryModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"]/g, function(c) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+    });
 }
 
 </script>

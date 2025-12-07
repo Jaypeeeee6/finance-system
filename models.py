@@ -656,8 +656,10 @@ class ProcurementItemRequest(db.Model):
     category = db.Column(db.String(100), nullable=True)  # Category of the item
     item_name = db.Column(db.String(200), nullable=False)
     quantity = db.Column(db.String(100), nullable=True)  # Can be "10 units", "5 boxes", etc.
-    # Quantities adjusted by assigned procurement staff (per-item, does NOT overwrite original requestor quantity)
+    # Quantities adjusted by manager during Manager Approval (per-item, does NOT overwrite original requestor quantity)
     procurement_quantities = db.Column(db.Text, nullable=True)
+    # Quantities adjusted by procurement manager during Procurement Manager Approval (per-item, separate from manager quantities)
+    procurement_manager_quantities = db.Column(db.Text, nullable=True)
     purpose = db.Column(db.Text, nullable=False)
     branch_name = db.Column(db.String(100), nullable=False)
     request_date = db.Column(db.Date, nullable=False)
@@ -686,6 +688,7 @@ class ProcurementItemRequest(db.Model):
     manager_on_hold_by = db.Column(db.String(100), nullable=True)
     manager_on_hold_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
     manager_on_hold_reason = db.Column(db.Text, nullable=True)
+    manager_quantity_rejection_reason = db.Column(db.Text, nullable=True)  # Reason for rejecting items (when quantity set to 0)
     
     # Procurement Manager approval fields
     procurement_manager_approval_date = db.Column(db.Date, nullable=True)
@@ -700,6 +703,7 @@ class ProcurementItemRequest(db.Model):
     procurement_manager_on_hold_by = db.Column(db.String(100), nullable=True)
     procurement_manager_on_hold_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
     procurement_manager_on_hold_reason = db.Column(db.Text, nullable=True)
+    procurement_manager_quantity_rejection_reason = db.Column(db.Text, nullable=True)  # Reason for rejecting items (when quantity set to 0)
     amount = db.Column(db.Numeric(10, 3), nullable=True)  # Amount set by Procurement Manager when approving
     payment_date = db.Column(db.Date, nullable=True)  # Date when payment is scheduled
     

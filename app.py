@@ -2034,7 +2034,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
                         'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned',
-                        'request_on_hold'
+                        'request_on_hold', 'item_request_updated'
                     ])
                 )
             )
@@ -2058,7 +2058,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                             'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                             'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
                             'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned',
-                            'request_on_hold'
+                            'request_on_hold', 'item_request_updated'
                         ])
                     )
                 )
@@ -2104,7 +2104,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'ready_for_finance_review', 'proof_uploaded', 'recurring_due', 'installment_edited',
                         'finance_approval_timing_alert', 'finance_approval_timing_recurring',
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
-                            'admin_announcement', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold'
+                            'admin_announcement', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold', 'item_request_updated'
                     ])
                 )
             ).order_by(Notification.created_at.desc())
@@ -2121,7 +2121,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
                         'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned',
-                        'request_on_hold'
+                        'request_on_hold', 'item_request_updated', 'item_request_assigned'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -2143,7 +2143,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold'
+                        'installment_paid', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold', 'item_request_updated', 'item_request_assigned'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -2185,7 +2185,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'proof_required', 'recurring_approved', 'request_completed', 'installment_paid',
                         'user_created', 'user_updated', 'user_deleted', 'finance_note_added',
                         'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned',
-                        'request_on_hold'
+                        'request_on_hold', 'item_request_updated'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -2209,7 +2209,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'proof_required', 'recurring_approved', 'request_completed', 'installment_paid',
                         'user_created', 'user_updated', 'user_deleted', 'finance_note_added',
                         'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned',
-                        'request_on_hold'
+                        'request_on_hold', 'item_request_updated'
                     ]),
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
@@ -2240,7 +2240,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
                         'installment_paid', 'finance_note_added', 'one_time_payment_scheduled',
-                        'item_request_assigned', 'request_returned', 'request_on_hold'
+                        'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold'
                     ]),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -2256,7 +2256,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                     'status_changed', 'recurring_due', 'proof_required', 'recurring_approved',
                     'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled',
-                    'item_request_assigned', 'request_returned', 'request_on_hold'
+                        'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold'
                 ])
             )
         ).order_by(Notification.created_at.desc())
@@ -2343,7 +2343,7 @@ def get_unread_count_for_user(user):
                 db.or_(
                     Notification.notification_type == 'item_request_submission',
                     Notification.notification_type == 'new_submission',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold', 'item_request_updated', 'item_request_assigned']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -2359,7 +2359,7 @@ def get_unread_count_for_user(user):
                 db.or_(
                     Notification.notification_type == 'item_request_submission',
                     Notification.notification_type == 'new_submission',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned', 'request_on_hold']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned', 'request_on_hold', 'item_request_updated', 'item_request_assigned']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -2393,7 +2393,7 @@ def get_unread_count_for_user(user):
                             Notification.message.contains('IT')
                         )
                     ),
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold', 'item_request_updated']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -2409,7 +2409,7 @@ def get_unread_count_for_user(user):
                 db.or_(
                     # Item request submissions (for procurement item requests)
                     Notification.notification_type == 'item_request_submission',
-                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold']),
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold', 'item_request_updated']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
                 )
             )
@@ -2442,7 +2442,7 @@ def get_unread_count_for_user(user):
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
-                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'request_returned', 'request_on_hold'])
+                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold'])
             )
         ).count()
 
@@ -3809,7 +3809,22 @@ def procurement_item_requests():
             cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN invoice_amount NUMERIC(10, 3)")
             conn.commit()
             print("✓ Added 'invoice_amount' column to procurement_item_requests table")
-        
+
+        if 'procurement_manager_quantities' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN procurement_manager_quantities TEXT")
+            conn.commit()
+            print("✓ Added 'procurement_manager_quantities' column to procurement_item_requests table")
+
+        if 'manager_quantity_rejection_reason' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN manager_quantity_rejection_reason TEXT")
+            conn.commit()
+            print("✓ Added 'manager_quantity_rejection_reason' column to procurement_item_requests table")
+
+        if 'procurement_manager_quantity_rejection_reason' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN procurement_manager_quantity_rejection_reason TEXT")
+            conn.commit()
+            print("✓ Added 'procurement_manager_quantity_rejection_reason' column to procurement_item_requests table")
+
         conn.close()
     except Exception as e:
         print(f"Warning: Could not migrate columns: {e}")
@@ -4500,6 +4515,24 @@ def view_item_request_page(request_id):
         except (json.JSONDecodeError, TypeError):
             invoice_files = [item_request.invoice_path]
 
+    # Check if quantities have been edited (for showing Edited chip)
+    quantities_edited = False
+    try:
+        result = db.session.execute(db.text('''
+            CREATE TABLE IF NOT EXISTS item_request_quantity_edits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_request_id INTEGER NOT NULL,
+                first_edited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_edited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(item_request_id)
+            );
+        '''))
+        result.close()
+        row = db.session.execute(db.text('SELECT 1 FROM item_request_quantity_edits WHERE item_request_id = :rid'), {'rid': request_id}).fetchone()
+        quantities_edited = row is not None
+    except Exception:
+        quantities_edited = False
+
     return render_template('view_item_request.html',
                          item_request=item_request,
                          user=current_user,
@@ -4523,7 +4556,129 @@ def view_item_request_page(request_id):
                          can_reject_procurement_manager=can_reject_procurement_manager,
                          can_complete=can_complete,
                          can_schedule_payment_date=can_schedule_payment_date,
-                         payment_date_scheduled_by=payment_date_scheduled_by)
+                         payment_date_scheduled_by=payment_date_scheduled_by,
+                         quantities_edited=quantities_edited)
+
+
+@app.route('/api/item-request/<int:request_id>/quantity-history', methods=['GET'])
+@login_required
+def get_item_request_quantity_history(request_id):
+    """Return JSON history entries for quantity edits for this item request."""
+    item_request = ProcurementItemRequest.query.get_or_404(request_id)
+    
+    # Check access permissions (same as view_item_request_page)
+    can_view = False
+    if current_user.department == 'Procurement':
+        if item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
+            can_view = True
+    elif current_user.role in ['GM', 'Operation Manager']:
+        can_view = True
+    elif current_user.department == 'IT':
+        can_view = True
+    elif current_user.department == 'Auditing' and item_request.status == 'Completed':
+        can_view = True
+    elif item_request.user_id == current_user.user_id:
+        can_view = True
+    else:
+        approvers = get_authorized_manager_approvers_for_item_request(item_request)
+        if current_user in approvers:
+            can_view = True
+    
+    if not can_view:
+        return jsonify({'success': False, 'error': 'Not authorized'}), 403
+
+    try:
+        # Create table if it doesn't exist
+        db.session.execute(db.text('''
+            CREATE TABLE IF NOT EXISTS item_request_quantity_edit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_request_id INTEGER NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                edited_by_user_id INTEGER,
+                edited_by_name TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        '''))
+        
+        rows = db.session.execute(
+            db.text('''SELECT old_value, new_value, edited_by_name, created_at
+                       FROM item_request_quantity_edit_logs
+                       WHERE item_request_id = :rid
+                       ORDER BY created_at DESC'''),
+            {'rid': request_id}
+        ).fetchall()
+        
+        history = []
+        for r in rows:
+            # Format quantities for display
+            old_quantities = r[0] or ''
+            new_quantities = r[1] or ''
+            
+            # If it's a multi-item request, format as list
+            item_names = (item_request.item_name or '').split(',')
+            old_list = old_quantities.split(';') if old_quantities else []
+            new_list = new_quantities.split(';') if new_quantities else []
+            
+            # Build formatted display strings (one per line)
+            # Helper function to extract just the quantity value (in case old_value already has item names)
+            def extract_quantity(value_str):
+                """Extract quantity from a string that might be 'item: qty' or just 'qty'"""
+                if not value_str:
+                    return ''
+                value_str = value_str.strip()
+                # If it contains ':', it might already have item name, extract just the quantity part
+                if ':' in value_str:
+                    # Split by ':' and take the last part (should be the quantity)
+                    parts = value_str.rsplit(':', 1)  # Use rsplit to handle cases with multiple colons
+                    if len(parts) == 2:
+                        return parts[1].strip()
+                return value_str
+            
+            old_display = []
+            new_display = []
+            for i, item_name in enumerate(item_names):
+                item_name = item_name.strip()
+                if item_name:
+                    old_qty_raw = old_list[i].strip() if i < len(old_list) else ''
+                    new_qty_raw = new_list[i].strip() if i < len(new_list) else ''
+                    # Extract just the quantity part (in case it already has item name from previous formatting)
+                    old_qty = extract_quantity(old_qty_raw)
+                    new_qty = extract_quantity(new_qty_raw)
+                    if old_qty or new_qty:
+                        old_display.append(f"{item_name}: {old_qty if old_qty else 'Not specified'}")
+                        new_display.append(f"{item_name}: {new_qty if new_qty else 'Not specified'}")
+            
+            # Join with newlines instead of semicolons
+            old_formatted = '\n'.join(old_display) if old_display else (old_quantities if old_quantities else 'Not specified')
+            new_formatted = '\n'.join(new_display) if new_display else (new_quantities if new_quantities else 'Not specified')
+            
+            # Convert timestamp from UTC to local time (UTC+4)
+            edited_at_utc = r[3]
+            edited_at_local = None
+            if edited_at_utc:
+                try:
+                    # Parse the datetime string from SQLite
+                    if isinstance(edited_at_utc, str):
+                        # SQLite returns datetime as string, parse it
+                        edited_at_utc = datetime.strptime(edited_at_utc, '%Y-%m-%d %H:%M:%S')
+                    # Convert UTC to local time (UTC+4)
+                    edited_at_local = (edited_at_utc + timedelta(hours=4)).strftime('%B %d, %Y at %I:%M %p')
+                except Exception as e:
+                    # If parsing fails, use the original value
+                    edited_at_local = str(edited_at_utc) if edited_at_utc else ''
+            
+            history.append({
+                'old_value': old_formatted,
+                'new_value': new_formatted,
+                'edited_by': r[2] or 'Unknown',
+                'edited_at': edited_at_local or ''
+            })
+        
+        return jsonify({'success': True, 'history': history})
+    except Exception as e:
+        app.logger.error(f"Error fetching item request quantity history: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/procurement/item-request/<int:request_id>/schedule_payment_date', methods=['POST'])
@@ -4712,7 +4867,7 @@ def item_request_manager_approve_handler(request_id, item_request):
         create_notification(
             user_id=pm.user_id,
             title="New Item Request for Approval",
-            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} requires your approval.",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) requires your approval.",
             notification_type="new_submission",
             item_request_id=request_id
         )
@@ -4724,7 +4879,7 @@ def item_request_manager_approve_handler(request_id, item_request):
             create_notification(
                 user_id=approver.user_id,
                 title="Item Request Approved by Assigned Manager",
-                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been approved by {current_user.name} and sent to Procurement Manager.",
+                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has been approved by {current_user.name} and sent to Procurement Manager.",
                 notification_type="request_approved",
                 item_request_id=request_id
             )
@@ -5044,7 +5199,7 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         create_notification(
             user_id=item_request.user_id,
             title="Item Request Approved by Procurement Manager",
-            message=f"Your item request #{request_id} for {item_request.item_name} has been approved and is now available for procurement staff to process.",
+            message=f"Your item request #{request_id} has been approved and is now available for procurement staff to process.",
             notification_type="request_approved",
             item_request_id=request_id
         )
@@ -5056,7 +5211,7 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         create_notification(
             user_id=staff_member.user_id,
             title="New Item Request Available",
-            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} is now available for processing. Amount: {amount_text}",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) is now available for processing. Amount: {amount_text}",
             notification_type="item_request_assigned",
             item_request_id=request_id
         )
@@ -5066,7 +5221,7 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         create_notification(
             user_id=item_request.manager_approver_user_id,
             title="Item Request Approved by Procurement Manager",
-            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} that you approved has been approved by Procurement Manager and assigned for processing.",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) that you approved has been approved by Procurement Manager and assigned for processing.",
             notification_type="request_approved",
             item_request_id=request_id
         )
@@ -5424,6 +5579,228 @@ def item_request_complete(request_id):
     return redirect(url_for('view_item_request_page', request_id=request_id))
 
 
+@app.route('/procurement/item-request/<int:request_id>/update_quantities_procurement_manager', methods=['POST'])
+@login_required
+def update_item_request_quantities_procurement_manager(request_id):
+    """Allow Procurement Department Manager to adjust per-item quantities during Procurement Manager Approval.
+
+    This uses the same procurement_quantities field so that Procurement staff
+    see the procurement manager-approved quantities, while the original requested quantity
+    remains unchanged in the quantity column.
+    """
+    item_request = ProcurementItemRequest.query.get_or_404(request_id)
+
+    # Only allow updates while request is awaiting (or on) Procurement Manager Approval
+    if item_request.status not in ['Pending Procurement Manager Approval', 'On Hold']:
+        flash('Quantities can only be updated while the request is pending procurement manager approval or on hold by procurement manager.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Authorization: Only Procurement Department Manager
+    if current_user.department != 'Procurement' or current_user.role != 'Department Manager':
+        flash('You do not have permission to update quantities for this request at the procurement manager stage.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Check if it's on hold by procurement manager (not manager)
+    if item_request.status == 'On Hold' and not item_request.procurement_manager_on_hold_by_user_id:
+        flash('Quantities can only be updated while the request is pending procurement manager approval or on hold by procurement manager.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Parse the posted quantities list
+    raw_quantities = request.form.getlist('quantities[]')
+    cleaned_quantities = [q.strip() for q in raw_quantities]
+
+    # Ensure alignment with existing item list
+    item_names = [name.strip() for name in (item_request.item_name or '').split(',') if name.strip()]
+    if not item_names:
+        flash('No item names found for this request.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Normalise quantity list length to match items
+    if len(cleaned_quantities) < len(item_names):
+        cleaned_quantities += [''] * (len(item_names) - len(cleaned_quantities))
+    elif len(cleaned_quantities) > len(item_names):
+        cleaned_quantities = cleaned_quantities[:len(item_names)]
+
+    # Get old quantities for edit history tracking (use procurement_manager_quantities if exists, otherwise procurement_quantities)
+    old_quantities = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity or ''
+    old_quantities_str = old_quantities if old_quantities else ''
+    new_quantities_str = ';'.join(cleaned_quantities)
+
+    # Store procurement manager-approved quantities in separate field (does not affect manager-approved quantities)
+    item_request.procurement_manager_quantities = new_quantities_str
+    # Store rejection reason if provided
+    quantity_rejection_reason = request.form.get('quantity_rejection_reason', '').strip()
+    item_request.procurement_manager_quantity_rejection_reason = quantity_rejection_reason if quantity_rejection_reason else None
+    item_request.updated_at = datetime.utcnow()
+
+    # Track quantity edits in edit history table (similar to payment requests)
+    try:
+        # Create table if it doesn't exist
+        db.session.execute(db.text('''
+            CREATE TABLE IF NOT EXISTS item_request_quantity_edit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_request_id INTEGER NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                edited_by_user_id INTEGER,
+                edited_by_name TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        '''))
+        
+        # Create table to track which item requests have edited quantities
+        db.session.execute(db.text('''
+            CREATE TABLE IF NOT EXISTS item_request_quantity_edits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_request_id INTEGER NOT NULL,
+                first_edited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_edited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(item_request_id)
+            );
+        '''))
+        
+        # Only log if quantities actually changed
+        if old_quantities_str != new_quantities_str:
+            # Insert edit log entry
+            db.session.execute(db.text('''
+                INSERT INTO item_request_quantity_edit_logs (item_request_id, old_value, new_value, edited_by_user_id, edited_by_name)
+                VALUES (:rid, :oldv, :newv, :uid, :uname)
+            '''), {
+                'rid': request_id,
+                'oldv': old_quantities_str,
+                'newv': new_quantities_str,
+                'uid': current_user.user_id,
+                'uname': current_user.name
+            })
+            
+            # Mark that this item request has edited quantities
+            db.session.execute(db.text('''
+                INSERT INTO item_request_quantity_edits (item_request_id) VALUES (:rid)
+                ON CONFLICT(item_request_id) DO UPDATE SET last_edited_at = CURRENT_TIMESTAMP
+            '''), {'rid': request_id})
+            
+            # Notify requestor and other authorized managers that quantities have been edited (outside try block to ensure it always runs)
+            if old_quantities_str != new_quantities_str:
+                # Parse quantities to show what changed
+                item_names_list = [name.strip() for name in (item_request.item_name or '').split(',') if name.strip()]
+                old_list = old_quantities_str.split(';') if old_quantities_str else []
+                new_list = new_quantities_str.split(';') if new_quantities_str else []
+                
+                # Find which items changed
+                changed_items = []
+                for i, item_name in enumerate(item_names_list):
+                    old_qty = old_list[i].strip() if i < len(old_list) else ''
+                    new_qty = new_list[i].strip() if i < len(new_list) else ''
+                    if old_qty != new_qty:
+                        old_display = old_qty if old_qty else 'Not specified'
+                        new_display = new_qty if new_qty else 'Not specified'
+                        changed_items.append(f"{item_name}: {old_display} → {new_display}")
+                
+                if changed_items:
+                    # Format the message nicely
+                    if len(changed_items) == 1:
+                        items_changed_text = changed_items[0]
+                    elif len(changed_items) <= 3:
+                        items_changed_text = ', '.join(changed_items)
+                    else:
+                        items_changed_text = ', '.join(changed_items[:3]) + f" and {len(changed_items) - 3} more item(s)"
+                    
+                    # Notify requestor
+                    if item_request.user_id:
+                        create_notification(
+                            user_id=item_request.user_id,
+                            title="Item Request Quantities Updated",
+                            message=f"{current_user.name} has updated the quantities for your item request #{request_id}. Changes: {items_changed_text}.",
+                            notification_type="item_request_updated",
+                            item_request_id=request_id
+                        )
+                    
+                    # Reload item_request to ensure user relationship is fresh
+                    db.session.refresh(item_request)
+                    item_request = ProcurementItemRequest.query.get(request_id)
+                    requestor = User.query.get(item_request.user_id) if item_request.user_id else None
+                    
+                    # Track notified users to avoid duplicates
+                    notified_user_ids = set()
+                    
+                    # Notify all authorized approvers (excluding the one who made the edit)
+                    authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
+                    for approver in authorized_approvers:
+                        if approver.user_id != current_user.user_id and approver.user_id not in notified_user_ids:
+                            notified_user_ids.add(approver.user_id)
+                            create_notification(
+                                user_id=approver.user_id,
+                                title="Item Request Quantities Updated",
+                                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
+                                notification_type="item_request_updated",
+                                item_request_id=request_id
+                            )
+                    
+                    # Explicitly notify Operation Manager if it's an Operation or Project department request
+                    if requestor and (requestor.department == 'Operation' or requestor.department == 'Project'):
+                        op_managers = User.query.filter_by(role='Operation Manager').all()
+                        for op_manager in op_managers:
+                            if op_manager.user_id != current_user.user_id and op_manager.user_id not in notified_user_ids:
+                                notified_user_ids.add(op_manager.user_id)
+                                create_notification(
+                                    user_id=op_manager.user_id,
+                                    title="Item Request Quantities Updated",
+                                    message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
+                                    notification_type="item_request_updated",
+                                    item_request_id=request_id
+                                )
+                    
+                    # Explicitly notify Department Manager of the requestor's department
+                    if requestor and requestor.department:
+                        dept_managers = User.query.filter_by(
+                            role='Department Manager',
+                            department=requestor.department
+                        ).all()
+                        for dept_manager in dept_managers:
+                            if dept_manager.user_id != current_user.user_id and dept_manager.user_id not in notified_user_ids:
+                                notified_user_ids.add(dept_manager.user_id)
+                                create_notification(
+                                    user_id=dept_manager.user_id,
+                                    title="Item Request Quantities Updated",
+                                    message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
+                                    notification_type="item_request_updated",
+                                    item_request_id=request_id
+                                )
+                    
+                    # Explicitly notify the requestor's direct manager (manager_id)
+                    if requestor and requestor.manager_id:
+                        direct_manager = User.query.get(requestor.manager_id)
+                        if direct_manager and direct_manager.user_id != current_user.user_id and direct_manager.user_id not in notified_user_ids:
+                            notified_user_ids.add(direct_manager.user_id)
+                            create_notification(
+                                user_id=direct_manager.user_id,
+                                title="Item Request Quantities Updated",
+                                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
+                                notification_type="item_request_updated",
+                                item_request_id=request_id
+                            )
+                    
+                    # Notify GM (all GMs)
+                    gms = User.query.filter_by(role='GM').all()
+                    for gm in gms:
+                        if gm.user_id != current_user.user_id and gm.user_id not in notified_user_ids:
+                            notified_user_ids.add(gm.user_id)
+                            create_notification(
+                                user_id=gm.user_id,
+                                title="Item Request Quantities Updated",
+                                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
+                                notification_type="item_request_updated",
+                                item_request_id=request_id
+                            )
+    except Exception as e:
+        app.logger.warning(f"Failed to persist quantity edit history: {e}")
+
+    db.session.commit()
+    
+    flash('Quantities updated successfully!', 'success')
+    return redirect(url_for('view_item_request_page', request_id=request_id))
+
+
 @app.route('/procurement/item-request/<int:request_id>/update_quantities', methods=['POST'])
 @login_required
 def update_item_request_quantities(request_id):
@@ -5515,11 +5892,201 @@ def update_item_request_quantities_manager(request_id):
     elif len(cleaned_quantities) > len(item_names):
         cleaned_quantities = cleaned_quantities[:len(item_names)]
 
+    # Get old quantities for edit history tracking
+    old_quantities = item_request.procurement_quantities or item_request.quantity or ''
+    old_quantities_str = old_quantities if old_quantities else ''
+    new_quantities_str = ';'.join(cleaned_quantities)
+
     # Store manager-approved quantities in the same field used by Procurement
-    item_request.procurement_quantities = ';'.join(cleaned_quantities)
+    item_request.procurement_quantities = new_quantities_str
+    # Store rejection reason if provided
+    quantity_rejection_reason = request.form.get('quantity_rejection_reason', '').strip()
+    item_request.manager_quantity_rejection_reason = quantity_rejection_reason if quantity_rejection_reason else None
     item_request.updated_at = datetime.utcnow()
 
+    # Track quantity edits in edit history table (similar to payment requests)
+    try:
+        # Create table if it doesn't exist
+        db.session.execute(db.text('''
+            CREATE TABLE IF NOT EXISTS item_request_quantity_edit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_request_id INTEGER NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                edited_by_user_id INTEGER,
+                edited_by_name TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        '''))
+        
+        # Create table to track which item requests have edited quantities
+        db.session.execute(db.text('''
+            CREATE TABLE IF NOT EXISTS item_request_quantity_edits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_request_id INTEGER NOT NULL,
+                first_edited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_edited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(item_request_id)
+            );
+        '''))
+        
+        # Only log if quantities actually changed
+        if old_quantities_str != new_quantities_str:
+            # Insert edit log entry
+            db.session.execute(db.text('''
+                INSERT INTO item_request_quantity_edit_logs (item_request_id, old_value, new_value, edited_by_user_id, edited_by_name)
+                VALUES (:rid, :oldv, :newv, :uid, :uname)
+            '''), {
+                'rid': request_id,
+                'oldv': old_quantities_str,
+                'newv': new_quantities_str,
+                'uid': current_user.user_id,
+                'uname': current_user.name
+            })
+            
+            # Mark that this item request has edited quantities
+            db.session.execute(db.text('''
+                INSERT INTO item_request_quantity_edits (item_request_id) VALUES (:rid)
+                ON CONFLICT(item_request_id) DO UPDATE SET last_edited_at = CURRENT_TIMESTAMP
+            '''), {'rid': request_id})
+    except Exception as e:
+        app.logger.warning(f"Failed to persist quantity edit history: {e}")
+
     db.session.commit()
+
+    # Notify requestor and other authorized managers that quantities have been edited (outside try block to ensure it always runs)
+    if old_quantities_str != new_quantities_str:
+        try:
+            # Build a message showing what changed
+            item_names_list = [name.strip() for name in (item_request.item_name or '').split(',') if name.strip()]
+            old_list = old_quantities_str.split(';') if old_quantities_str else []
+            new_list = new_quantities_str.split(';') if new_quantities_str else []
+            
+            # Find which items changed
+            changed_items = []
+            for i, item_name in enumerate(item_names_list):
+                old_qty = old_list[i].strip() if i < len(old_list) else ''
+                new_qty = new_list[i].strip() if i < len(new_list) else ''
+                if old_qty != new_qty:
+                    old_display = old_qty if old_qty else 'Not specified'
+                    new_display = new_qty if new_qty else 'Not specified'
+                    changed_items.append(f"{item_name}: {old_display} → {new_display}")
+            
+            if changed_items:
+                # Format the message nicely
+                if len(changed_items) == 1:
+                    items_changed_text = changed_items[0]
+                elif len(changed_items) <= 3:
+                    items_changed_text = ', '.join(changed_items)
+                else:
+                    items_changed_text = ', '.join(changed_items[:3]) + f" and {len(changed_items) - 3} more item(s)"
+                
+                # Notify requestor
+                if item_request.user_id:
+                    create_notification(
+                        user_id=item_request.user_id,
+                        title="Item Request Quantities Updated",
+                        message=f"{current_user.name} has updated the quantities for your item request #{request_id}. Changes: {items_changed_text}.",
+                        notification_type="item_request_updated",
+                        item_request_id=request_id
+                    )
+                
+                # Reload item_request to ensure user relationship is fresh
+                db.session.refresh(item_request)
+                item_request = ProcurementItemRequest.query.get(request_id)
+                requestor = User.query.get(item_request.user_id) if item_request.user_id else None
+                
+                # Track notified users to avoid duplicates
+                notified_user_ids = set()
+                
+                # Notify all authorized approvers (excluding the one who made the edit)
+                authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
+                for approver in authorized_approvers:
+                    if approver.user_id != current_user.user_id and approver.user_id not in notified_user_ids:
+                        notified_user_ids.add(approver.user_id)
+                        create_notification(
+                            user_id=approver.user_id,
+                            title="Item Request Quantities Updated",
+                            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
+                            notification_type="item_request_updated",
+                            item_request_id=request_id
+                        )
+                
+                # Explicitly notify Operation Manager if it's an Operation or Project department request
+                if requestor and (requestor.department == 'Operation' or requestor.department == 'Project'):
+                    op_managers = User.query.filter_by(role='Operation Manager').all()
+                    for op_manager in op_managers:
+                        if op_manager.user_id != current_user.user_id and op_manager.user_id not in notified_user_ids:
+                            notified_user_ids.add(op_manager.user_id)
+                            create_notification(
+                                user_id=op_manager.user_id,
+                                title="Item Request Quantities Updated",
+                                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
+                                notification_type="item_request_updated",
+                                item_request_id=request_id
+                            )
+                
+                # Explicitly notify Department Manager of the requestor's department
+                if requestor and requestor.department:
+                    dept_managers = User.query.filter_by(
+                        role='Department Manager',
+                        department=requestor.department
+                    ).all()
+                    for dept_manager in dept_managers:
+                        if dept_manager.user_id != current_user.user_id and dept_manager.user_id not in notified_user_ids:
+                            notified_user_ids.add(dept_manager.user_id)
+                            create_notification(
+                                user_id=dept_manager.user_id,
+                                title="Item Request Quantities Updated",
+                                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
+                                notification_type="item_request_updated",
+                                item_request_id=request_id
+                            )
+                
+                # Explicitly notify the requestor's direct manager (manager_id)
+                if requestor and requestor.manager_id:
+                    direct_manager = User.query.get(requestor.manager_id)
+                    if direct_manager and direct_manager.user_id != current_user.user_id and direct_manager.user_id not in notified_user_ids:
+                        notified_user_ids.add(direct_manager.user_id)
+                        create_notification(
+                            user_id=direct_manager.user_id,
+                            title="Item Request Quantities Updated",
+                            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
+                            notification_type="item_request_updated",
+                            item_request_id=request_id
+                        )
+                
+                # Explicitly notify General Manager (GM) - they should know about all changes
+                gm_users = User.query.filter_by(role='GM').all()
+                for gm_user in gm_users:
+                    if gm_user.user_id != current_user.user_id and gm_user.user_id not in notified_user_ids:
+                        notified_user_ids.add(gm_user.user_id)
+                        create_notification(
+                            user_id=gm_user.user_id,
+                            title="Item Request Quantities Updated",
+                            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
+                            notification_type="item_request_updated",
+                            item_request_id=request_id
+                        )
+                
+                # Also notify IT Department (all IT Staff and IT Department Manager) - they should know about all changes
+                it_users = User.query.filter(
+                    User.department == 'IT'
+                ).filter(
+                    User.role.in_(['IT Staff', 'Department Manager'])
+                ).all()
+                for it_user in it_users:
+                    if it_user.user_id != current_user.user_id and it_user.user_id not in notified_user_ids:
+                        notified_user_ids.add(it_user.user_id)
+                        create_notification(
+                            user_id=it_user.user_id,
+                            title="Item Request Quantities Updated",
+                            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
+                            notification_type="item_request_updated",
+                            item_request_id=request_id
+                        )
+        except Exception as e:
+            app.logger.error(f"Failed to create notification for item request quantity update: {e}")
 
     log_action(f"Manager-stage quantities updated for item request #{request_id}")
     flash('Item quantities updated successfully for manager approval.', 'success')
@@ -5610,6 +6177,16 @@ def bulk_assign_item_requests():
                     item_request_id=request_id
                 )
             
+            # Explicitly notify the manager who originally approved (they should know it was assigned)
+            if item_request.manager_approver_user_id:
+                create_notification(
+                    user_id=item_request.manager_approver_user_id,
+                    title="Item Request Assigned",
+                    message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) that you approved has been assigned to {current_user.name} for processing.",
+                    notification_type="item_request_assigned",
+                    item_request_id=request_id
+                )
+            
             log_action(f"Bulk assigned item request #{request_id} to {current_user.name}")
         else:
             skipped_count += 1
@@ -5622,6 +6199,101 @@ def bulk_assign_item_requests():
         flash(f'Skipped {skipped_count} request(s) that are not in "Assigned to Procurement" status or are already assigned to someone else.', 'info')
     
     return redirect(url_for('procurement_item_requests'))
+
+
+@app.route('/procurement/item-request/<int:request_id>/assign-to-self', methods=['POST'])
+@login_required
+def assign_item_request_to_self(request_id):
+    """Assign a single item request to the current user"""
+    if current_user.department != 'Procurement':
+        flash('Only procurement staff can perform this action.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    
+    # GM and Operation Manager cannot assign
+    if current_user.role in ['GM', 'Operation Manager']:
+        flash('You do not have permission to assign this request.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    
+    item_request = ProcurementItemRequest.query.get_or_404(request_id)
+    
+    # Only assign if status is "Assigned to Procurement" and not already assigned to someone else
+    if item_request.status != 'Assigned to Procurement':
+        flash('This request is not in "Assigned to Procurement" status.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    
+    if item_request.assigned_to_user_id:
+        flash('This request is already assigned to someone else.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    
+    current_time = datetime.utcnow()
+    
+    item_request.assigned_to_user_id = current_user.user_id
+    item_request.assigned_by_user_id = current_user.user_id
+    item_request.assignment_date = current_time
+    item_request.updated_at = current_time
+    
+    # Get authorized persons for notifications - use a set to avoid duplicates
+    authorized_user_ids = set()
+    
+    # Add requestor
+    if item_request.user_id:
+        authorized_user_ids.add(item_request.user_id)
+    
+    # Add manager approver
+    if item_request.manager_approver_user_id:
+        authorized_user_ids.add(item_request.manager_approver_user_id)
+    
+    # Add procurement manager approver
+    if item_request.procurement_manager_approver_user_id:
+        authorized_user_ids.add(item_request.procurement_manager_approver_user_id)
+    
+    # Add all procurement staff (they should know about assignments)
+    procurement_staff = User.query.filter_by(department='Procurement').all()
+    for staff in procurement_staff:
+        authorized_user_ids.add(staff.user_id)
+    
+    # Get all authorized approvers for this item request (includes GM, Operation Manager, etc.)
+    authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
+    for approver in authorized_approvers:
+        authorized_user_ids.add(approver.user_id)
+    
+    # ALWAYS add General Manager (GM) - regardless of requestor
+    gm_users = User.query.filter_by(role='GM').all()
+    for gm_user in gm_users:
+        authorized_user_ids.add(gm_user.user_id)
+    
+    # ALWAYS add Operation Manager - regardless of requestor
+    op_manager_users = User.query.filter_by(role='Operation Manager').all()
+    for op_manager in op_manager_users:
+        authorized_user_ids.add(op_manager.user_id)
+    
+    # Send notifications to all authorized users
+    notification_message = f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been assigned to {current_user.name} by {current_user.name}."
+    for user_id in authorized_user_ids:
+        create_notification(
+            user_id=user_id,
+            title="Item Request Assigned",
+            message=notification_message,
+            notification_type="item_request_assigned",
+            item_request_id=request_id
+        )
+    
+    # Explicitly notify the manager who originally approved (they should know it was assigned)
+    if item_request.manager_approver_user_id:
+        create_notification(
+            user_id=item_request.manager_approver_user_id,
+            title="Item Request Assigned",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) that you approved has been assigned to {current_user.name} for processing.",
+            notification_type="item_request_assigned",
+            item_request_id=request_id
+        )
+    
+    db.session.commit()
+    
+    log_action(f"Assigned item request #{request_id} to {current_user.name}")
+    flash(f'Successfully assigned request #{request_id} to yourself.', 'success')
+    
+    return redirect(url_for('view_item_request_page', request_id=request_id) + '?tab=assigned')
 
 
 @app.route('/procurement/item-requests/bulk-upload', methods=['POST'])
@@ -16803,12 +17475,33 @@ if __name__ == '__main__':
             else:
                 print("✓ 'payment_date' column already exists in procurement_item_requests table")
             
+            if 'manager_quantity_rejection_reason' not in existing_columns:
+                cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN manager_quantity_rejection_reason TEXT")
+                conn.commit()
+                print("✓ Added 'manager_quantity_rejection_reason' column to procurement_item_requests table")
+            else:
+                print("✓ 'manager_quantity_rejection_reason' column already exists in procurement_item_requests table")
+            
+            if 'procurement_manager_quantity_rejection_reason' not in existing_columns:
+                cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN procurement_manager_quantity_rejection_reason TEXT")
+                conn.commit()
+                print("✓ Added 'procurement_manager_quantity_rejection_reason' column to procurement_item_requests table")
+            else:
+                print("✓ 'procurement_manager_quantity_rejection_reason' column already exists in procurement_item_requests table")
+            
             if 'category' not in existing_columns:
                 cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN category VARCHAR(100)")
                 conn.commit()
                 print("✓ Added 'category' column to procurement_item_requests table")
             else:
                 print("✓ 'category' column already exists in procurement_item_requests table")
+            
+            if 'procurement_manager_quantities' not in existing_columns:
+                cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN procurement_manager_quantities TEXT")
+                conn.commit()
+                print("✓ Added 'procurement_manager_quantities' column to procurement_item_requests table")
+            else:
+                print("✓ 'procurement_manager_quantities' column already exists in procurement_item_requests table")
             
             # Migrate: Add item_request_id column to notifications table if it doesn't exist
             cursor.execute("PRAGMA table_info(notifications)")
