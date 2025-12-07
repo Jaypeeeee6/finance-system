@@ -254,14 +254,44 @@
         {% endif %}
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
+                {# Existing inline alerts remain for non-error categories #}
                 <div class="flash-messages">
                     {% for category, message in messages %}
+                        {% if category != 'error' %}
                         <div class="alert alert-{{ category }}">
                             <span>{{ message }}</span>
                             <button class="close-alert" onclick="this.parentElement.remove()">&times;</button>
                         </div>
+                        {% endif %}
                     {% endfor %}
                 </div>
+
+                {# Central modal-style error dialog with OK button for error messages #}
+                {% for category, message in messages %}
+                    {% if category == 'error' %}
+                    <div id="flash-error-modal" class="flash-error-modal" style="display:flex;">
+                        <div class="flash-error-backdrop"></div>
+                        <div class="flash-error-dialog">
+                            <h3 class="flash-error-title"><i class="fas fa-exclamation-circle"></i> Error</h3>
+                            <div class="flash-error-body">
+                                {{ message }}
+                            </div>
+                            <div class="flash-error-actions">
+                                <button type="button" class="flash-error-ok-btn" onclick="(function(){ var m=document.getElementById('flash-error-modal'); if(m){m.style.display='none'; document.body.classList.remove('flash-error-open');}})()">OK</button>
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                        // Ensure body is dimmed and scrolling is locked when error modal is shown
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var m = document.getElementById('flash-error-modal');
+                            if (m) {
+                                document.body.classList.add('flash-error-open');
+                            }
+                        });
+                    </script>
+                    {% endif %}
+                {% endfor %}
             {% endif %}
         {% endwith %}
 

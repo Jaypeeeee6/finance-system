@@ -488,9 +488,17 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 </div>
                 {% endif %}
 
-                <div class="form-group">
+                <div class="form-group" id="personCompanyGroupView">
                     <label for="person_company">Person/Company Name {% if 'person_company' in edited_fields %}<span class="edited-badge" data-field="person_company" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                    <!-- Base text input (always holds the actual value saved to the backend) -->
                     <input type="text" id="person_company" name="person_company" value="{{ request.person_company or '' }}" readonly style="background: #f5f5f5;">
+                    
+                    {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') %}
+                    <!-- Simple dropdown used only when the chosen department + request type have options -->
+                    <select id="person_company_select_edit" class="form-control" style="display: none; margin-top: 8px;">
+                        <option value="">-- Select Person/Company --</option>
+                    </select>
+                    {% endif %}
                 </div>
 
                 {% if request.company_name %}
@@ -502,8 +510,18 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="department">Department</label>
+                        <label for="department">Department {% if 'department' in edited_fields %}<span class="edited-badge" data-field="department" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                        {% if can_edit_department_only and request.status == 'Pending Manager Approval' %}
+                        <select id="department" name="department" class="form-control" style="background: #ffffff;">
+                            <option value="">-- Select Department --</option>
+                            {% for dept in departments %}
+                                <option value="{{ dept }}" {% if request.department == dept %}selected{% endif %}>{{ dept }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">You can only update the Department while the request is pending manager approval.</small>
+                        {% else %}
                         <input type="text" id="department" value="{{ request.department }}" readonly style="background: #f5f5f5;">
+                        {% endif %}
                     </div>
 
                     <div class="form-group">
@@ -518,8 +536,15 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 </div>
 
                 <div class="form-group">
-                    <label for="payment_method">Payment Method</label>
+                    <label for="payment_method">Payment Method {% if 'payment_method' in edited_fields %}<span class="edited-badge" data-field="payment_method" role="button" tabindex="0">Edited</span>{% endif %}</label>
+                    {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') %}
+                    <select id="payment_method" name="payment_method" class="form-control" style="background: #ffffff;">
+                        <option value="Card" {% if (request.payment_method or 'Card') == 'Card' %}selected{% endif %}>Card</option>
+                        <option value="Cheque" {% if request.payment_method == 'Cheque' %}selected{% endif %}>Cheque</option>
+                    </select>
+                    {% else %}
                     <input type="text" id="payment_method" value="{{ request.payment_method or 'Card' }}" readonly style="background: #f5f5f5;">
+                    {% endif %}
                 </div>
 
                 <div class="form-group">
@@ -846,7 +871,10 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     </div>
                 </div>
                 {% endif %}
-                {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') or (user and user.role == 'Finance Admin' and request.status == 'Pending Finance Approval') %}
+                {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) 
+                      or (can_edit_request and request.status == 'Returned to Manager') 
+                      or (user and user.role == 'Finance Admin' and request.status == 'Pending Finance Approval')
+                      or (can_edit_department_only and request.status == 'Pending Manager Approval') %}
                 <div class="form-group" id="save-edits-container" style="display: none; margin-top: 15px;">
                     <button type="submit" id="save-edits-btn" class="btn btn-primary">Save Edits</button>
                 </div>
@@ -2608,6 +2636,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // IT department and authorized managers inline editability for Request Details (excluding specific fields)
     const canEdit = {{ 1 if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') else 0 }} === 1;
+    const canEditDepartmentOnly = {{ 1 if (can_edit_department_only and request.status == 'Pending Manager Approval') else 0 }} === 1;
     
     // Finance Admin can ONLY edit Request Type field when status is Pending Finance Approval
     const canEditFinanceAdmin = {{ 1 if (user and user.role == 'Finance Admin' and request.status == 'Pending Finance Approval') else 0 }} === 1;
@@ -2645,7 +2674,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Finance Admin: Only enable Request Type field and Others description field
-    if (canEditFinanceAdmin) {
+    if (canEditFinanceAdmin || canEditDepartmentOnly) {
         const form = document.querySelector('#step-submit form');
         if (form) {
             const saveContainer = document.getElementById('save-edits-container');
@@ -2655,6 +2684,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             };
             
+            if (canEditFinanceAdmin) {
             // Only enable Request Type dropdown
             const requestTypeSelect = document.getElementById('request_type');
             if (requestTypeSelect) {
@@ -2683,10 +2713,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 othersDescriptionInput.addEventListener('input', showSave);
                 othersDescriptionInput.addEventListener('change', showSave);
             }
+            }
+
+            if (canEditDepartmentOnly) {
+                // Show Save Edits when Department field is changed
+                const deptInput = document.getElementById('department');
+                if (deptInput) {
+                    deptInput.addEventListener('input', showSave);
+                    deptInput.addEventListener('change', showSave);
+                }
+            }
         }
     }
     
-    // When user can edit (IT or authorized manager), initialize SWIFT code behavior to match New Request
+    // When user can edit (IT or authorized manager), initialize SWIFT code behavior
     if (canEdit) {
         // Toggle Others description visibility when request type changes
         const requestTypeSelect = document.getElementById('request_type');
@@ -2706,9 +2746,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (saveContainerLocal && saveContainerLocal.style.display !== 'block') {
                     saveContainerLocal.style.display = 'block';
                 }
+
+                // ONLY when Request Type is actually edited, clear Person/Company
+                // and, if there are options in the DB, turn it into a dropdown.
+                const departmentEl = document.getElementById('department');
+                const departmentVal = departmentEl ? departmentEl.value : '';
+                if (departmentVal) {
+                    updatePersonCompanyForEdit(departmentVal, requestTypeSelect.value);
+                }
             });
             toggleOthers();
+
+            // On initial load, if the ORIGINAL request type has supplier options,
+            // show a dropdown and pre-select the existing Person/Company value
+            // WITHOUT clearing it.
+            (function initPersonCompanyDropdownForEditInitial() {
+                const departmentEl = document.getElementById('department');
+                const departmentVal = departmentEl ? departmentEl.value : '';
+                const currentRequestType = requestTypeSelect.value || '';
+                if (!departmentVal || !currentRequestType) return;
+                initPersonCompanyDropdownForEdit(departmentVal, currentRequestType);
+            })();
         }
+
         // Initialize SWIFT display based on current selection
         const bankSelect = document.getElementById('bank_name');
         if (bankSelect) {
@@ -2757,6 +2817,118 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(() => alert('Failed to load history'));
     });
+
+    // Edit-mode person/company logic when Request Type is CHANGED by the editor.
+    // - If DB has options for (department, request_type) → show dropdown and clear text.
+    // - If no options → keep plain text input and clear text.
+    function updatePersonCompanyForEdit(department, requestType) {
+        const personCompanyInput = document.getElementById('person_company');
+        const personCompanySelect = document.getElementById('person_company_select_edit');
+
+        if (!personCompanyInput || !personCompanySelect) return;
+
+        // Clear current value only when request type is actually changed
+        personCompanyInput.value = '';
+        personCompanySelect.innerHTML = '<option value="">-- Select Person/Company --</option>';
+
+        if (!department || !requestType) {
+            // Fall back to text input
+            personCompanyInput.style.display = 'block';
+            personCompanySelect.style.display = 'none';
+            return;
+        }
+
+        fetch(`/api/person-company-options?department=${encodeURIComponent(department)}&request_type=${encodeURIComponent(requestType)}`)
+            .then(response => response.json())
+            .then(data => {
+                const options = data.options || [];
+
+                if (options.length > 0) {
+                    // Show dropdown, hide text input
+                    personCompanyInput.style.display = 'none';
+                    personCompanySelect.style.display = 'block';
+
+                    options.forEach(option => {
+                        const optEl = document.createElement('option');
+                        const optionName = typeof option === 'string' ? option : option.name;
+                        optEl.value = optionName;
+                        optEl.textContent = optionName;
+                        personCompanySelect.appendChild(optEl);
+                    });
+
+                    // Keep text input in sync so backend receives the right value
+                    personCompanySelect.onchange = function() {
+                        personCompanyInput.value = this.value;
+                    };
+                } else {
+                    // No DB options → keep as plain text input
+                    personCompanyInput.style.display = 'block';
+                    personCompanySelect.style.display = 'none';
+                }
+            })
+            .catch(() => {
+                // On error, fall back to text input
+                personCompanyInput.style.display = 'block';
+                personCompanySelect.style.display = 'none';
+            });
+    }
+
+    // Initial-load person/company logic:
+    // If the ORIGINAL request type has supplier options, show dropdown and
+    // pre-select the existing person/company value WITHOUT clearing it.
+    function initPersonCompanyDropdownForEdit(department, requestType) {
+        const personCompanyInput = document.getElementById('person_company');
+        const personCompanySelect = document.getElementById('person_company_select_edit');
+
+        if (!personCompanyInput || !personCompanySelect) return;
+
+        const existingValue = personCompanyInput.value || '';
+
+        if (!department || !requestType) {
+            // Fall back to text input
+            personCompanyInput.style.display = 'block';
+            personCompanySelect.style.display = 'none';
+            return;
+        }
+
+        fetch(`/api/person-company-options?department=${encodeURIComponent(department)}&request_type=${encodeURIComponent(requestType)}`)
+            .then(response => response.json())
+            .then(data => {
+                const options = data.options || [];
+
+                if (options.length > 0) {
+                    // Show dropdown, hide text input
+                    personCompanyInput.style.display = 'none';
+                    personCompanySelect.style.display = 'block';
+
+                    personCompanySelect.innerHTML = '<option value="">-- Select Person/Company --</option>';
+                    options.forEach(option => {
+                        const optEl = document.createElement('option');
+                        const optionName = typeof option === 'string' ? option : option.name;
+                        optEl.value = optionName;
+                        optEl.textContent = optionName;
+                        if (existingValue && existingValue === optionName) {
+                            optEl.selected = true;
+                        }
+                        personCompanySelect.appendChild(optEl);
+                    });
+
+                    // Keep text input in sync so backend receives the right value
+                    personCompanySelect.onchange = function() {
+                        personCompanyInput.value = this.value;
+                    };
+                } else {
+                    // No options → keep as plain text input
+                    personCompanyInput.style.display = 'block';
+                    personCompanySelect.style.display = 'none';
+                }
+            })
+            .catch(() => {
+                // On error, fall back to text input
+                personCompanyInput.style.display = 'block';
+                personCompanySelect.style.display = 'none';
+            });
+    }
 
     function openFieldHistoryModal(field, history) {
         const modal = document.getElementById('fieldHistoryModal');

@@ -3080,6 +3080,7 @@ def department_dashboard():
     if tab == 'my_requests' and (not current_user.department or current_user.department != 'Auditing'):
         tab = 'all'
     urgent_filter = request.args.get('urgent', None)
+    department_filter = request.args.get('department', None)
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -3097,30 +3098,101 @@ def department_dashboard():
             # 2. All requests from Auditing department (as department manager)
             # 3. Completed and Recurring requests from OTHER departments (view-only)
             # 4. Any request where they are the temporary manager
+            # 5. Any request where they are an authorized manager approver (even if department changed)
             # Exclude archived requests
-            base_query = PaymentRequest.query.filter(
-                db.or_(
-                    PaymentRequest.user_id == current_user.user_id,
-                    PaymentRequest.department == 'Auditing',
-                    PaymentRequest.temporary_manager_id == current_user.user_id,
-                    db.and_(
-                        PaymentRequest.department != 'Auditing',
-                        PaymentRequest.status.in_(['Completed', 'Recurring'])
-                    )
-                ),
+            all_non_archived = PaymentRequest.query.filter(
                 PaymentRequest.is_archived == False
-            )
+            ).all()
+            
+            visible_request_ids = set()
+            
+            for req in all_non_archived:
+                # Their own requests
+                if req.user_id == current_user.user_id:
+                    visible_request_ids.add(req.request_id)
+                
+                # Auditing department requests - only if BOTH request department AND requestor's department match
+                # This prevents showing requests where department was changed but requestor is from different department
+                req_dept = (req.department or '').strip()
+                requestor_dept = (req.user.department or '').strip() if req.user else ''
+                if req_dept.lower() == 'auditing' and requestor_dept.lower() == 'auditing':
+                    visible_request_ids.add(req.request_id)
+                
+                # Temporary manager
+                if req.temporary_manager_id == current_user.user_id:
+                    visible_request_ids.add(req.request_id)
+                
+                # Completed/Recurring from other departments (view-only - this is fine as is)
+                if req_dept.lower() != 'auditing' and req.status in ['Completed', 'Recurring']:
+                    visible_request_ids.add(req.request_id)
+                
+                # Authorized approver (handles cases where department was edited)
+                authorized_approvers = get_authorized_manager_approvers(req)
+                if current_user in authorized_approvers:
+                    visible_request_ids.add(req.request_id)
+            
+            # Build query with all visible request IDs
+            if visible_request_ids:
+                base_query = PaymentRequest.query.filter(
+                    PaymentRequest.request_id.in_(visible_request_ids),
+                    PaymentRequest.is_archived == False
+                )
+            else:
+                # No requests visible - return empty query
+                base_query = PaymentRequest.query.filter(
+                    PaymentRequest.request_id == -1  # Impossible condition
+                )
         else:
-            # Other Department Managers can see ALL their department's requests
-            # plus any request where they are the temporary manager
+            # Other Department Managers can see:
+            # 1. Requests where BOTH the request department AND requestor's department match (normal case)
+            # 2. Requests where they are the temporary manager
+            # 3. Requests where they are an authorized manager approver (even if department was changed)
             # Exclude archived requests
-            base_query = PaymentRequest.query.filter(
-                db.or_(
-                    PaymentRequest.department == current_user.department,
-                    PaymentRequest.temporary_manager_id == current_user.user_id
-                ),
+            user_dept = current_user.department.strip() if current_user.department else ''
+            
+            # First, get all non-archived requests to check for authorized approver status
+            all_non_archived = PaymentRequest.query.filter(
                 PaymentRequest.is_archived == False
-            )
+            ).all()
+            
+            # Find requests where user is an authorized approver (handles cases where department was edited)
+            authorized_request_ids = set()
+            department_match_ids = set()
+            temp_manager_ids = set()
+            
+            for req in all_non_archived:
+                # Check if requestor's department matches (this ensures we only show requests from their department)
+                requestor_dept = (req.user.department or '').strip() if req.user else ''
+                req_dept = (req.department or '').strip()
+                
+                # Only include if BOTH request department AND requestor's department match
+                # This prevents showing requests where department was changed but requestor is from different department
+                if req_dept.lower() == user_dept.lower() and requestor_dept.lower() == user_dept.lower():
+                    department_match_ids.add(req.request_id)
+                
+                # Check temporary manager
+                if req.temporary_manager_id == current_user.user_id:
+                    temp_manager_ids.add(req.request_id)
+                
+                # Check if user is an authorized approver (based on requestor, not request department)
+                authorized_approvers = get_authorized_manager_approvers(req)
+                if current_user in authorized_approvers:
+                    authorized_request_ids.add(req.request_id)
+            
+            # Combine all request IDs
+            all_visible_ids = department_match_ids | temp_manager_ids | authorized_request_ids
+            
+            # Build query with all visible request IDs
+            if all_visible_ids:
+                base_query = PaymentRequest.query.filter(
+                    PaymentRequest.request_id.in_(all_visible_ids),
+                    PaymentRequest.is_archived == False
+                )
+            else:
+                # No requests visible - return empty query
+                base_query = PaymentRequest.query.filter(
+                    PaymentRequest.request_id == -1  # Impossible condition
+                )
     elif current_user.department == 'Auditing' and current_user.role == 'Auditing Staff':
         # Auditing Staff can see:
         # 1. All their own requests (regardless of status or department)
@@ -3420,6 +3492,7 @@ def procurement_dashboard():
     status_filter = request.args.get('status', None)
     tab = request.args.get('tab', 'all')
     urgent_filter = request.args.get('urgent', None)
+    department_filter = request.args.get('department', None)
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -3429,16 +3502,53 @@ def procurement_dashboard():
     if current_user.role == 'Department Manager':
         # Procurement Department Managers can see ALL their department's requests
         # plus any request where they are the temporary manager
+        # plus any request where they are an authorized manager approver (even if department changed)
         # Exclude archived requests
-        # Use normalized department for comparison
         user_dept = current_user.department.strip() if current_user.department else ''
-        base_query = PaymentRequest.query.filter(
-            db.or_(
-                PaymentRequest.department == current_user.department,
-                PaymentRequest.temporary_manager_id == current_user.user_id
-            ),
+        
+        # First, get all non-archived requests to check for authorized approver status
+        all_non_archived = PaymentRequest.query.filter(
             PaymentRequest.is_archived == False
-        )
+        ).all()
+        
+        # Find requests where user is an authorized approver (handles cases where department was edited)
+        authorized_request_ids = set()
+        department_match_ids = set()
+        temp_manager_ids = set()
+        
+        for req in all_non_archived:
+            # Check if requestor's department matches (this ensures we only show requests from their department)
+            requestor_dept = (req.user.department or '').strip() if req.user else ''
+            req_dept = (req.department or '').strip()
+            
+            # Only include if BOTH request department AND requestor's department match
+            # This prevents showing requests where department was changed but requestor is from different department
+            if req_dept.lower() == user_dept.lower() and requestor_dept.lower() == user_dept.lower():
+                department_match_ids.add(req.request_id)
+            
+            # Check temporary manager
+            if req.temporary_manager_id == current_user.user_id:
+                temp_manager_ids.add(req.request_id)
+            
+            # Check if user is an authorized approver (based on requestor, not request department)
+            authorized_approvers = get_authorized_manager_approvers(req)
+            if current_user in authorized_approvers:
+                authorized_request_ids.add(req.request_id)
+        
+        # Combine all request IDs
+        all_visible_ids = department_match_ids | temp_manager_ids | authorized_request_ids
+        
+        # Build query with all visible request IDs
+        if all_visible_ids:
+            base_query = PaymentRequest.query.filter(
+                PaymentRequest.request_id.in_(all_visible_ids),
+                PaymentRequest.is_archived == False
+            )
+        else:
+            # No requests visible - return empty query
+            base_query = PaymentRequest.query.filter(
+                PaymentRequest.request_id == -1  # Impossible condition
+            )
     else:
         # For regular Procurement Staff users, show their own requests (exclude archived)
         base_query = PaymentRequest.query.filter(
@@ -8918,10 +9028,53 @@ def project_dashboard():
         )
     elif current_user.role == 'Department Manager' and current_user.department == 'Project':
         # Project Manager sees all requests from Project department
-        query = PaymentRequest.query.filter(
-            PaymentRequest.department == 'Project',
+        # plus any request where they are the temporary manager
+        # plus any request where they are an authorized manager approver (even if department changed)
+        user_dept = 'Project'
+        
+        # First, get all non-archived requests to check for authorized approver status
+        all_non_archived = PaymentRequest.query.filter(
             PaymentRequest.is_archived == False
-        )
+        ).all()
+        
+        # Find requests where user is an authorized approver (handles cases where department was edited)
+        authorized_request_ids = set()
+        department_match_ids = set()
+        temp_manager_ids = set()
+        
+        for req in all_non_archived:
+            # Check if requestor's department matches (this ensures we only show requests from their department)
+            requestor_dept = (req.user.department or '').strip() if req.user else ''
+            req_dept = (req.department or '').strip()
+            
+            # Only include if BOTH request department AND requestor's department match
+            # This prevents showing requests where department was changed but requestor is from different department
+            if req_dept.lower() == user_dept.lower() and requestor_dept.lower() == user_dept.lower():
+                department_match_ids.add(req.request_id)
+            
+            # Check temporary manager
+            if req.temporary_manager_id == current_user.user_id:
+                temp_manager_ids.add(req.request_id)
+            
+            # Check if user is an authorized approver (based on requestor, not request department)
+            authorized_approvers = get_authorized_manager_approvers(req)
+            if current_user in authorized_approvers:
+                authorized_request_ids.add(req.request_id)
+        
+        # Combine all request IDs
+        all_visible_ids = department_match_ids | temp_manager_ids | authorized_request_ids
+        
+        # Build query with all visible request IDs
+        if all_visible_ids:
+            query = PaymentRequest.query.filter(
+                PaymentRequest.request_id.in_(all_visible_ids),
+                PaymentRequest.is_archived == False
+            )
+        else:
+            # No requests visible - return empty query
+            query = PaymentRequest.query.filter(
+                PaymentRequest.request_id == -1  # Impossible condition
+            )
     else:
         # Fallback - should not happen due to role_required decorator
         query = PaymentRequest.query.filter(
@@ -9005,18 +9158,67 @@ def project_dashboard():
         )
     elif current_user.role == 'Department Manager' and current_user.department == 'Project':
         # Project Manager sees all requests from Project department
-        completed_query = PaymentRequest.query.filter(
-            PaymentRequest.department == 'Project',
+        # plus any request where they are the temporary manager
+        # plus any request where they are an authorized manager approver (even if department changed)
+        user_dept = 'Project'
+        
+        # Get all non-archived requests to check for authorized approver status
+        all_non_archived = PaymentRequest.query.filter(
             PaymentRequest.is_archived == False
-        )
-        rejected_query = PaymentRequest.query.filter(
-            PaymentRequest.department == 'Project',
-            PaymentRequest.is_archived == False
-        )
-        recurring_query = PaymentRequest.query.filter(
-            PaymentRequest.department == 'Project',
-            PaymentRequest.is_archived == False
-        )
+        ).all()
+        
+        # Find requests where user is an authorized approver (handles cases where department was edited)
+        authorized_request_ids = set()
+        department_match_ids = set()
+        temp_manager_ids = set()
+        
+        for req in all_non_archived:
+            # Check if requestor's department matches (this ensures we only show requests from their department)
+            requestor_dept = (req.user.department or '').strip() if req.user else ''
+            req_dept = (req.department or '').strip()
+            
+            # Only include if BOTH request department AND requestor's department match
+            # This prevents showing requests where department was changed but requestor is from different department
+            if req_dept.lower() == user_dept.lower() and requestor_dept.lower() == user_dept.lower():
+                department_match_ids.add(req.request_id)
+            
+            # Check temporary manager
+            if req.temporary_manager_id == current_user.user_id:
+                temp_manager_ids.add(req.request_id)
+            
+            # Check if user is an authorized approver (based on requestor, not request department)
+            authorized_approvers = get_authorized_manager_approvers(req)
+            if current_user in authorized_approvers:
+                authorized_request_ids.add(req.request_id)
+        
+        # Combine all request IDs
+        all_visible_ids = department_match_ids | temp_manager_ids | authorized_request_ids
+        
+        # Build queries with all visible request IDs
+        if all_visible_ids:
+            completed_query = PaymentRequest.query.filter(
+                PaymentRequest.request_id.in_(all_visible_ids),
+                PaymentRequest.is_archived == False
+            )
+            rejected_query = PaymentRequest.query.filter(
+                PaymentRequest.request_id.in_(all_visible_ids),
+                PaymentRequest.is_archived == False
+            )
+            recurring_query = PaymentRequest.query.filter(
+                PaymentRequest.request_id.in_(all_visible_ids),
+                PaymentRequest.is_archived == False
+            )
+        else:
+            # No requests visible - return empty queries
+            completed_query = PaymentRequest.query.filter(
+                PaymentRequest.request_id == -1  # Impossible condition
+            )
+            rejected_query = PaymentRequest.query.filter(
+                PaymentRequest.request_id == -1  # Impossible condition
+            )
+            recurring_query = PaymentRequest.query.filter(
+                PaymentRequest.request_id == -1  # Impossible condition
+            )
     else:
         # Fallback - should not happen due to role_required decorator
         completed_query = PaymentRequest.query.filter(
@@ -10160,9 +10362,22 @@ def view_request(request_id):
             # Temporary manager may view regardless of department
             elif getattr(req, 'temporary_manager_id', None) == current_user.user_id:
                 pass
-            elif req.department != current_user.department:
-                flash('You do not have permission to view this request.', 'danger')
-                return redirect(url_for('dashboard'))
+            # Check if user is an authorized manager approver (regardless of department match)
+            # This allows managers to view requests they can approve even if department was changed
+            else:
+                authorized_approvers = get_authorized_manager_approvers(req)
+                if current_user in authorized_approvers:
+                    pass  # Allow access - user is authorized to approve this request
+                # Normalize department comparison (case-insensitive, trimmed) to handle whitespace/case issues
+                elif req.department and current_user.department:
+                    req_dept_normalized = req.department.strip().lower()
+                    user_dept_normalized = current_user.department.strip().lower()
+                    if req_dept_normalized != user_dept_normalized:
+                        flash('You do not have permission to view this request.', 'danger')
+                        return redirect(url_for('dashboard'))
+                elif req.department != current_user.department:
+                    flash('You do not have permission to view this request.', 'danger')
+                    return redirect(url_for('dashboard'))
         # Regular users can only view their own requests
         elif req.user_id != current_user.user_id:
             flash('You do not have permission to view this request.', 'danger')
@@ -10461,10 +10676,17 @@ def view_request(request_id):
     
     # Provide the same option lists used by the New Request form so edit UI can mirror creation behavior
     from models import RequestType, Branch
+    # IMPORTANT: Request Type options should be based on the ORIGINAL requestor department,
+    # not on later changes to the request's Department field (e.g., when a manager updates it).
+    original_department_for_types = getattr(req.user, 'department', None) or req.department
     # Map Office → Management for request type catalog
-    effective_department = 'Management' if req.department == 'Office' else req.department
+    effective_department = 'Management' if original_department_for_types == 'Office' else original_department_for_types
     available_request_types = RequestType.query.filter_by(department=effective_department, is_active=True).order_by(RequestType.name).all()
     available_branches = get_branches_ordered_by_location()
+    # Department options for manager/approver department changes
+    departments = ['Management', 'Finance', 'Operation', 'PR', 'Maintenance', 'Marketing',
+                   'Logistic', 'HR', 'Quality Control', 'Procurement', 'IT', 'Customer Service',
+                   'Project']
 
     was_just_edited = request.args.get('edited') == '1'
     edited_fields_param = request.args.get('edited_fields', '')
@@ -10494,6 +10716,9 @@ def view_request(request_id):
     
     # Check if current user can edit this request (for "Returned to Manager" status)
     can_edit_request = False
+    # Flag used in the template: when status is "Pending Manager Approval", certain approvers
+    # (GM, Operation Manager, assigned managers, temporary manager) can only edit the Department field
+    can_edit_department_only = False
     if req.status == 'Returned to Manager':
         # IT can always edit
         if current_user.department == 'IT' and current_user.role in ['IT Staff', 'Department Manager']:
@@ -10507,8 +10732,13 @@ def view_request(request_id):
         # IT can always edit
         if current_user.department == 'IT' and current_user.role in ['IT Staff', 'Department Manager']:
             can_edit_request = True
+        # GM, Operation Manager, assigned managers, temporary manager (including IT Department Manager
+        # when they are the assigned manager) can edit Department only
+        authorized_approvers = get_authorized_manager_approvers(req)
+        if current_user in authorized_approvers:
+            can_edit_department_only = True
     
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, was_just_edited=was_just_edited, edited_fields=edited_fields_all, can_schedule_one_time=can_schedule_one_time, one_time_scheduled_by=one_time_scheduled_by, can_edit_request=can_edit_request, return_reason_history=return_reason_history)
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, departments=departments, was_just_edited=was_just_edited, edited_fields=edited_fields_all, can_schedule_one_time=can_schedule_one_time, one_time_scheduled_by=one_time_scheduled_by, can_edit_request=can_edit_request, return_reason_history=return_reason_history, can_edit_department_only=can_edit_department_only)
 
 
 @app.route('/request/<int:request_id>/schedule_one_time_payment', methods=['POST'])
@@ -10716,6 +10946,8 @@ def edit_request(request_id):
     # - Assigned managers, GM, and Operation Manager can edit when status is "Returned to Manager"
     # - Finance Admin can edit Request Type only when status is "Pending Finance Approval"
     is_authorized = False
+    # Flag for manager/GM/Operation Manager/temporary manager editing ONLY department while status is Pending Manager Approval
+    is_manager_pending_edit = False
     
     # Finance Admin can edit Request Type only for Pending Finance Approval
     if is_finance_admin_edit:
@@ -10729,6 +10961,15 @@ def edit_request(request_id):
         authorized_approvers = get_authorized_manager_approvers(req)
         if current_user in authorized_approvers:
             is_authorized = True
+    # For "Pending Manager Approval" status, allow assigned managers, GM, Operation Manager, and temporary manager,
+    # but they will only be able to edit the Department field (handled below)
+    elif req.status == 'Pending Manager Approval':
+        authorized_approvers = get_authorized_manager_approvers(req)
+        if current_user in authorized_approvers:
+            is_authorized = True
+            # IT already handled above with full-edit permissions; here we restrict only non-IT approvers
+            if not (current_user.department == 'IT' and current_user.role in ['IT Staff', 'Department Manager']):
+                is_manager_pending_edit = True
     
     if not is_authorized:
         flash('You are not authorized to edit this request.', 'error')
@@ -10755,21 +10996,42 @@ def edit_request(request_id):
         'account_name': req.account_name or '',
         'account_number': req.account_number or '',
         'amount': norm_amount(req.amount),
-        'item_name': req.item_name or ''
+        'item_name': req.item_name or '',
+        'department': req.department or '',
+        'payment_method': req.payment_method or ''
     }
-    new_request_type = request.form.get('request_type') or req.request_type
-    others_description = (request.form.get('others_description') or '').strip()
-    if new_request_type == 'Others':
-        if not others_description:
-            flash('Please specify the type of request for "Others".', 'error')
-            return redirect(url_for('view_request', request_id=request_id))
-        new_request_type = f"Others: {others_description}"
 
-    req.request_type = new_request_type
+    # If this is a manager/GM/Operation Manager/temporary manager editing while status is
+    # "Pending Manager Approval", restrict them so they can ONLY change the Department field.
+    if is_manager_pending_edit and req.status == 'Pending Manager Approval':
+        new_department = (request.form.get('department') or '').strip()
+        if new_department:
+            req.department = new_department
+
+    # For all other cases (IT, Returned to Manager, Finance Admin as configured),
+    # apply the normal Request Type editing logic.
+    if not (is_manager_pending_edit and req.status == 'Pending Manager Approval'):
+        new_request_type = request.form.get('request_type') or req.request_type
+        others_description = (request.form.get('others_description') or '').strip()
+        if new_request_type == 'Others':
+            if not others_description:
+                flash('Please specify the type of request for "Others".', 'error')
+                return redirect(url_for('view_request', request_id=request_id))
+            new_request_type = f"Others: {others_description}"
+
+        req.request_type = new_request_type
+
+    # For all non-Finance-Admin edits, if a Department value was submitted, apply it.
+    # This covers IT users (including IT Department Manager) and any other flows where
+    # the Department field is legitimately editable.
+    if not is_finance_admin_edit:
+        new_department_general = (request.form.get('department') or '').strip()
+        if new_department_general:
+            req.department = new_department_general
     
     # For Finance Admin editing Request Type only in Pending Finance Approval status,
     # skip updating all other fields
-    if not is_finance_admin_edit:
+    if not is_finance_admin_edit and not (is_manager_pending_edit and req.status == 'Pending Manager Approval'):
         req.branch_name = request.form.get('branch_name') or req.branch_name
         req.person_company = request.form.get('person_company') or req.person_company
         req.company_name = request.form.get('company_name') or req.company_name
@@ -10778,6 +11040,7 @@ def edit_request(request_id):
         req.account_name = request.form.get('account_name') or req.account_name
         req.account_number = request.form.get('account_number') or req.account_number
         req.item_name = request.form.get('item_name') or req.item_name
+        req.payment_method = request.form.get('payment_method') or req.payment_method
         
         # Handle amount field
         amount_str = request.form.get('amount', '').strip()
@@ -10790,7 +11053,73 @@ def edit_request(request_id):
                 # Invalid amount, keep existing value
                 pass
 
-    # Handle file management (only when status is "Returned to Manager" and not Finance Admin edit)
+        # Server-side validation: prevent saving if any core fields become empty.
+        # This mirrors the required fields on the New Request form.
+        def _empty(val):
+            if val is None:
+                return True
+            if isinstance(val, str):
+                return val.strip() == ''
+            return False
+
+        if req.status in ['Pending Manager Approval', 'Returned to Manager']:
+            missing_fields = []
+
+            # Helper: prefer submitted value if the field was part of this form post;
+            # only fall back to current DB value if the user didn't touch the field.
+            def field_empty(field_name, current_value):
+                submitted = request.form.get(field_name, None)
+                if submitted is not None:
+                    # User submitted this field; treat blank/placeholder as empty
+                    return _empty(submitted)
+                return _empty(current_value)
+
+            # Request Type
+            if field_empty('request_type', req.request_type):
+                missing_fields.append('Request Type')
+            # Person/Company Name – also consider select placeholder
+            submitted_person = request.form.get('person_company', None)
+            submitted_person_select = request.form.get('person_company_select_edit', None)
+            if (submitted_person is not None or submitted_person_select is not None):
+                # User interacted with this field; both must be non-empty/meaningful
+                if _empty(submitted_person) and _empty(submitted_person_select):
+                    missing_fields.append('Person/Company Name')
+            elif _empty(req.person_company):
+                missing_fields.append('Person/Company Name')
+            # Department
+            if field_empty('department', req.department):
+                missing_fields.append('Department')
+            # Purpose
+            if field_empty('purpose', req.purpose):
+                missing_fields.append('Purpose/Description')
+            # Payment Method
+            if field_empty('payment_method', req.payment_method):
+                missing_fields.append('Payment Method')
+            # Bank Name
+            if field_empty('bank_name', req.bank_name):
+                missing_fields.append('Bank Name')
+            # Account Name
+            if field_empty('account_name', req.account_name):
+                missing_fields.append('Account Name')
+            # Account Number
+            if field_empty('account_number', req.account_number):
+                missing_fields.append('Account Number')
+            # Amount (allow 0 but not None/blank)
+            submitted_amount = request.form.get('amount', None)
+            if submitted_amount is not None:
+                if _empty(submitted_amount):
+                    missing_fields.append('Amount')
+            elif req.amount is None or _empty(str(req.amount)):
+                missing_fields.append('Amount')
+
+            if missing_fields:
+                friendly_list = ', '.join(missing_fields)
+                flash(f'The following fields cannot be empty when saving edits: {friendly_list}.', 'error')
+                return redirect(url_for('view_request', request_id=request_id))
+
+    # Handle file management (only when status is "Returned to Manager" and not Finance Admin edit).
+    # Manager/GM/Operation Manager/temporary manager restricted to Department only while
+    # status is "Pending Manager Approval" so file handling is unaffected.
     if req.status == 'Returned to Manager' and not is_finance_admin_edit:
         # Handle file deletions
         delete_files = request.form.getlist('delete_files')
@@ -10903,7 +11232,9 @@ def edit_request(request_id):
         'account_name': req.account_name or '',
         'account_number': req.account_number or '',
         'amount': norm_amount(req.amount),  # Normalize amount for consistent comparison
-        'item_name': req.item_name or ''
+        'item_name': req.item_name or '',
+        'department': req.department or '',
+        'payment_method': req.payment_method or ''
     }
     submitted_keys = set(request.form.keys())
     # Map form field names to our keys
@@ -10918,7 +11249,9 @@ def edit_request(request_id):
         'account_name': 'account_name',
         'account_number': 'account_number',
         'amount': 'amount',
-        'item_name': 'item_name'
+        'item_name': 'item_name',
+        'department': 'department',
+        'payment_method': 'payment_method'
     }
     candidate_keys = set(form_to_key[k] for k in submitted_keys if k in form_to_key)
     # Use special normalization for amount field
