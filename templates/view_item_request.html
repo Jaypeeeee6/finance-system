@@ -488,6 +488,17 @@
     border: 1px solid #ffc107;
 }
 
+/* Make entire row red when quantity is 0 */
+.qty-zero {
+    background: #ffe5e5 !important;
+    border: 1px solid #dc3545 !important;
+}
+
+.qty-zero .procurement-cart-item-name {
+    color: #dc3545;
+    font-weight: 600;
+}
+
 .previously-rejected-by-manager {
     background-color: #ffe5e5 !important;
     border-left: 4px solid #dc3545 !important;
@@ -3393,44 +3404,90 @@ document.addEventListener('DOMContentLoaded', function() {
                 return false;
             }
             
+            // Collect all validation errors
+            const errors = [];
+            let firstInvalidInput = null;
+            
+            // Validate that all amount fields are filled (amounts[] inputs in procurement cart)
+            const amountInputs = document.querySelectorAll('input[name="amounts[]"]');
+            if (amountInputs.length > 0) {
+                let hasEmptyAmount = false;
+                
+                amountInputs.forEach(input => {
+                    const valueStr = String(input.value || '').trim();
+                    const amount = parseFloat(valueStr);
+                    
+                    // Check if empty, "0", NaN, or <= 0 - ANY of these means invalid
+                    const isEmpty = valueStr === '';
+                    const isZero = valueStr === '0';
+                    const isNaNValue = isNaN(amount);
+                    const isNotPositive = amount <= 0;
+                    
+                    if (isEmpty || isZero || isNaNValue || isNotPositive) {
+                        hasEmptyAmount = true;
+                        if (!firstInvalidInput) {
+                            firstInvalidInput = input;
+                        }
+                    }
+                });
+                
+                if (hasEmptyAmount) {
+                    errors.push('Please fill in all amount fields before completing the request.');
+                }
+            }
+            
             // Get both upload components
             const receiptContainer = document.getElementById('item-receipt-upload-container');
             const invoiceContainer = document.getElementById('item-invoice-upload-container');
             
             // Validate receipt files
+            let receiptFilesMissing = false;
             if (receiptContainer && receiptContainer.uploadComponent) {
                 const receiptComponent = receiptContainer.uploadComponent;
                 if (receiptComponent.getFiles().length === 0) {
-                    resetButton();
-                    showReceiptUploadErrorDialog('Please select at least one receipt file to upload.');
-                    return false;
+                    receiptFilesMissing = true;
                 }
             } else {
                 // Fallback: check if receipt file input exists and has files
                 const receiptFileInput = this.querySelector('input[name="receipt_files"]');
                 if (!receiptFileInput || !receiptFileInput.files || receiptFileInput.files.length === 0) {
-                    resetButton();
-                    showReceiptUploadErrorDialog('Please select at least one receipt file to upload.');
-                    return false;
+                    receiptFilesMissing = true;
                 }
+            }
+            if (receiptFilesMissing) {
+                errors.push('Please select at least one receipt file to upload.');
             }
             
             // Validate invoice files
+            let invoiceFilesMissing = false;
             if (invoiceContainer && invoiceContainer.uploadComponent) {
                 const invoiceComponent = invoiceContainer.uploadComponent;
                 if (invoiceComponent.getFiles().length === 0) {
-                    resetButton();
-                    showReceiptUploadErrorDialog('Please select at least one invoice file to upload.');
-                    return false;
+                    invoiceFilesMissing = true;
                 }
             } else {
                 // Fallback: check if invoice file input exists and has files
                 const invoiceFileInput = this.querySelector('input[name="invoice_files"]');
                 if (!invoiceFileInput || !invoiceFileInput.files || invoiceFileInput.files.length === 0) {
-                    resetButton();
-                    showReceiptUploadErrorDialog('Please select at least one invoice file to upload.');
-                    return false;
+                    invoiceFilesMissing = true;
                 }
+            }
+            if (invoiceFilesMissing) {
+                errors.push('Please select at least one invoice file to upload.');
+            }
+            
+            // If there are any errors, show them and stop
+            if (errors.length > 0) {
+                resetButton();
+                // Focus the first invalid input if it's an amount field
+                if (firstInvalidInput) {
+                    firstInvalidInput.focus();
+                }
+                // Show combined error message in a readable list format
+                const errorMessage = 'Please fix the following issues before completing the request:<br><br>' + 
+                    errors.map(err => '• ' + err).join('<br>');
+                showReceiptUploadErrorDialog(errorMessage);
+                return false;
             }
             
             // Validate receipt amount - must be > 0
@@ -3535,6 +3592,13 @@ function updateCartQuantityState(index) {
     const diff = current - origQty;
     const diffAbs = Math.abs(diff);
 
+    // Make item name red if quantity is 0
+    if (current === 0) {
+        row.classList.add('qty-zero');
+    } else {
+        row.classList.remove('qty-zero');
+    }
+
     // Row highlight when less than original
     if (current < origQty) {
         row.classList.add('qty-less-than-original');
@@ -3588,6 +3652,13 @@ function updateProcurementCartQuantityState(index) {
 
     const diff = current - origQty;
     const diffAbs = Math.abs(diff);
+
+    // Make item name red if quantity is 0
+    if (current === 0) {
+        row.classList.add('qty-zero');
+    } else {
+        row.classList.remove('qty-zero');
+    }
 
     // Row highlight when less than original
     if (current < origQty) {
@@ -3887,12 +3958,12 @@ let originalQuantityValues = {};
 // Function to ensure original values are stored (call this before checking)
 function ensureOriginalValuesStored() {
     // Store assigned procurement quantity values if not already stored
-    const allQuantityForms = document.querySelectorAll('form[action*="update_item_request_quantities"]');
+    const allQuantityForms = document.querySelectorAll('form[action*="update_quantities"]');
     for (let form of allQuantityForms) {
         const action = form.getAttribute('action') || '';
         // Skip manager and procurement manager forms
-        if (action.includes('update_item_request_quantities_manager') || 
-            action.includes('update_item_request_quantities_procurement_manager')) {
+        if (action.includes('update_quantities_manager') || 
+            action.includes('update_quantities_procurement_manager')) {
             continue;
         }
         // This is the assigned procurement form
@@ -3914,8 +3985,8 @@ function ensureOriginalValuesStored() {
         const form = input.closest('form');
         if (form) {
             const action = form.getAttribute('action') || '';
-            if (action.includes('update_item_request_quantities_manager') || 
-                action.includes('update_item_request_quantities_procurement_manager')) {
+            if (action.includes('update_quantities_manager') || 
+                action.includes('update_quantities_procurement_manager')) {
                 index++;
                 continue;
             }
@@ -4080,7 +4151,7 @@ function hasUnsavedQuantityEdits() {
     ensureOriginalValuesStored();
     
     // Check manager quantity form
-    const managerForm = document.querySelector('form[action*="update_item_request_quantities_manager"]');
+    const managerForm = document.querySelector('form[action*="update_quantities_manager"]');
     if (managerForm) {
         const quantityInputs = managerForm.querySelectorAll('input[name="quantities[]"]');
         for (let input of quantityInputs) {
@@ -4094,7 +4165,7 @@ function hasUnsavedQuantityEdits() {
     }
     
     // Check procurement manager quantity form
-    const procurementManagerForm = document.querySelector('form[action*="update_item_request_quantities_procurement_manager"]');
+    const procurementManagerForm = document.querySelector('form[action*="update_quantities_procurement_manager"]');
     if (procurementManagerForm) {
         const quantityInputs = procurementManagerForm.querySelectorAll('input[name="quantities[]"]');
         for (let input of quantityInputs) {
@@ -4108,13 +4179,13 @@ function hasUnsavedQuantityEdits() {
     }
     
     // Check assigned procurement quantity form (for assigned procurement staff)
-    // This form has action containing "update_item_request_quantities" but NOT "manager" or "procurement_manager"
-    const allForms = document.querySelectorAll('form[action*="update_item_request_quantities"]');
+    // This form has action containing "update_quantities" but NOT "manager" or "procurement_manager"
+    const allForms = document.querySelectorAll('form[action*="update_quantities"]');
     for (let form of allForms) {
         const action = form.getAttribute('action') || '';
         // Skip manager and procurement manager forms
-        if (action.includes('update_item_request_quantities_manager') || 
-            action.includes('update_item_request_quantities_procurement_manager')) {
+        if (action.includes('update_quantities_manager') || 
+            action.includes('update_quantities_procurement_manager')) {
             continue;
         }
         // This is the assigned procurement form
@@ -4141,8 +4212,8 @@ function hasUnsavedQuantityEdits() {
         const form = input.closest('form');
         if (form) {
             const action = form.getAttribute('action') || '';
-            if (action.includes('update_item_request_quantities_manager') || 
-                action.includes('update_item_request_quantities_procurement_manager')) {
+            if (action.includes('update_quantities_manager') || 
+                action.includes('update_quantities_procurement_manager')) {
                 index++;
                 continue;
             }
@@ -4165,7 +4236,7 @@ function hasUnsavedQuantityEdits() {
 document.addEventListener('DOMContentLoaded', function() {
     // Store original quantity values on page load
     // Manager quantities
-    const managerForm = document.querySelector('form[action*="update_item_request_quantities_manager"]');
+    const managerForm = document.querySelector('form[action*="update_quantities_manager"]');
     if (managerForm) {
         const quantityInputs = managerForm.querySelectorAll('input[name="quantities[]"]');
         quantityInputs.forEach(input => {
@@ -4203,7 +4274,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Procurement manager quantity form validation
-    const procurementManagerForm = document.querySelector('form[action*="update_item_request_quantities_procurement_manager"]');
+    const procurementManagerForm = document.querySelector('form[action*="update_quantities_procurement_manager"]');
     if (procurementManagerForm) {
         const quantityInputs = procurementManagerForm.querySelectorAll('input[name="quantities[]"]');
         quantityInputs.forEach(input => {
@@ -4241,13 +4312,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Store original values for assigned procurement quantities
-    // Find the form that has "update_item_request_quantities" but NOT "manager" or "procurement_manager"
-    const allQuantityForms = document.querySelectorAll('form[action*="update_item_request_quantities"]');
+    // Find the form that has "update_quantities" but NOT "manager" or "procurement_manager"
+    const allQuantityForms = document.querySelectorAll('form[action*="update_quantities"]');
     for (let form of allQuantityForms) {
         const action = form.getAttribute('action') || '';
         // Skip manager and procurement manager forms
-        if (action.includes('update_item_request_quantities_manager') || 
-            action.includes('update_item_request_quantities_procurement_manager')) {
+        if (action.includes('update_quantities_manager') || 
+            action.includes('update_quantities_procurement_manager')) {
             continue;
         }
         // This is the assigned procurement form
@@ -4316,66 +4387,59 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Form submit handler - ALWAYS validates before submission
         const submitHandler = function(e) {
-            // ALWAYS prevent default form submission first - CRITICAL
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
+            // Prevent the default submit so we control validation
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+            }
             
             // Run validation - MUST pass before submission
             if (!validateAndSubmit(this)) {
                 return false; // Validation failed, STOP - don't submit
             }
             
-            // Validation passed - submit using FormData and fetch for full control
-            const formData = new FormData(this);
-            fetch(this.action, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    window.location.reload();
-                } else {
-                    console.error('Form submission failed');
-                    alert('Form submission failed. Please try again.');
-                }
-            })
-            .catch(error => {
-                console.error('Error submitting form:', error);
-                alert('An error occurred. Please try again.');
-            });
-            
-            return false; // Always prevent default submission
+            // Validation passed - temporarily remove handler to avoid recursion then submit
+            this.removeEventListener('submit', submitHandler, true);
+            this.submit();
+            return false;
         };
         
         // Attach form submit handler with capture phase to run first
         form.addEventListener('submit', submitHandler, true);
         
-        // ALSO attach button click handler - button is now type="button" so it won't auto-submit
-        const submitButton = form.querySelector('button.save-quantities-amounts-btn, button[type="submit"]');
-        if (submitButton) {
-            submitButton.addEventListener('click', function(e) {
-                // ALWAYS prevent any default behavior
+        // ALSO attach button click handler(s) - buttons are type="button" so they won't auto-submit
+        const submitButtons = form.querySelectorAll('button.save-quantities-amounts-btn');
+        submitButtons.forEach(btn => {
+            // Avoid double-binding if the script runs multiple times
+            if (btn.dataset.amountHandlerBound === 'true') {
+                return;
+            }
+            btn.dataset.amountHandlerBound = 'true';
+            
+            btn.addEventListener('click', function(e) {
+                // Prevent default button behavior
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
                 
-                // Run validation - MUST pass before submission
+                // Validate amounts
                 if (!validateAndSubmit(form)) {
-                    // Validation failed - STOP, don't submit
-                    return false;
+                    return false; // show modal already handled inside validation
                 }
                 
-                // Validation passed - trigger form submission via the submit handler
-                const syntheticEvent = new Event('submit', {
-                    bubbles: true,
-                    cancelable: true
-                });
-                submitHandler.call(form, syntheticEvent);
-                
+                // Submit normally (submit event will fire and be handled)
+                form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
                 return false;
             }, true); // Use capture phase to run first
-        }
+        });
+        
+        // Initialize quantity state on page load (to show red item names for zero quantities)
+        const qtyInputs = form.querySelectorAll('input[name="quantities[]"]');
+        qtyInputs.forEach(input => {
+            const index = input.getAttribute('data-index') || input.id.replace('cart_qty_', '');
+            updateCartQuantityState(index);
+        });
     }
     
     // Also store values by checking inputs directly (fallback)
@@ -4387,8 +4451,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const form = input.closest('form');
         if (form) {
             const action = form.getAttribute('action') || '';
-            if (action.includes('update_item_request_quantities_manager') || 
-                action.includes('update_item_request_quantities_procurement_manager')) {
+            if (action.includes('update_quantities_manager') || 
+                action.includes('update_quantities_procurement_manager')) {
                 index++;
                 continue;
             }
