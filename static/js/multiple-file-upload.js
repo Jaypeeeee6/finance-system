@@ -40,10 +40,6 @@ if (typeof MultipleFileUpload === 'undefined') {
                     <button type="button" id="add-files-btn-${this.containerId}" class="btn btn-primary" style="white-space: nowrap;">
                         <i class="fas fa-plus"></i> Add Files
                     </button>
-                    <span style="color: #666; font-size: 14px;">
-                        <i class="fas fa-info-circle" style="margin-right: 5px;"></i>
-                        Click to select one or multiple files
-                    </span>
                 </div>
                 <small>${this.helpText}</small>
                 <div id="file-preview-${this.containerId}" style="margin-top: 10px;"></div>

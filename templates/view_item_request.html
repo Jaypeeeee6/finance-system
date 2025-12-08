@@ -141,6 +141,17 @@
     border-top: none !important;
 }
 
+/* Override grid columns for Assigned to Procurement tab to include Amount column */
+#step-assigned .procurement-cart-header-row,
+#step-assigned .procurement-cart-row {
+    grid-template-columns: 2fr 1fr 1fr;
+}
+
+/* Align Quantity column to left in Assigned to Procurement tab */
+#step-assigned .procurement-cart-qty {
+    justify-content: flex-start;
+}
+
 .dashboard-container .card.assigned-section .card-header h4 {
     color: white !important;
     margin: 0 !important;
@@ -341,6 +352,7 @@
     display: grid;
     grid-template-columns: 2fr 1fr;
     padding: 10px 16px;
+    gap: 10px;
     background: #f8f9fb;
     border-radius: 8px;
     font-weight: 600;
@@ -352,16 +364,18 @@
     display: grid;
     grid-template-columns: 2fr 1fr;
     align-items: center;
-    padding: 10px 16px;
-    margin-bottom: 8px;
+    padding: 6px 14px;
+    margin-bottom: 6px;
     background: #ffffff;
     border-radius: 10px;
     box-shadow: 0 2px 4px rgba(15, 23, 42, 0.06);
+    gap: 10px;
 }
 
 .procurement-cart-item-name {
     font-weight: 600;
     color: #374151;
+    font-size: 0.9rem;
 }
 
 .procurement-cart-qty {
@@ -369,28 +383,50 @@
     justify-content: flex-end;
 }
 
+.procurement-cart-amount {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.procurement-cart-amount input[type="number"] {
+    width: 50px;
+    height: 32px;
+    text-align: center;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    padding: 0;
+}
+
+.procurement-cart-amount input[type="number"]:focus {
+    outline: none;
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
 .quantity-control {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     background: #f9fafb;
-    padding: 4px 8px;
+    padding: 3px 6px;
     border-radius: 999px;
 }
 
 .quantity-control input[type="number"] {
-    width: 70px;
+    width: 55px;
     border: none;
     background: transparent;
     text-align: center;
     font-weight: 600;
+    font-size: 0.85rem;
 }
 
 .original-qty-inline {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     font-weight: 600;
     color: #374151;
-    margin: 0 6px;
+    margin: 0 4px;
 }
 
 .quantity-control input[type="number"]:focus {
@@ -400,10 +436,10 @@
 
 .qty-btn {
     border: none;
-    width: 28px;
-    height: 28px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 700;
     cursor: pointer;
     display: flex;
@@ -428,11 +464,22 @@
 .readonly-qty-pill {
     display: inline-flex;
     align-items: center;
-    padding: 6px 14px;
+    padding: 4px 10px;
     border-radius: 999px;
     background: #f3f4f6;
     font-weight: 600;
     color: #374151;
+    font-size: 0.85rem;
+}
+
+/* Make Save Quantities buttons match Mark as Completed button size */
+#manager_save_quantities_btn,
+#manager_save_quantity_btn,
+#procurement_manager_save_quantities_btn,
+#procurement_manager_save_quantity_btn,
+.billing-completion-grid button.btn-success[type="submit"] {
+    padding: 0.4rem 0.9rem !important;
+    font-size: 0.9rem !important;
 }
 
 /* Highlight when procurement quantity is less than original requested quantity */
@@ -472,17 +519,21 @@
     text-align: left;
     border-radius: 6px;
     padding: 8px 12px;
-    position: absolute;
-    z-index: 1000;
-    bottom: 125%;
-    left: 50%;
-    margin-left: -140px;
+    position: fixed !important;
+    transform: translateX(-50%);
+    z-index: 99999 !important;
+    bottom: auto;
+    left: auto;
+    margin-left: 0;
     opacity: 0;
     transition: opacity 0.3s;
     font-size: 0.875rem;
     font-weight: normal;
     line-height: 1.4;
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    pointer-events: none;
+    white-space: normal;
+    word-wrap: break-word;
 }
 
 .tooltip-wrapper .tooltip-text::after {
@@ -499,6 +550,27 @@
 .tooltip-wrapper:hover .tooltip-text {
     visibility: visible;
     opacity: 1;
+}
+
+/* Ensure tooltips can overflow containers */
+.card-body,
+.billing-completion-grid,
+#item-request-complete-form,
+.card.your-approval-required {
+    overflow: visible !important;
+}
+
+/* Position tooltip using fixed positioning to avoid clipping */
+.tooltip-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip-wrapper .tooltip-text {
+    position: fixed !important;
+    transform: translateX(-50%);
+    white-space: normal;
+    word-wrap: break-word;
 }
 
 .procurement-cart-note.initially-hidden {
@@ -530,11 +602,68 @@
 .edit-qty-btn i {
     font-size: 0.875rem;
 }
+
+/* Billing and Completion Two-Column Layout */
+.billing-completion-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1.5fr !important;
+    gap: 30px !important;
+}
+
+.billing-completion-grid > div:last-child {
+    border-left: 1px solid #e0e0e0;
+    padding-left: 15px;
+}
+
+/* Smaller form controls in left column */
+.billing-completion-grid > div:first-child .form-control {
+    padding: 0.4rem 0.75rem !important;
+    font-size: 0.9rem !important;
+    height: auto !important;
+}
+
+.billing-completion-grid > div:first-child textarea.form-control,
+.billing-completion-grid > div:first-child textarea {
+    padding: 0.4rem 0.75rem !important;
+    font-size: 0.9rem !important;
+}
+
+.billing-completion-grid > div:first-child .btn {
+    padding: 0.4rem 0.9rem !important;
+    font-size: 0.9rem !important;
+}
+
+.billing-completion-grid > div:first-child label {
+    font-size: 0.9rem !important;
+    margin-bottom: 0.4rem !important;
+}
+
+.billing-completion-grid > div:first-child .form-group {
+    margin-bottom: 1rem !important;
+}
+
+.billing-completion-grid > div:first-child small {
+    font-size: 0.85rem !important;
+}
+
+@media (max-width: 768px) {
+    .billing-completion-grid {
+        grid-template-columns: 1fr !important;
+        gap: 20px !important;
+    }
+    
+    .billing-completion-grid > div:last-child {
+        border-left: none !important;
+        border-top: 1px solid #e0e0e0 !important;
+        padding-left: 0 !important;
+        padding-top: 20px !important;
+    }
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-container view-request-page">
+<div class="dashboard-container view-request-page" data-request-status="{{ item_request.status }}">
     <div class="dashboard-header">
         <h1><i class="fas fa-shopping-cart"></i> Item Request #{{ item_request.id }}
             {% if item_request.is_urgent %}
@@ -549,7 +678,7 @@
                 </span>
             {% endif %}
         </h1>
-        <a href="{{ url_for('procurement_item_requests') }}" class="btn btn-secondary">
+        <a href="{{ url_for('procurement_item_requests') }}" id="back-to-item-requests-btn" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Back to Item Requests
         </a>
     </div>
@@ -1225,6 +1354,7 @@
                                             <div class="procurement-cart-header-row">
                                                 <div>Item</div>
                                                 <div style="text-align: right;">Quantity</div>
+                                                <div style="text-align: right;">Amount</div>
                                             </div>
                                             
                                             {% for item in item_list %}
@@ -1340,7 +1470,7 @@
                                             </div>
                                         </div>
                                         <div class="step-actions" style="margin-top: 1rem;">
-                                            <button type="submit" class="btn btn-primary" id="manager_save_quantities_btn">
+                                            <button type="submit" class="btn btn-success" id="manager_save_quantities_btn">
                                                 <i class="fas fa-save"></i> Save Quantities
                                             </button>
                                         </div>
@@ -1458,7 +1588,7 @@
                                             </div>
                                         </div>
                                         <div class="step-actions" style="margin-top: 1rem;">
-                                            <button type="submit" class="btn btn-primary" id="manager_save_quantity_btn">
+                                            <button type="submit" class="btn btn-success" id="manager_save_quantity_btn">
                                                 <i class="fas fa-save"></i> Save Quantity
                                             </button>
                                         </div>
@@ -1955,6 +2085,7 @@
                                             <div class="procurement-cart-header-row">
                                                 <div>Item</div>
                                                 <div style="text-align: right;">Quantity</div>
+                                                <div style="text-align: right;">Amount</div>
                                             </div>
                                             
                                             {% for item in item_list %}
@@ -2131,7 +2262,7 @@
                                             </div>
                                         </div>
                                         <div class="step-actions" style="margin-top: 1rem;">
-                                            <button type="submit" class="btn btn-primary" id="procurement_manager_save_quantities_btn">
+                                            <button type="submit" class="btn btn-success" id="procurement_manager_save_quantities_btn">
                                                 <i class="fas fa-save"></i> Save Quantities
                                             </button>
                                         </div>
@@ -2184,6 +2315,7 @@
                                             <div class="procurement-cart-header-row">
                                                 <div>Item</div>
                                                 <div style="text-align: right;">Quantity</div>
+                                                <div style="text-align: right;">Amount</div>
                                             </div>
 
                                             <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %} {% if was_previously_rejected %}previously-rejected-by-manager{% endif %}"
@@ -2313,7 +2445,7 @@
                                             </div>
                                         </div>
                                         <div class="step-actions" style="margin-top: 1rem;">
-                                            <button type="submit" class="btn btn-primary" id="procurement_manager_save_quantity_btn">
+                                            <button type="submit" class="btn btn-success" id="procurement_manager_save_quantity_btn">
                                                 <i class="fas fa-save"></i> Save Quantity
                                             </button>
                                         </div>
@@ -2429,411 +2561,7 @@
                     </div>
                 </div>
 
-                {# Cart-style item view for both multi-item and single-item requests #}
-                {% if item_request.item_name %}
-                    {% if ',' in item_request.item_name %}
-                    <div class="card assigned-section procurement-cart-card" style="margin-bottom: 1.5rem;">
-                        <div class="card-header">
-                            <h4><i class="fas fa-shopping-cart"></i> Items Assigned for Procurement</h4>
-                        </div>
-                        <div class="card-body">
-                            <p style="color: #dc3545; font-size: 1rem; font-weight: 500; margin-bottom: 0.85rem;">
-                                <strong>Note:</strong> If the item is not bought, set quantity to <strong>0</strong>.
-                            </p>
-                            {% set item_list = item_request.item_name.split(',') %}
-                            {# Use procurement manager-approved quantities (final approved quantities); fall back to manager-approved, then original #}
-                            {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
-                            {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
-                            {# Procurement manager-approved quantities for comparison (this is the baseline for assigned procurement) #}
-                            {% set original_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
-                            {% set original_list = (original_source or '').split(';') if original_source else [] %}
-                            
-                            {% if can_complete %}
-                            <form method="POST" action="{{ url_for('update_item_request_quantities', request_id=item_request.id) }}">
-                            {% endif %}
-                                <div class="procurement-cart-table">
-                                    <div class="procurement-cart-header-row">
-                                        <div>Item</div>
-                                        <div style="text-align: right;">Quantity</div>
-                                    </div>
-                                    
-                                    {% for item in item_list %}
-                                        {% set item_trimmed = item.strip() %}
-                                        {% if item_trimmed %}
-                                            {% set qty = '' %}
-                                            {% if loop.index0 < quantity_list|length %}
-                                                {% set qty_raw = quantity_list[loop.index0] | trim %}
-                                                {% if qty_raw %}
-                                                    {# Quantities may be stored as "Item Name: 2"; extract just the numeric part #}
-                                                    {% if ':' in qty_raw %}
-                                                        {% set parts = qty_raw.split(':', 1) %}
-                                                        {% if parts|length > 1 %}
-                                                            {% set qty = parts[1].strip() %}
-                                                        {% else %}
-                                                            {% set qty = qty_raw %}
-                                                        {% endif %}
-                                                    {% else %}
-                                                        {% set qty = qty_raw %}
-                                                    {% endif %}
-                                                {% endif %}
-                                            {% endif %}
-
-                                            {# Derive original numeric quantity for this item #}
-                                            {% set orig_qty_raw = '' %}
-                                            {% if loop.index0 < original_list|length %}
-                                                {% set oq = original_list[loop.index0] | trim %}
-                                                {% if oq %}
-                                                    {% if ':' in oq %}
-                                                        {% set o_parts = oq.split(':', 1) %}
-                                                        {% if o_parts|length > 1 %}
-                                                            {% set orig_qty_raw = o_parts[1].strip() %}
-                                                        {% else %}
-                                                            {% set orig_qty_raw = oq %}
-                                                        {% endif %}
-                                                    {% else %}
-                                                        {% set orig_qty_raw = oq %}
-                                                    {% endif %}
-                                                {% endif %}
-                                            {% endif %}
-                                            {% set orig_qty_num = orig_qty_raw|int(0) %}
-                                            {% set proc_qty_num = qty|int(0) %}
-                                            {% set is_less = proc_qty_num < orig_qty_num %}
-                                            {% set diff = proc_qty_num - orig_qty_num %}
-                                            {% set diff_abs = diff|abs %}
-                                            
-                                            {# Check if procurement manager set quantity to 0 #}
-                                            {% set procurement_manager_qty_raw = '' %}
-                                            {% if item_request.procurement_manager_quantities %}
-                                                {% set pm_quantity_list = (item_request.procurement_manager_quantities or '').split(';') %}
-                                                {% if loop.index0 < pm_quantity_list|length %}
-                                                    {% set pm_qty_raw = pm_quantity_list[loop.index0] | trim %}
-                                                    {% if pm_qty_raw %}
-                                                        {% if ':' in pm_qty_raw %}
-                                                            {% set pm_parts = pm_qty_raw.split(':', 1) %}
-                                                            {% if pm_parts|length > 1 %}
-                                                                {% set procurement_manager_qty_raw = pm_parts[1].strip() %}
-                                                            {% else %}
-                                                                {% set procurement_manager_qty_raw = pm_qty_raw %}
-                                                            {% endif %}
-                                                        {% else %}
-                                                            {% set procurement_manager_qty_raw = pm_qty_raw %}
-                                                        {% endif %}
-                                                    {% endif %}
-                                                {% endif %}
-                                            {% endif %}
-                                            {% set procurement_manager_qty_num = procurement_manager_qty_raw|int(0) %}
-                                            {% set was_set_to_zero_by_procurement_manager = item_request.procurement_manager_quantities and procurement_manager_qty_num == 0 %}
-
-                                            <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %} {% if was_set_to_zero_by_procurement_manager %}previously-rejected-by-manager{% endif %}"
-                                                 id="cart_row_{{ loop.index0 }}"
-                                                 data-orig-qty="{{ orig_qty_num }}"
-                                                 data-orig-display="{{ orig_qty_raw or '0' }}">
-                                                <div class="procurement-cart-item-name">
-                                                    {{ item_trimmed }}
-                                                    {% if was_set_to_zero_by_procurement_manager %}
-                                                    <span class="tooltip-wrapper">
-                                                        <i class="fas fa-info-circle tooltip-icon"></i>
-                                                        <span class="tooltip-text">This item was set to 0 by the Procurement Manager but is kept in case you want to edit it again</span>
-                                                    </span>
-                                                    {% endif %}
-                                                </div>
-                                                <div class="procurement-cart-qty">
-                                                    {% if can_complete %}
-                                                        {% if was_set_to_zero_by_procurement_manager %}
-                                                        {# Read-only display with edit icon for items set to 0 by procurement manager #}
-                                                        <div class="quantity-readonly-display" id="cart_qty_readonly_{{ loop.index0 }}">
-                                                            <span class="readonly-qty-pill">
-                                                                {{ qty or 0 }} / {{ orig_qty_raw or '0' }}
-                                                            </span>
-                                                            <button type="button"
-                                                                    class="edit-qty-btn"
-                                                                    data-index="{{ loop.index0 }}"
-                                                                    onclick="enableCartQuantityEdit(this.dataset.index)"
-                                                                    title="Edit quantity">
-                                                                <i class="fas fa-edit"></i>
-                                                            </button>
-                                                        </div>
-                                                        {# Editable quantity control with cancel button (hidden by default for items set to 0) #}
-                                                        <div id="cart_qty_editable_wrapper_{{ loop.index0 }}" style="display: none; align-items: center; gap: 8px; justify-content: flex-end;">
-                                                            <div class="quantity-control" id="cart_qty_editable_{{ loop.index0 }}">
-                                                                <button type="button"
-                                                                        class="qty-btn minus"
-                                                                        data-index="{{ loop.index0 }}"
-                                                                        onclick="adjustCartQuantity(this.dataset.index, -1)">
-                                                                    -
-                                                                </button>
-                                                                <input type="number"
-                                                                       name="quantities[]"
-                                                                       id="cart_qty_{{ loop.index0 }}"
-                                                                       min="0"
-                                                                       step="1"
-                                                                       value="{{ qty or 0 }}"
-                                                                       data-index="{{ loop.index0 }}"
-                                                                       data-original-value="{{ qty or 0 }}"
-                                                                       oninput="updateCartQuantityState(this.dataset.index)">
-                                                                <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
-                                                                <button type="button"
-                                                                        class="qty-btn plus"
-                                                                        data-index="{{ loop.index0 }}"
-                                                                        onclick="adjustCartQuantity(this.dataset.index, 1)">
-                                                                    +
-                                                                </button>
-                                                            </div>
-                                                            <button type="button"
-                                                                    class="edit-qty-btn"
-                                                                    data-index="{{ loop.index0 }}"
-                                                                    onclick="cancelCartQuantityEdit(this.dataset.index)"
-                                                                    title="Cancel editing">
-                                                                <i class="fas fa-times"></i>
-                                                            </button>
-                                                        </div>
-                                                        {% else %}
-                                                        {# Normal editable quantity control for non-zero items #}
-                                                        <div class="quantity-control">
-                                                            <button type="button"
-                                                                    class="qty-btn minus"
-                                                                    data-index="{{ loop.index0 }}"
-                                                                    onclick="adjustCartQuantity(this.dataset.index, -1)">
-                                                                -
-                                                            </button>
-                                                            <input type="number"
-                                                                   name="quantities[]"
-                                                                   id="cart_qty_{{ loop.index0 }}"
-                                                                   min="0"
-                                                                   step="1"
-                                                                   value="{{ qty or 0 }}"
-                                                                   data-index="{{ loop.index0 }}"
-                                                                   oninput="updateCartQuantityState(this.dataset.index)">
-                                                            <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
-                                                            <button type="button"
-                                                                    class="qty-btn plus"
-                                                                    data-index="{{ loop.index0 }}"
-                                                                    onclick="adjustCartQuantity(this.dataset.index, 1)">
-                                                                +
-                                                            </button>
-                                                        </div>
-                                                        {% endif %}
-                                                    {% else %}
-                                                    <span class="readonly-qty-pill">
-                                                        {{ qty or '0' }}
-                                                    </span>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                            <div id="cart_note_{{ loop.index0 }}"
-                                                 class="procurement-cart-note {% if proc_qty_num == orig_qty_num %}initially-hidden{% endif %}"
-                                                 style="grid-column: 1 / -1; font-size: 0.85rem; color: #6b7280; margin: 2px 4px 10px 4px;">
-                                                {% if proc_qty_num != orig_qty_num %}
-                                                    Requestor requested for <strong>{{ orig_qty_raw or '0' }}</strong> of this item.
-                                                    You have currently set to <strong>{{ diff_abs }}</strong>
-                                                    {% if diff > 0 %}more{% else %}less{% endif %} than requested.
-                                                {% endif %}
-                                            </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                </div>
-                                
-                                {% if can_complete %}
-                                <div class="step-actions" style="margin-top: 1rem;">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save"></i> Save Quantities
-                                    </button>
-                                </div>
-                                {% endif %}
-                            {% if can_complete %}
-                            </form>
-                            {% endif %}
-                            
-                            <p style="margin-top: 0.75rem; font-size: 0.9rem; color: #6b7280;">
-                                {% if can_complete %}
-                                    Any quantity changes you make here will be visible to all authorized users who can view this item request.
-                                {% else %}
-                                    Quantities shown here are managed by the assigned procurement staff and are read-only for you.
-                                {% endif %}
-                            </p>
-                        </div>
-                    </div>
-                    {% else %}
-                    {# Single-item cart view #}
-                    <div class="card assigned-section procurement-cart-card" style="margin-bottom: 1.5rem;">
-                        <div class="card-header">
-                            <h4><i class="fas fa-shopping-cart"></i> Item Assigned for Procurement</h4>
-                        </div>
-                        <div class="card-body">
-                            <p style="color: #dc3545; font-size: 1rem; font-weight: 500; margin-bottom: 0.85rem;">
-                                <strong>Note:</strong> If the item is not bought, set quantity to <strong>0</strong>.
-                            </p>
-                            {# Use procurement manager-approved quantities (final approved quantities); fall back to manager-approved, then original #}
-                            {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
-                            {% set current_raw = (raw_quantity_source or '').split(';')[0] %}
-                            {% set qty = (current_raw or '').strip() %}
-                            {# Procurement manager-approved quantity for comparison (this is the baseline for assigned procurement) #}
-                            {% set orig_qty_raw = (item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity or '').strip() %}
-                            {% if ';' in orig_qty_raw %}
-                                {% set orig_qty_raw = orig_qty_raw.split(';')[0] %}
-                            {% endif %}
-                            {% set orig_qty_num = orig_qty_raw|int(0) %}
-                            {% set proc_qty_num = qty|int(0) %}
-                            {% set is_less = proc_qty_num < orig_qty_num %}
-                            {% set diff = proc_qty_num - orig_qty_num %}
-                            {% set diff_abs = diff|abs %}
-                            
-                            {# Check if procurement manager set quantity to 0 #}
-                            {% set procurement_manager_qty_raw = '' %}
-                            {% if item_request.procurement_manager_quantities %}
-                                {% set pm_quantity_list = (item_request.procurement_manager_quantities or '').split(';') %}
-                                {% if pm_quantity_list|length > 0 %}
-                                    {% set pm_qty_raw = pm_quantity_list[0] | trim %}
-                                    {% if pm_qty_raw %}
-                                        {% if ':' in pm_qty_raw %}
-                                            {% set pm_parts = pm_qty_raw.split(':', 1) %}
-                                            {% if pm_parts|length > 1 %}
-                                                {% set procurement_manager_qty_raw = pm_parts[1].strip() %}
-                                            {% else %}
-                                                {% set procurement_manager_qty_raw = pm_qty_raw %}
-                                            {% endif %}
-                                        {% else %}
-                                            {% set procurement_manager_qty_raw = pm_qty_raw %}
-                                        {% endif %}
-                                    {% endif %}
-                                {% endif %}
-                            {% endif %}
-                            {% set procurement_manager_qty_num = procurement_manager_qty_raw|int(0) %}
-                            {% set was_set_to_zero_by_procurement_manager = item_request.procurement_manager_quantities and procurement_manager_qty_num == 0 %}
-
-                            {% if can_complete %}
-                            <form method="POST" action="{{ url_for('update_item_request_quantities', request_id=item_request.id) }}">
-                            {% endif %}
-                                <div class="procurement-cart-table">
-                                    <div class="procurement-cart-header-row">
-                                        <div>Item</div>
-                                        <div style="text-align: right;">Quantity</div>
-                                    </div>
-
-                                    <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %} {% if was_set_to_zero_by_procurement_manager %}previously-rejected-by-manager{% endif %}"
-                                         id="cart_row_0"
-                                         data-orig-qty="{{ orig_qty_num }}"
-                                         data-orig-display="{{ orig_qty_raw or '0' }}">
-                                        <div class="procurement-cart-item-name">
-                                            {{ item_request.item_name }}
-                                            {% if was_set_to_zero_by_procurement_manager %}
-                                            <span class="tooltip-wrapper">
-                                                <i class="fas fa-info-circle tooltip-icon"></i>
-                                                <span class="tooltip-text">This item was set to 0 by the Procurement Manager but is kept in case you want to edit it again</span>
-                                            </span>
-                                            {% endif %}
-                                        </div>
-                                        <div class="procurement-cart-qty">
-                                            {% if can_complete %}
-                                                {% if was_set_to_zero_by_procurement_manager %}
-                                                {# Read-only display with edit icon for items set to 0 by procurement manager #}
-                                                <div class="quantity-readonly-display" id="cart_qty_readonly_0">
-                                                    <span class="readonly-qty-pill">
-                                                        {{ qty or 0 }} / {{ orig_qty_raw or '0' }}
-                                                    </span>
-                                                    <button type="button"
-                                                            class="edit-qty-btn"
-                                                            data-index="0"
-                                                            onclick="enableCartQuantityEdit(this.dataset.index)"
-                                                            title="Edit quantity">
-                                                        <i class="fas fa-edit"></i>
-                                                    </button>
-                                                </div>
-                                                {# Editable quantity control with cancel button (hidden by default for items set to 0) #}
-                                                <div id="cart_qty_editable_wrapper_0" style="display: none; align-items: center; gap: 8px; justify-content: flex-end;">
-                                                    <div class="quantity-control" id="cart_qty_editable_0">
-                                                        <button type="button"
-                                                                class="qty-btn minus"
-                                                                onclick="adjustCartQuantity(0, -1)">
-                                                            -
-                                                        </button>
-                                                        <input type="number"
-                                                               name="quantities[]"
-                                                               id="cart_qty_0"
-                                                               min="0"
-                                                               step="1"
-                                                               value="{{ qty or 0 }}"
-                                                               data-index="0"
-                                                               data-original-value="{{ qty or 0 }}"
-                                                               oninput="updateCartQuantityState(0)">
-                                                        <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
-                                                        <button type="button"
-                                                                class="qty-btn plus"
-                                                                onclick="adjustCartQuantity(0, 1)">
-                                                            +
-                                                        </button>
-                                                    </div>
-                                                    <button type="button"
-                                                            class="edit-qty-btn"
-                                                            data-index="0"
-                                                            onclick="cancelCartQuantityEdit(this.dataset.index)"
-                                                            title="Cancel editing">
-                                                        <i class="fas fa-times"></i>
-                                                    </button>
-                                                </div>
-                                                {% else %}
-                                                {# Normal editable quantity control for non-zero items #}
-                                                <div class="quantity-control">
-                                                    <button type="button"
-                                                            class="qty-btn minus"
-                                                            onclick="adjustCartQuantity(0, -1)">
-                                                        -
-                                                    </button>
-                                                    <input type="number"
-                                                           name="quantities[]"
-                                                           id="cart_qty_0"
-                                                           min="0"
-                                                           step="1"
-                                                           value="{{ qty or 0 }}"
-                                                           oninput="updateCartQuantityState(0)">
-                                                    <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
-                                                    <button type="button"
-                                                            class="qty-btn plus"
-                                                            onclick="adjustCartQuantity(0, 1)">
-                                                        +
-                                                    </button>
-                                                </div>
-                                                {% endif %}
-                                            {% else %}
-                                            <span class="readonly-qty-pill">
-                                                {{ qty or '0' }}
-                                            </span>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    <div id="cart_note_0"
-                                         class="procurement-cart-note {% if proc_qty_num == orig_qty_num %}initially-hidden{% endif %}"
-                                         style="grid-column: 1 / -1; font-size: 0.85rem; color: #6b7280; margin: 2px 4px 10px 4px;">
-                                        {% if proc_qty_num != orig_qty_num %}
-                                            Requestor requested for <strong>{{ orig_qty_raw or '0' }}</strong> of this item.
-                                            You have currently set to <strong>{{ diff_abs }}</strong>
-                                            {% if diff > 0 %}more{% else %}less{% endif %} than requested.
-                                        {% endif %}
-                                    </div>
-                                </div>
-
-                                {% if can_complete %}
-                                <div class="step-actions" style="margin-top: 1rem;">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save"></i> Save Quantity
-                                    </button>
-                                </div>
-                                {% endif %}
-                            {% if can_complete %}
-                            </form>
-                            {% endif %}
-
-                            <p style="margin-top: 0.75rem; font-size: 0.9rem; color: #6b7280;">
-                                {% if can_complete %}
-                                    Any quantity changes you make here will be visible to all authorized users who can view this item request.
-                                {% else %}
-                                    Quantity shown here is managed by the assigned procurement staff and is read-only for you.
-                                {% endif %}
-                            </p>
-                        </div>
-                    </div>
-                    {% endif %}
-                {% endif %}
+                {# Items Assigned section moved to Billing and Completion section #}
 
                 {# Button to assign request to self (only if not already assigned and user is procurement staff) #}
                 {% if not item_request.assigned_to_user_id and user.department == 'Procurement' and user.role not in ['GM', 'Operation Manager'] %}
@@ -2892,92 +2620,386 @@
                 {% if can_complete %}
                     <div class="card your-approval-required">
                         <div class="card-header">
-                            <h4><i class="fas fa-check-circle"></i> Mark Request as Completed</h4>
+                            <h4><i class="fas fa-check-circle"></i> Billing and Completion</h4>
                             <p>Complete this item request once the item has been procured and delivered.</p>
                         </div>
                         <div class="card-body">
-                            <form method="POST" action="{{ url_for('item_request_complete', request_id=item_request.id) }}" enctype="multipart/form-data" id="item-request-complete-form">
-                                <div class="form-group">
-                                    <p style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem;">
-                                        <strong>Upload Receipt:</strong> This is for the proof of transfer made by the Procurement Manager to the assigned procurement staff member (see Assignment Details section above).
-                                    </p>
-                                    <div id="item-receipt-upload-container" 
-                                         data-multiple-file-upload
-                                         data-input-name="receipt_files"
-                                         data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                                         data-max-size="10485760"
-                                         data-max-files="10"
-                                         data-required="true"
-                                         data-label="Upload Receipt"
-                                         data-help-text="Required for Finance Admin approval (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)">
+                            <div class="billing-completion-grid" style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 30px; margin: 0;">
+                                {# Left Column: Receipt, Invoice, and Completion Notes #}
+                                <div style="padding-right: 15px;">
+                                    <form method="POST" action="{{ url_for('item_request_complete', request_id=item_request.id) }}" enctype="multipart/form-data" id="item-request-complete-form">
+                                        <div class="form-group">
+                                            <div id="item-receipt-upload-container" 
+                                                 data-multiple-file-upload
+                                                 data-input-name="receipt_files"
+                                                 data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                                 data-max-size="10485760"
+                                                 data-max-files="10"
+                                                 data-required="true"
+                                                 data-label="Upload Receipt"
+                                                 data-help-text="PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each">
+                                            </div>
+                                            <script>
+                                                (function() {
+                                                    function positionTooltip(tooltipWrapper) {
+                                                        var icon = tooltipWrapper.querySelector('.tooltip-icon');
+                                                        var tooltip = tooltipWrapper.querySelector('.tooltip-text');
+                                                        if (icon && tooltip) {
+                                                            var iconRect = icon.getBoundingClientRect();
+                                                            tooltip.style.left = (iconRect.left + iconRect.width / 2) + 'px';
+                                                            tooltip.style.top = (iconRect.top - tooltip.offsetHeight - 8) + 'px';
+                                                        }
+                                                    }
+                                                    
+                                                    function addInfoIcon() {
+                                                        var container = document.getElementById('item-receipt-upload-container');
+                                                        if (container) {
+                                                            var label = container.querySelector('label');
+                                                            if (label && !label.querySelector('.receipt-info-icon')) {
+                                                                var tooltipWrapper = document.createElement('span');
+                                                                tooltipWrapper.className = 'tooltip-wrapper receipt-info-icon';
+                                                                tooltipWrapper.style.marginLeft = '8px';
+                                                                tooltipWrapper.innerHTML = '<i class="fas fa-info-circle tooltip-icon" style="color: #17a2b8;"></i><span class="tooltip-text">This is for the proof of transfer made by the Procurement Manager to the assigned procurement staff member.</span>';
+                                                                label.appendChild(tooltipWrapper);
+                                                                
+                                                                // Position tooltip on hover
+                                                                tooltipWrapper.addEventListener('mouseenter', function() {
+                                                                    positionTooltip(tooltipWrapper);
+                                                                });
+                                                                
+                                                                // Reposition on scroll/resize
+                                                                window.addEventListener('scroll', function() {
+                                                                    if (tooltipWrapper.querySelector('.tooltip-text').style.visibility === 'visible') {
+                                                                        positionTooltip(tooltipWrapper);
+                                                                    }
+                                                                });
+                                                                
+                                                                return true;
+                                                            }
+                                                        }
+                                                        return false;
+                                                    }
+                                                    
+                                                    // Try immediately
+                                                    if (!addInfoIcon()) {
+                                                        // If not found, try multiple times
+                                                        var attempts = 0;
+                                                        var interval = setInterval(function() {
+                                                            attempts++;
+                                                            if (addInfoIcon() || attempts > 20) {
+                                                                clearInterval(interval);
+                                                            }
+                                                        }, 100);
+                                                    }
+                                                })();
+                                            </script>
+                                        </div>
+
+                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                            <div class="form-group" style="margin-bottom: 0;">
+                                                <label for="completion_receipt_amount">Receipt Amount (OMR) <span style="color: red;">*</span></label>
+                                                <input type="number"
+                                                       name="receipt_amount"
+                                                       id="completion_receipt_amount"
+                                                       class="form-control"
+                                                       step="0.001"
+                                                       min="0"
+                                                       placeholder="Enter amount transferred to procurement staff in OMR"
+                                                       value="{% if item_request.receipt_amount is not none %}{{ '%.3f'|format(item_request.receipt_amount) }}{% endif %}"
+                                                       required>
+                                            </div>
+
+                                            <div class="form-group" style="margin-bottom: 0;">
+                                                <label for="completion_receipt_reference_number">Receipt Reference Number <span style="color: red;">*</span></label>
+                                                <input type="text"
+                                                       name="receipt_reference_number"
+                                                       id="completion_receipt_reference_number"
+                                                       class="form-control"
+                                                       placeholder="Enter the bank transfer or receipt reference number (letters and numbers only)"
+                                                       pattern="[A-Za-z0-9]+"
+                                                       oninput="this.value = this.value.replace(/[^a-zA-Z0-9]/g, '')"
+                                                       value="{{ item_request.receipt_reference_number or '' }}"
+                                                       required>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="form-group" style="margin-top: 2.5rem;">
+                                            <div id="item-invoice-upload-container" 
+                                                 data-multiple-file-upload
+                                                 data-input-name="invoice_files"
+                                                 data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                                 data-max-size="10485760"
+                                                 data-max-files="10"
+                                                 data-required="true"
+                                                 data-label="Upload Invoice"
+                                                 data-help-text="PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each">
+                                            </div>
+                                            <script>
+                                                (function() {
+                                                    function positionTooltip(tooltipWrapper) {
+                                                        var icon = tooltipWrapper.querySelector('.tooltip-icon');
+                                                        var tooltip = tooltipWrapper.querySelector('.tooltip-text');
+                                                        if (icon && tooltip) {
+                                                            var iconRect = icon.getBoundingClientRect();
+                                                            tooltip.style.left = (iconRect.left + iconRect.width / 2) + 'px';
+                                                            tooltip.style.top = (iconRect.top - tooltip.offsetHeight - 8) + 'px';
+                                                        }
+                                                    }
+                                                    
+                                                    function addInfoIcon() {
+                                                        var container = document.getElementById('item-invoice-upload-container');
+                                                        if (container) {
+                                                            var label = container.querySelector('label');
+                                                            if (label && !label.querySelector('.invoice-info-icon')) {
+                                                                var tooltipWrapper = document.createElement('span');
+                                                                tooltipWrapper.className = 'tooltip-wrapper invoice-info-icon';
+                                                                tooltipWrapper.style.marginLeft = '8px';
+                                                                tooltipWrapper.innerHTML = '<i class="fas fa-info-circle tooltip-icon" style="color: #17a2b8;"></i><span class="tooltip-text">This is for the proof of payment made for the requested item.</span>';
+                                                                label.appendChild(tooltipWrapper);
+                                                                
+                                                                // Position tooltip on hover
+                                                                tooltipWrapper.addEventListener('mouseenter', function() {
+                                                                    positionTooltip(tooltipWrapper);
+                                                                });
+                                                                
+                                                                // Reposition on scroll/resize
+                                                                window.addEventListener('scroll', function() {
+                                                                    if (tooltipWrapper.querySelector('.tooltip-text').style.visibility === 'visible') {
+                                                                        positionTooltip(tooltipWrapper);
+                                                                    }
+                                                                });
+                                                                
+                                                                return true;
+                                                            }
+                                                        }
+                                                        return false;
+                                                    }
+                                                    
+                                                    // Try immediately
+                                                    if (!addInfoIcon()) {
+                                                        // If not found, try multiple times
+                                                        var attempts = 0;
+                                                        var interval = setInterval(function() {
+                                                            attempts++;
+                                                            if (addInfoIcon() || attempts > 20) {
+                                                                clearInterval(interval);
+                                                            }
+                                                        }, 100);
+                                                    }
+                                                })();
+                                            </script>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="completion_invoice_amount">Invoice Amount (OMR) <span style="color: red;">*</span></label>
+                                            <input type="number"
+                                                   name="invoice_amount"
+                                                   id="completion_invoice_amount"
+                                                   class="form-control"
+                                                   step="0.001"
+                                                   min="0"
+                                                   placeholder="Enter invoice amount paid to supplier in OMR"
+                                                   value="{% if item_request.invoice_amount is not none %}{{ '%.3f'|format(item_request.invoice_amount) }}{% endif %}"
+                                                   required>
+                                        </div>
+                                        
+                                        <div class="form-group">
+                                            <label for="completion_notes">Completion Notes (Optional)</label>
+                                            <textarea name="completion_notes" id="completion_notes" rows="3" placeholder="Add any notes about the completion..."></textarea>
+                                        </div>
+                                        
+                                        <div class="step-actions">
+                                            <button type="submit" class="btn btn-success">
+                                                <i class="fas fa-check"></i> Mark as Completed
+                                            </button>
+                                        </div>
+                                    </form>
+                                    </div>
+                                    
+                                    {# Right Column: Items Assigned for Procurement #}
+                                    <div>
+                                        {% if item_request.item_name %}
+                                            <div class="form-group">
+                                                <p style="color: #dc3545; font-size: 1rem; font-weight: 500; margin-bottom: 0.85rem;">
+                                                    <strong>Note:</strong> If the item is not bought, set quantity to <strong>0</strong>.
+                                                </p>
+                                        {% if ',' in item_request.item_name %}
+                                            {# Multi-item request #}
+                                            {% set item_list = item_request.item_name.split(',') %}
+                                            {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                                            {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
+                                            {% set original_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                                            {% set original_list = (original_source or '').split(';') if original_source else [] %}
+                                            
+                                            {% if can_complete %}
+                                            <form method="POST" action="{{ url_for('update_item_request_quantities', request_id=item_request.id) }}" style="margin-bottom: 1rem;" novalidate>
+                                            {% endif %}
+                                                <div class="procurement-cart-table">
+                                                    <div class="procurement-cart-header-row">
+                                                        <div>Item</div>
+                                                        <div style="text-align: left;">Quantity</div>
+                                                        <div style="text-align: right;">Amount</div>
+                                                    </div>
+                                                    
+                                                    {% for item in item_list %}
+                                                        {% set item_trimmed = item.strip() %}
+                                                        {% if item_trimmed %}
+                                                            {% set qty = '' %}
+                                                            {% if loop.index0 < quantity_list|length %}
+                                                                {% set qty_raw = quantity_list[loop.index0] | trim %}
+                                                                {% if qty_raw %}
+                                                                    {% if ':' in qty_raw %}
+                                                                        {% set parts = qty_raw.split(':', 1) %}
+                                                                        {% if parts|length > 1 %}
+                                                                            {% set qty = parts[1].strip() %}
+                                                                        {% else %}
+                                                                            {% set qty = qty_raw %}
+                                                                        {% endif %}
+                                                                    {% else %}
+                                                                        {% set qty = qty_raw %}
+                                                                    {% endif %}
+                                                                {% endif %}
+                                                            {% endif %}
+                                                            {% set orig_qty_raw = '' %}
+                                                            {% if loop.index0 < original_list|length %}
+                                                                {% set oq = original_list[loop.index0] | trim %}
+                                                                {% if oq %}
+                                                                    {% if ':' in oq %}
+                                                                        {% set o_parts = oq.split(':', 1) %}
+                                                                        {% if o_parts|length > 1 %}
+                                                                            {% set orig_qty_raw = o_parts[1].strip() %}
+                                                                        {% else %}
+                                                                            {% set orig_qty_raw = oq %}
+                                                                        {% endif %}
+                                                                    {% else %}
+                                                                        {% set orig_qty_raw = oq %}
+                                                                    {% endif %}
+                                                                {% endif %}
+                                                            {% endif %}
+                                                            {% set orig_qty_num = orig_qty_raw|int(0) %}
+                                                            {% set proc_qty_num = qty|int(0) %}
+                                                            {% set is_less = proc_qty_num < orig_qty_num %}
+                                                            
+                                                            <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %}" 
+                                                                 id="cart_row_{{ loop.index0 }}"
+                                                                 data-orig-qty="{{ orig_qty_num }}"
+                                                                 data-orig-display="{{ orig_qty_raw or '0' }}">
+                                                                <div class="procurement-cart-item-name">{{ item_trimmed }}</div>
+                                                                <div class="procurement-cart-qty">
+                                                                    {% if can_complete %}
+                                                                        <div class="quantity-control">
+                                                                            <button type="button" class="qty-btn minus" data-index="{{ loop.index0 }}" onclick="adjustCartQuantity(this.dataset.index, -1)">-</button>
+                                                                            <input type="number" name="quantities[]" id="cart_qty_{{ loop.index0 }}" min="0" step="1" value="{{ qty or 0 }}" data-index="{{ loop.index0 }}" oninput="updateCartQuantityState(this.dataset.index)">
+                                                                            <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
+                                                                            <button type="button" class="qty-btn plus" data-index="{{ loop.index0 }}" onclick="adjustCartQuantity(this.dataset.index, 1)">+</button>
+                                                                        </div>
+                                                                    {% else %}
+                                                                        <span class="readonly-qty-pill">{{ qty or '0' }}</span>
+                                                                    {% endif %}
+                                                                </div>
+                                                                <div class="procurement-cart-amount">
+                                                                    {% if can_complete %}
+                                                                        <input type="number" name="amounts[]" id="cart_amount_{{ loop.index0 }}" min="0" step="0.001" value="0" data-index="{{ loop.index0 }}">
+                                                                    {% else %}
+                                                                        <span class="readonly-qty-pill">0</span>
+                                                                    {% endif %}
+                                                                </div>
+                                                            </div>
+                                                            <div id="cart_note_{{ loop.index0 }}"
+                                                                 class="procurement-cart-note {% if proc_qty_num == orig_qty_num %}initially-hidden{% endif %}"
+                                                                 style="grid-column: 1 / -1; font-size: 0.85rem; color: #6b7280; margin: 2px 4px 10px 4px; {% if proc_qty_num == orig_qty_num %}display: none;{% endif %}">
+                                                                {% if proc_qty_num != orig_qty_num %}
+                                                                    Requestor requested for <strong>{{ orig_qty_raw or '0' }}</strong> of this item.
+                                                                    You have currently set to <strong>{{ (proc_qty_num - orig_qty_num)|abs }}</strong>
+                                                                    {% if proc_qty_num > orig_qty_num %}more{% else %}less{% endif %} than requested.
+                                                                {% endif %}
+                                                            </div>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </div>
+                                                
+                                                {% if can_complete %}
+                                                <div class="step-actions" style="margin-top: 1rem;">
+                                                    <button type="button" class="btn btn-success save-quantities-amounts-btn">
+                                                        <i class="fas fa-save"></i> Save Quantities & Amounts
+                                                    </button>
+                                                </div>
+                                                {% endif %}
+                                            {% if can_complete %}
+                                            </form>
+                                            {% endif %}
+                                        {% else %}
+                                            {# Single-item request #}
+                                            {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                                            {% set current_raw = (raw_quantity_source or '').split(';')[0] %}
+                                            {% set qty = (current_raw or '').strip() %}
+                                            {% set orig_qty_raw = (item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity or '').strip() %}
+                                            {% if ';' in orig_qty_raw %}
+                                                {% set orig_qty_raw = orig_qty_raw.split(';')[0] %}
+                                            {% endif %}
+                                            {% set orig_qty_num = orig_qty_raw|int(0) %}
+                                            {% set proc_qty_num = qty|int(0) %}
+                                            {% set is_less = proc_qty_num < orig_qty_num %}
+                                            
+                                            {% if can_complete %}
+                                            <form method="POST" action="{{ url_for('update_item_request_quantities', request_id=item_request.id) }}" style="margin-bottom: 1rem;" novalidate>
+                                            {% endif %}
+                                                <div class="procurement-cart-table">
+                                                    <div class="procurement-cart-header-row">
+                                                        <div>Item</div>
+                                                        <div style="text-align: left;">Quantity</div>
+                                                        <div style="text-align: right;">Amount</div>
+                                                    </div>
+                                                    <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %}" 
+                                                         id="cart_row_0"
+                                                         data-orig-qty="{{ orig_qty_num }}"
+                                                         data-orig-display="{{ orig_qty_raw or '0' }}">
+                                                        <div class="procurement-cart-item-name">{{ item_request.item_name }}</div>
+                                                        <div class="procurement-cart-qty">
+                                                            {% if can_complete %}
+                                                                <div class="quantity-control">
+                                                                    <button type="button" class="qty-btn minus" onclick="adjustCartQuantity(0, -1)">-</button>
+                                                                    <input type="number" name="quantities[]" id="cart_qty_0" min="0" step="1" value="{{ qty or 0 }}" data-index="0" oninput="updateCartQuantityState(0)">
+                                                                    <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
+                                                                    <button type="button" class="qty-btn plus" onclick="adjustCartQuantity(0, 1)">+</button>
+                                                                </div>
+                                                            {% else %}
+                                                                <span class="readonly-qty-pill">{{ qty or '0' }}</span>
+                                                            {% endif %}
+                                                        </div>
+                                                        <div class="procurement-cart-amount">
+                                                            {% if can_complete %}
+                                                                <input type="number" name="amounts[]" id="cart_amount_0" min="0" step="0.001" value="0" data-index="0">
+                                                            {% else %}
+                                                                <span class="readonly-qty-pill">0</span>
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                    <div id="cart_note_0"
+                                                         class="procurement-cart-note {% if proc_qty_num == orig_qty_num %}initially-hidden{% endif %}"
+                                                         style="grid-column: 1 / -1; font-size: 0.85rem; color: #6b7280; margin: 2px 4px 10px 4px; {% if proc_qty_num == orig_qty_num %}display: none;{% endif %}">
+                                                        {% if proc_qty_num != orig_qty_num %}
+                                                            Requestor requested for <strong>{{ orig_qty_raw or '0' }}</strong> of this item.
+                                                            You have currently set to <strong>{{ (proc_qty_num - orig_qty_num)|abs }}</strong>
+                                                            {% if proc_qty_num > orig_qty_num %}more{% else %}less{% endif %} than requested.
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                                
+                                                {% if can_complete %}
+                                                <div class="step-actions" style="margin-top: 1rem;">
+                                                    <button type="button" class="btn btn-primary save-quantities-amounts-btn">
+                                                        <i class="fas fa-save"></i> Save Quantity
+                                                    </button>
+                                                </div>
+                                                {% endif %}
+                                            {% if can_complete %}
+                                            </form>
+                                            {% endif %}
+                                        {% endif %}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 </div>
-
-                                <div class="form-group">
-                                    <label for="completion_receipt_amount">Receipt Amount (OMR) <span style="color: red;">*</span></label>
-                                    <input type="number"
-                                           name="receipt_amount"
-                                           id="completion_receipt_amount"
-                                           class="form-control"
-                                           step="0.001"
-                                           min="0"
-                                           placeholder="Enter amount transferred to procurement staff in OMR"
-                                           value="{% if item_request.receipt_amount is not none %}{{ '%.3f'|format(item_request.receipt_amount) }}{% endif %}"
-                                           required>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="completion_receipt_reference_number">Receipt Reference Number <span style="color: red;">*</span></label>
-                                    <input type="text"
-                                           name="receipt_reference_number"
-                                           id="completion_receipt_reference_number"
-                                           class="form-control"
-                                           placeholder="Enter the bank transfer or receipt reference number (letters and numbers only)"
-                                           pattern="[A-Za-z0-9]+"
-                                           oninput="this.value = this.value.replace(/[^a-zA-Z0-9]/g, '')"
-                                           value="{{ item_request.receipt_reference_number or '' }}"
-                                           required>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <p style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem;">
-                                        <strong>Upload Invoice:</strong> This is for the proof of payment made for the requested item.
-                                    </p>
-                                    <div id="item-invoice-upload-container" 
-                                         data-multiple-file-upload
-                                         data-input-name="invoice_files"
-                                         data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                                         data-max-size="10485760"
-                                         data-max-files="10"
-                                         data-required="true"
-                                         data-label="Upload Invoice"
-                                         data-help-text="Required for Finance Admin approval (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)">
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="completion_invoice_amount">Invoice Amount (OMR) <span style="color: red;">*</span></label>
-                                    <input type="number"
-                                           name="invoice_amount"
-                                           id="completion_invoice_amount"
-                                           class="form-control"
-                                           step="0.001"
-                                           min="0"
-                                           placeholder="Enter invoice amount paid to supplier in OMR"
-                                           value="{% if item_request.invoice_amount is not none %}{{ '%.3f'|format(item_request.invoice_amount) }}{% endif %}"
-                                           required>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="completion_notes">Completion Notes (Optional)</label>
-                                    <textarea name="completion_notes" id="completion_notes" rows="3" placeholder="Add any notes about the completion..."></textarea>
-                                </div>
-                                
-                                <div class="step-actions">
-                                    <button type="submit" class="btn btn-success">
-                                        <i class="fas fa-check"></i> Mark as Completed
-                                    </button>
-                                </div>
-                            </form>
                         </div>
                     </div>
                 {% endif %}
@@ -3270,6 +3292,11 @@ document.addEventListener('DOMContentLoaded', function() {
             this.classList.add('active');
             document.getElementById(`step-${step}`).classList.add('active');
             
+            // Update URL to preserve tab state on refresh
+            const url = new URL(window.location);
+            url.searchParams.set('tab', step);
+            window.history.pushState({}, '', url);
+            
             // Show/hide request details section based on active tab
             const requestDetailsSection = document.querySelector('.request-details-section');
             if (requestDetailsSection) {
@@ -3282,16 +3309,26 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Check for URL parameter to set initial active tab
+    // Check for URL parameter to set initial active tab (preserves tab state on refresh)
     const urlParams = new URLSearchParams(window.location.search);
-    const requestedTab = urlParams.get('tab');
+    let requestedTab = urlParams.get('tab');
+    
+    // If no tab parameter and status is "Assigned to Procurement", default to assigned tab
+    const requestStatus = document.querySelector('.dashboard-container.view-request-page')?.getAttribute('data-request-status');
+    if (!requestedTab && requestStatus === 'Assigned to Procurement') {
+        requestedTab = 'assigned';
+        // Update URL to include the tab parameter
+        const url = new URL(window.location);
+        url.searchParams.set('tab', 'assigned');
+        window.history.replaceState({}, '', url);
+    }
+    
+    // Always remove active class from all tabs and contents first (to clear default)
+    stepTabs.forEach(t => t.classList.remove('active'));
+    stepContents.forEach(c => c.classList.remove('active'));
     
     if (requestedTab) {
-        // Remove active class from all tabs and contents
-        stepTabs.forEach(t => t.classList.remove('active'));
-        stepContents.forEach(c => c.classList.remove('active'));
-        
-        // Activate the requested tab
+        // Activate the requested tab from URL parameter
         const requestedTabElement = document.querySelector(`[data-step="${requestedTab}"]`);
         const requestedContent = document.getElementById(`step-${requestedTab}`);
         
@@ -3308,6 +3345,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     requestDetailsSection.style.display = 'none';
                 }
             }
+        } else {
+            // If requested tab is invalid or disabled, fall back to default (submit)
+            const defaultTab = document.querySelector('[data-step="submit"]');
+            const defaultContent = document.getElementById('step-submit');
+            if (defaultTab && defaultContent) {
+                defaultTab.classList.add('active');
+                defaultContent.classList.add('active');
+            }
+        }
+    } else {
+        // No URL parameter - use default (submit tab is already active in HTML)
+        const defaultTab = document.querySelector('[data-step="submit"]');
+        const defaultContent = document.getElementById('step-submit');
+        if (defaultTab && defaultContent) {
+            defaultTab.classList.add('active');
+            defaultContent.classList.add('active');
         }
     }
     
@@ -3317,34 +3370,106 @@ document.addEventListener('DOMContentLoaded', function() {
         // Store original values for assigned procurement quantities before adding validation
         ensureOriginalValuesStored();
         
+        // Store original button HTML
+        const submitButton = itemRequestCompleteForm.querySelector('button[type="submit"]');
+        let originalButtonHTML = submitButton ? submitButton.innerHTML : '';
+        
         itemRequestCompleteForm.addEventListener('submit', function(e) {
+            // Function to reset button state
+            const resetButton = () => {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonHTML;
+                }
+            };
+            
+            // ALWAYS prevent default first
+            e.preventDefault();
+            
             // Check for unsaved quantity edits first
             if (hasUnsavedQuantityEdits()) {
-                e.preventDefault();
+                resetButton();
                 showQuantityEditErrorDialog();
                 return false;
             }
-            
-            e.preventDefault();
             
             // Get both upload components
             const receiptContainer = document.getElementById('item-receipt-upload-container');
             const invoiceContainer = document.getElementById('item-invoice-upload-container');
             
+            // Validate receipt files
+            if (receiptContainer && receiptContainer.uploadComponent) {
+                const receiptComponent = receiptContainer.uploadComponent;
+                if (receiptComponent.getFiles().length === 0) {
+                    resetButton();
+                    showReceiptUploadErrorDialog('Please select at least one receipt file to upload.');
+                    return false;
+                }
+            } else {
+                // Fallback: check if receipt file input exists and has files
+                const receiptFileInput = this.querySelector('input[name="receipt_files"]');
+                if (!receiptFileInput || !receiptFileInput.files || receiptFileInput.files.length === 0) {
+                    resetButton();
+                    showReceiptUploadErrorDialog('Please select at least one receipt file to upload.');
+                    return false;
+                }
+            }
+            
+            // Validate invoice files
+            if (invoiceContainer && invoiceContainer.uploadComponent) {
+                const invoiceComponent = invoiceContainer.uploadComponent;
+                if (invoiceComponent.getFiles().length === 0) {
+                    resetButton();
+                    showReceiptUploadErrorDialog('Please select at least one invoice file to upload.');
+                    return false;
+                }
+            } else {
+                // Fallback: check if invoice file input exists and has files
+                const invoiceFileInput = this.querySelector('input[name="invoice_files"]');
+                if (!invoiceFileInput || !invoiceFileInput.files || invoiceFileInput.files.length === 0) {
+                    resetButton();
+                    showReceiptUploadErrorDialog('Please select at least one invoice file to upload.');
+                    return false;
+                }
+            }
+            
+            // Validate receipt amount - must be > 0
+            const receiptAmountInput = this.querySelector('input[name="receipt_amount"]');
+            if (receiptAmountInput) {
+                const receiptAmount = parseFloat(receiptAmountInput.value);
+                if (isNaN(receiptAmount) || receiptAmount <= 0) {
+                    resetButton();
+                    showReceiptUploadErrorDialog('Receipt Amount must be greater than 0.');
+                    return false;
+                }
+            }
+            
+            // Validate receipt reference number - must not be empty
+            const receiptRefInput = this.querySelector('input[name="receipt_reference_number"]');
+            if (receiptRefInput) {
+                const receiptRef = receiptRefInput.value.trim();
+                if (!receiptRef || receiptRef === '') {
+                    resetButton();
+                    showReceiptUploadErrorDialog('Receipt Reference Number is required.');
+                    return false;
+                }
+            }
+            
+            // Validate invoice amount - must be > 0
+            const invoiceAmountInput = this.querySelector('input[name="invoice_amount"]');
+            if (invoiceAmountInput) {
+                const invoiceAmount = parseFloat(invoiceAmountInput.value);
+                if (isNaN(invoiceAmount) || invoiceAmount <= 0) {
+                    resetButton();
+                    showReceiptUploadErrorDialog('Invoice Amount must be greater than 0.');
+                    return false;
+                }
+            }
+            
+            // All validations passed - proceed with submission
             if (receiptContainer && receiptContainer.uploadComponent && invoiceContainer && invoiceContainer.uploadComponent) {
                 const receiptComponent = receiptContainer.uploadComponent;
                 const invoiceComponent = invoiceContainer.uploadComponent;
-                
-                // Validate that both have files (both are required)
-                if (receiptComponent.getFiles().length === 0) {
-                    alert('Please select at least one receipt file to upload.');
-                    return;
-                }
-                
-                if (invoiceComponent.getFiles().length === 0) {
-                    alert('Please select at least one invoice file to upload.');
-                    return;
-                }
                 
                 // Prepare form data with all selected files
                 const formData = new FormData(this);
@@ -3360,11 +3485,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (response.ok) {
                         window.location.href = window.location.href;
                     } else {
+                        resetButton();
                         console.error('Form submission failed');
                         alert('Form submission failed. Please try again.');
                     }
                 })
                 .catch(error => {
+                    resetButton();
                     console.error('Error:', error);
                     alert('An error occurred. Please try again.');
                 });
@@ -3836,6 +3963,115 @@ function closeQuantityEditErrorDialog() {
         errorModal.style.display = 'none';
         document.body.classList.remove('flash-error-open');
     }
+    
+    // Reset Mark as Completed button state if it was changed to PROCESSING
+    const itemRequestCompleteForm = document.getElementById('item-request-complete-form');
+    if (itemRequestCompleteForm) {
+        const submitButton = itemRequestCompleteForm.querySelector('button[type="submit"]');
+        if (submitButton && submitButton.innerHTML.includes('Processing')) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = '<i class="fas fa-check"></i> Mark as Completed';
+        }
+    }
+}
+
+// Function to show amount validation error dialog
+function showAmountValidationErrorDialog() {
+    // Create error modal if it doesn't exist
+    let errorModal = document.getElementById('amount-validation-error-modal');
+    if (!errorModal) {
+        errorModal = document.createElement('div');
+        errorModal.id = 'amount-validation-error-modal';
+        errorModal.className = 'flash-error-modal';
+        errorModal.style.display = 'flex';
+        errorModal.innerHTML = `
+            <div class="flash-error-backdrop"></div>
+            <div class="flash-error-dialog">
+                <h3 class="flash-error-title"><i class="fas fa-exclamation-circle"></i> Error</h3>
+                <div class="flash-error-body">
+                    Please fill in all amount fields before saving quantities and amounts.
+                </div>
+                <div class="flash-error-actions">
+                    <button type="button" class="flash-error-ok-btn" onclick="closeAmountValidationErrorDialog()">OK</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(errorModal);
+        document.body.classList.add('flash-error-open');
+    } else {
+        errorModal.style.display = 'flex';
+        document.body.classList.add('flash-error-open');
+    }
+}
+
+// Function to close amount validation error dialog
+function closeAmountValidationErrorDialog() {
+    const errorModal = document.getElementById('amount-validation-error-modal');
+    if (errorModal) {
+        errorModal.style.display = 'none';
+        document.body.classList.remove('flash-error-open');
+    }
+    
+    // Reset Mark as Completed button state if it was changed to PROCESSING
+    const itemRequestCompleteForm = document.getElementById('item-request-complete-form');
+    if (itemRequestCompleteForm) {
+        const submitButton = itemRequestCompleteForm.querySelector('button[type="submit"]');
+        if (submitButton && submitButton.innerHTML.includes('Processing')) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = '<i class="fas fa-check"></i> Mark as Completed';
+        }
+    }
+}
+
+// Function to show receipt upload error dialog (matches server-side flash error modal exactly)
+function showReceiptUploadErrorDialog(message) {
+    // Remove any existing receipt upload error modal
+    const existingModal = document.getElementById('receipt-upload-error-modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Create new error modal matching the EXACT structure of server-side flash-error-modal from base.html
+    const errorModal = document.createElement('div');
+    errorModal.id = 'receipt-upload-error-modal';
+    errorModal.className = 'flash-error-modal';
+    errorModal.style.display = 'flex';
+    
+    // Match the exact HTML structure from base.html line 272-282
+    errorModal.innerHTML = `
+        <div class="flash-error-backdrop"></div>
+        <div class="flash-error-dialog">
+            <h3 class="flash-error-title"><i class="fas fa-exclamation-circle"></i> Error</h3>
+            <div class="flash-error-body">
+                ${message}
+            </div>
+            <div class="flash-error-actions">
+                <button type="button" class="flash-error-ok-btn" onclick="closeReceiptUploadErrorDialog()">OK</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(errorModal);
+    document.body.classList.add('flash-error-open');
+}
+
+// Function to close receipt upload error dialog
+function closeReceiptUploadErrorDialog() {
+    const errorModal = document.getElementById('receipt-upload-error-modal');
+    if (errorModal) {
+        errorModal.style.display = 'none';
+        document.body.classList.remove('flash-error-open');
+    }
+    
+    // Reset Mark as Completed button state if it was changed to PROCESSING
+    const itemRequestCompleteForm = document.getElementById('item-request-complete-form');
+    if (itemRequestCompleteForm) {
+        const submitButton = itemRequestCompleteForm.querySelector('button[type="submit"]');
+        if (submitButton && submitButton.innerHTML.includes('Processing')) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = '<i class="fas fa-check"></i> Mark as Completed';
+        }
+    }
 }
 
 // Function to check if there are unsaved quantity edits
@@ -4026,15 +4262,120 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        form.addEventListener('submit', function(e) {
-            // Update original values after successful save
-            const quantityInputs = this.querySelectorAll('input[name="quantities[]"]');
+        // Validation function that can be called from both form submit and button click
+        const validateAndSubmit = function(formElement) {
+            // Validate that all amount fields are filled (only requirement for this form)
+            const amountInputs = formElement.querySelectorAll('input[name="amounts[]"]');
+            
+            // If no amount inputs exist, this form doesn't need amount validation
+            // But if amount inputs DO exist, they MUST all be > 0
+            if (amountInputs.length > 0) {
+                // Check each amount input - must be > 0
+                let hasEmptyAmount = false;
+                let firstInvalidInput = null;
+                
+                amountInputs.forEach(input => {
+                    // For number inputs, get the value as string
+                    const valueStr = String(input.value || '').trim();
+                    const amount = parseFloat(valueStr);
+                    
+                    // Check if empty, "0", NaN, or <= 0 - ANY of these means invalid
+                    const isEmpty = valueStr === '';
+                    const isZero = valueStr === '0';
+                    const isNaNValue = isNaN(amount);
+                    const isNotPositive = amount <= 0;
+                    
+                    if (isEmpty || isZero || isNaNValue || isNotPositive) {
+                        hasEmptyAmount = true;
+                        if (!firstInvalidInput) {
+                            firstInvalidInput = input;
+                        }
+                    }
+                });
+                
+                // If validation fails, show error and STOP - don't submit
+                if (hasEmptyAmount) {
+                    // Focus the first invalid input
+                    if (firstInvalidInput) {
+                        firstInvalidInput.focus();
+                    }
+                    showAmountValidationErrorDialog();
+                    return false; // This prevents form submission
+                }
+            }
+            
+            // Validation passed - update original values
+            const quantityInputs = formElement.querySelectorAll('input[name="quantities[]"]');
             quantityInputs.forEach(input => {
                 const index = input.getAttribute('data-index') || input.id.replace('cart_qty_', '');
                 originalQuantityValues['assigned_' + index] = parseInt(input.value || '0', 10);
             });
-        });
-        break; // Only process the first matching form
+            
+            return true; // Validation passed
+        };
+        
+        // Form submit handler - ALWAYS validates before submission
+        const submitHandler = function(e) {
+            // ALWAYS prevent default form submission first - CRITICAL
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            
+            // Run validation - MUST pass before submission
+            if (!validateAndSubmit(this)) {
+                return false; // Validation failed, STOP - don't submit
+            }
+            
+            // Validation passed - submit using FormData and fetch for full control
+            const formData = new FormData(this);
+            fetch(this.action, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    console.error('Form submission failed');
+                    alert('Form submission failed. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error submitting form:', error);
+                alert('An error occurred. Please try again.');
+            });
+            
+            return false; // Always prevent default submission
+        };
+        
+        // Attach form submit handler with capture phase to run first
+        form.addEventListener('submit', submitHandler, true);
+        
+        // ALSO attach button click handler - button is now type="button" so it won't auto-submit
+        const submitButton = form.querySelector('button.save-quantities-amounts-btn, button[type="submit"]');
+        if (submitButton) {
+            submitButton.addEventListener('click', function(e) {
+                // ALWAYS prevent any default behavior
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                
+                // Run validation - MUST pass before submission
+                if (!validateAndSubmit(form)) {
+                    // Validation failed - STOP, don't submit
+                    return false;
+                }
+                
+                // Validation passed - trigger form submission via the submit handler
+                const syntheticEvent = new Event('submit', {
+                    bubbles: true,
+                    cancelable: true
+                });
+                submitHandler.call(form, syntheticEvent);
+                
+                return false;
+            }, true); // Use capture phase to run first
+        }
     }
     
     // Also store values by checking inputs directly (fallback)
@@ -4217,6 +4558,42 @@ function escapeHtml(s) {
         return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
     });
 }
+
+// Go back to the previous page (item requests list, reports, etc.) with all parameters preserved
+document.addEventListener('DOMContentLoaded', function() {
+    const backButton = document.getElementById('back-to-item-requests-btn');
+    if (backButton) {
+        // Check if return_url parameter is in current URL (explicit return URL)
+        const urlParams = new URLSearchParams(window.location.search);
+        const returnUrl = urlParams.get('return_url');
+        
+        if (returnUrl) {
+            // Use the explicit return_url parameter
+            try {
+                const decodedUrl = decodeURIComponent(returnUrl);
+                backButton.href = decodedUrl;
+            } catch (e) {
+                console.log('Could not decode return_url');
+            }
+        } else if (document.referrer) {
+            // Use the referrer URL if it's from the same origin
+            try {
+                const referrerUrl = new URL(document.referrer);
+                const currentUrl = new URL(window.location.href);
+                
+                // Only use referrer if it's from the same origin (same domain)
+                if (referrerUrl.origin === currentUrl.origin) {
+                    // Use the full referrer URL with all its parameters preserved
+                    backButton.href = document.referrer;
+                }
+            } catch (e) {
+                // If referrer URL parsing fails, use default item requests URL
+                console.log('Could not parse referrer URL');
+            }
+        }
+        // If no referrer or return_url, the button will use the default procurement_item_requests URL
+    }
+});
 
 </script>
 {% endblock %}

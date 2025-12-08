@@ -2832,6 +2832,11 @@ document.addEventListener('DOMContentLoaded', function() {
             this.classList.add('active');
             document.getElementById(`step-${step}`).classList.add('active');
             
+            // Update URL to preserve tab state on refresh
+            const url = new URL(window.location);
+            url.searchParams.set('tab', step);
+            window.history.pushState({}, '', url);
+            
             // Show/hide request details section based on active tab
             const requestDetailsSection = document.querySelector('.request-details-section');
             if (requestDetailsSection) {
@@ -3242,52 +3247,24 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set initial active tab based on request status
     const requestStatus = '{{ request.status }}';
     const requestRecurring = '{{ request.recurring }}';
-    let initialStep = 'submit';
     
-    // Check for URL parameter to override initial step
+    // Check for URL parameter first (preserves tab state on refresh)
     const urlParams = new URLSearchParams(window.location.search);
     const requestedTab = urlParams.get('tab');
     
-    if (requestedTab === 'finance') {
-        initialStep = 'finance';
-    } else if (requestedTab === 'manager') {
-        initialStep = 'manager';
-    } else if (requestedTab === 'submit') {
-        initialStep = 'submit';
-    } else {
-        // Default behavior: go to submit tab
-        initialStep = 'submit';
-        
-        // Exception 1: Assigned managers viewing "Pending Manager Approval" or "On Hold" → Manager tab
-        if ((requestStatus === 'Pending Manager Approval' || requestStatus === 'On Hold') && 
-            ((user.role === 'Department Manager' && user.department === request.department) || 
-             (user.role === 'Operation Manager' && request.department === 'Operation') ||
-             (user.role === 'Finance Admin' && request.department === 'Finance'))) {
-            initialStep = 'manager';
-        }
-        // Exception 1b: Any authorized manager viewing "On Hold" → Manager tab
-        else if (requestStatus === 'On Hold') {
-            initialStep = 'manager';
-        }
-        // Exception 2: Finance admins viewing "Pending Finance Approval" → Finance tab
-        else if (requestStatus === 'Pending Finance Approval' && user.role === 'Finance Admin') {
-            initialStep = 'finance';
-        }
-    }
+    // Always remove active class from all tabs and contents first (to clear default)
+    stepTabs.forEach(t => t.classList.remove('active'));
+    stepContents.forEach(c => c.classList.remove('active'));
     
-    // Activate the appropriate tab
-    const activeTab = document.querySelector(`[data-step="${initialStep}"]`);
-    const activeContent = document.getElementById(`step-${initialStep}`);
-    
-    // Set classes for all tabs based on request status
+    // Set classes for all tabs based on request status (do this before activating tab)
     const submitTab = document.querySelector('[data-step="submit"]');
     const managerTab = document.querySelector('[data-step="manager"]');
     const financeTab = document.querySelector('[data-step="finance"]');
     
-    // Remove all existing classes from all tabs
+    // Remove all existing status classes from all tabs (but keep active removal above)
     [submitTab, managerTab, financeTab].forEach(tab => {
         if (tab) {
-            tab.classList.remove('active', 'completed', 'disabled', 'rejected', 'warning');
+            tab.classList.remove('completed', 'disabled', 'rejected', 'warning');
         }
     });
     
@@ -3296,15 +3273,10 @@ document.addEventListener('DOMContentLoaded', function() {
         submitTab.classList.add('completed');
     }
     
-    // Set manager tab
+    // Set manager tab status classes
     if (managerTab) {
         if (requestStatus === 'Pending Manager Approval' || requestStatus === 'Returned to Manager' || requestStatus === 'On Hold') {
             managerTab.classList.add('warning');
-            // Hide request details section when manager tab is active
-            const requestDetailsSection = document.querySelector('.request-details-section');
-            if (requestDetailsSection) {
-                requestDetailsSection.style.display = 'none';
-            }
         } else if (requestStatus === 'Rejected by Manager') {
             managerTab.classList.add('rejected');
         } else if (['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Completed', 'Recurring'].includes(requestStatus)) {
@@ -3314,46 +3286,65 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Set finance tab
+    // Set finance tab status classes
     if (financeTab) {
-        if (requestedTab === 'finance') {
-            // Force finance tab to be active when requested via URL parameter
-            financeTab.classList.remove('warning', 'completed', 'disabled');
-            financeTab.classList.add('active');
-            
-            // Hide request details section when forcing finance tab
-            const requestDetailsSection = document.querySelector('.request-details-section');
-            if (requestDetailsSection) {
-                requestDetailsSection.style.display = 'none';
-            }
-        } else if (requestStatus === 'Rejected by Finance') {
-            financeTab.classList.remove('warning', 'completed', 'active', 'disabled');
+        if (requestStatus === 'Rejected by Finance') {
             financeTab.classList.add('rejected');
         } else if (['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'].includes(requestStatus)) {
-            financeTab.classList.remove('completed', 'active', 'disabled', 'rejected');
             financeTab.classList.add('warning');
         } else if (['Paid', 'Completed', 'Recurring'].includes(requestStatus)) {
-            financeTab.classList.remove('warning', 'active', 'disabled', 'rejected');
             financeTab.classList.add('completed');
         } else {
-            financeTab.classList.remove('warning', 'active', 'completed', 'rejected');
             financeTab.classList.add('disabled');
         }
     }
     
-    // Set active content and tab
-    if (activeTab && activeContent) {
-        activeTab.classList.add('active');
-        activeContent.classList.add('active');
-    }
-    
-    // Ensure request details section is only visible for submit tab
-    const requestDetailsSection = document.querySelector('.request-details-section');
-    if (requestDetailsSection) {
-        if (initialStep === 'submit') {
-            requestDetailsSection.style.display = 'block';
+    // Now activate the appropriate tab (URL parameter takes precedence)
+    if (requestedTab) {
+        // Activate the requested tab from URL parameter
+        const requestedTabElement = document.querySelector(`[data-step="${requestedTab}"]`);
+        const requestedContent = document.getElementById(`step-${requestedTab}`);
+        
+        if (requestedTabElement && requestedContent) {
+            // Activate even if disabled (user explicitly requested this tab via URL)
+            requestedTabElement.classList.add('active');
+            requestedContent.classList.add('active');
+            
+            // Show/hide request details section based on active tab
+            const requestDetailsSection = document.querySelector('.request-details-section');
+            if (requestDetailsSection) {
+                if (requestedTab === 'submit') {
+                    requestDetailsSection.style.display = 'block';
+                } else {
+                    requestDetailsSection.style.display = 'none';
+                }
+            }
         } else {
-            requestDetailsSection.style.display = 'none';
+            // If requested tab is invalid, fall back to submit tab
+            const defaultTab = document.querySelector('[data-step="submit"]');
+            const defaultContent = document.getElementById('step-submit');
+            if (defaultTab && defaultContent) {
+                defaultTab.classList.add('active');
+                defaultContent.classList.add('active');
+                
+                const requestDetailsSection = document.querySelector('.request-details-section');
+                if (requestDetailsSection) {
+                    requestDetailsSection.style.display = 'block';
+                }
+            }
+        }
+    } else {
+        // No URL parameter - always default to submit tab (when clicking "view" button)
+        const defaultTab = document.querySelector('[data-step="submit"]');
+        const defaultContent = document.getElementById('step-submit');
+        if (defaultTab && defaultContent) {
+            defaultTab.classList.add('active');
+            defaultContent.classList.add('active');
+            
+            const requestDetailsSection = document.querySelector('.request-details-section');
+            if (requestDetailsSection) {
+                requestDetailsSection.style.display = 'block';
+            }
         }
     }
     
@@ -3651,6 +3642,11 @@ function switchToFinanceTab() {
     if (financeTab && financeContent) {
         financeTab.classList.add('active');
         financeContent.classList.add('active');
+        
+        // Update URL to preserve tab state on refresh
+        const url = new URL(window.location);
+        url.searchParams.set('tab', 'finance');
+        window.history.pushState({}, '', url);
         
         // Hide request details section for non-submit tabs
         const requestDetailsSection = document.querySelector('.request-details-section');

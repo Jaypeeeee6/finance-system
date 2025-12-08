@@ -1623,6 +1623,43 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
+    font-weight: bold;
+}
+
+.flash-error-title i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+    border-radius: 50%;
+    background-color: #c82333 !important;
+    background: #c82333 !important;
+    color: #ffffff !important;
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0;
+    margin: 0;
+    position: relative;
+}
+
+.flash-error-title i::before {
+    color: #ffffff !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    -webkit-text-stroke: 0 !important;
+    text-shadow: none !important;
+    z-index: 1;
+    position: relative;
+    font-family: "Font Awesome 5 Free" !important;
+    font-weight: 900 !important;
+}
+
+/* Replace fa-exclamation-circle content with just exclamation mark (no circle) */
+.flash-error-title i.fa-exclamation-circle::before {
+    content: "\f12a" !important; /* fa-exclamation Unicode */
 }
 
 .flash-error-body {
@@ -1644,6 +1681,7 @@ body {
     color: #fff;
     font-weight: 600;
     cursor: pointer;
+    text-transform: uppercase;
 }
 
 .flash-error-ok-btn:hover {
