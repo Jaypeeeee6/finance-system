@@ -96,6 +96,7 @@
             <div class="card-header">
                 <div class="header-top">
                     <div class="filter-controls">
+                        {% if active_tab != 'my_requests' %}
                         <select id="departmentFilter" onchange="filterByDepartment()" class="form-select">
                             <option value="">All Departments</option>
                             <option value="HR" {% if department_filter == 'HR' %}selected{% endif %}>HR</option>
@@ -114,6 +115,7 @@
                             <option value="Office" {% if department_filter == 'Office' %}selected{% endif %}>Office</option>
                             <option value="Maintenance" {% if department_filter == 'Maintenance' %}selected{% endif %}>Maintenance</option>
                         </select>
+                        {% endif %}
                         {% if active_tab == 'all' %}
                         <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
                             <option value="">All Statuses</option>
