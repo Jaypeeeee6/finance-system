@@ -2572,6 +2572,74 @@
                     </div>
                 </div>
 
+                {# Read-only Billing & Completion view for authorized viewers (not the assigned procurement) #}
+                {% if not can_complete and item_request.item_name %}
+                <div class="card assigned-section procurement-cart-card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h4><i class="fas fa-check-circle"></i> Billing and Completion (Read-Only)</h4>
+                        <p style="margin: 0;">These are the quantities and amounts set by the assigned procurement staff.</p>
+                    </div>
+                    <div class="card-body">
+                        {% set amount_list = (item_request.procurement_amounts or '').split(';') %}
+                        {% set quantity_source = item_request.procurement_quantities or item_request.quantity %}
+                        {% if ',' in item_request.item_name %}
+                            {% set item_list = item_request.item_name.split(',') %}
+                            {% set quantity_list = (quantity_source or '').split(';') if quantity_source else [] %}
+                            <div class="procurement-cart-table">
+                                <div class="procurement-cart-header-row">
+                                    <div>Item</div>
+                                    <div style="text-align: left;">Quantity</div>
+                                    <div style="text-align: right;">Amount</div>
+                                </div>
+                                {% for item in item_list %}
+                                    {% set item_trimmed = item.strip() %}
+                                    {% if item_trimmed %}
+                                        {% set qty = quantity_list[loop.index0]|trim if loop.index0 < quantity_list|length else '0' %}
+                                        {% if ':' in qty %}
+                                            {% set parts = qty.split(':', 1) %}
+                                            {% set qty = parts[1].strip() if parts|length > 1 else qty %}
+                                        {% endif %}
+                                        {% set amt_val = amount_list[loop.index0] if amount_list|length > loop.index0 else '0.000' %}
+                                        <div class="procurement-cart-row">
+                                            <div class="procurement-cart-item-name">{{ item_trimmed }}</div>
+                                            <div class="procurement-cart-qty">
+                                                <span class="readonly-qty-pill">{{ qty or '0' }}</span>
+                                            </div>
+                                            <div class="procurement-cart-amount">
+                                                <span class="readonly-qty-pill">{{ amt_val or '0.000' }}</span>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            {% set qty_single = (quantity_source or '').split(';')[0] if quantity_source else '' %}
+                            {% if ':' in qty_single %}
+                                {% set parts = qty_single.split(':', 1) %}
+                                {% set qty_single = parts[1].strip() if parts|length > 1 else qty_single %}
+                            {% endif %}
+                            {% set amt_single = amount_list[0] if amount_list|length > 0 else '0.000' %}
+                            <div class="procurement-cart-table">
+                                <div class="procurement-cart-header-row">
+                                    <div>Item</div>
+                                    <div style="text-align: left;">Quantity</div>
+                                    <div style="text-align: right;">Amount</div>
+                                </div>
+                                <div class="procurement-cart-row">
+                                    <div class="procurement-cart-item-name">{{ item_request.item_name }}</div>
+                                    <div class="procurement-cart-qty">
+                                        <span class="readonly-qty-pill">{{ qty_single or '0' }}</span>
+                                    </div>
+                                    <div class="procurement-cart-amount">
+                                        <span class="readonly-qty-pill">{{ amt_single or '0.000' }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
                 {# Items Assigned section moved to Billing and Completion section #}
 
                 {# Button to assign request to self (only if not already assigned and user is procurement staff) #}
@@ -2836,9 +2904,12 @@
                                         {% if ',' in item_request.item_name %}
                                             {# Multi-item request #}
                                             {% set item_list = item_request.item_name.split(',') %}
-                                            {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                                            {% set all_amounts = (item_request.procurement_amounts or '').split(';') %}
+                                            {# Show the latest procurement-edited quantities; fall back to manager-approved, then original #}
+                                            {% set raw_quantity_source = item_request.procurement_quantities or item_request.procurement_manager_quantities or item_request.quantity %}
                                             {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
-                                            {% set original_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                                            {# Baseline for comparison: manager-approved if present, else original request #}
+                                            {% set original_source = item_request.procurement_manager_quantities or item_request.quantity %}
                                             {% set original_list = (original_source or '').split(';') if original_source else [] %}
                                             
                                             {% if can_complete %}
@@ -2850,6 +2921,7 @@
                                                         <div style="text-align: left;">Quantity</div>
                                                         <div style="text-align: right;">Amount</div>
                                                     </div>
+                                                    {% set all_amounts = (item_request.procurement_amounts or '').split(';') %}
                                                     
                                                     {% for item in item_list %}
                                                         {% set item_trimmed = item.strip() %}
@@ -2889,29 +2961,67 @@
                                                             {% set orig_qty_num = orig_qty_raw|int(0) %}
                                                             {% set proc_qty_num = qty|int(0) %}
                                                             {% set is_less = proc_qty_num < orig_qty_num %}
+                                                            {% set was_manager_zero = orig_qty_num == 0 %}
                                                             
-                                                            <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %}" 
+                                                            <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %} {% if was_manager_zero %}previously-rejected-by-manager{% endif %}" 
                                                                  id="cart_row_{{ loop.index0 }}"
                                                                  data-orig-qty="{{ orig_qty_num }}"
                                                                  data-orig-display="{{ orig_qty_raw or '0' }}">
-                                                                <div class="procurement-cart-item-name">{{ item_trimmed }}</div>
+                                                                <div class="procurement-cart-item-name">
+                                                                    {{ item_trimmed }}
+                                                                    {% if was_manager_zero %}
+                                                                    <span class="tooltip-wrapper">
+                                                                        <i class="fas fa-info-circle tooltip-icon"></i>
+                                                                        <span class="tooltip-text">This item was rejected by the manager (quantity set to 0). Click edit to re-enable if you are procuring it.</span>
+                                                                    </span>
+                                                                    {% endif %}
+                                                                </div>
                                                                 <div class="procurement-cart-qty">
                                                                     {% if can_complete %}
+                                                                        {% if was_manager_zero %}
+                                                                        <div class="quantity-readonly-display" id="cart_qty_readonly_{{ loop.index0 }}">
+                                                                            <span class="readonly-qty-pill">{{ qty or 0 }} / {{ orig_qty_raw or '0' }}</span>
+                                                                            <button type="button"
+                                                                                    class="edit-qty-btn"
+                                                                                    data-index="{{ loop.index0 }}"
+                                                                                    onclick="enableCartQuantityEdit(this.dataset.index)"
+                                                                                    title="Edit quantity">
+                                                                                <i class="fas fa-edit"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                        <div id="cart_qty_editable_wrapper_{{ loop.index0 }}" style="display: none; align-items: center; gap: 8px; justify-content: flex-end;">
+                                                                            <div class="quantity-control" id="cart_qty_editable_{{ loop.index0 }}">
+                                                                                <button type="button" class="qty-btn minus" data-index="{{ loop.index0 }}" onclick="adjustCartQuantity(this.dataset.index, -1)">-</button>
+                                                                                <input type="number" name="quantities[]" id="cart_qty_{{ loop.index0 }}" min="0" step="1" value="{{ qty or 0 }}" data-index="{{ loop.index0 }}" data-original-value="{{ qty or 0 }}" oninput="updateCartQuantityState(this.dataset.index)">
+                                                                                <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
+                                                                                <button type="button" class="qty-btn plus" data-index="{{ loop.index0 }}" onclick="adjustCartQuantity(this.dataset.index, 1)">+</button>
+                                                                            </div>
+                                                                        </div>
+                                                                        {% else %}
                                                                         <div class="quantity-control">
                                                                             <button type="button" class="qty-btn minus" data-index="{{ loop.index0 }}" onclick="adjustCartQuantity(this.dataset.index, -1)">-</button>
                                                                             <input type="number" name="quantities[]" id="cart_qty_{{ loop.index0 }}" min="0" step="1" value="{{ qty or 0 }}" data-index="{{ loop.index0 }}" oninput="updateCartQuantityState(this.dataset.index)">
                                                                             <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
                                                                             <button type="button" class="qty-btn plus" data-index="{{ loop.index0 }}" onclick="adjustCartQuantity(this.dataset.index, 1)">+</button>
                                                                         </div>
+                                                                        {% endif %}
                                                                     {% else %}
                                                                         <span class="readonly-qty-pill">{{ qty or '0' }}</span>
                                                                     {% endif %}
                                                                 </div>
                                                                 <div class="procurement-cart-amount">
+                                                                    {% set amt_val = all_amounts[loop.index0] if all_amounts|length > loop.index0 else '0.000' %}
                                                                     {% if can_complete %}
-                                                                        <input type="number" name="amounts[]" id="cart_amount_{{ loop.index0 }}" min="0" step="0.001" value="0" data-index="{{ loop.index0 }}">
+                                                                        {% if was_manager_zero %}
+                                                                        <div id="cart_amount_readonly_{{ loop.index0 }}" class="quantity-readonly-display" style="justify-content: flex-end;">
+                                                                            <span class="readonly-qty-pill">{{ amt_val }}</span>
+                                                                        </div>
+                                                                        <input type="number" name="amounts[]" id="cart_amount_{{ loop.index0 }}" min="0" step="0.001" value="{{ amt_val }}" data-index="{{ loop.index0 }}" style="display: none;" disabled>
+                                                                        {% else %}
+                                                                        <input type="number" name="amounts[]" id="cart_amount_{{ loop.index0 }}" min="0" step="0.001" value="{{ amt_val }}" data-index="{{ loop.index0 }}">
+                                                                        {% endif %}
                                                                     {% else %}
-                                                                        <span class="readonly-qty-pill">0</span>
+                                                                        <span class="readonly-qty-pill">{{ amt_val }}</span>
                                                                     {% endif %}
                                                                 </div>
                                                             </div>
@@ -2940,16 +3050,18 @@
                                             {% endif %}
                                         {% else %}
                                             {# Single-item request #}
-                                            {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                                            {% set raw_quantity_source = item_request.procurement_quantities or item_request.procurement_manager_quantities or item_request.quantity %}
                                             {% set current_raw = (raw_quantity_source or '').split(';')[0] %}
                                             {% set qty = (current_raw or '').strip() %}
-                                            {% set orig_qty_raw = (item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity or '').strip() %}
+                                            {# Baseline for comparison: manager-approved if present, else original request #}
+                                            {% set orig_qty_raw = (item_request.procurement_manager_quantities or item_request.quantity or '').strip() %}
                                             {% if ';' in orig_qty_raw %}
                                                 {% set orig_qty_raw = orig_qty_raw.split(';')[0] %}
                                             {% endif %}
                                             {% set orig_qty_num = orig_qty_raw|int(0) %}
                                             {% set proc_qty_num = qty|int(0) %}
                                             {% set is_less = proc_qty_num < orig_qty_num %}
+                                            {% set was_manager_zero = orig_qty_num == 0 %}
                                             
                                             {% if can_complete %}
                                             <form method="POST" action="{{ url_for('update_item_request_quantities', request_id=item_request.id) }}" style="margin-bottom: 1rem;" novalidate>
@@ -2960,28 +3072,65 @@
                                                         <div style="text-align: left;">Quantity</div>
                                                         <div style="text-align: right;">Amount</div>
                                                     </div>
-                                                    <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %}" 
+                                                    <div class="procurement-cart-row {% if is_less %}qty-less-than-original{% endif %} {% if was_manager_zero %}previously-rejected-by-manager{% endif %}" 
                                                          id="cart_row_0"
                                                          data-orig-qty="{{ orig_qty_num }}"
                                                          data-orig-display="{{ orig_qty_raw or '0' }}">
-                                                        <div class="procurement-cart-item-name">{{ item_request.item_name }}</div>
+                                                        <div class="procurement-cart-item-name">
+                                                            {{ item_request.item_name }}
+                                                            {% if was_manager_zero %}
+                                                            <span class="tooltip-wrapper">
+                                                                <i class="fas fa-info-circle tooltip-icon"></i>
+                                                                <span class="tooltip-text">This item was rejected by the manager (quantity set to 0). Click edit to re-enable if you are procuring it.</span>
+                                                            </span>
+                                                            {% endif %}
+                                                        </div>
                                                         <div class="procurement-cart-qty">
                                                             {% if can_complete %}
+                                                                {% if was_manager_zero %}
+                                                                <div class="quantity-readonly-display" id="cart_qty_readonly_0">
+                                                                    <span class="readonly-qty-pill">{{ qty or 0 }} / {{ orig_qty_raw or '0' }}</span>
+                                                                    <button type="button"
+                                                                            class="edit-qty-btn"
+                                                                            data-index="0"
+                                                                            onclick="enableCartQuantityEdit(this.dataset.index)"
+                                                                            title="Edit quantity">
+                                                                        <i class="fas fa-edit"></i>
+                                                                    </button>
+                                                                </div>
+                                                                <div id="cart_qty_editable_wrapper_0" style="display: none; align-items: center; gap: 8px; justify-content: flex-end;">
+                                                                    <div class="quantity-control" id="cart_qty_editable_0">
+                                                                        <button type="button" class="qty-btn minus" data-index="0" onclick="adjustCartQuantity(this.dataset.index, -1)">-</button>
+                                                                        <input type="number" name="quantities[]" id="cart_qty_0" min="0" step="1" value="{{ qty or 0 }}" data-index="0" data-original-value="{{ qty or 0 }}" oninput="updateCartQuantityState(this.dataset.index)">
+                                                                        <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
+                                                                        <button type="button" class="qty-btn plus" data-index="0" onclick="adjustCartQuantity(this.dataset.index, 1)">+</button>
+                                                                    </div>
+                                                                </div>
+                                                                {% else %}
                                                                 <div class="quantity-control">
                                                                     <button type="button" class="qty-btn minus" onclick="adjustCartQuantity(0, -1)">-</button>
                                                                     <input type="number" name="quantities[]" id="cart_qty_0" min="0" step="1" value="{{ qty or 0 }}" data-index="0" oninput="updateCartQuantityState(0)">
                                                                     <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
                                                                     <button type="button" class="qty-btn plus" onclick="adjustCartQuantity(0, 1)">+</button>
                                                                 </div>
+                                                                {% endif %}
                                                             {% else %}
                                                                 <span class="readonly-qty-pill">{{ qty or '0' }}</span>
                                                             {% endif %}
                                                         </div>
                                                         <div class="procurement-cart-amount">
+                                                            {% set amt_val = all_amounts[0] if all_amounts|length > 0 else '0.000' %}
                                                             {% if can_complete %}
-                                                                <input type="number" name="amounts[]" id="cart_amount_0" min="0" step="0.001" value="0" data-index="0">
+                                                                {% if was_manager_zero %}
+                                                                <div id="cart_amount_readonly_0" class="quantity-readonly-display" style="justify-content: flex-end;">
+                                                                    <span class="readonly-qty-pill">{{ amt_val }}</span>
+                                                                </div>
+                                                                <input type="number" name="amounts[]" id="cart_amount_0" min="0" step="0.001" value="{{ amt_val }}" data-index="0" style="display: none;" disabled>
+                                                                {% else %}
+                                                                <input type="number" name="amounts[]" id="cart_amount_0" min="0" step="0.001" value="{{ amt_val }}" data-index="0">
+                                                                {% endif %}
                                                             {% else %}
-                                                                <span class="readonly-qty-pill">0</span>
+                                                                <span class="readonly-qty-pill">{{ amt_val }}</span>
                                                             {% endif %}
                                                         </div>
                                                     </div>
@@ -3582,8 +3731,10 @@ function updateCartQuantityState(index) {
     index = parseInt(index, 10) || 0;
     const input = document.getElementById('cart_qty_' + index);
     const row = document.getElementById('cart_row_' + index);
-    const note = document.getElementById('cart_note_' + index);
-    if (!input || !row || !note) return;
+    const note = document.getElementById('cart_note_' + index) || document.getElementById('cart_note_mgr_' + index);
+    
+    // Allow quantity styling even if the note container is missing
+    if (!input || !row) return;
 
     const origQty = parseInt(row.getAttribute('data-orig-qty') || '0', 10);
     let current = parseInt(input.value || '0', 10);
@@ -3608,17 +3759,22 @@ function updateCartQuantityState(index) {
 
     // Update note
     if (current === origQty) {
-        note.style.display = 'none';
-        note.innerHTML = '';
-    } else {
+        if (note) {
+            note.style.display = 'none';
+            note.innerHTML = '';
+        }
+    } else if (note) {
         const origDisplay = row.getAttribute('data-orig-display') || String(origQty);
         const moreOrLess = diff > 0 ? 'more' : 'less';
         note.style.display = 'block';
         note.innerHTML =
-            'Requestor requested for <strong>' + origDisplay +
-            '</strong> of this item. You have currently set to <strong>' +
+            'Requestor requested <strong>' + origDisplay +
+            '</strong> of this item. You have currently set <strong>' +
             diffAbs + '</strong> ' + moreOrLess + ' than requested.';
     }
+    
+    // Show or hide rejection reason as quantities change
+    checkManagerRejectionReasonRequired();
 }
 
 // Quantity controls for Procurement Manager cart
@@ -3759,6 +3915,9 @@ function enableCartQuantityEdit(index) {
     index = parseInt(index, 10) || 0;
     const readonlyDiv = document.getElementById('cart_qty_readonly_' + index);
     const editableWrapper = document.getElementById('cart_qty_editable_wrapper_' + index);
+    const amountReadonly = document.getElementById('cart_amount_readonly_' + index);
+    const amountInput = document.getElementById('cart_amount_' + index);
+    const note = document.getElementById('cart_note_' + index);
     
     if (readonlyDiv && editableWrapper) {
         // Store the current value as the original value for cancel functionality
@@ -3767,11 +3926,21 @@ function enableCartQuantityEdit(index) {
             // Store the current value before editing
             input.setAttribute('data-original-value', input.value || '0');
         }
+        // Store the current amount as the original value
+        if (amountInput && !amountInput.dataset.originalValue) {
+            amountInput.dataset.originalValue = amountInput.value || '0';
+        }
         
         // Hide read-only display
         readonlyDiv.style.display = 'none';
         // Show editable wrapper (contains quantity-control and X button)
         editableWrapper.style.display = 'flex';
+        // Toggle amount visibility
+        if (amountReadonly && amountInput) {
+            amountReadonly.style.display = 'none';
+            amountInput.style.display = 'block';
+            amountInput.disabled = false;
+        }
         // Focus on the input
         if (input) {
             input.focus();
@@ -3780,6 +3949,10 @@ function enableCartQuantityEdit(index) {
         
         // Update quantity state
         updateCartQuantityState(index);
+        // Keep note in sync if present
+        if (note) {
+            note.style.display = '';
+        }
     }
 }
 
@@ -3789,6 +3962,8 @@ function cancelCartQuantityEdit(index) {
     const readonlyDiv = document.getElementById('cart_qty_readonly_' + index);
     const editableWrapper = document.getElementById('cart_qty_editable_wrapper_' + index);
     const note = document.getElementById('cart_note_' + index);
+    const amountReadonly = document.getElementById('cart_amount_readonly_' + index);
+    const amountInput = document.getElementById('cart_amount_' + index);
     
     if (readonlyDiv && editableWrapper) {
         // Restore the original value
@@ -3796,6 +3971,11 @@ function cancelCartQuantityEdit(index) {
         if (input) {
             const originalValue = input.getAttribute('data-original-value') || '0';
             input.value = originalValue;
+        }
+        // Restore the original amount
+        if (amountInput) {
+            const originalAmount = amountInput.dataset.originalValue || amountInput.getAttribute('data-original-value') || amountInput.value || '0';
+            amountInput.value = originalAmount;
         }
         
         // Hide the note
@@ -3808,6 +3988,12 @@ function cancelCartQuantityEdit(index) {
         editableWrapper.style.display = 'none';
         // Show read-only display
         readonlyDiv.style.display = 'inline-flex';
+        // Toggle amount visibility back to readonly
+        if (amountReadonly && amountInput) {
+            amountReadonly.style.display = 'flex';
+            amountInput.style.display = 'none';
+            amountInput.disabled = true;
+        }
         
         // Update quantity state
         updateCartQuantityState(index);
@@ -4239,15 +4425,34 @@ document.addEventListener('DOMContentLoaded', function() {
     const managerForm = document.querySelector('form[action*="update_quantities_manager"]');
     if (managerForm) {
         const quantityInputs = managerForm.querySelectorAll('input[name="quantities[]"]');
+        const managerSubmitButton = managerForm.querySelector('button[type="submit"]');
+        if (managerSubmitButton && !managerSubmitButton.dataset.originalLabel) {
+            managerSubmitButton.dataset.originalLabel = managerSubmitButton.innerHTML;
+        }
         quantityInputs.forEach(input => {
             const index = input.getAttribute('data-index') || input.id.replace('cart_qty_', '');
             originalQuantityValues['manager_' + index] = parseInt(input.value || '0', 10);
+            updateCartQuantityState(index); // initialize row state (color/notes/rejection toggle)
         });
         
         managerForm.addEventListener('submit', function(e) {
+            // Force return to Manager tab after post-back
+            try {
+                const actionUrl = new URL(this.action, window.location.origin);
+                actionUrl.searchParams.set('tab', 'manager');
+                this.action = actionUrl.toString();
+            } catch (err) {
+                // no-op if URL construction fails
+            }
             // Check if any quantity is 0
             const quantityInputs = this.querySelectorAll('input[name="quantities[]"]');
             let hasZero = false;
+            const resetSubmitButton = () => {
+                if (managerSubmitButton) {
+                    managerSubmitButton.disabled = false;
+                    managerSubmitButton.innerHTML = managerSubmitButton.dataset.originalLabel || managerSubmitButton.innerHTML;
+                }
+            };
             quantityInputs.forEach(input => {
                 const qty = parseInt(input.value || '0', 10);
                 if (qty === 0) {
@@ -4259,6 +4464,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const rejectionField = this.querySelector('textarea[name="quantity_rejection_reason"]');
                 if (rejectionField && !rejectionField.value.trim()) {
                     e.preventDefault();
+                    resetSubmitButton();
                     alert('Please provide a reason for rejecting the item(s) with quantity set to 0.');
                     rejectionField.focus();
                     return false;
@@ -4335,47 +4541,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Validation function that can be called from both form submit and button click
         const validateAndSubmit = function(formElement) {
-            // Validate that all amount fields are filled (only requirement for this form)
-            const amountInputs = formElement.querySelectorAll('input[name="amounts[]"]');
-            
-            // If no amount inputs exist, this form doesn't need amount validation
-            // But if amount inputs DO exist, they MUST all be > 0
-            if (amountInputs.length > 0) {
-                // Check each amount input - must be > 0
-                let hasEmptyAmount = false;
-                let firstInvalidInput = null;
-                
-                amountInputs.forEach(input => {
-                    // For number inputs, get the value as string
-                    const valueStr = String(input.value || '').trim();
-                    const amount = parseFloat(valueStr);
-                    
-                    // Check if empty, "0", NaN, or <= 0 - ANY of these means invalid
-                    const isEmpty = valueStr === '';
-                    const isZero = valueStr === '0';
-                    const isNaNValue = isNaN(amount);
-                    const isNotPositive = amount <= 0;
-                    
-                    if (isEmpty || isZero || isNaNValue || isNotPositive) {
-                        hasEmptyAmount = true;
-                        if (!firstInvalidInput) {
-                            firstInvalidInput = input;
-                        }
-                    }
-                });
-                
-                // If validation fails, show error and STOP - don't submit
-                if (hasEmptyAmount) {
-                    // Focus the first invalid input
-                    if (firstInvalidInput) {
-                        firstInvalidInput.focus();
-                    }
-                    showAmountValidationErrorDialog();
-                    return false; // This prevents form submission
-                }
-            }
-            
-            // Validation passed - update original values
+            // For Save Quantities & Amounts: allow blank/zero amounts; only update originals after submit
             const quantityInputs = formElement.querySelectorAll('input[name="quantities[]"]');
             quantityInputs.forEach(input => {
                 const index = input.getAttribute('data-index') || input.id.replace('cart_qty_', '');
@@ -4524,6 +4690,37 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(() => alert('Failed to load history'));
     });
+
+    // Ensure all tooltip icons (including item rows) get positioned on hover
+    const positionTooltipWrapper = (tooltipWrapper) => {
+        if (!tooltipWrapper) return;
+        const icon = tooltipWrapper.querySelector('.tooltip-icon');
+        const tooltip = tooltipWrapper.querySelector('.tooltip-text');
+        if (!icon || !tooltip) return;
+        const rect = icon.getBoundingClientRect();
+        const tipHeight = tooltip.offsetHeight || 40;
+        tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+        tooltip.style.top = (rect.top - tipHeight - 8) + 'px';
+    };
+
+    const bindTooltipPositioning = (wrapper) => {
+        if (!wrapper || wrapper.dataset.tooltipBound === 'true') return;
+        wrapper.dataset.tooltipBound = 'true';
+        ['mouseenter', 'touchstart'].forEach(evt => {
+            wrapper.addEventListener(evt, () => positionTooltipWrapper(wrapper), { passive: true });
+        });
+        // Re-position on scroll/resize while visible
+        ['scroll', 'resize'].forEach(evt => {
+            window.addEventListener(evt, () => {
+                const tooltip = wrapper.querySelector('.tooltip-text');
+                if (tooltip && tooltip.style.visibility === 'visible') {
+                    positionTooltipWrapper(wrapper);
+                }
+            });
+        });
+    };
+
+    document.querySelectorAll('.tooltip-wrapper').forEach(bindTooltipPositioning);
 });
 
 function openFieldHistoryModal(field, history) {

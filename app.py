@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_socketio import SocketIO, emit, join_room
 from flask_mail import Mail, Message
+from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from functools import wraps
 import os
@@ -267,6 +268,8 @@ app.jinja_env.globals.update(format_recurring_schedule=format_recurring_schedule
 
 # Initialize database
 db.init_app(app)
+# Enable DB migrations
+migrate = Migrate(app, db)
 
 # Initialize Flask-Mail
 mail = Mail(app)
@@ -5189,6 +5192,14 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
     item_request.assigned_by_user_id = current_user.user_id
     item_request.assignment_date = current_time
     item_request.updated_at = current_time
+
+    # If procurement manager did not edit quantities, persist the manager-approved quantities (or original) as the PM-approved baseline
+    pm_quantities = (item_request.procurement_manager_quantities or '').strip()
+    if not pm_quantities:
+        item_request.procurement_manager_quantities = item_request.procurement_quantities or item_request.quantity or ''
+        # Also carry over manager rejection reason so it remains visible in the PM approval tab
+        if not item_request.procurement_manager_quantity_rejection_reason and item_request.manager_quantity_rejection_reason:
+            item_request.procurement_manager_quantity_rejection_reason = item_request.manager_quantity_rejection_reason
     
     db.session.commit()
     
@@ -5842,12 +5853,58 @@ def update_item_request_quantities(request_id):
     elif len(cleaned_quantities) > len(item_names):
         cleaned_quantities = cleaned_quantities[:len(item_names)]
 
+    # Parse and align per-item amounts (new field)
+    raw_amounts = request.form.getlist('amounts[]')
+    cleaned_amounts = []
+    for a in raw_amounts:
+        try:
+            amt = round(float(a.strip()), 3) if a.strip() else 0.0
+        except Exception:
+            amt = 0.0
+        cleaned_amounts.append(f"{amt:.3f}")
+
+    if len(cleaned_amounts) < len(item_names):
+        cleaned_amounts += ['0.000'] * (len(item_names) - len(cleaned_amounts))
+    elif len(cleaned_amounts) > len(item_names):
+        cleaned_amounts = cleaned_amounts[:len(item_names)]
+
     # Join using ";" separator (same convention used when displaying multiple quantities)
     # Store in dedicated field so original requestor quantity remains unchanged
     item_request.procurement_quantities = ';'.join(cleaned_quantities)
+    item_request.procurement_amounts = ';'.join(cleaned_amounts)
     item_request.updated_at = datetime.utcnow()
 
     db.session.commit()
+
+    # Notify all authorized people (requestor, GM, manager chain, op manager, temp manager if any, procurement dept manager)
+    try:
+        recipient_ids = set()
+        # Assigned procurement name for message context
+        assigned_name = None
+        try:
+            if item_request.assigned_to_user_id:
+                assigned_user = User.query.get(item_request.assigned_to_user_id)
+                if assigned_user:
+                    assigned_name = assigned_user.name or "assigned procurement staff"
+        except Exception:
+            assigned_name = "assigned procurement staff"
+        # Requestor
+        if item_request.user_id:
+            recipient_ids.add(item_request.user_id)
+        # Authorized approvers (GM, operation manager, manager chain, etc.)
+        for user in get_authorized_manager_approvers_for_item_request(item_request):
+            recipient_ids.add(user.user_id)
+        # Procurement Department Manager(s)
+        procurement_mgrs = User.query.filter_by(department='Procurement', role='Department Manager').all()
+        for pm in procurement_mgrs:
+            recipient_ids.add(pm.user_id)
+        # Send notifications
+        title = f"Quantities & amounts updated for Item Request #{request_id}"
+        message = f"Quantities and amounts were updated by {assigned_name or 'assigned procurement staff'} for Item Request #{request_id}."
+        for uid in recipient_ids:
+            create_notification(uid, title, message, 'item_request_updated', item_request_id=request_id)
+    except Exception as e:
+        print(f"DEBUG: Failed to send notifications for item request #{request_id}: {e}")
 
     log_action(f"Updated item quantities for procurement item request #{request_id}")
     flash('Item quantities updated successfully.', 'success')
