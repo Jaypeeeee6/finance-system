@@ -3825,6 +3825,11 @@ def procurement_item_requests():
             conn.commit()
             print("✓ Added 'procurement_manager_quantity_rejection_reason' column to procurement_item_requests table")
 
+        if 'procurement_quantity_rejection_reason' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN procurement_quantity_rejection_reason TEXT")
+            conn.commit()
+            print("✓ Added 'procurement_quantity_rejection_reason' column to procurement_item_requests table")
+
         conn.close()
     except Exception as e:
         print(f"Warning: Could not migrate columns: {e}")
@@ -5670,15 +5675,31 @@ def item_request_complete(request_id):
         flash('Receipt reference number must contain only letters and numbers (no spaces or symbols).', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
-    # Handle receipt file upload (required, allow multiple)
+    # Handle receipt file upload (allow reuse of existing saved receipts)
+    existing_receipt_files = []
+    try:
+        if item_request.receipt_path:
+            existing_receipt_files = json.loads(item_request.receipt_path) or []
+    except Exception:
+        existing_receipt_files = []
+
     receipt_files = request.files.getlist('receipt_files')
-    if not receipt_files or not any(f.filename for f in receipt_files):
+    has_new_receipts = receipt_files and any(f.filename for f in receipt_files)
+    if not has_new_receipts and not existing_receipt_files:
         flash('Upload Receipt file is required.', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
-    # Handle invoice file upload (required, allow multiple)
+    # Handle invoice file upload (allow reuse of existing saved invoices)
+    existing_invoice_files = []
+    try:
+        if item_request.invoice_path:
+            existing_invoice_files = json.loads(item_request.invoice_path) or []
+    except Exception:
+        existing_invoice_files = []
+
     invoice_files = request.files.getlist('invoice_files')
-    if not invoice_files or not any(f.filename for f in invoice_files):
+    has_new_invoices = invoice_files and any(f.filename for f in invoice_files)
+    if not has_new_invoices and not existing_invoice_files:
         flash('Upload Invoice file is required.', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
@@ -5688,7 +5709,7 @@ def item_request_complete(request_id):
     uploaded_invoice_filenames = []
     
     # Process receipt files
-    for receipt_file in receipt_files:
+    for receipt_file in receipt_files or []:
         if receipt_file and receipt_file.filename:
             file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
             if file_extension not in allowed_extensions:
@@ -5708,12 +5729,8 @@ def item_request_complete(request_id):
             receipt_file.save(filepath)
             uploaded_receipt_filenames.append(filename)
     
-    if not uploaded_receipt_filenames:
-        flash('Upload Receipt file is required.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
-    
     # Process invoice files
-    for invoice_file in invoice_files:
+    for invoice_file in invoice_files or []:
         if invoice_file and invoice_file.filename:
             file_extension = invoice_file.filename.rsplit('.', 1)[1].lower() if '.' in invoice_file.filename else ''
             if file_extension not in allowed_extensions:
@@ -5733,13 +5750,12 @@ def item_request_complete(request_id):
             invoice_file.save(filepath)
             uploaded_invoice_filenames.append(filename)
     
-    if not uploaded_invoice_filenames:
-        flash('Upload Invoice file is required.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
-    
     current_time = datetime.utcnow()
     
-    # Update request
+    # Update request (reuse existing files if none uploaded)
+    final_receipts = uploaded_receipt_filenames if uploaded_receipt_filenames else existing_receipt_files
+    final_invoices = uploaded_invoice_filenames if uploaded_invoice_filenames else existing_invoice_files
+
     item_request.status = 'Completed'
     item_request.completed_by_user_id = current_user.user_id
     item_request.completion_date = current_time
@@ -5747,8 +5763,8 @@ def item_request_complete(request_id):
     item_request.receipt_amount = receipt_amount_value
     item_request.invoice_amount = invoice_amount_value
     item_request.receipt_reference_number = receipt_reference_number
-    item_request.receipt_path = json.dumps(uploaded_receipt_filenames)
-    item_request.invoice_path = json.dumps(uploaded_invoice_filenames)
+    item_request.receipt_path = json.dumps(final_receipts)
+    item_request.invoice_path = json.dumps(final_invoices)
     item_request.updated_at = current_time
     
     db.session.commit()
@@ -5836,10 +5852,40 @@ def update_item_request_quantities_procurement_manager(request_id):
     old_quantities_str = old_quantities if old_quantities else ''
     new_quantities_str = ';'.join(cleaned_quantities)
 
+    # Helper to parse quantity string to int
+    def _qty_to_int(val: str) -> int:
+        try:
+            # support "Item: 0" style values
+            parts = (val or '').split(':', 1)
+            num_str = parts[1].strip() if len(parts) > 1 else (parts[0].strip() if parts else '0')
+            return int(num_str or 0)
+        except Exception:
+            return 0
+
+    # Manager-approved quantities (baseline)
+    mgr_quantities_str = item_request.procurement_quantities or item_request.quantity or ''
+    mgr_list = mgr_quantities_str.split(';') if mgr_quantities_str else []
+    new_list = new_quantities_str.split(';') if new_quantities_str else []
+
+    # Indices with quantity 0 before (manager) and after (procurement manager)
+    zeros_old = {i for i, q in enumerate(mgr_list) if _qty_to_int(q) == 0}
+    zeros_new = {i for i, q in enumerate(new_list) if _qty_to_int(q) == 0}
+
+    # Decide rejection reason
+    quantity_rejection_reason = request.form.get('quantity_rejection_reason', '').strip()
+    new_zero_not_prev = zeros_new - zeros_old
+
+    if zeros_new:
+        # If procurement manager zeroed a NEW item, reason is required
+        if new_zero_not_prev and not quantity_rejection_reason:
+            flash('Please provide a reason for items you set to quantity 0.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id, tab='procurement'))
+        # If only previously-zero items remain zero and no new reason given, inherit manager reason
+        if not new_zero_not_prev and not quantity_rejection_reason:
+            quantity_rejection_reason = item_request.manager_quantity_rejection_reason or ''
+
     # Store procurement manager-approved quantities in separate field (does not affect manager-approved quantities)
     item_request.procurement_manager_quantities = new_quantities_str
-    # Store rejection reason if provided
-    quantity_rejection_reason = request.form.get('quantity_rejection_reason', '').strip()
     item_request.procurement_manager_quantity_rejection_reason = quantity_rejection_reason if quantity_rejection_reason else None
     item_request.updated_at = datetime.utcnow()
 
@@ -6067,10 +6113,30 @@ def update_item_request_quantities(request_id):
     elif len(cleaned_amounts) > len(item_names):
         cleaned_amounts = cleaned_amounts[:len(item_names)]
 
+    # Determine if any quantity is set to 0 (for rejection reason requirement)
+    def _parse_qty_to_int(val: str) -> int:
+        try:
+            return int(val)
+        except Exception:
+            return 0
+
+    has_zero_quantity = False
+    for q in cleaned_quantities:
+        parts = (q or '').split(':', 1)
+        numeric_part = parts[1].strip() if len(parts) > 1 else (parts[0].strip() if parts else '0')
+        if _parse_qty_to_int(numeric_part or '0') == 0:
+            has_zero_quantity = True
+            break
+    quantity_rejection_reason = request.form.get('quantity_rejection_reason', '').strip()
+    if has_zero_quantity and not quantity_rejection_reason:
+        flash('Please provide a reason for items set to quantity 0.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
     # Join using ";" separator (same convention used when displaying multiple quantities)
     # Store in dedicated field so original requestor quantity remains unchanged
     item_request.procurement_quantities = ';'.join(cleaned_quantities)
     item_request.procurement_amounts = ';'.join(cleaned_amounts)
+    item_request.procurement_quantity_rejection_reason = quantity_rejection_reason if quantity_rejection_reason else None
     item_request.updated_at = datetime.utcnow()
 
     db.session.commit()
@@ -17748,6 +17814,13 @@ if __name__ == '__main__':
                 print("✓ Added 'procurement_manager_quantity_rejection_reason' column to procurement_item_requests table")
             else:
                 print("✓ 'procurement_manager_quantity_rejection_reason' column already exists in procurement_item_requests table")
+
+            if 'procurement_quantity_rejection_reason' not in existing_columns:
+                cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN procurement_quantity_rejection_reason TEXT")
+                conn.commit()
+                print("✓ Added 'procurement_quantity_rejection_reason' column to procurement_item_requests table")
+            else:
+                print("✓ 'procurement_quantity_rejection_reason' column already exists in procurement_item_requests table")
             
             if 'category' not in existing_columns:
                 cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN category VARCHAR(100)")

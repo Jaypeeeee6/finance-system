@@ -661,6 +661,7 @@ class ProcurementItemRequest(db.Model):
     # Quantities adjusted by procurement manager during Procurement Manager Approval (per-item, separate from manager quantities)
     procurement_manager_quantities = db.Column(db.Text, nullable=True)
     procurement_amounts = db.Column(db.Text, nullable=True)  # Per-item procurement-entered amounts (semicolon-separated)
+    procurement_quantity_rejection_reason = db.Column(db.Text, nullable=True)  # Reason when assigned procurement sets quantity to 0
     purpose = db.Column(db.Text, nullable=False)
     branch_name = db.Column(db.String(100), nullable=False)
     request_date = db.Column(db.Date, nullable=False)

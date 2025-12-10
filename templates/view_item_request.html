@@ -414,7 +414,7 @@
 }
 
 .procurement-cart-amount input[type="number"] {
-    width: 50px;
+    width: 70px;
     height: 32px;
     text-align: center;
     border: 1px solid #ced4da;
@@ -432,14 +432,17 @@
 .quantity-control {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     background: #f9fafb;
     padding: 3px 6px;
     border-radius: 999px;
+    flex-shrink: 0;
 }
 
 .quantity-control input[type="number"] {
-    width: 55px;
+    width: 70px;
+    min-width: 70px;
+    flex: 0 0 70px;
     border: none;
     background: transparent;
     text-align: center;
@@ -628,6 +631,7 @@
     border-radius: 4px;
     transition: all 0.2s;
     font-size: 0.9rem;
+    flex-shrink: 0;
 }
 
 .edit-qty-btn:hover {
@@ -2625,8 +2629,9 @@
                                             {% set parts = qty.split(':', 1) %}
                                             {% set qty = parts[1].strip() if parts|length > 1 else qty %}
                                         {% endif %}
+                                        {% set qty_num = qty|int(0) %}
                                         {% set amt_val = amount_list[loop.index0] if amount_list|length > loop.index0 else '0.000' %}
-                                        <div class="procurement-cart-row">
+                                        <div class="procurement-cart-row {% if qty_num == 0 %}qty-zero{% endif %}">
                                             <div class="procurement-cart-item-name">{{ item_trimmed }}</div>
                                             <div class="procurement-cart-qty">
                                                 <span class="readonly-qty-pill">{{ qty or '0' }}</span>
@@ -2638,12 +2643,46 @@
                                     {% endif %}
                                 {% endfor %}
                             </div>
+                            {% if item_request.procurement_quantity_rejection_reason %}
+                            <div class="form-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Reason for Rejecting Item(s)</label>
+                                <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                    {% set rejected_items = [] %}
+                                    {% for item in item_list %}
+                                        {% set item_trimmed = item.strip() %}
+                                        {% if item_trimmed %}
+                                            {% set qty = quantity_list[loop.index0]|trim if loop.index0 < quantity_list|length else '0' %}
+                                            {% if ':' in qty %}
+                                                {% set parts = qty.split(':', 1) %}
+                                                {% set qty = parts[1].strip() if parts|length > 1 else qty %}
+                                            {% endif %}
+                                            {% set qty_num = qty|int(0) %}
+                                            {% if qty_num == 0 %}
+                                                {% set _ = rejected_items.append(item_trimmed) %}
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if rejected_items|length > 0 %}
+                                    <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #fecaca;">
+                                        <strong style="color: #991b1b;">Rejected Items (Quantity set to 0):</strong>
+                                        <ul style="color: #991b1b; margin: 5px 0 0 20px; padding: 0;">
+                                            {% for rejected_item in rejected_items %}
+                                            <li>{{ rejected_item }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                    <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.procurement_quantity_rejection_reason }}</p>
+                                </div>
+                            </div>
+                            {% endif %}
                         {% else %}
                             {% set qty_single = (quantity_source or '').split(';')[0] if quantity_source else '' %}
                             {% if ':' in qty_single %}
                                 {% set parts = qty_single.split(':', 1) %}
                                 {% set qty_single = parts[1].strip() if parts|length > 1 else qty_single %}
                             {% endif %}
+                            {% set qty_single_num = qty_single|int(0) %}
                             {% set amt_single = amount_list[0] if amount_list|length > 0 else '0.000' %}
                             <div class="procurement-cart-table">
                                 <div class="procurement-cart-header-row">
@@ -2651,7 +2690,7 @@
                                     <div style="text-align: left;">Quantity</div>
                                     <div style="text-align: right;">Amount</div>
                                 </div>
-                                <div class="procurement-cart-row">
+                                <div class="procurement-cart-row {% if qty_single_num == 0 %}qty-zero{% endif %}">
                                     <div class="procurement-cart-item-name">{{ item_request.item_name }}</div>
                                     <div class="procurement-cart-qty">
                                         <span class="readonly-qty-pill">{{ qty_single or '0' }}</span>
@@ -2661,6 +2700,20 @@
                                     </div>
                                 </div>
                             </div>
+                            {% if item_request.procurement_quantity_rejection_reason %}
+                            <div class="form-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Reason for Rejecting Item</label>
+                                <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                    {% if qty_single_num == 0 %}
+                                    <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #fecaca;">
+                                        <strong style="color: #991b1b;">Rejected Item (Quantity set to 0):</strong>
+                                        <p style="color: #991b1b; margin: 5px 0 0 0;">{{ item_request.item_name }}</p>
+                                    </div>
+                                    {% endif %}
+                                    <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.procurement_quantity_rejection_reason }}</p>
+                                </div>
+                            </div>
+                            {% endif %}
                         {% endif %}
                         {% set readonly_ns = namespace(total=0.0) %}
                         {% for amt in amount_list %}
@@ -3034,6 +3087,13 @@
                                                                                 <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
                                                                                 <button type="button" class="qty-btn plus" data-index="{{ loop.index0 }}" onclick="adjustCartQuantity(this.dataset.index, 1)">+</button>
                                                                             </div>
+                                                                            <button type="button"
+                                                                                    class="edit-qty-btn"
+                                                                                    data-index="{{ loop.index0 }}"
+                                                                                    onclick="cancelCartQuantityEdit(this.dataset.index)"
+                                                                                    title="Cancel editing">
+                                                                                <i class="fas fa-times"></i>
+                                                                            </button>
                                                                         </div>
                                                                         {% else %}
                                                                         <div class="quantity-control">
@@ -3054,7 +3114,7 @@
                                                                         <div id="cart_amount_readonly_{{ loop.index0 }}" class="quantity-readonly-display" style="justify-content: flex-end;">
                                                                             <span class="readonly-qty-pill">{{ amt_val }}</span>
                                                                         </div>
-                                                                        <input type="number" name="amounts[]" id="cart_amount_{{ loop.index0 }}" min="0" step="0.001" value="{{ amt_val }}" data-index="{{ loop.index0 }}" style="display: none;" disabled>
+                                                                        <input type="number" name="amounts[]" id="cart_amount_{{ loop.index0 }}" min="0" step="0.001" value="{{ amt_val }}" data-index="{{ loop.index0 }}" style="display: none;">
                                                                         {% else %}
                                                                         <input type="number" name="amounts[]" id="cart_amount_{{ loop.index0 }}" min="0" step="0.001" value="{{ amt_val }}" data-index="{{ loop.index0 }}">
                                                                         {% endif %}
@@ -3076,6 +3136,24 @@
                                                     {% endfor %}
                                                 </div>
                                                 
+                                            {% if item_request.procurement_quantity_rejection_reason %}
+                                            <div id="assigned_saved_rejection_reason_group" style="display: block; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                                <div class="form-group">
+                                                    <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Previously Saved Reason for Rejecting Item(s)</label>
+                                                    <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                                        <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.procurement_quantity_rejection_reason }}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                            <div id="assigned_rejection_reason_group" style="display: none; margin-top: 1rem;">
+                                                <div class="form-group">
+                                                <label for="assigned_quantity_rejection_reason">Reason for Rejecting Item(s) <span style="color: red;">*</span></label>
+                                                    <textarea name="quantity_rejection_reason" id="assigned_quantity_rejection_reason" rows="3" placeholder="Please provide a reason for rejecting the item(s) with quantity set to 0..." style="width: 100%;">{{ item_request.procurement_quantity_rejection_reason or '' }}</textarea>
+                                                    <small class="form-text text-muted">This field is required when at least one item quantity is set to 0.</small>
+                                                </div>
+                                            </div>
+
                                                 {% set assigned_ns = namespace(total=0.0) %}
                                                 {% for amt in all_amounts %}
                                                     {% set assigned_ns.total = assigned_ns.total + (amt | float) %}
@@ -3152,6 +3230,13 @@
                                                                         <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
                                                                         <button type="button" class="qty-btn plus" data-index="0" onclick="adjustCartQuantity(this.dataset.index, 1)">+</button>
                                                                     </div>
+                                                                    <button type="button"
+                                                                            class="edit-qty-btn"
+                                                                            data-index="0"
+                                                                            onclick="cancelCartQuantityEdit(this.dataset.index)"
+                                                                            title="Cancel editing">
+                                                                        <i class="fas fa-times"></i>
+                                                                    </button>
                                                                 </div>
                                                                 {% else %}
                                                                 <div class="quantity-control">
@@ -3172,7 +3257,7 @@
                                                                 <div id="cart_amount_readonly_0" class="quantity-readonly-display" style="justify-content: flex-end;">
                                                                     <span class="readonly-qty-pill">{{ amt_val }}</span>
                                                                 </div>
-                                                                <input type="number" name="amounts[]" id="cart_amount_0" min="0" step="0.001" value="{{ amt_val }}" data-index="0" style="display: none;" disabled>
+                                                                <input type="number" name="amounts[]" id="cart_amount_0" min="0" step="0.001" value="{{ amt_val }}" data-index="0" style="display: none;">
                                                                 {% else %}
                                                                 <input type="number" name="amounts[]" id="cart_amount_0" min="0" step="0.001" value="{{ amt_val }}" data-index="0">
                                                                 {% endif %}
@@ -3191,7 +3276,24 @@
                                                         {% endif %}
                                                     </div>
                                                 </div>
-                                                
+                                                {% if item_request.procurement_quantity_rejection_reason %}
+                                                <div id="assigned_saved_rejection_reason_group_single" style="display: block; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                                    <div class="form-group">
+                                                        <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Previously Saved Reason for Rejecting Item</label>
+                                                        <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                                            <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.procurement_quantity_rejection_reason }}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {% endif %}
+                                                <div id="assigned_rejection_reason_group_single" style="display: none; margin-top: 1rem;">
+                                                    <div class="form-group">
+                                                        <label for="assigned_quantity_rejection_reason_single">Reason for Rejecting Item <span style="color: red;">*</span></label>
+                                                        <textarea name="quantity_rejection_reason" id="assigned_quantity_rejection_reason_single" rows="3" placeholder="Please provide a reason for rejecting this item..." style="width: 100%;">{{ item_request.procurement_quantity_rejection_reason or '' }}</textarea>
+                                                        <small class="form-text text-muted">This field is required when the quantity is set to 0.</small>
+                                                    </div>
+                                                </div>
+
                                                 {% set assigned_ns = namespace(total=0.0) %}
                                                 {% for amt in all_amounts %}
                                                     {% set assigned_ns.total = assigned_ns.total + (amt | float) %}
@@ -3296,6 +3398,86 @@
                                    style="background: #f5f5f5;">
                         </div>
                         {% endif %}
+
+                        {# Read-only view of procurement quantities/amounts after completion #}
+                        {% if item_request.item_name %}
+                        {% set amount_list = (item_request.procurement_amounts or '').split(';') %}
+                        {% set quantity_source = item_request.procurement_quantities or item_request.procurement_manager_quantities or item_request.quantity %}
+                        <div class="card assigned-section procurement-cart-card" style="margin-top: 1.5rem;">
+                            <div class="card-header">
+                                <h4><i class="fas fa-shopping-cart"></i> Billing and Completion (Read-Only)</h4>
+                                <p style="margin: 0;">These are the final quantities and amounts saved by the assigned procurement staff.</p>
+                            </div>
+                            <div class="card-body">
+                                {% if ',' in item_request.item_name %}
+                                    {% set item_list = item_request.item_name.split(',') %}
+                                    {% set quantity_list = (quantity_source or '').split(';') if quantity_source else [] %}
+                                    <div class="procurement-cart-table">
+                                        <div class="procurement-cart-header-row">
+                                            <div>Item</div>
+                                            <div style="text-align: left;">Quantity</div>
+                                            <div style="text-align: right;">Amount</div>
+                                        </div>
+                                        {% for item in item_list %}
+                                            {% set item_trimmed = item.strip() %}
+                                            {% if item_trimmed %}
+                                                {% set qty = quantity_list[loop.index0]|trim if loop.index0 < quantity_list|length else '0' %}
+                                                {% if ':' in qty %}
+                                                    {% set parts = qty.split(':', 1) %}
+                                                    {% set qty = parts[1].strip() if parts|length > 1 else qty %}
+                                                {% endif %}
+                                                {% set qty_num = qty|int(0) %}
+                                                {% set amt_val = amount_list[loop.index0] if amount_list|length > loop.index0 else '0.000' %}
+                                                <div class="procurement-cart-row {% if qty_num == 0 %}qty-zero{% endif %}">
+                                                    <div class="procurement-cart-item-name">{{ item_trimmed }}</div>
+                                                    <div class="procurement-cart-qty">
+                                                        <span class="readonly-qty-pill">{{ qty or '0' }}</span>
+                                                    </div>
+                                                    <div class="procurement-cart-amount">
+                                                        <span class="readonly-qty-pill">{{ amt_val or '0.000' }}</span>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    {% set qty_single = (quantity_source or '').split(';')[0] if quantity_source else '' %}
+                                    {% if ':' in qty_single %}
+                                        {% set parts = qty_single.split(':', 1) %}
+                                        {% set qty_single = parts[1].strip() if parts|length > 1 else qty_single %}
+                                    {% endif %}
+                                    {% set qty_single_num = qty_single|int(0) %}
+                                    {% set amt_single = amount_list[0] if amount_list|length > 0 else '0.000' %}
+                                    <div class="procurement-cart-table">
+                                        <div class="procurement-cart-header-row">
+                                            <div>Item</div>
+                                            <div style="text-align: left;">Quantity</div>
+                                            <div style="text-align: right;">Amount</div>
+                                        </div>
+                                        <div class="procurement-cart-row {% if qty_single_num == 0 %}qty-zero{% endif %}">
+                                            <div class="procurement-cart-item-name">{{ item_request.item_name }}</div>
+                                            <div class="procurement-cart-qty">
+                                                <span class="readonly-qty-pill">{{ qty_single or '0' }}</span>
+                                            </div>
+                                            <div class="procurement-cart-amount">
+                                                <span class="readonly-qty-pill">{{ amt_single or '0.000' }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+
+                                {% set readonly_ns = namespace(total=0.0) %}
+                                {% for amt in amount_list %}
+                                    {% set readonly_ns.total = readonly_ns.total + (amt | float) %}
+                                {% endfor %}
+                                <div class="procurement-cart-total-row">
+                                    <div class="procurement-cart-total-label">TOTAL AMOUNT</div>
+                                    <div class="procurement-cart-total-value">OMR {{ '%.3f'|format(readonly_ns.total) }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
                     </div>
                 </div>
             {% else %}
@@ -3736,7 +3918,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const submitButton = itemRequestCompleteForm.querySelector('button[type="submit"]');
         let originalButtonHTML = submitButton ? submitButton.innerHTML : '';
         
-        itemRequestCompleteForm.addEventListener('submit', function(e) {
+    itemRequestCompleteForm.addEventListener('submit', function(e) {
+        // Prevent duplicate submissions
+        if (this.dataset.mcSubmitting === 'true') {
+            return;
+        }
+
+        // Locate assigned procurement form once
+        const assignedForm = Array.from(document.querySelectorAll('form[action*="update_quantities"]')).find(f => {
+            const action = f.getAttribute('action') || '';
+            return !action.includes('update_quantities_manager') && !action.includes('update_quantities_procurement_manager');
+        });
             // Function to reset button state
             const resetButton = () => {
                 if (submitButton) {
@@ -3763,18 +3955,22 @@ document.addEventListener('DOMContentLoaded', function() {
             const amountInputs = document.querySelectorAll('input[name="amounts[]"]');
             if (amountInputs.length > 0) {
                 let hasEmptyAmount = false;
-                
                 amountInputs.forEach(input => {
                     const valueStr = String(input.value || '').trim();
                     const amount = parseFloat(valueStr);
+                    const index = input.dataset.index || input.id.replace('cart_amount_', '');
+                    const qtyInput = document.getElementById('cart_qty_' + index);
+                    const qtyVal = qtyInput ? parseInt(qtyInput.value || '0', 10) : null;
                     
-                    // Check if empty, "0", NaN, or <= 0 - ANY of these means invalid
+                    // If quantity is zero, allow empty/zero amount
+                    const skipAmount = qtyVal === 0;
+                    
                     const isEmpty = valueStr === '';
                     const isZero = valueStr === '0';
                     const isNaNValue = isNaN(amount);
                     const isNotPositive = amount <= 0;
                     
-                    if (isEmpty || isZero || isNaNValue || isNotPositive) {
+                    if (!skipAmount && (isEmpty || isZero || isNaNValue || isNotPositive)) {
                         hasEmptyAmount = true;
                         if (!firstInvalidInput) {
                             firstInvalidInput = input;
@@ -3783,7 +3979,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 
                 if (hasEmptyAmount) {
-                    errors.push('Please fill in all amount fields before completing the request.');
+                    errors.push('Please fill in all amount fields before completing the request (amounts not required for items with quantity 0).');
+                }
+            }
+
+            // Validate rejection reason if any quantity is 0 (assigned procurement)
+            if (assignedForm) {
+                const qtyInputs = assignedForm.querySelectorAll('input[name="quantities[]"]');
+                let hasZero = false;
+                qtyInputs.forEach(input => {
+                    const qty = parseInt(input.value || '0', 10);
+                    if (qty === 0) hasZero = true;
+                });
+                if (hasZero) {
+                    const rejectionField = assignedForm.querySelector('#assigned_quantity_rejection_reason') ||
+                                           assignedForm.querySelector('#assigned_quantity_rejection_reason_single') ||
+                                           assignedForm.querySelector('textarea[name="quantity_rejection_reason"]');
+                    if (rejectionField && !rejectionField.value.trim()) {
+                        errors.push('Please provide a reason for rejecting the item(s) with quantity set to 0.');
+                        if (!firstInvalidInput) firstInvalidInput = rejectionField;
+                    }
                 }
             }
             
@@ -3841,76 +4056,113 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show combined error message in a readable list format
                 const errorMessage = 'Please fix the following issues before completing the request:<br><br>' + 
                     errors.map(err => '• ' + err).join('<br>');
-                showReceiptUploadErrorDialog(errorMessage);
+                showMarkCompleteValidationErrorDialog(errorMessage);
                 return false;
             }
             
             // Validate receipt amount - must be > 0
+            // Validate receipt amount - must be > 0 only if a new receipt is being uploaded
             const receiptAmountInput = this.querySelector('input[name="receipt_amount"]');
-            if (receiptAmountInput) {
+            if (receiptAmountInput && !hasExistingReceipts) {
                 const receiptAmount = parseFloat(receiptAmountInput.value);
                 if (isNaN(receiptAmount) || receiptAmount <= 0) {
                     resetButton();
-                    showReceiptUploadErrorDialog('Receipt Amount must be greater than 0.');
+                    showMarkCompleteValidationErrorDialog('Receipt Amount must be greater than 0.');
                     return false;
                 }
             }
             
-            // Validate receipt reference number - must not be empty
+            // Validate receipt reference number - must not be empty only if a new receipt is being uploaded
             const receiptRefInput = this.querySelector('input[name="receipt_reference_number"]');
-            if (receiptRefInput) {
+            if (receiptRefInput && !hasExistingReceipts) {
                 const receiptRef = receiptRefInput.value.trim();
                 if (!receiptRef || receiptRef === '') {
                     resetButton();
-                    showReceiptUploadErrorDialog('Receipt Reference Number is required.');
+                    showMarkCompleteValidationErrorDialog('Receipt Reference Number is required.');
                     return false;
                 }
             }
             
-            // Validate invoice amount - must be > 0
+            // Validate invoice amount - must be > 0 only if a new invoice is being uploaded
             const invoiceAmountInput = this.querySelector('input[name="invoice_amount"]');
-            if (invoiceAmountInput) {
+            if (invoiceAmountInput && !hasExistingInvoices) {
                 const invoiceAmount = parseFloat(invoiceAmountInput.value);
                 if (isNaN(invoiceAmount) || invoiceAmount <= 0) {
                     resetButton();
-                    showReceiptUploadErrorDialog('Invoice Amount must be greater than 0.');
+                    showMarkCompleteValidationErrorDialog('Invoice Amount must be greater than 0.');
                     return false;
                 }
             }
             
-            // All validations passed - proceed with submission
-            if (receiptContainer && receiptContainer.uploadComponent && invoiceContainer && invoiceContainer.uploadComponent) {
-                const receiptComponent = receiptContainer.uploadComponent;
-                const invoiceComponent = invoiceContainer.uploadComponent;
-                
-                // Prepare form data with all selected files
-                const formData = new FormData(this);
-                receiptComponent.prepareFormData(formData);
-                invoiceComponent.prepareFormData(formData);
-                
-                // Submit the form with FormData
-                fetch(this.action, {
+            // All validations passed - first save quantities/amounts (assigned procurement), then submit completion with uploads
+            this.dataset.mcSubmitting = 'true';
+
+            const saveAssigned = () => {
+                if (!assignedForm) return Promise.resolve({ ok: true });
+                const assignedData = new FormData(assignedForm);
+                return fetch(assignedForm.action, {
                     method: 'POST',
-                    body: formData
+                    body: assignedData
+                });
+            };
+
+            const submitCompletion = () => {
+                const formData = new FormData(this);
+                if (assignedForm) {
+                    const extraFields = assignedForm.querySelectorAll('input[name], textarea[name], select[name]');
+                    extraFields.forEach(field => {
+                        const { name, type } = field;
+                        if (!name) return;
+                        if (type === 'checkbox' || type === 'radio') {
+                            if (!field.checked) return;
+                        }
+                        formData.append(name, field.value ?? '');
+                    });
+                }
+                if (receiptContainer && receiptContainer.uploadComponent) {
+                    receiptContainer.uploadComponent.prepareFormData(formData);
+                }
+                if (invoiceContainer && invoiceContainer.uploadComponent) {
+                    invoiceContainer.uploadComponent.prepareFormData(formData);
+                }
+
+                return fetch(this.action, {
+                    method: 'POST',
+                    body: formData,
+                });
+            };
+
+            saveAssigned()
+                .then(res => {
+                    if (!res || !res.ok) {
+                        throw new Error('save-assigned-failed');
+                    }
+                    return submitCompletion();
                 })
                 .then(response => {
-                    if (response.ok) {
-                        window.location.href = window.location.href;
-                    } else {
-                        resetButton();
-                        console.error('Form submission failed');
-                        alert('Form submission failed. Please try again.');
+                    if (!response) {
+                        throw new Error('complete-failed');
                     }
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                        return;
+                    }
+                    if (response.ok) {
+                        window.location.reload();
+                        return;
+                    }
+                    throw new Error('complete-failed');
                 })
-                .catch(error => {
+                .catch(err => {
+                    console.error('Error:', err);
                     resetButton();
-                    console.error('Error:', error);
-                    alert('An error occurred. Please try again.');
+                    this.dataset.mcSubmitting = 'false';
+                    if (String(err.message || '').includes('save-assigned')) {
+                        showMarkCompleteValidationErrorDialog('Could not save quantities/amounts before completing. Please try again.');
+                    } else {
+                        showMarkCompleteValidationErrorDialog('Form submission failed. Please try again.');
+                    }
                 });
-            } else {
-                // Fallback to regular form submission if components not found
-                this.submit();
-            }
         });
     }
 });
@@ -3981,6 +4233,7 @@ function updateCartQuantityState(index) {
     
     // Show or hide rejection reason as quantities change
     checkManagerRejectionReasonRequired();
+    checkAssignedProcurementRejectionReasonRequired();
 }
 
 function calculateAssignedProcurementTotal() {
@@ -4366,6 +4619,73 @@ function checkProcurementManagerRejectionReasonRequired() {
     }
 }
 
+// Check if assigned procurement rejection reason is required (when any quantity is 0)
+function checkAssignedProcurementRejectionReasonRequired() {
+    const assignedForm = Array.from(document.querySelectorAll('form[action*="update_quantities"]')).find(f => {
+        const action = f.getAttribute('action') || '';
+        return !action.includes('update_quantities_manager') && !action.includes('update_quantities_procurement_manager');
+    });
+
+    const multiGroup = document.getElementById('assigned_rejection_reason_group');
+    const multiField = document.getElementById('assigned_quantity_rejection_reason');
+    const multiSavedGroup = document.getElementById('assigned_saved_rejection_reason_group');
+    const singleGroup = document.getElementById('assigned_rejection_reason_group_single');
+    const singleField = document.getElementById('assigned_quantity_rejection_reason_single');
+    const singleSavedGroup = document.getElementById('assigned_saved_rejection_reason_group_single');
+
+    if (!assignedForm) {
+        // Hide any assigned-specific reason fields if form not present
+        [multiGroup, singleGroup].forEach(g => { if (g) g.style.display = 'none'; });
+        [multiField, singleField].forEach(f => { if (f) f.removeAttribute('required'); });
+        if (multiSavedGroup) multiSavedGroup.style.display = 'none';
+        if (singleSavedGroup) singleSavedGroup.style.display = 'none';
+        return;
+    }
+
+    const quantityInputs = assignedForm.querySelectorAll('input[name="quantities[]"]');
+    let hasZero = false;
+    quantityInputs.forEach(input => {
+        const qty = parseInt(input.value || '0', 10);
+        if (qty === 0) {
+            hasZero = true;
+        }
+    });
+
+    // Multi-item form fields
+    if (multiGroup && multiField && quantityInputs.length > 1) {
+        if (hasZero) {
+            multiGroup.style.display = 'block';
+            multiField.setAttribute('required', 'required');
+            if (multiSavedGroup && multiSavedGroup.querySelector('p') && multiSavedGroup.querySelector('p').textContent.trim()) {
+                multiSavedGroup.style.display = 'block';
+            }
+        } else {
+            multiGroup.style.display = 'none';
+            multiField.removeAttribute('required');
+            if (multiSavedGroup) {
+                multiSavedGroup.style.display = 'none';
+            }
+        }
+    }
+
+    // Single-item form fields
+    if (singleGroup && singleField && quantityInputs.length === 1) {
+        if (hasZero) {
+            singleGroup.style.display = 'block';
+            singleField.setAttribute('required', 'required');
+            if (singleSavedGroup && singleSavedGroup.querySelector('p') && singleSavedGroup.querySelector('p').textContent.trim()) {
+                singleSavedGroup.style.display = 'block';
+            }
+        } else {
+            singleGroup.style.display = 'none';
+            singleField.removeAttribute('required');
+            if (singleSavedGroup) {
+                singleSavedGroup.style.display = 'none';
+            }
+        }
+    }
+}
+
 // Store original quantity values for unsaved edits detection
 let originalQuantityValues = {};
 
@@ -4505,6 +4825,82 @@ function closeAmountValidationErrorDialog() {
             submitButton.disabled = false;
             submitButton.innerHTML = '<i class="fas fa-check"></i> Mark as Completed';
         }
+    }
+}
+
+// Function to show rejection reason error dialog (assigned procurement)
+function showAssignedRejectionReasonErrorDialog(message) {
+    let errorModal = document.getElementById('assigned-rejection-error-modal');
+    if (!errorModal) {
+        errorModal = document.createElement('div');
+        errorModal.id = 'assigned-rejection-error-modal';
+        errorModal.className = 'flash-error-modal';
+        errorModal.style.display = 'flex';
+        errorModal.innerHTML = `
+            <div class="flash-error-backdrop"></div>
+            <div class="flash-error-dialog">
+                <h3 class="flash-error-title"><i class="fas fa-exclamation-circle"></i> Error</h3>
+                <div class="flash-error-body">
+                    ${message || 'Please provide a reason for rejecting the item(s) with quantity set to 0.'}
+                </div>
+                <div class="flash-error-actions">
+                    <button type="button" class="flash-error-ok-btn" onclick="closeAssignedRejectionReasonErrorDialog()">OK</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(errorModal);
+        document.body.classList.add('flash-error-open');
+    } else {
+        const body = errorModal.querySelector('.flash-error-body');
+        if (body) {
+            body.innerHTML = message || 'Please provide a reason for rejecting the item(s) with quantity set to 0.';
+        }
+        errorModal.style.display = 'flex';
+        document.body.classList.add('flash-error-open');
+    }
+}
+
+function closeAssignedRejectionReasonErrorDialog() {
+    const errorModal = document.getElementById('assigned-rejection-error-modal');
+    if (errorModal) {
+        errorModal.style.display = 'none';
+        document.body.classList.remove('flash-error-open');
+    }
+}
+
+// Unified validation error modal for Mark as Completed
+function showMarkCompleteValidationErrorDialog(message) {
+    // Remove any existing modal to avoid duplicates
+    const existing = document.getElementById('mark-complete-error-modal');
+    if (existing) {
+        existing.remove();
+    }
+
+    const errorModal = document.createElement('div');
+    errorModal.id = 'mark-complete-error-modal';
+    errorModal.className = 'flash-error-modal';
+    errorModal.style.display = 'flex';
+    errorModal.innerHTML = `
+        <div class="flash-error-backdrop"></div>
+        <div class="flash-error-dialog">
+            <h3 class="flash-error-title"><i class="fas fa-exclamation-circle"></i> Error</h3>
+            <div class="flash-error-body">
+                ${message || 'Please fix the highlighted issues before completing the request.'}
+            </div>
+            <div class="flash-error-actions">
+                <button type="button" class="flash-error-ok-btn" onclick="closeMarkCompleteValidationErrorDialog()">OK</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(errorModal);
+    document.body.classList.add('flash-error-open');
+}
+
+function closeMarkCompleteValidationErrorDialog() {
+    const errorModal = document.getElementById('mark-complete-error-modal');
+    if (errorModal) {
+        errorModal.style.display = 'none';
+        document.body.classList.remove('flash-error-open');
     }
 }
 
@@ -4776,8 +5172,28 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Validation function that can be called from both form submit and button click
         const validateAndSubmit = function(formElement) {
-            // For Save Quantities & Amounts: allow blank/zero amounts; only update originals after submit
             const quantityInputs = formElement.querySelectorAll('input[name="quantities[]"]');
+            let hasZero = false;
+            quantityInputs.forEach(input => {
+                const qty = parseInt(input.value || '0', 10);
+                if (qty === 0) {
+                    hasZero = true;
+                }
+            });
+
+            if (hasZero) {
+                const rejectionField = formElement.querySelector('#assigned_quantity_rejection_reason') ||
+                                        formElement.querySelector('#assigned_quantity_rejection_reason_single') ||
+                                        formElement.querySelector('textarea[name="quantity_rejection_reason"]');
+                if (rejectionField && !rejectionField.value.trim()) {
+                    checkAssignedProcurementRejectionReasonRequired();
+                    showAssignedRejectionReasonErrorDialog('Please provide a reason for rejecting the item(s) with quantity set to 0.');
+                    rejectionField.focus();
+                    return false;
+                }
+            }
+
+            // For Save Quantities & Amounts: allow blank/zero amounts; only update originals after submit
             quantityInputs.forEach(input => {
                 const index = input.getAttribute('data-index') || input.id.replace('cart_qty_', '');
                 originalQuantityValues['assigned_' + index] = parseInt(input.value || '0', 10);
@@ -4864,6 +5280,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         index++;
     }
+
+    // Initialize visibility for assigned procurement rejection reason on load
+    checkAssignedProcurementRejectionReasonRequired();
     
     // Validate manager decision form
     const managerDecisionForm = document.querySelector('form[action*="item_request_manager_decision"]');
