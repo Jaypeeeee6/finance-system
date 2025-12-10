@@ -2428,7 +2428,7 @@ def get_unread_count_for_user(user):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned',
+                        'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'item_request_updated',
                         'request_returned', 'request_on_hold'
                     ]),
                     Notification.notification_type == 'temporary_manager_assignment'
@@ -5406,6 +5406,208 @@ def item_request_procurement_manager_reject(request_id):
     return redirect(url_for('view_item_request_page', request_id=request_id))
 
 
+@app.route('/procurement/item-request/<int:request_id>/save_uploads', methods=['POST'])
+@login_required
+def item_request_save_uploads(request_id):
+    """Allow assigned procurement staff to save uploads incrementally before completion."""
+    item_request = ProcurementItemRequest.query.get_or_404(request_id)
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    def error_response(message):
+        if is_ajax:
+            return jsonify({'success': False, 'message': message}), 400
+        flash(message, 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Authorization mirrors completion rules
+    if current_user.department != 'Procurement':
+        return error_response('Only procurement staff can save uploads for this request.')
+
+    if current_user.role in ['GM', 'Operation Manager']:
+        return error_response('You do not have permission to save uploads for this request.')
+
+    if item_request.status != 'Assigned to Procurement':
+        return error_response('Uploads can only be saved while the request is assigned to procurement.')
+
+    if not item_request.assigned_to_user_id or item_request.assigned_to_user_id != current_user.user_id:
+        return error_response('Only the assigned procurement staff member can save uploads for this request.')
+
+    # Optional fields (validate if provided)
+    receipt_amount_value = None
+    receipt_amount_str = request.form.get('receipt_amount', '').strip()
+    if receipt_amount_str:
+        try:
+            receipt_amount_value = float(receipt_amount_str)
+            if receipt_amount_value <= 0:
+                raise ValueError()
+        except Exception:
+            return error_response('Please enter a valid positive receipt amount in OMR or leave it blank.')
+
+    invoice_amount_value = None
+    invoice_amount_str = request.form.get('invoice_amount', '').strip()
+    if invoice_amount_str:
+        try:
+            invoice_amount_value = float(invoice_amount_str)
+            if invoice_amount_value <= 0:
+                raise ValueError()
+        except Exception:
+            return error_response('Please enter a valid positive invoice amount in OMR or leave it blank.')
+
+    receipt_reference_number = request.form.get('receipt_reference_number', '').strip()
+    if receipt_reference_number and not re.match(r'^[A-Za-z0-9]+$', receipt_reference_number):
+        return error_response('Receipt reference number must contain only letters and numbers (no spaces or symbols).')
+
+    completion_notes = request.form.get('completion_notes', '').strip()
+
+    # Collect uploaded files
+    receipt_files = request.files.getlist('receipt_files')
+    invoice_files = request.files.getlist('invoice_files')
+
+    has_new_receipts = receipt_files and any(f.filename for f in receipt_files)
+    has_new_invoices = invoice_files and any(f.filename for f in invoice_files)
+
+    if not has_new_receipts and not has_new_invoices and not any([receipt_amount_str, invoice_amount_str, receipt_reference_number, completion_notes]):
+        return error_response('Please select at least one receipt or invoice file to save.')
+
+    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
+    max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+    uploaded_receipt_filenames = []
+    uploaded_invoice_filenames = []
+
+    # Helper to load existing files safely
+    def _load_existing(json_field):
+        if not json_field:
+            return []
+        try:
+            data = json.loads(json_field)
+            if isinstance(data, list):
+                return data
+            return [json_field]
+        except Exception:
+            return [json_field]
+
+    existing_receipts = _load_existing(item_request.receipt_path)
+    existing_invoices = _load_existing(item_request.invoice_path)
+    had_receipts_before = len(existing_receipts) > 0
+    had_invoices_before = len(existing_invoices) > 0
+    has_saved_receipt_values = item_request.receipt_amount is not None and bool(item_request.receipt_reference_number)
+    has_saved_invoice_amount = item_request.invoice_amount is not None
+
+    # Enforce required receipt fields on first receipt upload
+    if has_new_receipts and not (had_receipts_before or has_saved_receipt_values):
+        if receipt_amount_value is None:
+            return error_response('Receipt amount is required when uploading the first receipt.')
+        if not receipt_reference_number:
+            return error_response('Receipt reference number is required when uploading the first receipt.')
+
+    # Enforce required invoice amount on first invoice upload
+    if has_new_invoices and not (had_invoices_before or has_saved_invoice_amount):
+        if invoice_amount_value is None:
+            return error_response('Invoice amount is required when uploading the first invoice.')
+
+    # Process receipt files
+    if has_new_receipts:
+        for receipt_file in receipt_files:
+            if receipt_file and receipt_file.filename:
+                file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
+                if file_extension not in allowed_extensions:
+                    flash(f'Invalid file type for receipt "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'danger')
+                    return redirect(url_for('view_item_request_page', request_id=request_id))
+
+                file_size = len(receipt_file.read())
+                if file_size > max_file_size:
+                    flash(f'Receipt file "{receipt_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'danger')
+                    return redirect(url_for('view_item_request_page', request_id=request_id))
+
+                receipt_file.seek(0)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+                filename = secure_filename(receipt_file.filename)
+                filename = f"item_receipt_{request_id}_{timestamp}_{filename}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                receipt_file.save(filepath)
+                uploaded_receipt_filenames.append(filename)
+
+    # Process invoice files
+    if has_new_invoices:
+        for invoice_file in invoice_files:
+            if invoice_file and invoice_file.filename:
+                file_extension = invoice_file.filename.rsplit('.', 1)[1].lower() if '.' in invoice_file.filename else ''
+                if file_extension not in allowed_extensions:
+                    flash(f'Invalid file type for invoice "{invoice_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'danger')
+                    return redirect(url_for('view_item_request_page', request_id=request_id))
+
+                file_size = len(invoice_file.read())
+                if file_size > max_file_size:
+                    flash(f'Invoice file "{invoice_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'danger')
+                    return redirect(url_for('view_item_request_page', request_id=request_id))
+
+                invoice_file.seek(0)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+                filename = secure_filename(invoice_file.filename)
+                filename = f"item_invoice_{request_id}_{timestamp}_{filename}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                invoice_file.save(filepath)
+                uploaded_invoice_filenames.append(filename)
+
+    # Merge new and existing files
+    all_receipts = existing_receipts + uploaded_receipt_filenames
+    all_invoices = existing_invoices + uploaded_invoice_filenames
+
+    item_request.receipt_path = json.dumps(all_receipts) if all_receipts else None
+    item_request.invoice_path = json.dumps(all_invoices) if all_invoices else None
+
+    if receipt_amount_value is not None:
+        item_request.receipt_amount = receipt_amount_value
+    if invoice_amount_value is not None:
+        item_request.invoice_amount = invoice_amount_value
+    if receipt_reference_number:
+        item_request.receipt_reference_number = receipt_reference_number
+    if completion_notes:
+        item_request.completion_notes = completion_notes
+
+    item_request.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    # Notify authorized users about saved uploads
+    try:
+        recipient_ids = set()
+        if item_request.user_id:
+            recipient_ids.add(item_request.user_id)
+        # Authorized approvers (GM, operation manager, manager chain, etc.)
+        for user in get_authorized_manager_approvers_for_item_request(item_request):
+            recipient_ids.add(user.user_id)
+        # Procurement Department Manager(s)
+        procurement_mgrs = User.query.filter_by(department='Procurement', role='Department Manager').all()
+        for pm in procurement_mgrs:
+            recipient_ids.add(pm.user_id)
+        # All procurement staff
+        procurement_staff = User.query.filter_by(department='Procurement').all()
+        for staff in procurement_staff:
+            recipient_ids.add(staff.user_id)
+
+        title = f"Uploads saved for Item Request #{request_id}"
+        who = current_user.name or 'assigned procurement staff'
+        message = f"{who} saved receipt/invoice uploads for Item Request #{request_id}."
+        for uid in recipient_ids:
+            create_notification(uid, title, message, 'item_request_updated', item_request_id=request_id)
+    except Exception as e:
+        app.logger.warning(f"Failed to send upload notifications for item request #{request_id}: {e}")
+
+    log_action(f"Procurement member saved uploads for item request #{request_id}")
+
+    # Return JSON for AJAX saves, otherwise redirect with flash
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'success': True,
+            'message': 'Uploads saved successfully.',
+            'receipt_files': all_receipts,
+            'invoice_files': all_invoices
+        })
+
+    flash('Uploads saved. You can add more before marking this request as completed.', 'success')
+    return redirect(url_for('view_item_request_page', request_id=request_id))
+
+
 @app.route('/procurement/item-request/<int:request_id>/complete', methods=['POST'])
 @login_required
 def item_request_complete(request_id):
@@ -5895,6 +6097,10 @@ def update_item_request_quantities(request_id):
         procurement_mgrs = User.query.filter_by(department='Procurement', role='Department Manager').all()
         for pm in procurement_mgrs:
             recipient_ids.add(pm.user_id)
+        # All procurement staff
+        procurement_staff = User.query.filter_by(department='Procurement').all()
+        for staff in procurement_staff:
+            recipient_ids.add(staff.user_id)
         # Send notifications
         title = f"Quantities & amounts updated for Item Request #{request_id}"
         message = f"Quantities and amounts were updated by {assigned_name or 'assigned procurement staff'} for Item Request #{request_id}."

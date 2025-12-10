@@ -2606,7 +2606,8 @@
                     </div>
                     <div class="card-body">
                         {% set amount_list = (item_request.procurement_amounts or '').split(';') %}
-                        {% set quantity_source = item_request.procurement_quantities or item_request.quantity %}
+                        {# Prefer saved procurement quantities, then procurement manager approved, then original request #}
+                        {% set quantity_source = item_request.procurement_quantities or item_request.procurement_manager_quantities or item_request.quantity %}
                         {% if ',' in item_request.item_name %}
                             {% set item_list = item_request.item_name.split(',') %}
                             {% set quantity_list = (quantity_source or '').split(';') if quantity_source else [] %}
@@ -2693,13 +2694,13 @@
 
                 <!-- Display uploaded files (if any) -->
                 {% if receipt_files or invoice_files %}
-                <div class="card assigned-section" style="margin-bottom: 1.5rem;">
+                <div class="card assigned-section" style="margin-bottom: 1.5rem;" id="uploaded-files-card">
                     <div class="card-header">
                         <h4>Uploaded Files</h4>
                     </div>
                     <div class="card-body">
                         {% if receipt_files %}
-                        <div class="form-group">
+                        <div class="form-group" id="uploaded-receipts-list">
                             <label><i class="fas fa-check-circle"></i> Receipt (Proof of transfer made by the Procurement Manager)</label>
                             {% for file in receipt_files %}
                             <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
@@ -2712,7 +2713,7 @@
                         </div>
                         {% endif %}
                         {% if invoice_files %}
-                        <div class="form-group">
+                        <div class="form-group" id="uploaded-invoices-list">
                             <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
                             {% for file in invoice_files %}
                             <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
@@ -2919,6 +2920,11 @@
                                             <textarea name="completion_notes" id="completion_notes" rows="3" placeholder="Add any notes about the completion..."></textarea>
                                         </div>
                                         
+                                        <div class="step-actions" style="margin-bottom: 10px;">
+                                            <button type="button" class="btn btn-success" id="save-uploads-btn">
+                                                <i class="fas fa-save"></i> Save Uploads
+                                            </button>
+                                        </div>
                                         <div class="step-actions">
                                             <button type="submit" class="btn btn-success">
                                                 <i class="fas fa-check"></i> Mark as Completed
@@ -3577,6 +3583,152 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle item request completion form submission with multiple file upload components
     const itemRequestCompleteForm = document.getElementById('item-request-complete-form');
     if (itemRequestCompleteForm) {
+        const hasExistingReceipts = {{ 'true' if receipt_files else 'false' }};
+        const hasExistingInvoices = {{ 'true' if invoice_files else 'false' }};
+        // Helper to render uploaded files card without a full reload
+        const renderUploadedFiles = (receipts, invoices) => {
+            const card = document.getElementById('uploaded-files-card');
+            if (!card) return;
+            const receiptsList = document.getElementById('uploaded-receipts-list');
+            const invoicesList = document.getElementById('uploaded-invoices-list');
+
+            // If no files at all, hide the card
+            if ((!receipts || receipts.length === 0) && (!invoices || invoices.length === 0)) {
+                card.style.display = 'none';
+                return;
+            }
+
+            card.style.display = 'block';
+
+            if (receiptsList) {
+                if (receipts && receipts.length > 0) {
+                    receiptsList.style.display = 'block';
+                    receiptsList.innerHTML = `
+                        <label><i class="fas fa-check-circle"></i> Receipt (Proof of transfer made by the Procurement Manager)</label>
+                        ${receipts.map((file, idx) => `
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                <a href="${window.location.origin + "{{ url_for('uploaded_file', filename='__FILE__') }}".replace('__FILE__', file)}" target="_blank" class="btn btn-warning">
+                                    <i class="fas fa-download"></i> View Receipt ${idx + 1}
+                                </a>
+                                <small style="color: #666; margin-left: 10px;">${file.includes('_') ? file.split('_', 2)[1] || file : file}</small>
+                            </div>
+                        `).join('')}
+                    `;
+                } else {
+                    receiptsList.style.display = 'none';
+                    receiptsList.innerHTML = '';
+                }
+            }
+
+            if (invoicesList) {
+                if (invoices && invoices.length > 0) {
+                    invoicesList.style.display = 'block';
+                    invoicesList.innerHTML = `
+                        <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
+                        ${invoices.map((file, idx) => `
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                <a href="${window.location.origin + "{{ url_for('uploaded_file', filename='__FILE__') }}".replace('__FILE__', file)}" target="_blank" class="btn btn-warning">
+                                    <i class="fas fa-download"></i> View Invoice ${idx + 1}
+                                </a>
+                                <small style="color: #666; margin-left: 10px;">${file.includes('_') ? file.split('_', 2)[1] || file : file}</small>
+                            </div>
+                        `).join('')}
+                    `;
+                } else {
+                    invoicesList.style.display = 'none';
+                    invoicesList.innerHTML = '';
+                }
+            }
+        };
+
+        // Save uploads without completing the request
+        const saveUploadsBtn = document.getElementById('save-uploads-btn');
+        if (saveUploadsBtn) {
+            const originalSaveHTML = saveUploadsBtn.innerHTML;
+            saveUploadsBtn.addEventListener('click', function() {
+                if (hasUnsavedQuantityEdits()) {
+                    showQuantityEditErrorDialog();
+                    return;
+                }
+
+                const receiptContainer = document.getElementById('item-receipt-upload-container');
+                const invoiceContainer = document.getElementById('item-invoice-upload-container');
+                const receiptComponent = receiptContainer ? receiptContainer.uploadComponent : null;
+                const invoiceComponent = invoiceContainer ? invoiceContainer.uploadComponent : null;
+                const receiptInput = itemRequestCompleteForm.querySelector('input[name="receipt_files"]');
+                const invoiceInput = itemRequestCompleteForm.querySelector('input[name="invoice_files"]');
+
+                const hasReceiptFiles = receiptComponent
+                    ? receiptComponent.getFiles().length > 0
+                    : (receiptInput && receiptInput.files && receiptInput.files.length > 0);
+                const hasInvoiceFiles = invoiceComponent
+                    ? invoiceComponent.getFiles().length > 0
+                    : (invoiceInput && invoiceInput.files && invoiceInput.files.length > 0);
+
+                if (!hasReceiptFiles && !hasInvoiceFiles) {
+                    showReceiptUploadErrorDialog('Please select at least one receipt or invoice file to save.');
+                    return;
+                }
+
+                saveUploadsBtn.disabled = true;
+                saveUploadsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+                const formData = new FormData(itemRequestCompleteForm);
+                if (receiptComponent) {
+                    receiptComponent.prepareFormData(formData);
+                }
+                if (invoiceComponent) {
+                    invoiceComponent.prepareFormData(formData);
+                }
+                formData.append('save_uploads', 'true');
+
+                fetch("{{ url_for('item_request_save_uploads', request_id=item_request.id) }}", {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                })
+                .then(async response => {
+                    const contentType = response.headers.get('content-type') || '';
+                    let data = null;
+                    if (contentType.includes('application/json')) {
+                        data = await response.json();
+                    }
+
+                    if (response.ok && data && data.success) {
+                        renderUploadedFiles(data.receipt_files || [], data.invoice_files || []);
+                        saveUploadsBtn.disabled = false;
+                        saveUploadsBtn.innerHTML = originalSaveHTML;
+                        // Provide immediate success feedback and refresh to sync UI
+                        alert(data.message || 'Uploads saved successfully.');
+                        window.location.reload();
+                        return;
+                    }
+
+                    // Show error message if provided
+                    if (data && data.message) {
+                        saveUploadsBtn.disabled = false;
+                        saveUploadsBtn.innerHTML = originalSaveHTML;
+                        showReceiptUploadErrorDialog(data.message);
+                        return;
+                    }
+
+                    if (response.ok) {
+                        window.location.href = window.location.href;
+                        return;
+                    }
+
+                    throw new Error('Save failed');
+                })
+                .catch(() => {
+                    saveUploadsBtn.disabled = false;
+                    saveUploadsBtn.innerHTML = originalSaveHTML;
+                    showReceiptUploadErrorDialog('Could not save uploads. Please try again.');
+                });
+            });
+        }
+
         // Store original values for assigned procurement quantities before adding validation
         ensureOriginalValuesStored();
         
@@ -3641,38 +3793,42 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Validate receipt files
             let receiptFilesMissing = false;
-            if (receiptContainer && receiptContainer.uploadComponent) {
-                const receiptComponent = receiptContainer.uploadComponent;
-                if (receiptComponent.getFiles().length === 0) {
-                    receiptFilesMissing = true;
+            if (!hasExistingReceipts) {
+                if (receiptContainer && receiptContainer.uploadComponent) {
+                    const receiptComponent = receiptContainer.uploadComponent;
+                    if (receiptComponent.getFiles().length === 0) {
+                        receiptFilesMissing = true;
+                    }
+                } else {
+                    // Fallback: check if receipt file input exists and has files
+                    const receiptFileInput = this.querySelector('input[name="receipt_files"]');
+                    if (!receiptFileInput || !receiptFileInput.files || receiptFileInput.files.length === 0) {
+                        receiptFilesMissing = true;
+                    }
                 }
-            } else {
-                // Fallback: check if receipt file input exists and has files
-                const receiptFileInput = this.querySelector('input[name="receipt_files"]');
-                if (!receiptFileInput || !receiptFileInput.files || receiptFileInput.files.length === 0) {
-                    receiptFilesMissing = true;
+                if (receiptFilesMissing) {
+                    errors.push('Please select at least one receipt file to upload.');
                 }
-            }
-            if (receiptFilesMissing) {
-                errors.push('Please select at least one receipt file to upload.');
             }
             
             // Validate invoice files
             let invoiceFilesMissing = false;
-            if (invoiceContainer && invoiceContainer.uploadComponent) {
-                const invoiceComponent = invoiceContainer.uploadComponent;
-                if (invoiceComponent.getFiles().length === 0) {
-                    invoiceFilesMissing = true;
+            if (!hasExistingInvoices) {
+                if (invoiceContainer && invoiceContainer.uploadComponent) {
+                    const invoiceComponent = invoiceContainer.uploadComponent;
+                    if (invoiceComponent.getFiles().length === 0) {
+                        invoiceFilesMissing = true;
+                    }
+                } else {
+                    // Fallback: check if invoice file input exists and has files
+                    const invoiceFileInput = this.querySelector('input[name="invoice_files"]');
+                    if (!invoiceFileInput || !invoiceFileInput.files || invoiceFileInput.files.length === 0) {
+                        invoiceFilesMissing = true;
+                    }
                 }
-            } else {
-                // Fallback: check if invoice file input exists and has files
-                const invoiceFileInput = this.querySelector('input[name="invoice_files"]');
-                if (!invoiceFileInput || !invoiceFileInput.files || invoiceFileInput.files.length === 0) {
-                    invoiceFilesMissing = true;
+                if (invoiceFilesMissing) {
+                    errors.push('Please select at least one invoice file to upload.');
                 }
-            }
-            if (invoiceFilesMissing) {
-                errors.push('Please select at least one invoice file to upload.');
             }
             
             // If there are any errors, show them and stop
