@@ -152,6 +152,31 @@
     justify-content: flex-start;
 }
 
+.procurement-cart-total-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 8px;
+    align-items: center;
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+}
+
+.procurement-cart-total-label {
+    text-align: right;
+    font-weight: 600;
+    color: #111827;
+}
+
+.procurement-cart-total-value {
+    text-align: right;
+    font-weight: 700;
+    color: #111827;
+    letter-spacing: 0.01em;
+}
+
 .dashboard-container .card.assigned-section .card-header h4 {
     color: white !important;
     margin: 0 !important;
@@ -2636,6 +2661,14 @@
                                 </div>
                             </div>
                         {% endif %}
+                        {% set readonly_ns = namespace(total=0.0) %}
+                        {% for amt in amount_list %}
+                            {% set readonly_ns.total = readonly_ns.total + (amt | float) %}
+                        {% endfor %}
+                        <div class="procurement-cart-total-row">
+                            <div class="procurement-cart-total-label">TOTAL AMOUNT</div>
+                            <div class="procurement-cart-total-value" id="assignedProcurementTotal">OMR {{ '%.3f'|format(readonly_ns.total) }}</div>
+                        </div>
                     </div>
                 </div>
                 {% endif %}
@@ -2901,10 +2934,10 @@
                                                 <p style="color: #dc3545; font-size: 1rem; font-weight: 500; margin-bottom: 0.85rem;">
                                                     <strong>Note:</strong> If the item is not bought, set quantity to <strong>0</strong>.
                                                 </p>
+                                                {% set all_amounts = (item_request.procurement_amounts or '').split(';') %}
                                         {% if ',' in item_request.item_name %}
                                             {# Multi-item request #}
                                             {% set item_list = item_request.item_name.split(',') %}
-                                            {% set all_amounts = (item_request.procurement_amounts or '').split(';') %}
                                             {# Show the latest procurement-edited quantities; fall back to manager-approved, then original #}
                                             {% set raw_quantity_source = item_request.procurement_quantities or item_request.procurement_manager_quantities or item_request.quantity %}
                                             {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
@@ -2921,7 +2954,6 @@
                                                         <div style="text-align: left;">Quantity</div>
                                                         <div style="text-align: right;">Amount</div>
                                                     </div>
-                                                    {% set all_amounts = (item_request.procurement_amounts or '').split(';') %}
                                                     
                                                     {% for item in item_list %}
                                                         {% set item_trimmed = item.strip() %}
@@ -3038,6 +3070,15 @@
                                                     {% endfor %}
                                                 </div>
                                                 
+                                                {% set assigned_ns = namespace(total=0.0) %}
+                                                {% for amt in all_amounts %}
+                                                    {% set assigned_ns.total = assigned_ns.total + (amt | float) %}
+                                                {% endfor %}
+                                                <div class="procurement-cart-total-row">
+                                                    <div class="procurement-cart-total-label">TOTAL AMOUNT</div>
+                                                    <div class="procurement-cart-total-value" id="assignedProcurementTotal">OMR {{ '%.3f'|format(assigned_ns.total) }}</div>
+                                                </div>
+                                                
                                                 {% if can_complete %}
                                                 <div class="step-actions" style="margin-top: 1rem;">
                                                     <button type="button" class="btn btn-success save-quantities-amounts-btn">
@@ -3143,6 +3184,15 @@
                                                             {% if proc_qty_num > orig_qty_num %}more{% else %}less{% endif %} than requested.
                                                         {% endif %}
                                                     </div>
+                                                </div>
+                                                
+                                                {% set assigned_ns = namespace(total=0.0) %}
+                                                {% for amt in all_amounts %}
+                                                    {% set assigned_ns.total = assigned_ns.total + (amt | float) %}
+                                                {% endfor %}
+                                                <div class="procurement-cart-total-row">
+                                                    <div class="procurement-cart-total-label">TOTAL AMOUNT</div>
+                                                    <div class="procurement-cart-total-value" id="assignedProcurementTotal">OMR {{ '%.3f'|format(assigned_ns.total) }}</div>
                                                 </div>
                                                 
                                                 {% if can_complete %}
@@ -3777,6 +3827,24 @@ function updateCartQuantityState(index) {
     checkManagerRejectionReasonRequired();
 }
 
+function calculateAssignedProcurementTotal() {
+    const totalEl = document.getElementById('assignedProcurementTotal');
+    const amountInputs = document.querySelectorAll('#step-assigned input[id^="cart_amount_"]');
+    
+    // Skip if there is no total display or no editable amount inputs (e.g., read-only view)
+    if (!totalEl || amountInputs.length === 0) return;
+    
+    let total = 0;
+    amountInputs.forEach(input => {
+        const val = parseFloat(input.value);
+        if (!isNaN(val)) {
+            total += val;
+        }
+    });
+    
+    totalEl.textContent = 'OMR ' + total.toFixed(3);
+}
+
 // Quantity controls for Procurement Manager cart
 function adjustProcurementCartQuantity(index, delta) {
     index = parseInt(index, 10) || 0;
@@ -3954,6 +4022,8 @@ function enableCartQuantityEdit(index) {
             note.style.display = '';
         }
     }
+    
+    calculateAssignedProcurementTotal();
 }
 
 // Cancel editing for assigned procurement quantity (for items set to 0 by procurement manager)
@@ -3998,6 +4068,8 @@ function cancelCartQuantityEdit(index) {
         // Update quantity state
         updateCartQuantityState(index);
     }
+    
+    calculateAssignedProcurementTotal();
 }
 
 // Check if manager rejection reason is required (when any quantity is 0)
@@ -4538,6 +4610,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 originalQuantityValues['assigned_' + index] = value;
             }
         });
+        // Track amount inputs for total calculation
+        const amountInputs = form.querySelectorAll('input[name="amounts[]"]');
+        amountInputs.forEach(input => {
+            input.addEventListener('input', calculateAssignedProcurementTotal);
+            input.addEventListener('change', calculateAssignedProcurementTotal);
+        });
+        calculateAssignedProcurementTotal();
         
         // Validation function that can be called from both form submit and button click
         const validateAndSubmit = function(formElement) {
