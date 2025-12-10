@@ -2768,14 +2768,55 @@
                         {% if invoice_files %}
                         <div class="form-group" id="uploaded-invoices-list">
                             <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
+                            {% set invoice_amount_lookup = {} %}
+                            {% set invoice_items_lookup = {} %}
+                            {% set invoice_total_ns = namespace(total=0.0) %}
+                            {% for inv in invoice_entries or [] %}
+                                {% if inv.filename %}
+                                    {% set inv_amt = inv['amount'] if inv['amount'] is defined else None %}
+                                    {% set inv_items = inv['items'] if inv['items'] is defined else [] %}
+                                    {% if inv_items is none %}{% set inv_items = [] %}{% endif %}
+                                    {% set _ = invoice_amount_lookup.update({inv.filename: inv_amt}) %}
+                                    {% set _ = invoice_items_lookup.update({inv.filename: inv_items}) %}
+                                    {% if inv_amt %}
+                                        {% set invoice_total_ns.total = invoice_total_ns.total + (inv_amt | float) %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
                             {% for file in invoice_files %}
                             <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
                                 <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
                                     <i class="fas fa-download"></i> View Invoice {{ loop.index }}
                                 </a>
                                 <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                                {% if invoice_amount_lookup.get(file) %}
+                                <div style="margin-top: 6px; font-weight: 600; color: #1f2937;">Amount: OMR {{ '%.3f'|format(invoice_amount_lookup.get(file)|float) }}</div>
+                                {% endif %}
+                                {% if invoice_items_lookup.get(file) %}
+                                <div style="margin-top: 4px; color: #374151;">
+                                    <strong>Items:</strong>
+                                    <ul style="margin: 4px 0 0 18px; padding: 0;">
+                                        {% for itm in invoice_items_lookup.get(file) %}
+                                        <li>{{ itm }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
                             </div>
                             {% endfor %}
+                            {% if invoice_total_ns is not defined %}
+                                {% set invoice_total_ns = namespace(total=0.0) %}
+                            {% endif %}
+                            {% set invoice_total_value = (invoice_total_ns.total if invoice_total_ns.total > 0 else item_request.invoice_amount) %}
+                            {% if invoice_total_value is not none %}
+                            <div class="form-group" style="margin-top: 10px;">
+                                <label>Invoice Amount (OMR)</label>
+                                <input type="text"
+                                       value="{{ '%.3f'|format(invoice_total_value) }}"
+                                       readonly
+                                       style="background: #f5f5f5;">
+                            </div>
+                            {% endif %}
                         </div>
                         {% endif %}
                     </div>
@@ -2955,18 +2996,12 @@
                                                 })();
                                             </script>
                                         </div>
-                                        <div class="form-group">
-                                            <label for="completion_invoice_amount">Invoice Amount (OMR) <span style="color: red;">*</span></label>
-                                            <input type="number"
-                                                   name="invoice_amount"
-                                                   id="completion_invoice_amount"
-                                                   class="form-control"
-                                                   step="0.001"
-                                                   min="0"
-                                                   placeholder="Enter invoice amount paid to supplier in OMR"
-                                                   value="{% if item_request.invoice_amount is not none %}{{ '%.3f'|format(item_request.invoice_amount) }}{% endif %}"
-                                                   required>
+                                        <div class="form-group" id="invoice-item-mapping" style="margin-top: 10px; display: none;">
+                                            <label>Which item(s) does each invoice cover? <span style="color: red;">*</span></label>
+                                            <div id="invoice-item-mapping-list" style="display: grid; gap: 10px;"></div>
+                                            <small class="form-text text-muted">Select at least one item for every invoice file you upload.</small>
                                         </div>
+                                        <input type="hidden" name="invoice_item_map" id="invoice_item_map_input">
                                         
                                         <div class="form-group">
                                             <label for="completion_notes">Completion Notes (Optional)</label>
@@ -3355,11 +3390,24 @@
                                 <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
                             </div>
                             {% endfor %}
+                            {% if invoice_total_ns is not defined %}
+                                {% set invoice_total_ns = namespace(total=0.0) %}
+                            {% endif %}
+                            {% set invoice_total_value = (invoice_total_ns.total if invoice_total_ns.total > 0 else item_request.invoice_amount) %}
+                            {% if invoice_total_value is not none %}
+                            <div class="form-group" style="margin-top: 10px;">
+                                <label>Invoice Amount (OMR)</label>
+                                <input type="text"
+                                       value="{{ '%.3f'|format(invoice_total_value) }}"
+                                       readonly
+                                       style="background: #f5f5f5;">
+                            </div>
+                            {% endif %}
                         </div>
                         {% endif %}
 
                         {% if item_request.receipt_amount is not none or item_request.receipt_reference_number %}
-                        <div class="form-group">
+                        <div class="form-group" style="margin-top: 8px;">
                             <label>Receipt Amount (OMR)</label>
                             <input type="text"
                                    value="{% if item_request.receipt_amount is not none %}{{ '%.3f'|format(item_request.receipt_amount) }}{% else %}-{% endif %}"
@@ -3378,24 +3426,42 @@
                         {% if invoice_files %}
                         <div class="form-group">
                             <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
+                            {% set invoice_amount_lookup = {} %}
+                            {% set invoice_items_lookup = {} %}
+                            {% set invoice_total_ns = namespace(total=0.0) %}
+                            {% for inv in invoice_entries or [] %}
+                                {% if inv.filename %}
+                                    {% set inv_amt = inv['amount'] if inv['amount'] is defined else None %}
+                                    {% set inv_items = inv['items'] if inv['items'] is defined else [] %}
+                                    {% if inv_items is none %}{% set inv_items = [] %}{% endif %}
+                                    {% set _ = invoice_amount_lookup.update({inv.filename: inv_amt}) %}
+                                    {% set _ = invoice_items_lookup.update({inv.filename: inv_items}) %}
+                                    {% if inv_amt %}
+                                        {% set invoice_total_ns.total = invoice_total_ns.total + (inv_amt | float) %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
                             {% for file in invoice_files %}
                             <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
                                 <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
                                     <i class="fas fa-download"></i> View Invoice {{ loop.index }}
                                 </a>
                                 <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                                {% if invoice_amount_lookup.get(file) %}
+                                <div style="margin-top: 6px; font-weight: 600; color: #1f2937;">Amount: OMR {{ '%.3f'|format(invoice_amount_lookup.get(file)|float) }}</div>
+                                {% endif %}
+                                {% if invoice_items_lookup.get(file) %}
+                                <div style="margin-top: 4px; color: #374151;">
+                                    <strong>Items:</strong>
+                                    <ul style="margin: 4px 0 0 18px; padding: 0;">
+                                        {% for itm in invoice_items_lookup.get(file) %}
+                                        <li>{{ itm }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
                             </div>
                             {% endfor %}
-                        </div>
-                        {% endif %}
-
-                        {% if item_request.invoice_amount is not none %}
-                        <div class="form-group">
-                            <label>Invoice Amount (OMR)</label>
-                            <input type="text"
-                                   value="{{ '%.3f'|format(item_request.invoice_amount) }}"
-                                   readonly
-                                   style="background: #f5f5f5;">
                         </div>
                         {% endif %}
 
@@ -3534,21 +3600,7 @@
                             {% endfor %}
                         </div>
                         {% endif %}
-                        {% if invoice_files %}
-                        <div class="form-group">
-                            <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
-                            {% for file in invoice_files %}
-                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
-                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
-                                    <i class="fas fa-download"></i> View Invoice {{ loop.index }}
-                                </a>
-                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-
-                        {% if item_request.receipt_amount is not none or item_request.invoice_amount is not none or item_request.receipt_reference_number %}
+                        {% if item_request.receipt_amount is not none or item_request.receipt_reference_number %}
                         <div class="form-group">
                             <label>Receipt Amount (OMR)</label>
                             <input type="text"
@@ -3557,16 +3609,62 @@
                                    style="background: #f5f5f5;">
                         </div>
                         <div class="form-group">
-                            <label>Invoice Amount (OMR)</label>
-                            <input type="text"
-                                   value="{% if item_request.invoice_amount is not none %}{{ '%.3f'|format(item_request.invoice_amount) }}{% else %}-{% endif %}"
-                                   readonly
-                                   style="background: #f5f5f5;">
-                        </div>
-                        <div class="form-group">
                             <label>Receipt Reference Number</label>
                             <input type="text"
                                    value="{{ item_request.receipt_reference_number or '-' }}"
+                                   readonly
+                                   style="background: #f5f5f5;">
+                        </div>
+                        {% endif %}
+
+                        {% if invoice_files %}
+                        <div class="form-group">
+                            <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
+                            {% set invoice_amount_lookup = {} %}
+                            {% set invoice_items_lookup = {} %}
+                            {% set invoice_total_ns = namespace(total=0.0) %}
+                            {% for inv in invoice_entries or [] %}
+                                {% if inv.filename %}
+                                    {% set inv_amt = inv['amount'] if inv['amount'] is defined else None %}
+                                    {% set inv_items = inv['items'] if inv['items'] is defined else [] %}
+                                    {% if inv_items is none %}{% set inv_items = [] %}{% endif %}
+                                    {% set _ = invoice_amount_lookup.update({inv.filename: inv_amt}) %}
+                                    {% set _ = invoice_items_lookup.update({inv.filename: inv_items}) %}
+                                    {% if inv_amt %}
+                                        {% set invoice_total_ns.total = invoice_total_ns.total + (inv_amt | float) %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                            {% for file in invoice_files %}
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
+                                    <i class="fas fa-download"></i> View Invoice {{ loop.index }}
+                                </a>
+                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                                {% if invoice_amount_lookup.get(file) %}
+                                <div style="margin-top: 6px; font-weight: 600; color: #1f2937;">Amount: OMR {{ '%.3f'|format(invoice_amount_lookup.get(file)|float) }}</div>
+                                {% endif %}
+                                {% if invoice_items_lookup.get(file) %}
+                                <div style="margin-top: 4px; color: #374151;">
+                                    <strong>Items:</strong>
+                                    <ul style="margin: 4px 0 0 18px; padding: 0;">
+                                        {% for itm in invoice_items_lookup.get(file) %}
+                                        <li>{{ itm }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        {% set invoice_total_value = invoice_total_ns.total if (invoice_total_ns is defined and invoice_total_ns.total > 0) else item_request.invoice_amount %}
+                        {% if invoice_total_value is not none %}
+                        <div class="form-group">
+                            <label>Invoice Amount (OMR)</label>
+                            <input type="text"
+                                   value="{{ '%.3f'|format(invoice_total_value) }}"
                                    readonly
                                    style="background: #f5f5f5;">
                         </div>
@@ -3767,6 +3865,159 @@ document.addEventListener('DOMContentLoaded', function() {
     if (itemRequestCompleteForm) {
         const hasExistingReceipts = {{ 'true' if receipt_files else 'false' }};
         const hasExistingInvoices = {{ 'true' if invoice_files else 'false' }};
+        const invoiceItemOptions = {{ assigned_items|tojson }};
+        const invoiceItemQuantities = {{ assigned_item_quantities|tojson }};
+        const invoiceMappingWrapper = document.getElementById('invoice-item-mapping');
+        const invoiceMappingList = document.getElementById('invoice-item-mapping-list');
+        const invoiceItemMapInput = document.getElementById('invoice_item_map_input');
+        const receiptUploadContainer = document.getElementById('item-receipt-upload-container');
+        const invoiceUploadContainer = document.getElementById('item-invoice-upload-container');
+
+        const sanitizeForId = (val) => String(val || '').replace(/[^a-zA-Z0-9_-]/g, '');
+
+        const syncInvoiceItemMapInput = () => {
+            if (!invoiceItemMapInput || !invoiceMappingList) return {};
+            const map = {};
+            invoiceMappingList.querySelectorAll('[data-invoice-file]').forEach(group => {
+                const fileName = group.getAttribute('data-invoice-file');
+                const selected = Array.from(group.querySelectorAll('input[type="checkbox"]:checked'))
+                    .map(cb => cb.value)
+                    .filter(Boolean);
+                const amountInput = group.querySelector('input[type="number"][data-invoice-amount]');
+                let amountVal = amountInput ? parseFloat(amountInput.value) : null;
+                if (isNaN(amountVal)) {
+                    amountVal = null;
+                }
+                if (fileName && selected.length > 0) {
+                    map[fileName] = {
+                        items: selected,
+                        amount: amountVal,
+                    };
+                }
+            });
+            invoiceItemMapInput.value = JSON.stringify(map);
+            return map;
+        };
+
+        const renderInvoiceItemMapping = (files) => {
+            if (!invoiceMappingWrapper || !invoiceMappingList) return;
+            invoiceMappingList.innerHTML = '';
+            const fileList = Array.from(files || []);
+            if (fileList.length === 0) {
+                invoiceMappingWrapper.style.display = 'none';
+                if (invoiceItemMapInput) {
+                    invoiceItemMapInput.value = '';
+                }
+                return;
+            }
+
+            invoiceMappingWrapper.style.display = 'block';
+            fileList.forEach((file, idx) => {
+                const fileRow = document.createElement('div');
+                fileRow.className = 'invoice-mapping-row';
+                fileRow.style.padding = '10px';
+                fileRow.style.border = '1px solid #dee2e6';
+                fileRow.style.borderRadius = '6px';
+                fileRow.style.background = '#f8f9fa';
+                fileRow.setAttribute('data-invoice-file', file.name);
+
+                const title = document.createElement('div');
+                title.style.fontWeight = '600';
+                title.style.marginBottom = '6px';
+                title.textContent = file.name;
+                fileRow.appendChild(title);
+
+                const optionsWrap = document.createElement('div');
+                optionsWrap.style.display = 'flex';
+                optionsWrap.style.flexWrap = 'wrap';
+                optionsWrap.style.gap = '10px';
+
+                invoiceItemOptions.forEach((itemName, itemIdx) => {
+                    const qtyVal = Array.isArray(invoiceItemQuantities) && invoiceItemQuantities.length > itemIdx
+                        ? invoiceItemQuantities[itemIdx]
+                        : null;
+                    const optionId = `inv-${sanitizeForId(file.name)}-${itemIdx}`;
+                    const label = document.createElement('label');
+                    label.setAttribute('for', optionId);
+                    label.style.display = 'inline-flex';
+                    label.style.alignItems = 'center';
+                    label.style.gap = '6px';
+                    label.style.marginRight = '10px';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = optionId;
+                    checkbox.value = itemName;
+                    checkbox.className = 'invoice-item-checkbox';
+                    if (qtyVal !== null && qtyVal <= 0) {
+                        checkbox.disabled = true;
+                        label.title = 'This item has quantity 0 and cannot be selected.';
+                    }
+
+                    label.appendChild(checkbox);
+                    label.appendChild(document.createTextNode(itemName));
+                    optionsWrap.appendChild(label);
+                });
+
+                fileRow.appendChild(optionsWrap);
+
+                const amountWrap = document.createElement('div');
+                amountWrap.style.marginTop = '8px';
+                const amountLabel = document.createElement('label');
+                amountLabel.textContent = 'Invoice amount (OMR) *';
+                amountLabel.style.display = 'block';
+                amountLabel.style.fontWeight = '500';
+                amountLabel.style.marginBottom = '4px';
+                const amountInput = document.createElement('input');
+                amountInput.type = 'number';
+                amountInput.min = '0';
+                amountInput.step = '0.001';
+                amountInput.required = true;
+                amountInput.setAttribute('data-invoice-amount', 'true');
+                amountInput.style.width = '160px';
+                amountInput.placeholder = '0.000';
+                amountWrap.appendChild(amountLabel);
+                amountWrap.appendChild(amountInput);
+                fileRow.appendChild(amountWrap);
+
+                invoiceMappingList.appendChild(fileRow);
+            });
+
+            syncInvoiceItemMapInput();
+        };
+
+        if (invoiceMappingList) {
+            invoiceMappingList.addEventListener('change', function(e) {
+                if (e.target && e.target.classList.contains('invoice-item-checkbox')) {
+                    syncInvoiceItemMapInput();
+                }
+            });
+        }
+
+        const refreshInvoiceMapping = () => {
+            if (invoiceUploadContainer && invoiceUploadContainer.uploadComponent) {
+                renderInvoiceItemMapping(invoiceUploadContainer.uploadComponent.getFiles());
+            } else {
+                const fallbackInput = itemRequestCompleteForm.querySelector('input[name="invoice_files"]');
+                renderInvoiceItemMapping(fallbackInput ? fallbackInput.files : []);
+            }
+        };
+
+        if (invoiceUploadContainer) {
+            invoiceUploadContainer.addEventListener('multipleFileUpload:changed', (evt) => {
+                renderInvoiceItemMapping(evt.detail?.files || []);
+            });
+        }
+
+        const invoiceFileInputFallback = itemRequestCompleteForm.querySelector('input[name="invoice_files"]');
+        if (invoiceFileInputFallback) {
+            invoiceFileInputFallback.addEventListener('change', (e) => {
+                renderInvoiceItemMapping(e.target.files);
+            });
+        }
+
+        // Initialize mapping UI
+        refreshInvoiceMapping();
         // Helper to render uploaded files card without a full reload
         const renderUploadedFiles = (receipts, invoices) => {
             const card = document.getElementById('uploaded-files-card');
@@ -3833,10 +4084,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
-                const receiptContainer = document.getElementById('item-receipt-upload-container');
-                const invoiceContainer = document.getElementById('item-invoice-upload-container');
-                const receiptComponent = receiptContainer ? receiptContainer.uploadComponent : null;
-                const invoiceComponent = invoiceContainer ? invoiceContainer.uploadComponent : null;
+                const receiptComponent = receiptUploadContainer ? receiptUploadContainer.uploadComponent : null;
+                const invoiceComponent = invoiceUploadContainer ? invoiceUploadContainer.uploadComponent : null;
                 const receiptInput = itemRequestCompleteForm.querySelector('input[name="receipt_files"]');
                 const invoiceInput = itemRequestCompleteForm.querySelector('input[name="invoice_files"]');
 
@@ -3852,8 +4101,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
+                const invoiceFileList = invoiceComponent
+                    ? invoiceComponent.getFiles()
+                    : (invoiceInput && invoiceInput.files ? Array.from(invoiceInput.files) : []);
+                const invoiceMap = syncInvoiceItemMapInput();
+                if (invoiceFileList && invoiceFileList.length > 0) {
+                    const missingMappings = invoiceFileList.filter(f => {
+                        const entry = invoiceMap[f.name];
+                        return !entry || !entry.items || entry.items.length === 0 || !entry.amount || entry.amount <= 0;
+                    });
+                    if (missingMappings.length > 0) {
+                        showReceiptUploadErrorDialog('Please select item name(s) and enter a positive amount for each invoice file: ' + missingMappings.map(f => f.name).join(', '));
+                        return;
+                    }
+                }
+
                 saveUploadsBtn.disabled = true;
                 saveUploadsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+                // Ensure the latest mapping is in the form before submission
+                syncInvoiceItemMapInput();
 
                 const formData = new FormData(itemRequestCompleteForm);
                 if (receiptComponent) {
@@ -4003,8 +4270,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Get both upload components
-            const receiptContainer = document.getElementById('item-receipt-upload-container');
-            const invoiceContainer = document.getElementById('item-invoice-upload-container');
+            const receiptContainer = receiptUploadContainer;
+            const invoiceContainer = invoiceUploadContainer;
             
             // Validate receipt files
             let receiptFilesMissing = false;
@@ -4028,21 +4295,38 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Validate invoice files
             let invoiceFilesMissing = false;
+            let invoiceFileList = [];
             if (!hasExistingInvoices) {
                 if (invoiceContainer && invoiceContainer.uploadComponent) {
                     const invoiceComponent = invoiceContainer.uploadComponent;
+                    invoiceFileList = invoiceComponent.getFiles();
                     if (invoiceComponent.getFiles().length === 0) {
                         invoiceFilesMissing = true;
                     }
                 } else {
                     // Fallback: check if invoice file input exists and has files
                     const invoiceFileInput = this.querySelector('input[name="invoice_files"]');
+                    invoiceFileList = invoiceFileInput && invoiceFileInput.files ? Array.from(invoiceFileInput.files) : [];
                     if (!invoiceFileInput || !invoiceFileInput.files || invoiceFileInput.files.length === 0) {
                         invoiceFilesMissing = true;
                     }
                 }
                 if (invoiceFilesMissing) {
                     errors.push('Please select at least one invoice file to upload.');
+                }
+            } else if (invoiceContainer && invoiceContainer.uploadComponent) {
+                invoiceFileList = invoiceContainer.uploadComponent.getFiles();
+            }
+
+            // Validate that each uploaded invoice file has item mapping and amount
+            const invoiceMap = syncInvoiceItemMapInput();
+            if (invoiceFileList && invoiceFileList.length > 0) {
+                const missingInvoiceMapping = invoiceFileList.filter(f => {
+                    const entry = invoiceMap[f.name];
+                    return !entry || !entry.items || entry.items.length === 0 || !entry.amount || entry.amount <= 0;
+                });
+                if (missingInvoiceMapping.length > 0) {
+                    errors.push('Please choose item name(s) and enter a positive amount for each invoice file: ' + missingInvoiceMapping.map(f => f.name).join(', '));
                 }
             }
             
@@ -4083,17 +4367,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
-            // Validate invoice amount - must be > 0 only if a new invoice is being uploaded
-            const invoiceAmountInput = this.querySelector('input[name="invoice_amount"]');
-            if (invoiceAmountInput && !hasExistingInvoices) {
-                const invoiceAmount = parseFloat(invoiceAmountInput.value);
-                if (isNaN(invoiceAmount) || invoiceAmount <= 0) {
-                    resetButton();
-                    showMarkCompleteValidationErrorDialog('Invoice Amount must be greater than 0.');
-                    return false;
-                }
-            }
-            
             // All validations passed - first save quantities/amounts (assigned procurement), then submit completion with uploads
             this.dataset.mcSubmitting = 'true';
 
@@ -4107,6 +4380,8 @@ document.addEventListener('DOMContentLoaded', function() {
             };
 
             const submitCompletion = () => {
+                // Ensure invoice item mapping is captured
+                syncInvoiceItemMapInput();
                 const formData = new FormData(this);
                 if (assignedForm) {
                     const extraFields = assignedForm.querySelectorAll('input[name], textarea[name], select[name]');
