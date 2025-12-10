@@ -2099,6 +2099,10 @@
                         {# Procurement Manager-stage quantity adjustment (for multi-item and single-item requests) #}
                         {% if item_request.item_name %}
                             {% set procurement_manager_can_edit_quantities = can_approve_procurement_manager %}
+                            {% set manager_rejection_reason = item_request.manager_quantity_rejection_reason or '' %}
+                            {% set manager_reason_submitter = manager_approver_name or item_request.manager_approver or 'Authorized Manager' %}
+                            {% set procurement_manager_reason_value = item_request.procurement_manager_quantity_rejection_reason or manager_rejection_reason %}
+                            {% set procurement_reason_inherited = (not item_request.procurement_manager_quantity_rejection_reason) and manager_rejection_reason %}
 
                             {# Multi-item requests: item_name is a comma-separated list #}
                             {% if ',' in item_request.item_name %}
@@ -2294,10 +2298,27 @@
                                             </div>
                                         </div>
                                         {% endif %}
+                                        {% if manager_rejection_reason %}
+                                        <div id="manager_original_rejection_reason_multi" style="margin-top: 0.75rem; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px;">
+                                            <div style="font-weight: 600; color: #374151; margin-bottom: 4px;">
+                                                Original reason from {{ manager_reason_submitter }} (authorized manager)
+                                            </div>
+                                            <p style="margin: 0; color: #4b5563; white-space: pre-wrap;">{{ manager_rejection_reason }}</p>
+                                        </div>
+                                        {% endif %}
                                         <div id="procurement_manager_rejection_reason_group" style="display: none; margin-top: 1rem;">
                                             <div class="form-group">
-                                                <label for="procurement_manager_quantity_rejection_reason">Reason for Rejecting Item(s) *</label>
-                                                <textarea name="quantity_rejection_reason" id="procurement_manager_quantity_rejection_reason" rows="3" placeholder="Please provide a reason for rejecting the item(s) with quantity set to 0..." style="width: 100%;">{{ item_request.procurement_manager_quantity_rejection_reason or '' }}</textarea>
+                                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                                                    <label for="procurement_manager_quantity_rejection_reason" style="margin: 0;">Reason for Rejecting Item(s) *</label>
+                                                </div>
+                                                <textarea name="quantity_rejection_reason"
+                                                          id="procurement_manager_quantity_rejection_reason"
+                                                          rows="3"
+                                                          placeholder="Please provide a reason for rejecting the item(s) with quantity set to 0..."
+                                                          style="width: 100%;"
+                                                          data-default-value="{{ procurement_manager_reason_value }}"
+                                                          data-original-value="{{ procurement_manager_reason_value }}"
+                                                          data-start-readonly="false">{{ procurement_manager_reason_value }}</textarea>
                                                 <small class="form-text text-muted">This field is required when at least one item quantity is set to 0.</small>
                                             </div>
                                         </div>
@@ -2479,11 +2500,28 @@
                                         {% endif %}
                                         <div id="procurement_manager_rejection_reason_group_single" style="display: none; margin-top: 1rem;">
                                             <div class="form-group">
-                                                <label for="procurement_manager_quantity_rejection_reason_single">Reason for Rejecting Item *</label>
-                                                <textarea name="quantity_rejection_reason" id="procurement_manager_quantity_rejection_reason_single" rows="3" placeholder="Please provide a reason for rejecting this item..." style="width: 100%;">{{ item_request.procurement_manager_quantity_rejection_reason or '' }}</textarea>
+                                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                                                    <label for="procurement_manager_quantity_rejection_reason_single" style="margin: 0;">Reason for Rejecting Item *</label>
+                                                </div>
+                                                <textarea name="quantity_rejection_reason"
+                                                          id="procurement_manager_quantity_rejection_reason_single"
+                                                          rows="3"
+                                                          placeholder="Please provide a reason for rejecting this item..."
+                                                          style="width: 100%;"
+                                                          data-default-value="{{ procurement_manager_reason_value }}"
+                                                          data-original-value="{{ procurement_manager_reason_value }}"
+                                                          data-start-readonly="false">{{ procurement_manager_reason_value }}</textarea>
                                                 <small class="form-text text-muted">This field is required when the quantity is set to 0.</small>
                                             </div>
                                         </div>
+                                        {% if manager_rejection_reason %}
+                                        <div id="manager_original_rejection_reason_single" style="margin-top: 0.75rem; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px;">
+                                            <div style="font-weight: 600; color: #374151; margin-bottom: 4px;">
+                                                Original reason from {{ manager_reason_submitter }} (authorized manager)
+                                            </div>
+                                            <p style="margin: 0; color: #4b5563; white-space: pre-wrap;">{{ manager_rejection_reason }}</p>
+                                        </div>
+                                        {% endif %}
                                         <div class="step-actions" style="margin-top: 1rem;">
                                             <button type="submit" class="btn btn-success" id="procurement_manager_save_quantity_btn">
                                                 <i class="fas fa-save"></i> Save Quantity
@@ -4815,41 +4853,32 @@ function checkProcurementManagerRejectionReasonRequired() {
     const multiRejectionField = document.getElementById('procurement_manager_quantity_rejection_reason');
     const multiSavedReasonGroup = document.getElementById('procurement_manager_saved_rejection_reason_group');
     const multiSaveBtn = document.getElementById('procurement_manager_save_quantities_btn');
+    const multiEditBtn = null;
+    const multiCancelBtn = null;
     
     if (multiRejectionGroup && multiRejectionField && multiSaveBtn) {
-        let hasZero = false;
-        let hasEditableVisible = false;
-        const quantityInputs = document.querySelectorAll('input[name="quantities[]"]');
-        quantityInputs.forEach(input => {
-            if (input.id && input.id.startsWith('procurement_cart_qty_')) {
-                // Check if this input's editable wrapper is visible (editing is enabled)
-                const editableWrapper = document.getElementById('procurement_qty_editable_wrapper_' + input.dataset.index);
-                if (editableWrapper && editableWrapper.style.display !== 'none') {
-                    hasEditableVisible = true;
-                    const qty = parseInt(input.value || '0', 10);
-                    if (qty === 0) {
-                        hasZero = true;
-                    }
-                }
-            }
-        });
+        const { hasZeroAny, hasZeroNew } = procurementManagerHasNewZero(false);
         
-        // Show rejection reason field only if editing is enabled AND any quantity is 0
-        if (hasEditableVisible && hasZero) {
+        if (hasZeroAny && hasZeroNew) {
             multiRejectionGroup.style.display = 'block';
             multiRejectionField.setAttribute('required', 'required');
+            // Prefill with default/inherited reason if empty
+            const defaultVal = multiRejectionField.dataset ? (multiRejectionField.dataset.defaultValue || '') : '';
+            if (!multiRejectionField.value.trim() && defaultVal) {
+                multiRejectionField.value = defaultVal;
+            }
             // Show previously saved reason if it exists
             if (multiSavedReasonGroup) {
                 multiSavedReasonGroup.style.display = 'block';
             }
+            // Make editable immediately
+            setProcurementManagerReasonReadonly(multiRejectionField, false);
         } else {
             multiRejectionGroup.style.display = 'none';
             multiRejectionField.removeAttribute('required');
-            // Hide previously saved reason
             if (multiSavedReasonGroup) {
                 multiSavedReasonGroup.style.display = 'none';
             }
-            // Don't clear the value - keep it for when they show the field again
         }
     }
     
@@ -4858,33 +4887,26 @@ function checkProcurementManagerRejectionReasonRequired() {
     const singleRejectionField = document.getElementById('procurement_manager_quantity_rejection_reason_single');
     const singleSavedReasonGroup = document.getElementById('procurement_manager_saved_rejection_reason_group_single');
     const singleSaveBtn = document.getElementById('procurement_manager_save_quantity_btn');
+    const singleEditBtn = null;
+    const singleCancelBtn = null;
     
     if (singleRejectionGroup && singleRejectionField && singleSaveBtn) {
-        const quantityInput = document.getElementById('procurement_cart_qty_0');
-        const editableWrapper = document.getElementById('procurement_qty_editable_wrapper_0');
-        const isEditableVisible = editableWrapper && editableWrapper.style.display !== 'none';
-        
-        if (quantityInput && isEditableVisible) {
-            const qty = parseInt(quantityInput.value || '0', 10);
-            // Show editable field only if editing is enabled AND quantity is 0
-            if (qty === 0) {
-                singleRejectionGroup.style.display = 'block';
-                singleRejectionField.setAttribute('required', 'required');
-                // Show previously saved reason if it exists
-                if (singleSavedReasonGroup) {
-                    singleSavedReasonGroup.style.display = 'block';
-                }
-            } else {
-                singleRejectionGroup.style.display = 'none';
-                singleRejectionField.removeAttribute('required');
-                // Hide previously saved reason
-                if (singleSavedReasonGroup) {
-                    singleSavedReasonGroup.style.display = 'none';
-                }
-                // Don't clear the value - keep it for when they show the field again
+        const { hasZeroAny, hasZeroNew } = procurementManagerHasNewZero(true);
+        if (hasZeroAny && hasZeroNew) {
+            singleRejectionGroup.style.display = 'block';
+            singleRejectionField.setAttribute('required', 'required');
+            // Prefill with default/inherited reason if empty
+            const defaultVal = singleRejectionField.dataset ? (singleRejectionField.dataset.defaultValue || '') : '';
+            if (!singleRejectionField.value.trim() && defaultVal) {
+                singleRejectionField.value = defaultVal;
             }
+            // Show previously saved reason if it exists
+            if (singleSavedReasonGroup) {
+                singleSavedReasonGroup.style.display = 'block';
+            }
+            // Make editable immediately
+            setProcurementManagerReasonReadonly(singleRejectionField, false);
         } else {
-            // If editing is not enabled, hide the rejection reason fields
             singleRejectionGroup.style.display = 'none';
             singleRejectionField.removeAttribute('required');
             if (singleSavedReasonGroup) {
@@ -4892,6 +4914,101 @@ function checkProcurementManagerRejectionReasonRequired() {
             }
         }
     }
+}
+
+// Helpers to manage procurement manager rejection reason edit/cancel behaviour
+function getProcurementManagerReasonElements(context = 'multi') {
+    const isSingle = context === 'single';
+    return {
+        textarea: document.getElementById(isSingle ? 'procurement_manager_quantity_rejection_reason_single' : 'procurement_manager_quantity_rejection_reason'),
+        editBtn: document.getElementById(isSingle ? 'procurement_manager_reason_edit_btn_single' : 'procurement_manager_reason_edit_btn'),
+        cancelBtn: document.getElementById(isSingle ? 'procurement_manager_reason_cancel_btn_single' : 'procurement_manager_reason_cancel_btn')
+    };
+}
+
+function procurementManagerHasNewZero(isSingle = false) {
+    let hasZeroAny = false;
+    let hasZeroNew = false;
+    if (isSingle) {
+        const qtyInput = document.getElementById('procurement_cart_qty_0');
+        const row = document.getElementById('procurement_cart_row_0');
+        const origQty = row ? parseInt(row.dataset.origQty || '0', 10) : 0;
+        if (qtyInput) {
+            const qty = parseInt(qtyInput.value || '0', 10);
+            if (qty === 0) {
+                hasZeroAny = true;
+                if (origQty > 0) {
+                    hasZeroNew = true;
+                }
+            }
+        }
+    } else {
+        const quantityInputs = document.querySelectorAll('input[name="quantities[]"]');
+        quantityInputs.forEach(input => {
+            if (input.id && input.id.startsWith('procurement_cart_qty_')) {
+                const row = document.getElementById('procurement_cart_row_' + input.dataset.index);
+                const origQty = row ? parseInt(row.dataset.origQty || '0', 10) : 0;
+                const qty = parseInt(input.value || '0', 10);
+                if (qty === 0) {
+                    hasZeroAny = true;
+                    if (origQty > 0) {
+                        hasZeroNew = true;
+                    }
+                }
+            }
+        });
+    }
+    return { hasZeroAny, hasZeroNew };
+}
+
+function setProcurementManagerReasonReadonly(textarea, isReadonly) {
+    if (!textarea) return;
+    if (isReadonly) {
+        textarea.setAttribute('readonly', 'readonly');
+        textarea.style.backgroundColor = '#f1f5f9';
+        textarea.style.color = '#6b7280';
+        textarea.style.cursor = 'not-allowed';
+    } else {
+        textarea.removeAttribute('readonly');
+        textarea.style.backgroundColor = '#ffffff';
+        textarea.style.color = '';
+        textarea.style.cursor = 'text';
+    }
+}
+
+function enableProcurementManagerReasonEdit(context = 'multi') {
+    const { textarea, editBtn, cancelBtn } = getProcurementManagerReasonElements(context);
+    if (!textarea) return;
+    // Deprecated: field now editable immediately when visible
+}
+
+function cancelProcurementManagerReasonEdit(context = 'multi') {
+    const { textarea, editBtn, cancelBtn } = getProcurementManagerReasonElements(context);
+    if (!textarea) return;
+    // Deprecated: field now editable immediately when visible
+}
+
+function initializeProcurementManagerReasonFields() {
+    ['multi', 'single'].forEach(context => {
+        const { textarea, editBtn, cancelBtn } = getProcurementManagerReasonElements(context);
+        if (!textarea) return;
+        const defaultVal = textarea.dataset ? (textarea.dataset.defaultValue || '') : '';
+        if (!textarea.value.trim() && defaultVal) {
+            textarea.value = defaultVal;
+        }
+        if (textarea.dataset && !textarea.dataset.originalValue) {
+            textarea.dataset.originalValue = textarea.value || '';
+        }
+        const startReadonly = textarea.dataset ? (textarea.dataset.startReadonly === 'true') : textarea.hasAttribute('readonly');
+        setProcurementManagerReasonReadonly(textarea, startReadonly);
+        if (startReadonly) {
+            if (editBtn) editBtn.style.display = 'inline-flex';
+            if (cancelBtn) cancelBtn.style.display = 'none';
+        } else {
+            if (editBtn) editBtn.style.display = 'none';
+            if (cancelBtn) cancelBtn.style.display = 'none';
+        }
+    });
 }
 
 // Check if assigned procurement rejection reason is required (when any quantity is 0)
@@ -5382,6 +5499,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const procurementManagerForm = document.querySelector('form[action*="update_quantities_procurement_manager"]');
     if (procurementManagerForm) {
         const quantityInputs = procurementManagerForm.querySelectorAll('input[name="quantities[]"]');
+        const procurementManagerSubmitButton = procurementManagerForm.querySelector('button[type="submit"]');
+        if (procurementManagerSubmitButton && !procurementManagerSubmitButton.dataset.originalLabel) {
+            procurementManagerSubmitButton.dataset.originalLabel = procurementManagerSubmitButton.innerHTML;
+        }
         quantityInputs.forEach(input => {
             const index = input.getAttribute('data-index') || input.id.replace('procurement_cart_qty_', '');
             originalQuantityValues['procurement_manager_' + index] = parseInt(input.value || '0', 10);
@@ -5391,6 +5512,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // Check if any quantity is 0
             const quantityInputs = this.querySelectorAll('input[name="quantities[]"]');
             let hasZero = false;
+            const resetSubmitButton = () => {
+                if (procurementManagerSubmitButton) {
+                    procurementManagerSubmitButton.disabled = false;
+                    procurementManagerSubmitButton.innerHTML = procurementManagerSubmitButton.dataset.originalLabel || procurementManagerSubmitButton.innerHTML;
+                }
+            };
             quantityInputs.forEach(input => {
                 const qty = parseInt(input.value || '0', 10);
                 if (qty === 0) {
@@ -5402,6 +5529,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const rejectionField = this.querySelector('textarea[name="quantity_rejection_reason"]');
                 if (rejectionField && !rejectionField.value.trim()) {
                     e.preventDefault();
+                    resetSubmitButton();
                     alert('Please provide a reason for rejecting the item(s) with quantity set to 0.');
                     rejectionField.focus();
                     return false;
@@ -5597,6 +5725,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Initialize rejection reason fields on page load
+    initializeProcurementManagerReasonFields();
     checkManagerRejectionReasonRequired();
     checkProcurementManagerRejectionReasonRequired();
     
