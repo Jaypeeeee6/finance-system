@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_socketio import SocketIO, emit, join_room
 from flask_mail import Mail, Message
-from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from functools import wraps
 import os
@@ -268,8 +267,6 @@ app.jinja_env.globals.update(format_recurring_schedule=format_recurring_schedule
 
 # Initialize database
 db.init_app(app)
-# Enable DB migrations
-migrate = Migrate(app, db)
 
 # Initialize Flask-Mail
 mail = Mail(app)
