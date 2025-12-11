@@ -3070,11 +3070,13 @@
                                         {% if ',' in item_request.item_name %}
                                             {# Multi-item request #}
                                             {% set item_list = item_request.item_name.split(',') %}
-                                            {# Show the latest procurement-edited quantities; fall back to manager-approved, then original #}
-                                            {% set raw_quantity_source = item_request.procurement_quantities or item_request.procurement_manager_quantities or item_request.quantity %}
+                                            {# PRIORITY: Show procurement manager quantities if they exist (most recent approval), otherwise show manager quantities (if procurement manager hasn't acted), otherwise original #}
+                                            {% set display_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                                            {# If procurement staff has edited AFTER procurement manager, show their edits; otherwise show display_source #}
+                                            {% set raw_quantity_source = item_request.procurement_quantities if quantities_edited else display_source %}
                                             {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
-                                            {# Baseline for comparison: manager-approved if present, else original request #}
-                                            {% set original_source = item_request.procurement_manager_quantities or item_request.quantity %}
+                                            {# Baseline (for showing quantity comparison) is always the most recent approval from procurement manager #}
+                                            {% set original_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
                                             {% set original_list = (original_source or '').split(';') if original_source else [] %}
                                             
                                             {% if can_complete %}
@@ -3181,7 +3183,8 @@
                                                                     {% endif %}
                                                                 </div>
                                                                 <div class="procurement-cart-amount">
-                                                                    {% set amt_val = all_amounts[loop.index0] if all_amounts|length > loop.index0 else '0.000' %}
+                                                                    {% set amt_val = (all_amounts[loop.index0]|trim if all_amounts|length > loop.index0 else '')|default('0.000', true) %}
+                                                                    {% set amt_val = amt_val if amt_val else '0.000' %}
                                                                     {% if can_complete %}
                                                                         {% if was_manager_zero %}
                                                                         <div id="cart_amount_readonly_{{ loop.index0 }}" class="quantity-readonly-display" style="justify-content: flex-end;">
@@ -3248,11 +3251,14 @@
                                             {% endif %}
                                         {% else %}
                                             {# Single-item request #}
-                                            {% set raw_quantity_source = item_request.procurement_quantities or item_request.procurement_manager_quantities or item_request.quantity %}
+                                            {# PRIORITY: Show procurement manager quantities if they exist (most recent approval), otherwise show manager quantities (if procurement manager hasn't acted), otherwise original #}
+                                            {% set display_source_single = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                                            {# If procurement staff has edited AFTER procurement manager, show their edits; otherwise show display_source #}
+                                            {% set raw_quantity_source = item_request.procurement_quantities if quantities_edited else display_source_single %}
                                             {% set current_raw = (raw_quantity_source or '').split(';')[0] %}
                                             {% set qty = (current_raw or '').strip() %}
-                                            {# Baseline for comparison: manager-approved if present, else original request #}
-                                            {% set orig_qty_raw = (item_request.procurement_manager_quantities or item_request.quantity or '').strip() %}
+                                            {# Baseline (for showing quantity comparison) is always the most recent approval from procurement manager #}
+                                            {% set orig_qty_raw = (item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity or '').strip() %}
                                             {% if ';' in orig_qty_raw %}
                                                 {% set orig_qty_raw = orig_qty_raw.split(';')[0] %}
                                             {% endif %}
@@ -3324,7 +3330,8 @@
                                                             {% endif %}
                                                         </div>
                                                         <div class="procurement-cart-amount">
-                                                            {% set amt_val = all_amounts[0] if all_amounts|length > 0 else '0.000' %}
+                                                            {% set amt_raw = all_amounts[0]|trim if all_amounts|length > 0 else '' %}
+                                                            {% set amt_val = amt_raw if amt_raw else (('%.3f'|format(item_request.amount)) if item_request.amount else '0.000') %}
                                                             {% if can_complete %}
                                                                 {% if was_manager_zero %}
                                                                 <div id="cart_amount_readonly_0" class="quantity-readonly-display" style="justify-content: flex-end;">
