@@ -2428,7 +2428,7 @@ def get_unread_count_for_user(user):
                     Notification.notification_type.in_([
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
-                        'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned',
+                        'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'item_request_updated',
                         'request_returned', 'request_on_hold'
                     ]),
                     Notification.notification_type == 'temporary_manager_assignment'
@@ -3825,6 +3825,11 @@ def procurement_item_requests():
             conn.commit()
             print("✓ Added 'procurement_manager_quantity_rejection_reason' column to procurement_item_requests table")
 
+        if 'procurement_quantity_rejection_reason' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN procurement_quantity_rejection_reason TEXT")
+            conn.commit()
+            print("✓ Added 'procurement_quantity_rejection_reason' column to procurement_item_requests table")
+
         conn.close()
     except Exception as e:
         print(f"Warning: Could not migrate columns: {e}")
@@ -4226,16 +4231,32 @@ def view_item_request(request_id):
         except (json.JSONDecodeError, TypeError):
             receipt_files = [item_request.receipt_path]
     
-    invoice_files = []
-    if item_request.invoice_path:
+    def _parse_invoice_files(raw_value):
+        files = []
+        if not raw_value:
+            return files
         try:
-            data = json.loads(item_request.invoice_path)
-            if isinstance(data, list):
-                invoice_files = data
-            else:
-                invoice_files = [item_request.invoice_path]
+            data = json.loads(raw_value)
         except (json.JSONDecodeError, TypeError):
-            invoice_files = [item_request.invoice_path]
+            return [raw_value]
+
+        if isinstance(data, list):
+            for entry in data:
+                if isinstance(entry, dict):
+                    fname = entry.get('filename') or entry.get('file') or entry.get('name')
+                    if fname:
+                        files.append(fname)
+                elif isinstance(entry, str):
+                    files.append(entry)
+        elif isinstance(data, dict):
+            fname = data.get('filename') or data.get('file') or data.get('name')
+            if fname:
+                files.append(fname)
+        else:
+            files.append(raw_value)
+        return files
+
+    invoice_files = _parse_invoice_files(item_request.invoice_path)
     
     return jsonify({
         'success': True,
@@ -4503,17 +4524,67 @@ def view_item_request_page(request_id):
         except (json.JSONDecodeError, TypeError):
             receipt_files = [item_request.receipt_path]
     
-    # Prepare invoice files list
-    invoice_files = []
-    if item_request.invoice_path:
+    # Prepare invoice files list (supports legacy string list and new metadata objects)
+    def _parse_invoice_entries(raw_value):
+        entries = []
+        if not raw_value:
+            return entries
         try:
-            data = json.loads(item_request.invoice_path)
-            if isinstance(data, list):
-                invoice_files = data
-            else:
-                invoice_files = [item_request.invoice_path]
+            data = json.loads(raw_value)
         except (json.JSONDecodeError, TypeError):
-            invoice_files = [item_request.invoice_path]
+            return [{'filename': raw_value, 'items': [], 'amount': None}]
+
+        if isinstance(data, list):
+            for entry in data:
+                if isinstance(entry, dict):
+                    fname = entry.get('filename') or entry.get('file') or entry.get('name')
+                    items = entry.get('items') or entry.get('item_names') or []
+                    amount_val = entry.get('amount')
+                    if fname:
+                        if not isinstance(items, list):
+                            items = []
+                        clean_items = [itm.strip() for itm in items if isinstance(itm, str) and itm.strip()]
+                        entries.append({'filename': fname, 'items': clean_items, 'amount': amount_val})
+                elif isinstance(entry, str):
+                    entries.append({'filename': entry, 'items': [], 'amount': None})
+        elif isinstance(data, dict):
+            fname = data.get('filename') or data.get('file') or data.get('name')
+            items = data.get('items') or []
+            amount_val = data.get('amount')
+            if fname:
+                if not isinstance(items, list):
+                    items = []
+                clean_items = [itm.strip() for itm in items if isinstance(itm, str) and itm.strip()]
+                entries.append({'filename': fname, 'items': clean_items, 'amount': amount_val})
+        else:
+            entries.append({'filename': raw_value, 'items': [], 'amount': None})
+
+        return entries
+
+    invoice_entries = _parse_invoice_entries(item_request.invoice_path)
+    invoice_files = [entry.get('filename') for entry in invoice_entries if entry.get('filename')]
+
+    # Items assigned to this request (used for invoice-to-item mapping)
+    assigned_items = []
+    if item_request.item_name:
+        assigned_items = [itm.strip() for itm in item_request.item_name.split(',') if itm.strip()]
+
+    # Current quantities aligned with assigned items (used to disable zero-qty items in invoice mapping)
+    assigned_item_quantities = []
+    try:
+        raw_quantity_source = item_request.procurement_quantities or item_request.procurement_manager_quantities or item_request.quantity
+        quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else []
+        for idx, itm in enumerate(assigned_items):
+            qty_raw = quantity_list[idx].strip() if idx < len(quantity_list) else ''
+            if ':' in qty_raw:
+                parts = qty_raw.split(':', 1)
+                qty_raw = parts[1].strip() if len(parts) > 1 else qty_raw
+            try:
+                assigned_item_quantities.append(int(qty_raw))
+            except Exception:
+                assigned_item_quantities.append(0)
+    except Exception:
+        assigned_item_quantities = [0 for _ in assigned_items]
 
     # Check if quantities have been edited (for showing Edited chip)
     quantities_edited = False
@@ -4542,6 +4613,7 @@ def view_item_request_page(request_id):
                          completed_by_name=completed_by_name,
                          receipt_files=receipt_files,
                          invoice_files=invoice_files,
+                         invoice_entries=invoice_entries,
                          manager_approver_name=manager_approver_name,
                          manager_rejector_name=manager_rejector_name,
                          procurement_manager_approver_name=procurement_manager_approver_name,
@@ -4557,7 +4629,9 @@ def view_item_request_page(request_id):
                          can_complete=can_complete,
                          can_schedule_payment_date=can_schedule_payment_date,
                          payment_date_scheduled_by=payment_date_scheduled_by,
-                         quantities_edited=quantities_edited)
+                         quantities_edited=quantities_edited,
+                         assigned_items=assigned_items,
+                         assigned_item_quantities=assigned_item_quantities)
 
 
 @app.route('/api/item-request/<int:request_id>/quantity-history', methods=['GET'])
@@ -5406,6 +5480,328 @@ def item_request_procurement_manager_reject(request_id):
     return redirect(url_for('view_item_request_page', request_id=request_id))
 
 
+@app.route('/procurement/item-request/<int:request_id>/save_uploads', methods=['POST'])
+@login_required
+def item_request_save_uploads(request_id):
+    """Allow assigned procurement staff to save uploads incrementally before completion."""
+    item_request = ProcurementItemRequest.query.get_or_404(request_id)
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    def error_response(message):
+        if is_ajax:
+            return jsonify({'success': False, 'message': message}), 400
+        flash(message, 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Authorization mirrors completion rules
+    if current_user.department != 'Procurement':
+        return error_response('Only procurement staff can save uploads for this request.')
+
+    if current_user.role in ['GM', 'Operation Manager']:
+        return error_response('You do not have permission to save uploads for this request.')
+
+    if item_request.status != 'Assigned to Procurement':
+        return error_response('Uploads can only be saved while the request is assigned to procurement.')
+
+    if not item_request.assigned_to_user_id or item_request.assigned_to_user_id != current_user.user_id:
+        return error_response('Only the assigned procurement staff member can save uploads for this request.')
+
+    # Optional fields (validate if provided)
+    receipt_amount_value = None
+    receipt_amount_str = request.form.get('receipt_amount', '').strip()
+    if receipt_amount_str:
+        try:
+            receipt_amount_value = float(receipt_amount_str)
+            if receipt_amount_value <= 0:
+                raise ValueError()
+        except Exception:
+            return error_response('Please enter a valid positive receipt amount in OMR or leave it blank.')
+
+    receipt_reference_number = request.form.get('receipt_reference_number', '').strip()
+    if receipt_reference_number and not re.match(r'^[A-Za-z0-9]+$', receipt_reference_number):
+        return error_response('Receipt reference number must contain only letters and numbers (no spaces or symbols).')
+
+    completion_notes = request.form.get('completion_notes', '').strip()
+    # Items assigned to this request (for invoice-to-item validation)
+    assigned_items = []
+    if item_request.item_name:
+        assigned_items = [itm.strip() for itm in item_request.item_name.split(',') if itm.strip()]
+
+    # Parse invoice-to-item selections (required when uploading invoice files)
+    invoice_item_map_raw = request.form.get('invoice_item_map', '').strip()
+    invoice_item_map = {}
+    if invoice_item_map_raw:
+        try:
+            parsed_map = json.loads(invoice_item_map_raw) or {}
+            if isinstance(parsed_map, dict):
+                invoice_item_map = parsed_map
+        except Exception:
+            flash('Could not read the invoice-to-item selections. Please try again.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Items assigned to this request (for invoice-to-item validation)
+    assigned_items = []
+    if item_request.item_name:
+        assigned_items = [itm.strip() for itm in item_request.item_name.split(',') if itm.strip()]
+
+    # Parse invoice-to-item selections (required when uploading invoice files)
+    invoice_item_map_raw = request.form.get('invoice_item_map', '').strip()
+    invoice_item_map = {}
+    if invoice_item_map_raw:
+        try:
+            parsed_map = json.loads(invoice_item_map_raw) or {}
+            if isinstance(parsed_map, dict):
+                invoice_item_map = parsed_map
+        except Exception:
+            flash('Could not read the invoice-to-item selections. Please try again.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Collect uploaded files
+    receipt_files = request.files.getlist('receipt_files')
+    invoice_files = request.files.getlist('invoice_files')
+
+    has_new_receipts = receipt_files and any(f.filename for f in receipt_files)
+    has_new_invoices = invoice_files and any(f.filename for f in invoice_files)
+
+    if not has_new_receipts and not has_new_invoices and not any([receipt_amount_str, invoice_amount_str, receipt_reference_number, completion_notes]):
+        return error_response('Please select at least one receipt or invoice file to save.')
+
+    allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
+    max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+    uploaded_receipt_filenames = []
+    uploaded_invoice_entries = []
+
+    # Helper to load existing files safely
+    def _load_existing(json_field):
+        if not json_field:
+            return []
+        try:
+            data = json.loads(json_field)
+            if isinstance(data, list):
+                return data
+            return [json_field]
+        except Exception:
+            return [json_field]
+
+    def _parse_invoice_entries(raw_value):
+        entries = []
+        if not raw_value:
+            return entries
+        try:
+            data = json.loads(raw_value)
+        except Exception:
+            return [{'filename': raw_value, 'items': []}]
+
+        if isinstance(data, list):
+            for entry in data:
+                if isinstance(entry, dict):
+                    fname = entry.get('filename') or entry.get('file') or entry.get('name')
+                    items = entry.get('items') or []
+                    amount_val = entry.get('amount')
+                    if fname:
+                        if not isinstance(items, list):
+                            items = []
+                        clean_items = [itm.strip() for itm in items if isinstance(itm, str) and itm.strip()]
+                        entries.append({'filename': fname, 'items': clean_items, 'amount': amount_val})
+                elif isinstance(entry, str):
+                    entries.append({'filename': entry, 'items': [], 'amount': None})
+        elif isinstance(data, dict):
+            fname = data.get('filename') or data.get('file') or data.get('name')
+            items = data.get('items') or []
+            amount_val = data.get('amount')
+            if fname:
+                if not isinstance(items, list):
+                    items = []
+                clean_items = [itm.strip() for itm in items if isinstance(itm, str) and itm.strip()]
+                entries.append({'filename': fname, 'items': clean_items, 'amount': amount_val})
+        else:
+            entries.append({'filename': raw_value, 'items': [], 'amount': None})
+
+        return entries
+
+    existing_receipts = _load_existing(item_request.receipt_path)
+    existing_invoice_entries = _parse_invoice_entries(item_request.invoice_path)
+    had_receipts_before = len(existing_receipts) > 0
+    had_invoices_before = len(existing_invoice_entries) > 0
+    has_saved_receipt_values = item_request.receipt_amount is not None and bool(item_request.receipt_reference_number)
+    has_saved_invoice_amount = item_request.invoice_amount is not None or any(
+        isinstance(entry, dict) and entry.get('amount') for entry in existing_invoice_entries
+    )
+
+    # Enforce required receipt fields on first receipt upload
+    if has_new_receipts and not (had_receipts_before or has_saved_receipt_values):
+        if receipt_amount_value is None:
+            return error_response('Receipt amount is required when uploading the first receipt.')
+        if not receipt_reference_number:
+            return error_response('Receipt reference number is required when uploading the first receipt.')
+
+    # Enforce required invoice amount on first invoice upload
+    if has_new_invoices and not (had_invoices_before or has_saved_invoice_amount):
+        # Require that mapping provides amounts for each invoice instead of a single invoice_amount field
+        for inv_file in invoice_files or []:
+            if inv_file and inv_file.filename:
+                selected_entry = invoice_item_map.get(inv_file.filename) or {}
+                amount_raw = selected_entry.get('amount') if isinstance(selected_entry, dict) else None
+                try:
+                    amount_val = float(amount_raw) if amount_raw not in [None, ''] else None
+                except Exception:
+                    amount_val = None
+                if amount_val is None or amount_val <= 0:
+                    return error_response('Invoice amount is required and must be greater than 0 for each uploaded invoice.')
+
+    # Require item selections for any new invoice uploads
+    if has_new_invoices and not invoice_item_map:
+        return error_response('Please choose which item(s) apply to each invoice file you are uploading.')
+
+    # Process receipt files
+    if has_new_receipts:
+        for receipt_file in receipt_files:
+            if receipt_file and receipt_file.filename:
+                file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
+                if file_extension not in allowed_extensions:
+                    flash(f'Invalid file type for receipt "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'danger')
+                    return redirect(url_for('view_item_request_page', request_id=request_id))
+
+                file_size = len(receipt_file.read())
+                if file_size > max_file_size:
+                    flash(f'Receipt file "{receipt_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'danger')
+                    return redirect(url_for('view_item_request_page', request_id=request_id))
+
+                receipt_file.seek(0)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+                filename = secure_filename(receipt_file.filename)
+                filename = f"item_receipt_{request_id}_{timestamp}_{filename}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                receipt_file.save(filepath)
+                uploaded_receipt_filenames.append(filename)
+
+    # Process invoice files
+    if has_new_invoices:
+        for invoice_file in invoice_files:
+            if invoice_file and invoice_file.filename:
+                original_name = invoice_file.filename
+                file_extension = original_name.rsplit('.', 1)[1].lower() if '.' in original_name else ''
+                if file_extension not in allowed_extensions:
+                    flash(f'Invalid file type for invoice "{original_name}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'danger')
+                    return redirect(url_for('view_item_request_page', request_id=request_id))
+
+                file_size = len(invoice_file.read())
+                if file_size > max_file_size:
+                    flash(f'Invoice file "{original_name}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'danger')
+                    return redirect(url_for('view_item_request_page', request_id=request_id))
+
+                invoice_file.seek(0)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+                filename = secure_filename(original_name)
+                filename = f"item_invoice_{request_id}_{timestamp}_{filename}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                invoice_file.save(filepath)
+
+                selected_entry = invoice_item_map.get(original_name) or invoice_item_map.get(filename) or {}
+                selected_items = []
+                amount_val = None
+                if isinstance(selected_entry, dict):
+                    selected_items = selected_entry.get('items') or []
+                    try:
+                        amount_val_raw = selected_entry.get('amount')
+                        if amount_val_raw is not None and amount_val_raw != '':
+                            amount_val = float(amount_val_raw)
+                    except Exception:
+                        pass
+                elif isinstance(selected_entry, list):
+                    selected_items = selected_entry
+
+                if not isinstance(selected_items, list):
+                    selected_items = []
+                clean_items = [itm.strip() for itm in selected_items if isinstance(itm, str) and itm.strip()]
+                if not clean_items:
+                    return error_response(f'Please choose which item(s) apply to invoice "{original_name}".')
+                invalid_items = [itm for itm in clean_items if itm not in assigned_items]
+                if invalid_items:
+                    return error_response(f'Invoice "{original_name}" includes item selections not assigned to this request.')
+
+                if amount_val is None or amount_val <= 0:
+                    return error_response(f'Please enter a valid amount greater than 0 for invoice "{original_name}".')
+
+                uploaded_invoice_entries.append({'filename': filename, 'items': clean_items, 'amount': amount_val})
+
+    # Merge new and existing files
+    all_receipts = existing_receipts + uploaded_receipt_filenames
+    all_invoices = existing_invoice_entries + uploaded_invoice_entries
+
+    # Persist combined invoice total (for legacy views/exports) using per-file amounts when present
+    def _invoice_total(entries):
+        total = 0.0
+        for entry in entries:
+            if isinstance(entry, dict):
+                try:
+                    amt = float(entry.get('amount') or 0)
+                    total += amt
+                except Exception:
+                    continue
+        return total if total > 0 else None
+
+    invoice_total = _invoice_total(all_invoices)
+
+    item_request.receipt_path = json.dumps(all_receipts) if all_receipts else None
+    item_request.invoice_path = json.dumps(all_invoices) if all_invoices else None
+
+    if receipt_amount_value is not None:
+        item_request.receipt_amount = receipt_amount_value
+    if invoice_total is not None:
+        item_request.invoice_amount = invoice_total
+    if receipt_reference_number:
+        item_request.receipt_reference_number = receipt_reference_number
+    if completion_notes:
+        item_request.completion_notes = completion_notes
+
+    item_request.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    # Notify authorized users about saved uploads
+    try:
+        recipient_ids = set()
+        if item_request.user_id:
+            recipient_ids.add(item_request.user_id)
+        # Authorized approvers (GM, operation manager, manager chain, etc.)
+        for user in get_authorized_manager_approvers_for_item_request(item_request):
+            recipient_ids.add(user.user_id)
+        # Procurement Department Manager(s)
+        procurement_mgrs = User.query.filter_by(department='Procurement', role='Department Manager').all()
+        for pm in procurement_mgrs:
+            recipient_ids.add(pm.user_id)
+        # All procurement staff
+        procurement_staff = User.query.filter_by(department='Procurement').all()
+        for staff in procurement_staff:
+            recipient_ids.add(staff.user_id)
+
+        title = f"Uploads saved for Item Request #{request_id}"
+        who = current_user.name or 'assigned procurement staff'
+        message = f"{who} saved receipt/invoice uploads for Item Request #{request_id}."
+        for uid in recipient_ids:
+            create_notification(uid, title, message, 'item_request_updated', item_request_id=request_id)
+    except Exception as e:
+        app.logger.warning(f"Failed to send upload notifications for item request #{request_id}: {e}")
+
+    log_action(f"Procurement member saved uploads for item request #{request_id}")
+
+    # Return JSON for AJAX saves, otherwise redirect with flash
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'success': True,
+            'message': 'Uploads saved successfully.',
+            'receipt_files': all_receipts,
+            'invoice_files': [
+                entry.get('filename') if isinstance(entry, dict) else entry
+                for entry in all_invoices
+                if (isinstance(entry, dict) and entry.get('filename')) or isinstance(entry, str)
+            ]
+        })
+
+    flash('Uploads saved. You can add more before marking this request as completed.', 'success')
+    return redirect(url_for('view_item_request_page', request_id=request_id))
+
+
 @app.route('/procurement/item-request/<int:request_id>/complete', methods=['POST'])
 @login_required
 def item_request_complete(request_id):
@@ -5432,6 +5828,22 @@ def item_request_complete(request_id):
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
     completion_notes = request.form.get('completion_notes', '').strip()
+    # Items assigned to this request (for invoice-to-item validation)
+    assigned_items = []
+    if item_request.item_name:
+        assigned_items = [itm.strip() for itm in item_request.item_name.split(',') if itm.strip()]
+
+    # Parse invoice-to-item selections (required when uploading invoice files)
+    invoice_item_map_raw = request.form.get('invoice_item_map', '').strip()
+    invoice_item_map = {}
+    if invoice_item_map_raw:
+        try:
+            parsed_map = json.loads(invoice_item_map_raw) or {}
+            if isinstance(parsed_map, dict):
+                invoice_item_map = parsed_map
+        except Exception:
+            flash('Could not read the invoice-to-item selections. Please try again.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id))
     
     # Receipt Amount (required)
     receipt_amount_str = request.form.get('receipt_amount', '').strip()
@@ -5446,19 +5858,6 @@ def item_request_complete(request_id):
         flash('Please enter a valid positive receipt amount in OMR.', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
-    # Invoice Amount (required)
-    invoice_amount_str = request.form.get('invoice_amount', '').strip()
-    if not invoice_amount_str:
-        flash('Invoice amount is required.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
-    try:
-        invoice_amount_value = float(invoice_amount_str)
-        if invoice_amount_value <= 0:
-            raise ValueError()
-    except Exception:
-        flash('Please enter a valid positive invoice amount in OMR.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
-    
     # Receipt reference number (required, alphanumeric only)
     receipt_reference_number = request.form.get('receipt_reference_number', '').strip()
     if not receipt_reference_number:
@@ -5468,25 +5867,75 @@ def item_request_complete(request_id):
         flash('Receipt reference number must contain only letters and numbers (no spaces or symbols).', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
-    # Handle receipt file upload (required, allow multiple)
+    # Handle receipt file upload (allow reuse of existing saved receipts)
+    existing_receipt_files = []
+    try:
+        if item_request.receipt_path:
+            existing_receipt_files = json.loads(item_request.receipt_path) or []
+    except Exception:
+        existing_receipt_files = []
+
     receipt_files = request.files.getlist('receipt_files')
-    if not receipt_files or not any(f.filename for f in receipt_files):
+    has_new_receipts = receipt_files and any(f.filename for f in receipt_files)
+    if not has_new_receipts and not existing_receipt_files:
         flash('Upload Receipt file is required.', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
-    # Handle invoice file upload (required, allow multiple)
+    # Handle invoice file upload (allow reuse of existing saved invoices)
+    def _parse_invoice_entries(raw_value):
+        entries = []
+        if not raw_value:
+            return entries
+        try:
+            data = json.loads(raw_value)
+        except Exception:
+            return [{'filename': raw_value, 'items': [], 'amount': None}]
+
+        if isinstance(data, list):
+            for entry in data:
+                if isinstance(entry, dict):
+                    fname = entry.get('filename') or entry.get('file') or entry.get('name')
+                    items = entry.get('items') or []
+                    amount_val = entry.get('amount')
+                    if fname:
+                        if not isinstance(items, list):
+                            items = []
+                        clean_items = [itm.strip() for itm in items if isinstance(itm, str) and itm.strip()]
+                        entries.append({'filename': fname, 'items': clean_items, 'amount': amount_val})
+                elif isinstance(entry, str):
+                    entries.append({'filename': entry, 'items': [], 'amount': None})
+        elif isinstance(data, dict):
+            fname = data.get('filename') or data.get('file') or data.get('name')
+            items = data.get('items') or []
+            amount_val = data.get('amount')
+            if fname:
+                if not isinstance(items, list):
+                    items = []
+                clean_items = [itm.strip() for itm in items if isinstance(itm, str) and itm.strip()]
+                entries.append({'filename': fname, 'items': clean_items, 'amount': amount_val})
+        else:
+            entries.append({'filename': raw_value, 'items': [], 'amount': None})
+
+        return entries
+
+    existing_invoice_entries = _parse_invoice_entries(item_request.invoice_path)
+
     invoice_files = request.files.getlist('invoice_files')
-    if not invoice_files or not any(f.filename for f in invoice_files):
+    has_new_invoices = invoice_files and any(f.filename for f in invoice_files)
+    if not has_new_invoices and not existing_invoice_entries:
         flash('Upload Invoice file is required.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+    if has_new_invoices and not invoice_item_map:
+        flash('Please choose which item(s) apply to each invoice file you are uploading.', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
     allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
     max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
     uploaded_receipt_filenames = []
-    uploaded_invoice_filenames = []
+    uploaded_invoice_entries = []
     
     # Process receipt files
-    for receipt_file in receipt_files:
+    for receipt_file in receipt_files or []:
         if receipt_file and receipt_file.filename:
             file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
             if file_extension not in allowed_extensions:
@@ -5506,47 +5955,98 @@ def item_request_complete(request_id):
             receipt_file.save(filepath)
             uploaded_receipt_filenames.append(filename)
     
-    if not uploaded_receipt_filenames:
-        flash('Upload Receipt file is required.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
-    
     # Process invoice files
-    for invoice_file in invoice_files:
+    for invoice_file in invoice_files or []:
         if invoice_file and invoice_file.filename:
-            file_extension = invoice_file.filename.rsplit('.', 1)[1].lower() if '.' in invoice_file.filename else ''
+            original_name = invoice_file.filename
+            file_extension = original_name.rsplit('.', 1)[1].lower() if '.' in original_name else ''
             if file_extension not in allowed_extensions:
-                flash(f'Invalid file type for invoice "{invoice_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'danger')
+                flash(f'Invalid file type for invoice "{original_name}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'danger')
                 return redirect(url_for('view_item_request_page', request_id=request_id))
             
             file_size = len(invoice_file.read())
             if file_size > max_file_size:
-                flash(f'Invoice file "{invoice_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'danger')
+                flash(f'Invoice file "{original_name}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'danger')
                 return redirect(url_for('view_item_request_page', request_id=request_id))
             
             invoice_file.seek(0)
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = secure_filename(invoice_file.filename)
+            filename = secure_filename(original_name)
             filename = f"item_invoice_{request_id}_{timestamp}_{filename}"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             invoice_file.save(filepath)
-            uploaded_invoice_filenames.append(filename)
-    
-    if not uploaded_invoice_filenames:
-        flash('Upload Invoice file is required.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
+
+            selected_entry = invoice_item_map.get(original_name) or invoice_item_map.get(filename) or {}
+            selected_items = []
+            amount_val = None
+            if isinstance(selected_entry, dict):
+                selected_items = selected_entry.get('items') or []
+                try:
+                    amount_raw = selected_entry.get('amount')
+                    if amount_raw is not None and amount_raw != '':
+                        amount_val = float(amount_raw)
+                except Exception:
+                    pass
+            elif isinstance(selected_entry, list):
+                selected_items = selected_entry
+
+            if not isinstance(selected_items, list):
+                selected_items = []
+            clean_items = [itm.strip() for itm in selected_items if isinstance(itm, str) and itm.strip()]
+            if not clean_items:
+                flash(f'Please choose which item(s) apply to invoice "{original_name}".', 'danger')
+                return redirect(url_for('view_item_request_page', request_id=request_id))
+            invalid_items = [itm for itm in clean_items if itm not in assigned_items]
+            if invalid_items:
+                flash(f'Invoice "{original_name}" includes item selections not assigned to this request.', 'danger')
+                return redirect(url_for('view_item_request_page', request_id=request_id))
+
+            if amount_val is None or amount_val <= 0:
+                flash(f'Please enter a valid amount greater than 0 for invoice "{original_name}".', 'danger')
+                return redirect(url_for('view_item_request_page', request_id=request_id))
+
+            uploaded_invoice_entries.append({'filename': filename, 'items': clean_items, 'amount': amount_val})
     
     current_time = datetime.utcnow()
     
-    # Update request
+    # Update request (reuse existing files if none uploaded)
+    final_receipts = uploaded_receipt_filenames if uploaded_receipt_filenames else existing_receipt_files
+    final_invoices = uploaded_invoice_entries if uploaded_invoice_entries else existing_invoice_entries
+
+    # Ensure all invoice entries carry a valid amount
+    for entry in final_invoices:
+        if isinstance(entry, dict):
+            try:
+                amt = float(entry.get('amount') or 0)
+            except Exception:
+                amt = 0
+            if amt <= 0:
+                flash('Please ensure every invoice has a positive amount.', 'danger')
+                return redirect(url_for('view_item_request_page', request_id=request_id))
+
+    # Sum invoice amounts from entries for storage/exports
+    def _invoice_total(entries):
+        total = 0.0
+        for entry in entries:
+            if isinstance(entry, dict):
+                try:
+                    total += float(entry.get('amount') or 0)
+                except Exception:
+                    continue
+        return total if total > 0 else None
+
+    invoice_total = _invoice_total(final_invoices)
+
     item_request.status = 'Completed'
     item_request.completed_by_user_id = current_user.user_id
     item_request.completion_date = current_time
     item_request.completion_notes = completion_notes
     item_request.receipt_amount = receipt_amount_value
-    item_request.invoice_amount = invoice_amount_value
+    if invoice_total is not None:
+        item_request.invoice_amount = invoice_total
     item_request.receipt_reference_number = receipt_reference_number
-    item_request.receipt_path = json.dumps(uploaded_receipt_filenames)
-    item_request.invoice_path = json.dumps(uploaded_invoice_filenames)
+    item_request.receipt_path = json.dumps(final_receipts)
+    item_request.invoice_path = json.dumps(final_invoices)
     item_request.updated_at = current_time
     
     db.session.commit()
@@ -5634,10 +6134,40 @@ def update_item_request_quantities_procurement_manager(request_id):
     old_quantities_str = old_quantities if old_quantities else ''
     new_quantities_str = ';'.join(cleaned_quantities)
 
+    # Helper to parse quantity string to int
+    def _qty_to_int(val: str) -> int:
+        try:
+            # support "Item: 0" style values
+            parts = (val or '').split(':', 1)
+            num_str = parts[1].strip() if len(parts) > 1 else (parts[0].strip() if parts else '0')
+            return int(num_str or 0)
+        except Exception:
+            return 0
+
+    # Manager-approved quantities (baseline)
+    mgr_quantities_str = item_request.procurement_quantities or item_request.quantity or ''
+    mgr_list = mgr_quantities_str.split(';') if mgr_quantities_str else []
+    new_list = new_quantities_str.split(';') if new_quantities_str else []
+
+    # Indices with quantity 0 before (manager) and after (procurement manager)
+    zeros_old = {i for i, q in enumerate(mgr_list) if _qty_to_int(q) == 0}
+    zeros_new = {i for i, q in enumerate(new_list) if _qty_to_int(q) == 0}
+
+    # Decide rejection reason
+    quantity_rejection_reason = request.form.get('quantity_rejection_reason', '').strip()
+    new_zero_not_prev = zeros_new - zeros_old
+
+    if zeros_new:
+        # If procurement manager zeroed a NEW item, reason is required
+        if new_zero_not_prev and not quantity_rejection_reason:
+            flash('Please provide a reason for items you set to quantity 0.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id, tab='procurement'))
+        # If only previously-zero items remain zero and no new reason given, inherit manager reason
+        if not new_zero_not_prev and not quantity_rejection_reason:
+            quantity_rejection_reason = item_request.manager_quantity_rejection_reason or ''
+
     # Store procurement manager-approved quantities in separate field (does not affect manager-approved quantities)
     item_request.procurement_manager_quantities = new_quantities_str
-    # Store rejection reason if provided
-    quantity_rejection_reason = request.form.get('quantity_rejection_reason', '').strip()
     item_request.procurement_manager_quantity_rejection_reason = quantity_rejection_reason if quantity_rejection_reason else None
     item_request.updated_at = datetime.utcnow()
 
@@ -5865,10 +6395,30 @@ def update_item_request_quantities(request_id):
     elif len(cleaned_amounts) > len(item_names):
         cleaned_amounts = cleaned_amounts[:len(item_names)]
 
+    # Determine if any quantity is set to 0 (for rejection reason requirement)
+    def _parse_qty_to_int(val: str) -> int:
+        try:
+            return int(val)
+        except Exception:
+            return 0
+
+    has_zero_quantity = False
+    for q in cleaned_quantities:
+        parts = (q or '').split(':', 1)
+        numeric_part = parts[1].strip() if len(parts) > 1 else (parts[0].strip() if parts else '0')
+        if _parse_qty_to_int(numeric_part or '0') == 0:
+            has_zero_quantity = True
+            break
+    quantity_rejection_reason = request.form.get('quantity_rejection_reason', '').strip()
+    if has_zero_quantity and not quantity_rejection_reason:
+        flash('Please provide a reason for items set to quantity 0.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
+
     # Join using ";" separator (same convention used when displaying multiple quantities)
     # Store in dedicated field so original requestor quantity remains unchanged
     item_request.procurement_quantities = ';'.join(cleaned_quantities)
     item_request.procurement_amounts = ';'.join(cleaned_amounts)
+    item_request.procurement_quantity_rejection_reason = quantity_rejection_reason if quantity_rejection_reason else None
     item_request.updated_at = datetime.utcnow()
 
     db.session.commit()
@@ -5895,6 +6445,10 @@ def update_item_request_quantities(request_id):
         procurement_mgrs = User.query.filter_by(department='Procurement', role='Department Manager').all()
         for pm in procurement_mgrs:
             recipient_ids.add(pm.user_id)
+        # All procurement staff
+        procurement_staff = User.query.filter_by(department='Procurement').all()
+        for staff in procurement_staff:
+            recipient_ids.add(staff.user_id)
         # Send notifications
         title = f"Quantities & amounts updated for Item Request #{request_id}"
         message = f"Quantities and amounts were updated by {assigned_name or 'assigned procurement staff'} for Item Request #{request_id}."
@@ -17542,6 +18096,13 @@ if __name__ == '__main__':
                 print("✓ Added 'procurement_manager_quantity_rejection_reason' column to procurement_item_requests table")
             else:
                 print("✓ 'procurement_manager_quantity_rejection_reason' column already exists in procurement_item_requests table")
+
+            if 'procurement_quantity_rejection_reason' not in existing_columns:
+                cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN procurement_quantity_rejection_reason TEXT")
+                conn.commit()
+                print("✓ Added 'procurement_quantity_rejection_reason' column to procurement_item_requests table")
+            else:
+                print("✓ 'procurement_quantity_rejection_reason' column already exists in procurement_item_requests table")
             
             if 'category' not in existing_columns:
                 cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN category VARCHAR(100)")

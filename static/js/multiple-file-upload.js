@@ -16,6 +16,8 @@ if (typeof MultipleFileUpload === 'undefined') {
         this.required = options.required || false;
         this.label = options.label || 'Upload Files';
         this.helpText = options.helpText || 'Upload multiple files (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)';
+        this.metadataProvider = null; // Optional hook to attach structured metadata per file
+        this.container = null;
         
         this.allSelectedFiles = [];
         this.init();
@@ -32,6 +34,7 @@ if (typeof MultipleFileUpload === 'undefined') {
             console.error(`Container with ID '${this.containerId}' not found`);
             return;
         }
+        this.container = container;
         
         container.innerHTML = `
             <div class="form-group">
@@ -105,6 +108,24 @@ if (typeof MultipleFileUpload === 'undefined') {
             this.allSelectedFiles.push(...validFiles);
             this.updateFilePreview();
         }
+    }
+
+    // Allow consumers to attach a metadata provider that returns any serializable structure
+    setMetadataProvider(fn) {
+        if (typeof fn === 'function') {
+            this.metadataProvider = fn;
+        }
+    }
+
+    dispatchChangeEvent() {
+        if (!this.container) return;
+        const event = new CustomEvent('multipleFileUpload:changed', {
+            detail: {
+                containerId: this.containerId,
+                files: [...this.allSelectedFiles],
+            },
+        });
+        this.container.dispatchEvent(event);
     }
     
     validateFile(file) {
@@ -198,6 +219,8 @@ if (typeof MultipleFileUpload === 'undefined') {
             button.className = 'btn btn-primary';
             preview.innerHTML = '';
         }
+
+        this.dispatchChangeEvent();
     }
     
     removeFile(indexToRemove) {
@@ -223,6 +246,18 @@ if (typeof MultipleFileUpload === 'undefined') {
         this.allSelectedFiles.forEach((file) => {
             formData.append(this.inputName, file);
         });
+
+        // Attach optional metadata payload if provided
+        if (typeof this.metadataProvider === 'function') {
+            try {
+                const metadata = this.metadataProvider(this.allSelectedFiles);
+                if (metadata !== undefined) {
+                    formData.set(`${this.inputName}_metadata`, JSON.stringify(metadata));
+                }
+            } catch (err) {
+                console.warn('Could not attach upload metadata:', err);
+            }
+        }
         
         return formData;
     }

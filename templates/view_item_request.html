@@ -414,7 +414,7 @@
 }
 
 .procurement-cart-amount input[type="number"] {
-    width: 50px;
+    width: 70px;
     height: 32px;
     text-align: center;
     border: 1px solid #ced4da;
@@ -432,14 +432,17 @@
 .quantity-control {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     background: #f9fafb;
     padding: 3px 6px;
     border-radius: 999px;
+    flex-shrink: 0;
 }
 
 .quantity-control input[type="number"] {
-    width: 55px;
+    width: 70px;
+    min-width: 70px;
+    flex: 0 0 70px;
     border: none;
     background: transparent;
     text-align: center;
@@ -628,6 +631,7 @@
     border-radius: 4px;
     transition: all 0.2s;
     font-size: 0.9rem;
+    flex-shrink: 0;
 }
 
 .edit-qty-btn:hover {
@@ -2095,6 +2099,10 @@
                         {# Procurement Manager-stage quantity adjustment (for multi-item and single-item requests) #}
                         {% if item_request.item_name %}
                             {% set procurement_manager_can_edit_quantities = can_approve_procurement_manager %}
+                            {% set manager_rejection_reason = item_request.manager_quantity_rejection_reason or '' %}
+                            {% set manager_reason_submitter = manager_approver_name or item_request.manager_approver or 'Authorized Manager' %}
+                            {% set procurement_manager_reason_value = item_request.procurement_manager_quantity_rejection_reason or manager_rejection_reason %}
+                            {% set procurement_reason_inherited = (not item_request.procurement_manager_quantity_rejection_reason) and manager_rejection_reason %}
 
                             {# Multi-item requests: item_name is a comma-separated list #}
                             {% if ',' in item_request.item_name %}
@@ -2290,10 +2298,27 @@
                                             </div>
                                         </div>
                                         {% endif %}
+                                        {% if manager_rejection_reason %}
+                                        <div id="manager_original_rejection_reason_multi" style="margin-top: 0.75rem; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px;">
+                                            <div style="font-weight: 600; color: #374151; margin-bottom: 4px;">
+                                                Original reason from {{ manager_reason_submitter }} (authorized manager)
+                                            </div>
+                                            <p style="margin: 0; color: #4b5563; white-space: pre-wrap;">{{ manager_rejection_reason }}</p>
+                                        </div>
+                                        {% endif %}
                                         <div id="procurement_manager_rejection_reason_group" style="display: none; margin-top: 1rem;">
                                             <div class="form-group">
-                                                <label for="procurement_manager_quantity_rejection_reason">Reason for Rejecting Item(s) *</label>
-                                                <textarea name="quantity_rejection_reason" id="procurement_manager_quantity_rejection_reason" rows="3" placeholder="Please provide a reason for rejecting the item(s) with quantity set to 0..." style="width: 100%;">{{ item_request.procurement_manager_quantity_rejection_reason or '' }}</textarea>
+                                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                                                    <label for="procurement_manager_quantity_rejection_reason" style="margin: 0;">Reason for Rejecting Item(s) *</label>
+                                                </div>
+                                                <textarea name="quantity_rejection_reason"
+                                                          id="procurement_manager_quantity_rejection_reason"
+                                                          rows="3"
+                                                          placeholder="Please provide a reason for rejecting the item(s) with quantity set to 0..."
+                                                          style="width: 100%;"
+                                                          data-default-value="{{ procurement_manager_reason_value }}"
+                                                          data-original-value="{{ procurement_manager_reason_value }}"
+                                                          data-start-readonly="false">{{ procurement_manager_reason_value }}</textarea>
                                                 <small class="form-text text-muted">This field is required when at least one item quantity is set to 0.</small>
                                             </div>
                                         </div>
@@ -2475,11 +2500,28 @@
                                         {% endif %}
                                         <div id="procurement_manager_rejection_reason_group_single" style="display: none; margin-top: 1rem;">
                                             <div class="form-group">
-                                                <label for="procurement_manager_quantity_rejection_reason_single">Reason for Rejecting Item *</label>
-                                                <textarea name="quantity_rejection_reason" id="procurement_manager_quantity_rejection_reason_single" rows="3" placeholder="Please provide a reason for rejecting this item..." style="width: 100%;">{{ item_request.procurement_manager_quantity_rejection_reason or '' }}</textarea>
+                                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                                                    <label for="procurement_manager_quantity_rejection_reason_single" style="margin: 0;">Reason for Rejecting Item *</label>
+                                                </div>
+                                                <textarea name="quantity_rejection_reason"
+                                                          id="procurement_manager_quantity_rejection_reason_single"
+                                                          rows="3"
+                                                          placeholder="Please provide a reason for rejecting this item..."
+                                                          style="width: 100%;"
+                                                          data-default-value="{{ procurement_manager_reason_value }}"
+                                                          data-original-value="{{ procurement_manager_reason_value }}"
+                                                          data-start-readonly="false">{{ procurement_manager_reason_value }}</textarea>
                                                 <small class="form-text text-muted">This field is required when the quantity is set to 0.</small>
                                             </div>
                                         </div>
+                                        {% if manager_rejection_reason %}
+                                        <div id="manager_original_rejection_reason_single" style="margin-top: 0.75rem; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px;">
+                                            <div style="font-weight: 600; color: #374151; margin-bottom: 4px;">
+                                                Original reason from {{ manager_reason_submitter }} (authorized manager)
+                                            </div>
+                                            <p style="margin: 0; color: #4b5563; white-space: pre-wrap;">{{ manager_rejection_reason }}</p>
+                                        </div>
+                                        {% endif %}
                                         <div class="step-actions" style="margin-top: 1rem;">
                                             <button type="submit" class="btn btn-success" id="procurement_manager_save_quantity_btn">
                                                 <i class="fas fa-save"></i> Save Quantity
@@ -2606,7 +2648,8 @@
                     </div>
                     <div class="card-body">
                         {% set amount_list = (item_request.procurement_amounts or '').split(';') %}
-                        {% set quantity_source = item_request.procurement_quantities or item_request.quantity %}
+                        {# Prefer saved procurement quantities, then procurement manager approved, then original request #}
+                        {% set quantity_source = item_request.procurement_quantities or item_request.procurement_manager_quantities or item_request.quantity %}
                         {% if ',' in item_request.item_name %}
                             {% set item_list = item_request.item_name.split(',') %}
                             {% set quantity_list = (quantity_source or '').split(';') if quantity_source else [] %}
@@ -2624,8 +2667,9 @@
                                             {% set parts = qty.split(':', 1) %}
                                             {% set qty = parts[1].strip() if parts|length > 1 else qty %}
                                         {% endif %}
+                                        {% set qty_num = qty|int(0) %}
                                         {% set amt_val = amount_list[loop.index0] if amount_list|length > loop.index0 else '0.000' %}
-                                        <div class="procurement-cart-row">
+                                        <div class="procurement-cart-row {% if qty_num == 0 %}qty-zero{% endif %}">
                                             <div class="procurement-cart-item-name">{{ item_trimmed }}</div>
                                             <div class="procurement-cart-qty">
                                                 <span class="readonly-qty-pill">{{ qty or '0' }}</span>
@@ -2637,12 +2681,46 @@
                                     {% endif %}
                                 {% endfor %}
                             </div>
+                            {% if item_request.procurement_quantity_rejection_reason %}
+                            <div class="form-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Reason for Rejecting Item(s)</label>
+                                <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                    {% set rejected_items = [] %}
+                                    {% for item in item_list %}
+                                        {% set item_trimmed = item.strip() %}
+                                        {% if item_trimmed %}
+                                            {% set qty = quantity_list[loop.index0]|trim if loop.index0 < quantity_list|length else '0' %}
+                                            {% if ':' in qty %}
+                                                {% set parts = qty.split(':', 1) %}
+                                                {% set qty = parts[1].strip() if parts|length > 1 else qty %}
+                                            {% endif %}
+                                            {% set qty_num = qty|int(0) %}
+                                            {% if qty_num == 0 %}
+                                                {% set _ = rejected_items.append(item_trimmed) %}
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if rejected_items|length > 0 %}
+                                    <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #fecaca;">
+                                        <strong style="color: #991b1b;">Rejected Items (Quantity set to 0):</strong>
+                                        <ul style="color: #991b1b; margin: 5px 0 0 20px; padding: 0;">
+                                            {% for rejected_item in rejected_items %}
+                                            <li>{{ rejected_item }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                    <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.procurement_quantity_rejection_reason }}</p>
+                                </div>
+                            </div>
+                            {% endif %}
                         {% else %}
                             {% set qty_single = (quantity_source or '').split(';')[0] if quantity_source else '' %}
                             {% if ':' in qty_single %}
                                 {% set parts = qty_single.split(':', 1) %}
                                 {% set qty_single = parts[1].strip() if parts|length > 1 else qty_single %}
                             {% endif %}
+                            {% set qty_single_num = qty_single|int(0) %}
                             {% set amt_single = amount_list[0] if amount_list|length > 0 else '0.000' %}
                             <div class="procurement-cart-table">
                                 <div class="procurement-cart-header-row">
@@ -2650,7 +2728,7 @@
                                     <div style="text-align: left;">Quantity</div>
                                     <div style="text-align: right;">Amount</div>
                                 </div>
-                                <div class="procurement-cart-row">
+                                <div class="procurement-cart-row {% if qty_single_num == 0 %}qty-zero{% endif %}">
                                     <div class="procurement-cart-item-name">{{ item_request.item_name }}</div>
                                     <div class="procurement-cart-qty">
                                         <span class="readonly-qty-pill">{{ qty_single or '0' }}</span>
@@ -2660,6 +2738,20 @@
                                     </div>
                                 </div>
                             </div>
+                            {% if item_request.procurement_quantity_rejection_reason %}
+                            <div class="form-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Reason for Rejecting Item</label>
+                                <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                    {% if qty_single_num == 0 %}
+                                    <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #fecaca;">
+                                        <strong style="color: #991b1b;">Rejected Item (Quantity set to 0):</strong>
+                                        <p style="color: #991b1b; margin: 5px 0 0 0;">{{ item_request.item_name }}</p>
+                                    </div>
+                                    {% endif %}
+                                    <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.procurement_quantity_rejection_reason }}</p>
+                                </div>
+                            </div>
+                            {% endif %}
                         {% endif %}
                         {% set readonly_ns = namespace(total=0.0) %}
                         {% for amt in amount_list %}
@@ -2693,13 +2785,13 @@
 
                 <!-- Display uploaded files (if any) -->
                 {% if receipt_files or invoice_files %}
-                <div class="card assigned-section" style="margin-bottom: 1.5rem;">
+                <div class="card assigned-section" style="margin-bottom: 1.5rem;" id="uploaded-files-card">
                     <div class="card-header">
                         <h4>Uploaded Files</h4>
                     </div>
                     <div class="card-body">
                         {% if receipt_files %}
-                        <div class="form-group">
+                        <div class="form-group" id="uploaded-receipts-list">
                             <label><i class="fas fa-check-circle"></i> Receipt (Proof of transfer made by the Procurement Manager)</label>
                             {% for file in receipt_files %}
                             <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
@@ -2712,16 +2804,57 @@
                         </div>
                         {% endif %}
                         {% if invoice_files %}
-                        <div class="form-group">
+                        <div class="form-group" id="uploaded-invoices-list">
                             <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
+                            {% set invoice_amount_lookup = {} %}
+                            {% set invoice_items_lookup = {} %}
+                            {% set invoice_total_ns = namespace(total=0.0) %}
+                            {% for inv in invoice_entries or [] %}
+                                {% if inv.filename %}
+                                    {% set inv_amt = inv['amount'] if inv['amount'] is defined else None %}
+                                    {% set inv_items = inv['items'] if inv['items'] is defined else [] %}
+                                    {% if inv_items is none %}{% set inv_items = [] %}{% endif %}
+                                    {% set _ = invoice_amount_lookup.update({inv.filename: inv_amt}) %}
+                                    {% set _ = invoice_items_lookup.update({inv.filename: inv_items}) %}
+                                    {% if inv_amt %}
+                                        {% set invoice_total_ns.total = invoice_total_ns.total + (inv_amt | float) %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
                             {% for file in invoice_files %}
                             <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
                                 <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
                                     <i class="fas fa-download"></i> View Invoice {{ loop.index }}
                                 </a>
                                 <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                                {% if invoice_amount_lookup.get(file) %}
+                                <div style="margin-top: 6px; font-weight: 600; color: #1f2937;">Amount: OMR {{ '%.3f'|format(invoice_amount_lookup.get(file)|float) }}</div>
+                                {% endif %}
+                                {% if invoice_items_lookup.get(file) %}
+                                <div style="margin-top: 4px; color: #374151;">
+                                    <strong>Items:</strong>
+                                    <ul style="margin: 4px 0 0 18px; padding: 0;">
+                                        {% for itm in invoice_items_lookup.get(file) %}
+                                        <li>{{ itm }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
                             </div>
                             {% endfor %}
+                            {% if invoice_total_ns is not defined %}
+                                {% set invoice_total_ns = namespace(total=0.0) %}
+                            {% endif %}
+                            {% set invoice_total_value = (invoice_total_ns.total if invoice_total_ns.total > 0 else item_request.invoice_amount) %}
+                            {% if invoice_total_value is not none %}
+                            <div class="form-group" style="margin-top: 10px;">
+                                <label>Invoice Amount (OMR)</label>
+                                <input type="text"
+                                       value="{{ '%.3f'|format(invoice_total_value) }}"
+                                       readonly
+                                       style="background: #f5f5f5;">
+                            </div>
+                            {% endif %}
                         </div>
                         {% endif %}
                     </div>
@@ -2901,24 +3034,23 @@
                                                 })();
                                             </script>
                                         </div>
-                                        <div class="form-group">
-                                            <label for="completion_invoice_amount">Invoice Amount (OMR) <span style="color: red;">*</span></label>
-                                            <input type="number"
-                                                   name="invoice_amount"
-                                                   id="completion_invoice_amount"
-                                                   class="form-control"
-                                                   step="0.001"
-                                                   min="0"
-                                                   placeholder="Enter invoice amount paid to supplier in OMR"
-                                                   value="{% if item_request.invoice_amount is not none %}{{ '%.3f'|format(item_request.invoice_amount) }}{% endif %}"
-                                                   required>
+                                        <div class="form-group" id="invoice-item-mapping" style="margin-top: 10px; display: none;">
+                                            <label>Which item(s) does each invoice cover? <span style="color: red;">*</span></label>
+                                            <div id="invoice-item-mapping-list" style="display: grid; gap: 10px;"></div>
+                                            <small class="form-text text-muted">Select at least one item for every invoice file you upload.</small>
                                         </div>
+                                        <input type="hidden" name="invoice_item_map" id="invoice_item_map_input">
                                         
                                         <div class="form-group">
                                             <label for="completion_notes">Completion Notes (Optional)</label>
                                             <textarea name="completion_notes" id="completion_notes" rows="3" placeholder="Add any notes about the completion..."></textarea>
                                         </div>
                                         
+                                        <div class="step-actions" style="margin-bottom: 10px;">
+                                            <button type="button" class="btn btn-success" id="save-uploads-btn">
+                                                <i class="fas fa-save"></i> Save Uploads
+                                            </button>
+                                        </div>
                                         <div class="step-actions">
                                             <button type="submit" class="btn btn-success">
                                                 <i class="fas fa-check"></i> Mark as Completed
@@ -2938,11 +3070,13 @@
                                         {% if ',' in item_request.item_name %}
                                             {# Multi-item request #}
                                             {% set item_list = item_request.item_name.split(',') %}
-                                            {# Show the latest procurement-edited quantities; fall back to manager-approved, then original #}
-                                            {% set raw_quantity_source = item_request.procurement_quantities or item_request.procurement_manager_quantities or item_request.quantity %}
+                                            {# PRIORITY: Show procurement manager quantities if they exist (most recent approval), otherwise show manager quantities (if procurement manager hasn't acted), otherwise original #}
+                                            {% set display_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                                            {# If procurement staff has edited AFTER procurement manager, show their edits; otherwise show display_source #}
+                                            {% set raw_quantity_source = item_request.procurement_quantities if quantities_edited else display_source %}
                                             {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
-                                            {# Baseline for comparison: manager-approved if present, else original request #}
-                                            {% set original_source = item_request.procurement_manager_quantities or item_request.quantity %}
+                                            {# Baseline (for showing quantity comparison) is always the most recent approval from procurement manager #}
+                                            {% set original_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
                                             {% set original_list = (original_source or '').split(';') if original_source else [] %}
                                             
                                             {% if can_complete %}
@@ -3028,6 +3162,13 @@
                                                                                 <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
                                                                                 <button type="button" class="qty-btn plus" data-index="{{ loop.index0 }}" onclick="adjustCartQuantity(this.dataset.index, 1)">+</button>
                                                                             </div>
+                                                                            <button type="button"
+                                                                                    class="edit-qty-btn"
+                                                                                    data-index="{{ loop.index0 }}"
+                                                                                    onclick="cancelCartQuantityEdit(this.dataset.index)"
+                                                                                    title="Cancel editing">
+                                                                                <i class="fas fa-times"></i>
+                                                                            </button>
                                                                         </div>
                                                                         {% else %}
                                                                         <div class="quantity-control">
@@ -3042,13 +3183,14 @@
                                                                     {% endif %}
                                                                 </div>
                                                                 <div class="procurement-cart-amount">
-                                                                    {% set amt_val = all_amounts[loop.index0] if all_amounts|length > loop.index0 else '0.000' %}
+                                                                    {% set amt_val = (all_amounts[loop.index0]|trim if all_amounts|length > loop.index0 else '')|default('0.000', true) %}
+                                                                    {% set amt_val = amt_val if amt_val else '0.000' %}
                                                                     {% if can_complete %}
                                                                         {% if was_manager_zero %}
                                                                         <div id="cart_amount_readonly_{{ loop.index0 }}" class="quantity-readonly-display" style="justify-content: flex-end;">
                                                                             <span class="readonly-qty-pill">{{ amt_val }}</span>
                                                                         </div>
-                                                                        <input type="number" name="amounts[]" id="cart_amount_{{ loop.index0 }}" min="0" step="0.001" value="{{ amt_val }}" data-index="{{ loop.index0 }}" style="display: none;" disabled>
+                                                                        <input type="number" name="amounts[]" id="cart_amount_{{ loop.index0 }}" min="0" step="0.001" value="{{ amt_val }}" data-index="{{ loop.index0 }}" style="display: none;">
                                                                         {% else %}
                                                                         <input type="number" name="amounts[]" id="cart_amount_{{ loop.index0 }}" min="0" step="0.001" value="{{ amt_val }}" data-index="{{ loop.index0 }}">
                                                                         {% endif %}
@@ -3070,6 +3212,24 @@
                                                     {% endfor %}
                                                 </div>
                                                 
+                                            {% if item_request.procurement_quantity_rejection_reason %}
+                                            <div id="assigned_saved_rejection_reason_group" style="display: block; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                                <div class="form-group">
+                                                    <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Previously Saved Reason for Rejecting Item(s)</label>
+                                                    <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                                        <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.procurement_quantity_rejection_reason }}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                            <div id="assigned_rejection_reason_group" style="display: none; margin-top: 1rem;">
+                                                <div class="form-group">
+                                                <label for="assigned_quantity_rejection_reason">Reason for Rejecting Item(s) <span style="color: red;">*</span></label>
+                                                    <textarea name="quantity_rejection_reason" id="assigned_quantity_rejection_reason" rows="3" placeholder="Please provide a reason for rejecting the item(s) with quantity set to 0..." style="width: 100%;">{{ item_request.procurement_quantity_rejection_reason or '' }}</textarea>
+                                                    <small class="form-text text-muted">This field is required when at least one item quantity is set to 0.</small>
+                                                </div>
+                                            </div>
+
                                                 {% set assigned_ns = namespace(total=0.0) %}
                                                 {% for amt in all_amounts %}
                                                     {% set assigned_ns.total = assigned_ns.total + (amt | float) %}
@@ -3091,11 +3251,14 @@
                                             {% endif %}
                                         {% else %}
                                             {# Single-item request #}
-                                            {% set raw_quantity_source = item_request.procurement_quantities or item_request.procurement_manager_quantities or item_request.quantity %}
+                                            {# PRIORITY: Show procurement manager quantities if they exist (most recent approval), otherwise show manager quantities (if procurement manager hasn't acted), otherwise original #}
+                                            {% set display_source_single = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                                            {# If procurement staff has edited AFTER procurement manager, show their edits; otherwise show display_source #}
+                                            {% set raw_quantity_source = item_request.procurement_quantities if quantities_edited else display_source_single %}
                                             {% set current_raw = (raw_quantity_source or '').split(';')[0] %}
                                             {% set qty = (current_raw or '').strip() %}
-                                            {# Baseline for comparison: manager-approved if present, else original request #}
-                                            {% set orig_qty_raw = (item_request.procurement_manager_quantities or item_request.quantity or '').strip() %}
+                                            {# Baseline (for showing quantity comparison) is always the most recent approval from procurement manager #}
+                                            {% set orig_qty_raw = (item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity or '').strip() %}
                                             {% if ';' in orig_qty_raw %}
                                                 {% set orig_qty_raw = orig_qty_raw.split(';')[0] %}
                                             {% endif %}
@@ -3146,6 +3309,13 @@
                                                                         <span class="original-qty-inline">/ {{ orig_qty_raw or '0' }}</span>
                                                                         <button type="button" class="qty-btn plus" data-index="0" onclick="adjustCartQuantity(this.dataset.index, 1)">+</button>
                                                                     </div>
+                                                                    <button type="button"
+                                                                            class="edit-qty-btn"
+                                                                            data-index="0"
+                                                                            onclick="cancelCartQuantityEdit(this.dataset.index)"
+                                                                            title="Cancel editing">
+                                                                        <i class="fas fa-times"></i>
+                                                                    </button>
                                                                 </div>
                                                                 {% else %}
                                                                 <div class="quantity-control">
@@ -3160,13 +3330,14 @@
                                                             {% endif %}
                                                         </div>
                                                         <div class="procurement-cart-amount">
-                                                            {% set amt_val = all_amounts[0] if all_amounts|length > 0 else '0.000' %}
+                                                            {% set amt_raw = all_amounts[0]|trim if all_amounts|length > 0 else '' %}
+                                                            {% set amt_val = amt_raw if amt_raw else (('%.3f'|format(item_request.amount)) if item_request.amount else '0.000') %}
                                                             {% if can_complete %}
                                                                 {% if was_manager_zero %}
                                                                 <div id="cart_amount_readonly_0" class="quantity-readonly-display" style="justify-content: flex-end;">
                                                                     <span class="readonly-qty-pill">{{ amt_val }}</span>
                                                                 </div>
-                                                                <input type="number" name="amounts[]" id="cart_amount_0" min="0" step="0.001" value="{{ amt_val }}" data-index="0" style="display: none;" disabled>
+                                                                <input type="number" name="amounts[]" id="cart_amount_0" min="0" step="0.001" value="{{ amt_val }}" data-index="0" style="display: none;">
                                                                 {% else %}
                                                                 <input type="number" name="amounts[]" id="cart_amount_0" min="0" step="0.001" value="{{ amt_val }}" data-index="0">
                                                                 {% endif %}
@@ -3185,7 +3356,24 @@
                                                         {% endif %}
                                                     </div>
                                                 </div>
-                                                
+                                                {% if item_request.procurement_quantity_rejection_reason %}
+                                                <div id="assigned_saved_rejection_reason_group_single" style="display: block; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
+                                                    <div class="form-group">
+                                                        <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Previously Saved Reason for Rejecting Item</label>
+                                                        <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                                            <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.procurement_quantity_rejection_reason }}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {% endif %}
+                                                <div id="assigned_rejection_reason_group_single" style="display: none; margin-top: 1rem;">
+                                                    <div class="form-group">
+                                                        <label for="assigned_quantity_rejection_reason_single">Reason for Rejecting Item <span style="color: red;">*</span></label>
+                                                        <textarea name="quantity_rejection_reason" id="assigned_quantity_rejection_reason_single" rows="3" placeholder="Please provide a reason for rejecting this item..." style="width: 100%;">{{ item_request.procurement_quantity_rejection_reason or '' }}</textarea>
+                                                        <small class="form-text text-muted">This field is required when the quantity is set to 0.</small>
+                                                    </div>
+                                                </div>
+
                                                 {% set assigned_ns = namespace(total=0.0) %}
                                                 {% for amt in all_amounts %}
                                                     {% set assigned_ns.total = assigned_ns.total + (amt | float) %}
@@ -3247,11 +3435,24 @@
                                 <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
                             </div>
                             {% endfor %}
+                            {% if invoice_total_ns is not defined %}
+                                {% set invoice_total_ns = namespace(total=0.0) %}
+                            {% endif %}
+                            {% set invoice_total_value = (invoice_total_ns.total if invoice_total_ns.total > 0 else item_request.invoice_amount) %}
+                            {% if invoice_total_value is not none %}
+                            <div class="form-group" style="margin-top: 10px;">
+                                <label>Invoice Amount (OMR)</label>
+                                <input type="text"
+                                       value="{{ '%.3f'|format(invoice_total_value) }}"
+                                       readonly
+                                       style="background: #f5f5f5;">
+                            </div>
+                            {% endif %}
                         </div>
                         {% endif %}
 
                         {% if item_request.receipt_amount is not none or item_request.receipt_reference_number %}
-                        <div class="form-group">
+                        <div class="form-group" style="margin-top: 8px;">
                             <label>Receipt Amount (OMR)</label>
                             <input type="text"
                                    value="{% if item_request.receipt_amount is not none %}{{ '%.3f'|format(item_request.receipt_amount) }}{% else %}-{% endif %}"
@@ -3270,26 +3471,124 @@
                         {% if invoice_files %}
                         <div class="form-group">
                             <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
+                            {% set invoice_amount_lookup = {} %}
+                            {% set invoice_items_lookup = {} %}
+                            {% set invoice_total_ns = namespace(total=0.0) %}
+                            {% for inv in invoice_entries or [] %}
+                                {% if inv.filename %}
+                                    {% set inv_amt = inv['amount'] if inv['amount'] is defined else None %}
+                                    {% set inv_items = inv['items'] if inv['items'] is defined else [] %}
+                                    {% if inv_items is none %}{% set inv_items = [] %}{% endif %}
+                                    {% set _ = invoice_amount_lookup.update({inv.filename: inv_amt}) %}
+                                    {% set _ = invoice_items_lookup.update({inv.filename: inv_items}) %}
+                                    {% if inv_amt %}
+                                        {% set invoice_total_ns.total = invoice_total_ns.total + (inv_amt | float) %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
                             {% for file in invoice_files %}
                             <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
                                 <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
                                     <i class="fas fa-download"></i> View Invoice {{ loop.index }}
                                 </a>
                                 <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                                {% if invoice_amount_lookup.get(file) %}
+                                <div style="margin-top: 6px; font-weight: 600; color: #1f2937;">Amount: OMR {{ '%.3f'|format(invoice_amount_lookup.get(file)|float) }}</div>
+                                {% endif %}
+                                {% if invoice_items_lookup.get(file) %}
+                                <div style="margin-top: 4px; color: #374151;">
+                                    <strong>Items:</strong>
+                                    <ul style="margin: 4px 0 0 18px; padding: 0;">
+                                        {% for itm in invoice_items_lookup.get(file) %}
+                                        <li>{{ itm }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
                             </div>
                             {% endfor %}
                         </div>
                         {% endif %}
 
-                        {% if item_request.invoice_amount is not none %}
-                        <div class="form-group">
-                            <label>Invoice Amount (OMR)</label>
-                            <input type="text"
-                                   value="{{ '%.3f'|format(item_request.invoice_amount) }}"
-                                   readonly
-                                   style="background: #f5f5f5;">
+                        {# Read-only view of procurement quantities/amounts after completion #}
+                        {% if item_request.item_name %}
+                        {% set amount_list = (item_request.procurement_amounts or '').split(';') %}
+                        {% set quantity_source = item_request.procurement_quantities or item_request.procurement_manager_quantities or item_request.quantity %}
+                        <div class="card assigned-section procurement-cart-card" style="margin-top: 1.5rem;">
+                            <div class="card-header">
+                                <h4><i class="fas fa-shopping-cart"></i> Billing and Completion (Read-Only)</h4>
+                                <p style="margin: 0;">These are the final quantities and amounts saved by the assigned procurement staff.</p>
+                            </div>
+                            <div class="card-body">
+                                {% if ',' in item_request.item_name %}
+                                    {% set item_list = item_request.item_name.split(',') %}
+                                    {% set quantity_list = (quantity_source or '').split(';') if quantity_source else [] %}
+                                    <div class="procurement-cart-table">
+                                        <div class="procurement-cart-header-row">
+                                            <div>Item</div>
+                                            <div style="text-align: left;">Quantity</div>
+                                            <div style="text-align: right;">Amount</div>
+                                        </div>
+                                        {% for item in item_list %}
+                                            {% set item_trimmed = item.strip() %}
+                                            {% if item_trimmed %}
+                                                {% set qty = quantity_list[loop.index0]|trim if loop.index0 < quantity_list|length else '0' %}
+                                                {% if ':' in qty %}
+                                                    {% set parts = qty.split(':', 1) %}
+                                                    {% set qty = parts[1].strip() if parts|length > 1 else qty %}
+                                                {% endif %}
+                                                {% set qty_num = qty|int(0) %}
+                                                {% set amt_val = amount_list[loop.index0] if amount_list|length > loop.index0 else '0.000' %}
+                                                <div class="procurement-cart-row {% if qty_num == 0 %}qty-zero{% endif %}">
+                                                    <div class="procurement-cart-item-name">{{ item_trimmed }}</div>
+                                                    <div class="procurement-cart-qty">
+                                                        <span class="readonly-qty-pill">{{ qty or '0' }}</span>
+                                                    </div>
+                                                    <div class="procurement-cart-amount">
+                                                        <span class="readonly-qty-pill">{{ amt_val or '0.000' }}</span>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    {% set qty_single = (quantity_source or '').split(';')[0] if quantity_source else '' %}
+                                    {% if ':' in qty_single %}
+                                        {% set parts = qty_single.split(':', 1) %}
+                                        {% set qty_single = parts[1].strip() if parts|length > 1 else qty_single %}
+                                    {% endif %}
+                                    {% set qty_single_num = qty_single|int(0) %}
+                                    {% set amt_single = amount_list[0] if amount_list|length > 0 else '0.000' %}
+                                    <div class="procurement-cart-table">
+                                        <div class="procurement-cart-header-row">
+                                            <div>Item</div>
+                                            <div style="text-align: left;">Quantity</div>
+                                            <div style="text-align: right;">Amount</div>
+                                        </div>
+                                        <div class="procurement-cart-row {% if qty_single_num == 0 %}qty-zero{% endif %}">
+                                            <div class="procurement-cart-item-name">{{ item_request.item_name }}</div>
+                                            <div class="procurement-cart-qty">
+                                                <span class="readonly-qty-pill">{{ qty_single or '0' }}</span>
+                                            </div>
+                                            <div class="procurement-cart-amount">
+                                                <span class="readonly-qty-pill">{{ amt_single or '0.000' }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+
+                                {% set readonly_ns = namespace(total=0.0) %}
+                                {% for amt in amount_list %}
+                                    {% set readonly_ns.total = readonly_ns.total + (amt | float) %}
+                                {% endfor %}
+                                <div class="procurement-cart-total-row">
+                                    <div class="procurement-cart-total-label">TOTAL AMOUNT</div>
+                                    <div class="procurement-cart-total-value">OMR {{ '%.3f'|format(readonly_ns.total) }}</div>
+                                </div>
+                            </div>
                         </div>
                         {% endif %}
+
                     </div>
                 </div>
             {% else %}
@@ -3346,21 +3645,7 @@
                             {% endfor %}
                         </div>
                         {% endif %}
-                        {% if invoice_files %}
-                        <div class="form-group">
-                            <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
-                            {% for file in invoice_files %}
-                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
-                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
-                                    <i class="fas fa-download"></i> View Invoice {{ loop.index }}
-                                </a>
-                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-
-                        {% if item_request.receipt_amount is not none or item_request.invoice_amount is not none or item_request.receipt_reference_number %}
+                        {% if item_request.receipt_amount is not none or item_request.receipt_reference_number %}
                         <div class="form-group">
                             <label>Receipt Amount (OMR)</label>
                             <input type="text"
@@ -3369,16 +3654,62 @@
                                    style="background: #f5f5f5;">
                         </div>
                         <div class="form-group">
-                            <label>Invoice Amount (OMR)</label>
-                            <input type="text"
-                                   value="{% if item_request.invoice_amount is not none %}{{ '%.3f'|format(item_request.invoice_amount) }}{% else %}-{% endif %}"
-                                   readonly
-                                   style="background: #f5f5f5;">
-                        </div>
-                        <div class="form-group">
                             <label>Receipt Reference Number</label>
                             <input type="text"
                                    value="{{ item_request.receipt_reference_number or '-' }}"
+                                   readonly
+                                   style="background: #f5f5f5;">
+                        </div>
+                        {% endif %}
+
+                        {% if invoice_files %}
+                        <div class="form-group">
+                            <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
+                            {% set invoice_amount_lookup = {} %}
+                            {% set invoice_items_lookup = {} %}
+                            {% set invoice_total_ns = namespace(total=0.0) %}
+                            {% for inv in invoice_entries or [] %}
+                                {% if inv.filename %}
+                                    {% set inv_amt = inv['amount'] if inv['amount'] is defined else None %}
+                                    {% set inv_items = inv['items'] if inv['items'] is defined else [] %}
+                                    {% if inv_items is none %}{% set inv_items = [] %}{% endif %}
+                                    {% set _ = invoice_amount_lookup.update({inv.filename: inv_amt}) %}
+                                    {% set _ = invoice_items_lookup.update({inv.filename: inv_items}) %}
+                                    {% if inv_amt %}
+                                        {% set invoice_total_ns.total = invoice_total_ns.total + (inv_amt | float) %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                            {% for file in invoice_files %}
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
+                                    <i class="fas fa-download"></i> View Invoice {{ loop.index }}
+                                </a>
+                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                                {% if invoice_amount_lookup.get(file) %}
+                                <div style="margin-top: 6px; font-weight: 600; color: #1f2937;">Amount: OMR {{ '%.3f'|format(invoice_amount_lookup.get(file)|float) }}</div>
+                                {% endif %}
+                                {% if invoice_items_lookup.get(file) %}
+                                <div style="margin-top: 4px; color: #374151;">
+                                    <strong>Items:</strong>
+                                    <ul style="margin: 4px 0 0 18px; padding: 0;">
+                                        {% for itm in invoice_items_lookup.get(file) %}
+                                        <li>{{ itm }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        {% set invoice_total_value = invoice_total_ns.total if (invoice_total_ns is defined and invoice_total_ns.total > 0) else item_request.invoice_amount %}
+                        {% if invoice_total_value is not none %}
+                        <div class="form-group">
+                            <label>Invoice Amount (OMR)</label>
+                            <input type="text"
+                                   value="{{ '%.3f'|format(invoice_total_value) }}"
                                    readonly
                                    style="background: #f5f5f5;">
                         </div>
@@ -3577,6 +3908,321 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle item request completion form submission with multiple file upload components
     const itemRequestCompleteForm = document.getElementById('item-request-complete-form');
     if (itemRequestCompleteForm) {
+        const hasExistingReceipts = {{ 'true' if receipt_files else 'false' }};
+        const hasExistingInvoices = {{ 'true' if invoice_files else 'false' }};
+        const invoiceItemOptions = {{ assigned_items|tojson }};
+        const invoiceItemQuantities = {{ assigned_item_quantities|tojson }};
+        const invoiceMappingWrapper = document.getElementById('invoice-item-mapping');
+        const invoiceMappingList = document.getElementById('invoice-item-mapping-list');
+        const invoiceItemMapInput = document.getElementById('invoice_item_map_input');
+        const receiptUploadContainer = document.getElementById('item-receipt-upload-container');
+        const invoiceUploadContainer = document.getElementById('item-invoice-upload-container');
+
+        const sanitizeForId = (val) => String(val || '').replace(/[^a-zA-Z0-9_-]/g, '');
+
+        const syncInvoiceItemMapInput = () => {
+            if (!invoiceItemMapInput || !invoiceMappingList) return {};
+            const map = {};
+            invoiceMappingList.querySelectorAll('[data-invoice-file]').forEach(group => {
+                const fileName = group.getAttribute('data-invoice-file');
+                const selected = Array.from(group.querySelectorAll('input[type="checkbox"]:checked'))
+                    .map(cb => cb.value)
+                    .filter(Boolean);
+                const amountInput = group.querySelector('input[type="number"][data-invoice-amount]');
+                let amountVal = amountInput ? parseFloat(amountInput.value) : null;
+                if (isNaN(amountVal)) {
+                    amountVal = null;
+                }
+                if (fileName && selected.length > 0) {
+                    map[fileName] = {
+                        items: selected,
+                        amount: amountVal,
+                    };
+                }
+            });
+            invoiceItemMapInput.value = JSON.stringify(map);
+            return map;
+        };
+
+        const renderInvoiceItemMapping = (files) => {
+            if (!invoiceMappingWrapper || !invoiceMappingList) return;
+            invoiceMappingList.innerHTML = '';
+            const fileList = Array.from(files || []);
+            if (fileList.length === 0) {
+                invoiceMappingWrapper.style.display = 'none';
+                if (invoiceItemMapInput) {
+                    invoiceItemMapInput.value = '';
+                }
+                return;
+            }
+
+            invoiceMappingWrapper.style.display = 'block';
+            fileList.forEach((file, idx) => {
+                const fileRow = document.createElement('div');
+                fileRow.className = 'invoice-mapping-row';
+                fileRow.style.padding = '10px';
+                fileRow.style.border = '1px solid #dee2e6';
+                fileRow.style.borderRadius = '6px';
+                fileRow.style.background = '#f8f9fa';
+                fileRow.setAttribute('data-invoice-file', file.name);
+
+                const title = document.createElement('div');
+                title.style.fontWeight = '600';
+                title.style.marginBottom = '6px';
+                title.textContent = file.name;
+                fileRow.appendChild(title);
+
+                const optionsWrap = document.createElement('div');
+                optionsWrap.style.display = 'flex';
+                optionsWrap.style.flexWrap = 'wrap';
+                optionsWrap.style.gap = '10px';
+
+                invoiceItemOptions.forEach((itemName, itemIdx) => {
+                    const qtyVal = Array.isArray(invoiceItemQuantities) && invoiceItemQuantities.length > itemIdx
+                        ? invoiceItemQuantities[itemIdx]
+                        : null;
+                    const optionId = `inv-${sanitizeForId(file.name)}-${itemIdx}`;
+                    const label = document.createElement('label');
+                    label.setAttribute('for', optionId);
+                    label.style.display = 'inline-flex';
+                    label.style.alignItems = 'center';
+                    label.style.gap = '6px';
+                    label.style.marginRight = '10px';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = optionId;
+                    checkbox.value = itemName;
+                    checkbox.className = 'invoice-item-checkbox';
+                    if (qtyVal !== null && qtyVal <= 0) {
+                        checkbox.disabled = true;
+                        label.title = 'This item has quantity 0 and cannot be selected.';
+                    }
+
+                    label.appendChild(checkbox);
+                    label.appendChild(document.createTextNode(itemName));
+                    optionsWrap.appendChild(label);
+                });
+
+                fileRow.appendChild(optionsWrap);
+
+                const amountWrap = document.createElement('div');
+                amountWrap.style.marginTop = '8px';
+                const amountLabel = document.createElement('label');
+                amountLabel.textContent = 'Invoice amount (OMR) *';
+                amountLabel.style.display = 'block';
+                amountLabel.style.fontWeight = '500';
+                amountLabel.style.marginBottom = '4px';
+                const amountInput = document.createElement('input');
+                amountInput.type = 'number';
+                amountInput.min = '0';
+                amountInput.step = '0.001';
+                amountInput.required = true;
+                amountInput.setAttribute('data-invoice-amount', 'true');
+                amountInput.style.width = '160px';
+                amountInput.placeholder = '0.000';
+                amountWrap.appendChild(amountLabel);
+                amountWrap.appendChild(amountInput);
+                fileRow.appendChild(amountWrap);
+
+                invoiceMappingList.appendChild(fileRow);
+            });
+
+            syncInvoiceItemMapInput();
+        };
+
+        if (invoiceMappingList) {
+            invoiceMappingList.addEventListener('change', function(e) {
+                if (e.target && e.target.classList.contains('invoice-item-checkbox')) {
+                    syncInvoiceItemMapInput();
+                }
+            });
+        }
+
+        const refreshInvoiceMapping = () => {
+            if (invoiceUploadContainer && invoiceUploadContainer.uploadComponent) {
+                renderInvoiceItemMapping(invoiceUploadContainer.uploadComponent.getFiles());
+            } else {
+                const fallbackInput = itemRequestCompleteForm.querySelector('input[name="invoice_files"]');
+                renderInvoiceItemMapping(fallbackInput ? fallbackInput.files : []);
+            }
+        };
+
+        if (invoiceUploadContainer) {
+            invoiceUploadContainer.addEventListener('multipleFileUpload:changed', (evt) => {
+                renderInvoiceItemMapping(evt.detail?.files || []);
+            });
+        }
+
+        const invoiceFileInputFallback = itemRequestCompleteForm.querySelector('input[name="invoice_files"]');
+        if (invoiceFileInputFallback) {
+            invoiceFileInputFallback.addEventListener('change', (e) => {
+                renderInvoiceItemMapping(e.target.files);
+            });
+        }
+
+        // Initialize mapping UI
+        refreshInvoiceMapping();
+        // Helper to render uploaded files card without a full reload
+        const renderUploadedFiles = (receipts, invoices) => {
+            const card = document.getElementById('uploaded-files-card');
+            if (!card) return;
+            const receiptsList = document.getElementById('uploaded-receipts-list');
+            const invoicesList = document.getElementById('uploaded-invoices-list');
+
+            // If no files at all, hide the card
+            if ((!receipts || receipts.length === 0) && (!invoices || invoices.length === 0)) {
+                card.style.display = 'none';
+                return;
+            }
+
+            card.style.display = 'block';
+
+            if (receiptsList) {
+                if (receipts && receipts.length > 0) {
+                    receiptsList.style.display = 'block';
+                    receiptsList.innerHTML = `
+                        <label><i class="fas fa-check-circle"></i> Receipt (Proof of transfer made by the Procurement Manager)</label>
+                        ${receipts.map((file, idx) => `
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                <a href="${window.location.origin + "{{ url_for('uploaded_file', filename='__FILE__') }}".replace('__FILE__', file)}" target="_blank" class="btn btn-warning">
+                                    <i class="fas fa-download"></i> View Receipt ${idx + 1}
+                                </a>
+                                <small style="color: #666; margin-left: 10px;">${file.includes('_') ? file.split('_', 2)[1] || file : file}</small>
+                            </div>
+                        `).join('')}
+                    `;
+                } else {
+                    receiptsList.style.display = 'none';
+                    receiptsList.innerHTML = '';
+                }
+            }
+
+            if (invoicesList) {
+                if (invoices && invoices.length > 0) {
+                    invoicesList.style.display = 'block';
+                    invoicesList.innerHTML = `
+                        <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
+                        ${invoices.map((file, idx) => `
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                <a href="${window.location.origin + "{{ url_for('uploaded_file', filename='__FILE__') }}".replace('__FILE__', file)}" target="_blank" class="btn btn-warning">
+                                    <i class="fas fa-download"></i> View Invoice ${idx + 1}
+                                </a>
+                                <small style="color: #666; margin-left: 10px;">${file.includes('_') ? file.split('_', 2)[1] || file : file}</small>
+                            </div>
+                        `).join('')}
+                    `;
+                } else {
+                    invoicesList.style.display = 'none';
+                    invoicesList.innerHTML = '';
+                }
+            }
+        };
+
+        // Save uploads without completing the request
+        const saveUploadsBtn = document.getElementById('save-uploads-btn');
+        if (saveUploadsBtn) {
+            const originalSaveHTML = saveUploadsBtn.innerHTML;
+            saveUploadsBtn.addEventListener('click', function() {
+                if (hasUnsavedQuantityEdits()) {
+                    showQuantityEditErrorDialog();
+                    return;
+                }
+
+                const receiptComponent = receiptUploadContainer ? receiptUploadContainer.uploadComponent : null;
+                const invoiceComponent = invoiceUploadContainer ? invoiceUploadContainer.uploadComponent : null;
+                const receiptInput = itemRequestCompleteForm.querySelector('input[name="receipt_files"]');
+                const invoiceInput = itemRequestCompleteForm.querySelector('input[name="invoice_files"]');
+
+                const hasReceiptFiles = receiptComponent
+                    ? receiptComponent.getFiles().length > 0
+                    : (receiptInput && receiptInput.files && receiptInput.files.length > 0);
+                const hasInvoiceFiles = invoiceComponent
+                    ? invoiceComponent.getFiles().length > 0
+                    : (invoiceInput && invoiceInput.files && invoiceInput.files.length > 0);
+
+                if (!hasReceiptFiles && !hasInvoiceFiles) {
+                    showReceiptUploadErrorDialog('Please select at least one receipt or invoice file to save.');
+                    return;
+                }
+
+                const invoiceFileList = invoiceComponent
+                    ? invoiceComponent.getFiles()
+                    : (invoiceInput && invoiceInput.files ? Array.from(invoiceInput.files) : []);
+                const invoiceMap = syncInvoiceItemMapInput();
+                if (invoiceFileList && invoiceFileList.length > 0) {
+                    const missingMappings = invoiceFileList.filter(f => {
+                        const entry = invoiceMap[f.name];
+                        return !entry || !entry.items || entry.items.length === 0 || !entry.amount || entry.amount <= 0;
+                    });
+                    if (missingMappings.length > 0) {
+                        showReceiptUploadErrorDialog('Please select item name(s) and enter a positive amount for each invoice file: ' + missingMappings.map(f => f.name).join(', '));
+                        return;
+                    }
+                }
+
+                saveUploadsBtn.disabled = true;
+                saveUploadsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+                // Ensure the latest mapping is in the form before submission
+                syncInvoiceItemMapInput();
+
+                const formData = new FormData(itemRequestCompleteForm);
+                if (receiptComponent) {
+                    receiptComponent.prepareFormData(formData);
+                }
+                if (invoiceComponent) {
+                    invoiceComponent.prepareFormData(formData);
+                }
+                formData.append('save_uploads', 'true');
+
+                fetch("{{ url_for('item_request_save_uploads', request_id=item_request.id) }}", {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                })
+                .then(async response => {
+                    const contentType = response.headers.get('content-type') || '';
+                    let data = null;
+                    if (contentType.includes('application/json')) {
+                        data = await response.json();
+                    }
+
+                    if (response.ok && data && data.success) {
+                        renderUploadedFiles(data.receipt_files || [], data.invoice_files || []);
+                        saveUploadsBtn.disabled = false;
+                        saveUploadsBtn.innerHTML = originalSaveHTML;
+                        // Provide immediate success feedback and refresh to sync UI
+                        alert(data.message || 'Uploads saved successfully.');
+                        window.location.reload();
+                        return;
+                    }
+
+                    // Show error message if provided
+                    if (data && data.message) {
+                        saveUploadsBtn.disabled = false;
+                        saveUploadsBtn.innerHTML = originalSaveHTML;
+                        showReceiptUploadErrorDialog(data.message);
+                        return;
+                    }
+
+                    if (response.ok) {
+                        window.location.href = window.location.href;
+                        return;
+                    }
+
+                    throw new Error('Save failed');
+                })
+                .catch(() => {
+                    saveUploadsBtn.disabled = false;
+                    saveUploadsBtn.innerHTML = originalSaveHTML;
+                    showReceiptUploadErrorDialog('Could not save uploads. Please try again.');
+                });
+            });
+        }
+
         // Store original values for assigned procurement quantities before adding validation
         ensureOriginalValuesStored();
         
@@ -3584,7 +4230,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const submitButton = itemRequestCompleteForm.querySelector('button[type="submit"]');
         let originalButtonHTML = submitButton ? submitButton.innerHTML : '';
         
-        itemRequestCompleteForm.addEventListener('submit', function(e) {
+    itemRequestCompleteForm.addEventListener('submit', function(e) {
+        // Prevent duplicate submissions
+        if (this.dataset.mcSubmitting === 'true') {
+            return;
+        }
+
+        // Locate assigned procurement form once
+        const assignedForm = Array.from(document.querySelectorAll('form[action*="update_quantities"]')).find(f => {
+            const action = f.getAttribute('action') || '';
+            return !action.includes('update_quantities_manager') && !action.includes('update_quantities_procurement_manager');
+        });
             // Function to reset button state
             const resetButton = () => {
                 if (submitButton) {
@@ -3611,18 +4267,22 @@ document.addEventListener('DOMContentLoaded', function() {
             const amountInputs = document.querySelectorAll('input[name="amounts[]"]');
             if (amountInputs.length > 0) {
                 let hasEmptyAmount = false;
-                
                 amountInputs.forEach(input => {
                     const valueStr = String(input.value || '').trim();
                     const amount = parseFloat(valueStr);
+                    const index = input.dataset.index || input.id.replace('cart_amount_', '');
+                    const qtyInput = document.getElementById('cart_qty_' + index);
+                    const qtyVal = qtyInput ? parseInt(qtyInput.value || '0', 10) : null;
                     
-                    // Check if empty, "0", NaN, or <= 0 - ANY of these means invalid
+                    // If quantity is zero, allow empty/zero amount
+                    const skipAmount = qtyVal === 0;
+                    
                     const isEmpty = valueStr === '';
                     const isZero = valueStr === '0';
                     const isNaNValue = isNaN(amount);
                     const isNotPositive = amount <= 0;
                     
-                    if (isEmpty || isZero || isNaNValue || isNotPositive) {
+                    if (!skipAmount && (isEmpty || isZero || isNaNValue || isNotPositive)) {
                         hasEmptyAmount = true;
                         if (!firstInvalidInput) {
                             firstInvalidInput = input;
@@ -3631,48 +4291,88 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 
                 if (hasEmptyAmount) {
-                    errors.push('Please fill in all amount fields before completing the request.');
+                    errors.push('Please fill in all amount fields before completing the request (amounts not required for items with quantity 0).');
+                }
+            }
+
+            // Validate rejection reason if any quantity is 0 (assigned procurement)
+            if (assignedForm) {
+                const qtyInputs = assignedForm.querySelectorAll('input[name="quantities[]"]');
+                let hasZero = false;
+                qtyInputs.forEach(input => {
+                    const qty = parseInt(input.value || '0', 10);
+                    if (qty === 0) hasZero = true;
+                });
+                if (hasZero) {
+                    const rejectionField = assignedForm.querySelector('#assigned_quantity_rejection_reason') ||
+                                           assignedForm.querySelector('#assigned_quantity_rejection_reason_single') ||
+                                           assignedForm.querySelector('textarea[name="quantity_rejection_reason"]');
+                    if (rejectionField && !rejectionField.value.trim()) {
+                        errors.push('Please provide a reason for rejecting the item(s) with quantity set to 0.');
+                        if (!firstInvalidInput) firstInvalidInput = rejectionField;
+                    }
                 }
             }
             
             // Get both upload components
-            const receiptContainer = document.getElementById('item-receipt-upload-container');
-            const invoiceContainer = document.getElementById('item-invoice-upload-container');
+            const receiptContainer = receiptUploadContainer;
+            const invoiceContainer = invoiceUploadContainer;
             
             // Validate receipt files
             let receiptFilesMissing = false;
-            if (receiptContainer && receiptContainer.uploadComponent) {
-                const receiptComponent = receiptContainer.uploadComponent;
-                if (receiptComponent.getFiles().length === 0) {
-                    receiptFilesMissing = true;
+            if (!hasExistingReceipts) {
+                if (receiptContainer && receiptContainer.uploadComponent) {
+                    const receiptComponent = receiptContainer.uploadComponent;
+                    if (receiptComponent.getFiles().length === 0) {
+                        receiptFilesMissing = true;
+                    }
+                } else {
+                    // Fallback: check if receipt file input exists and has files
+                    const receiptFileInput = this.querySelector('input[name="receipt_files"]');
+                    if (!receiptFileInput || !receiptFileInput.files || receiptFileInput.files.length === 0) {
+                        receiptFilesMissing = true;
+                    }
                 }
-            } else {
-                // Fallback: check if receipt file input exists and has files
-                const receiptFileInput = this.querySelector('input[name="receipt_files"]');
-                if (!receiptFileInput || !receiptFileInput.files || receiptFileInput.files.length === 0) {
-                    receiptFilesMissing = true;
+                if (receiptFilesMissing) {
+                    errors.push('Please select at least one receipt file to upload.');
                 }
-            }
-            if (receiptFilesMissing) {
-                errors.push('Please select at least one receipt file to upload.');
             }
             
             // Validate invoice files
             let invoiceFilesMissing = false;
-            if (invoiceContainer && invoiceContainer.uploadComponent) {
-                const invoiceComponent = invoiceContainer.uploadComponent;
-                if (invoiceComponent.getFiles().length === 0) {
-                    invoiceFilesMissing = true;
+            let invoiceFileList = [];
+            if (!hasExistingInvoices) {
+                if (invoiceContainer && invoiceContainer.uploadComponent) {
+                    const invoiceComponent = invoiceContainer.uploadComponent;
+                    invoiceFileList = invoiceComponent.getFiles();
+                    if (invoiceComponent.getFiles().length === 0) {
+                        invoiceFilesMissing = true;
+                    }
+                } else {
+                    // Fallback: check if invoice file input exists and has files
+                    const invoiceFileInput = this.querySelector('input[name="invoice_files"]');
+                    invoiceFileList = invoiceFileInput && invoiceFileInput.files ? Array.from(invoiceFileInput.files) : [];
+                    if (!invoiceFileInput || !invoiceFileInput.files || invoiceFileInput.files.length === 0) {
+                        invoiceFilesMissing = true;
+                    }
                 }
-            } else {
-                // Fallback: check if invoice file input exists and has files
-                const invoiceFileInput = this.querySelector('input[name="invoice_files"]');
-                if (!invoiceFileInput || !invoiceFileInput.files || invoiceFileInput.files.length === 0) {
-                    invoiceFilesMissing = true;
+                if (invoiceFilesMissing) {
+                    errors.push('Please select at least one invoice file to upload.');
                 }
+            } else if (invoiceContainer && invoiceContainer.uploadComponent) {
+                invoiceFileList = invoiceContainer.uploadComponent.getFiles();
             }
-            if (invoiceFilesMissing) {
-                errors.push('Please select at least one invoice file to upload.');
+
+            // Validate that each uploaded invoice file has item mapping and amount
+            const invoiceMap = syncInvoiceItemMapInput();
+            if (invoiceFileList && invoiceFileList.length > 0) {
+                const missingInvoiceMapping = invoiceFileList.filter(f => {
+                    const entry = invoiceMap[f.name];
+                    return !entry || !entry.items || entry.items.length === 0 || !entry.amount || entry.amount <= 0;
+                });
+                if (missingInvoiceMapping.length > 0) {
+                    errors.push('Please choose item name(s) and enter a positive amount for each invoice file: ' + missingInvoiceMapping.map(f => f.name).join(', '));
+                }
             }
             
             // If there are any errors, show them and stop
@@ -3685,76 +4385,104 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show combined error message in a readable list format
                 const errorMessage = 'Please fix the following issues before completing the request:<br><br>' + 
                     errors.map(err => '• ' + err).join('<br>');
-                showReceiptUploadErrorDialog(errorMessage);
+                showMarkCompleteValidationErrorDialog(errorMessage);
                 return false;
             }
             
             // Validate receipt amount - must be > 0
+            // Validate receipt amount - must be > 0 only if a new receipt is being uploaded
             const receiptAmountInput = this.querySelector('input[name="receipt_amount"]');
-            if (receiptAmountInput) {
+            if (receiptAmountInput && !hasExistingReceipts) {
                 const receiptAmount = parseFloat(receiptAmountInput.value);
                 if (isNaN(receiptAmount) || receiptAmount <= 0) {
                     resetButton();
-                    showReceiptUploadErrorDialog('Receipt Amount must be greater than 0.');
+                    showMarkCompleteValidationErrorDialog('Receipt Amount must be greater than 0.');
                     return false;
                 }
             }
             
-            // Validate receipt reference number - must not be empty
+            // Validate receipt reference number - must not be empty only if a new receipt is being uploaded
             const receiptRefInput = this.querySelector('input[name="receipt_reference_number"]');
-            if (receiptRefInput) {
+            if (receiptRefInput && !hasExistingReceipts) {
                 const receiptRef = receiptRefInput.value.trim();
                 if (!receiptRef || receiptRef === '') {
                     resetButton();
-                    showReceiptUploadErrorDialog('Receipt Reference Number is required.');
+                    showMarkCompleteValidationErrorDialog('Receipt Reference Number is required.');
                     return false;
                 }
             }
             
-            // Validate invoice amount - must be > 0
-            const invoiceAmountInput = this.querySelector('input[name="invoice_amount"]');
-            if (invoiceAmountInput) {
-                const invoiceAmount = parseFloat(invoiceAmountInput.value);
-                if (isNaN(invoiceAmount) || invoiceAmount <= 0) {
-                    resetButton();
-                    showReceiptUploadErrorDialog('Invoice Amount must be greater than 0.');
-                    return false;
-                }
-            }
-            
-            // All validations passed - proceed with submission
-            if (receiptContainer && receiptContainer.uploadComponent && invoiceContainer && invoiceContainer.uploadComponent) {
-                const receiptComponent = receiptContainer.uploadComponent;
-                const invoiceComponent = invoiceContainer.uploadComponent;
-                
-                // Prepare form data with all selected files
-                const formData = new FormData(this);
-                receiptComponent.prepareFormData(formData);
-                invoiceComponent.prepareFormData(formData);
-                
-                // Submit the form with FormData
-                fetch(this.action, {
+            // All validations passed - first save quantities/amounts (assigned procurement), then submit completion with uploads
+            this.dataset.mcSubmitting = 'true';
+
+            const saveAssigned = () => {
+                if (!assignedForm) return Promise.resolve({ ok: true });
+                const assignedData = new FormData(assignedForm);
+                return fetch(assignedForm.action, {
                     method: 'POST',
-                    body: formData
+                    body: assignedData
+                });
+            };
+
+            const submitCompletion = () => {
+                // Ensure invoice item mapping is captured
+                syncInvoiceItemMapInput();
+                const formData = new FormData(this);
+                if (assignedForm) {
+                    const extraFields = assignedForm.querySelectorAll('input[name], textarea[name], select[name]');
+                    extraFields.forEach(field => {
+                        const { name, type } = field;
+                        if (!name) return;
+                        if (type === 'checkbox' || type === 'radio') {
+                            if (!field.checked) return;
+                        }
+                        formData.append(name, field.value ?? '');
+                    });
+                }
+                if (receiptContainer && receiptContainer.uploadComponent) {
+                    receiptContainer.uploadComponent.prepareFormData(formData);
+                }
+                if (invoiceContainer && invoiceContainer.uploadComponent) {
+                    invoiceContainer.uploadComponent.prepareFormData(formData);
+                }
+
+                return fetch(this.action, {
+                    method: 'POST',
+                    body: formData,
+                });
+            };
+
+            saveAssigned()
+                .then(res => {
+                    if (!res || !res.ok) {
+                        throw new Error('save-assigned-failed');
+                    }
+                    return submitCompletion();
                 })
                 .then(response => {
-                    if (response.ok) {
-                        window.location.href = window.location.href;
-                    } else {
-                        resetButton();
-                        console.error('Form submission failed');
-                        alert('Form submission failed. Please try again.');
+                    if (!response) {
+                        throw new Error('complete-failed');
                     }
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                        return;
+                    }
+                    if (response.ok) {
+                        window.location.reload();
+                        return;
+                    }
+                    throw new Error('complete-failed');
                 })
-                .catch(error => {
+                .catch(err => {
+                    console.error('Error:', err);
                     resetButton();
-                    console.error('Error:', error);
-                    alert('An error occurred. Please try again.');
+                    this.dataset.mcSubmitting = 'false';
+                    if (String(err.message || '').includes('save-assigned')) {
+                        showMarkCompleteValidationErrorDialog('Could not save quantities/amounts before completing. Please try again.');
+                    } else {
+                        showMarkCompleteValidationErrorDialog('Form submission failed. Please try again.');
+                    }
                 });
-            } else {
-                // Fallback to regular form submission if components not found
-                this.submit();
-            }
         });
     }
 });
@@ -3825,6 +4553,7 @@ function updateCartQuantityState(index) {
     
     // Show or hide rejection reason as quantities change
     checkManagerRejectionReasonRequired();
+    checkAssignedProcurementRejectionReasonRequired();
 }
 
 function calculateAssignedProcurementTotal() {
@@ -4131,41 +4860,32 @@ function checkProcurementManagerRejectionReasonRequired() {
     const multiRejectionField = document.getElementById('procurement_manager_quantity_rejection_reason');
     const multiSavedReasonGroup = document.getElementById('procurement_manager_saved_rejection_reason_group');
     const multiSaveBtn = document.getElementById('procurement_manager_save_quantities_btn');
+    const multiEditBtn = null;
+    const multiCancelBtn = null;
     
     if (multiRejectionGroup && multiRejectionField && multiSaveBtn) {
-        let hasZero = false;
-        let hasEditableVisible = false;
-        const quantityInputs = document.querySelectorAll('input[name="quantities[]"]');
-        quantityInputs.forEach(input => {
-            if (input.id && input.id.startsWith('procurement_cart_qty_')) {
-                // Check if this input's editable wrapper is visible (editing is enabled)
-                const editableWrapper = document.getElementById('procurement_qty_editable_wrapper_' + input.dataset.index);
-                if (editableWrapper && editableWrapper.style.display !== 'none') {
-                    hasEditableVisible = true;
-                    const qty = parseInt(input.value || '0', 10);
-                    if (qty === 0) {
-                        hasZero = true;
-                    }
-                }
-            }
-        });
+        const { hasZeroAny, hasZeroNew } = procurementManagerHasNewZero(false);
         
-        // Show rejection reason field only if editing is enabled AND any quantity is 0
-        if (hasEditableVisible && hasZero) {
+        if (hasZeroAny && hasZeroNew) {
             multiRejectionGroup.style.display = 'block';
             multiRejectionField.setAttribute('required', 'required');
+            // Prefill with default/inherited reason if empty
+            const defaultVal = multiRejectionField.dataset ? (multiRejectionField.dataset.defaultValue || '') : '';
+            if (!multiRejectionField.value.trim() && defaultVal) {
+                multiRejectionField.value = defaultVal;
+            }
             // Show previously saved reason if it exists
             if (multiSavedReasonGroup) {
                 multiSavedReasonGroup.style.display = 'block';
             }
+            // Make editable immediately
+            setProcurementManagerReasonReadonly(multiRejectionField, false);
         } else {
             multiRejectionGroup.style.display = 'none';
             multiRejectionField.removeAttribute('required');
-            // Hide previously saved reason
             if (multiSavedReasonGroup) {
                 multiSavedReasonGroup.style.display = 'none';
             }
-            // Don't clear the value - keep it for when they show the field again
         }
     }
     
@@ -4174,37 +4894,192 @@ function checkProcurementManagerRejectionReasonRequired() {
     const singleRejectionField = document.getElementById('procurement_manager_quantity_rejection_reason_single');
     const singleSavedReasonGroup = document.getElementById('procurement_manager_saved_rejection_reason_group_single');
     const singleSaveBtn = document.getElementById('procurement_manager_save_quantity_btn');
+    const singleEditBtn = null;
+    const singleCancelBtn = null;
     
     if (singleRejectionGroup && singleRejectionField && singleSaveBtn) {
-        const quantityInput = document.getElementById('procurement_cart_qty_0');
-        const editableWrapper = document.getElementById('procurement_qty_editable_wrapper_0');
-        const isEditableVisible = editableWrapper && editableWrapper.style.display !== 'none';
-        
-        if (quantityInput && isEditableVisible) {
-            const qty = parseInt(quantityInput.value || '0', 10);
-            // Show editable field only if editing is enabled AND quantity is 0
-            if (qty === 0) {
-                singleRejectionGroup.style.display = 'block';
-                singleRejectionField.setAttribute('required', 'required');
-                // Show previously saved reason if it exists
-                if (singleSavedReasonGroup) {
-                    singleSavedReasonGroup.style.display = 'block';
-                }
-            } else {
-                singleRejectionGroup.style.display = 'none';
-                singleRejectionField.removeAttribute('required');
-                // Hide previously saved reason
-                if (singleSavedReasonGroup) {
-                    singleSavedReasonGroup.style.display = 'none';
-                }
-                // Don't clear the value - keep it for when they show the field again
+        const { hasZeroAny, hasZeroNew } = procurementManagerHasNewZero(true);
+        if (hasZeroAny && hasZeroNew) {
+            singleRejectionGroup.style.display = 'block';
+            singleRejectionField.setAttribute('required', 'required');
+            // Prefill with default/inherited reason if empty
+            const defaultVal = singleRejectionField.dataset ? (singleRejectionField.dataset.defaultValue || '') : '';
+            if (!singleRejectionField.value.trim() && defaultVal) {
+                singleRejectionField.value = defaultVal;
             }
+            // Show previously saved reason if it exists
+            if (singleSavedReasonGroup) {
+                singleSavedReasonGroup.style.display = 'block';
+            }
+            // Make editable immediately
+            setProcurementManagerReasonReadonly(singleRejectionField, false);
         } else {
-            // If editing is not enabled, hide the rejection reason fields
             singleRejectionGroup.style.display = 'none';
             singleRejectionField.removeAttribute('required');
             if (singleSavedReasonGroup) {
                 singleSavedReasonGroup.style.display = 'none';
+            }
+        }
+    }
+}
+
+// Helpers to manage procurement manager rejection reason edit/cancel behaviour
+function getProcurementManagerReasonElements(context = 'multi') {
+    const isSingle = context === 'single';
+    return {
+        textarea: document.getElementById(isSingle ? 'procurement_manager_quantity_rejection_reason_single' : 'procurement_manager_quantity_rejection_reason'),
+        editBtn: document.getElementById(isSingle ? 'procurement_manager_reason_edit_btn_single' : 'procurement_manager_reason_edit_btn'),
+        cancelBtn: document.getElementById(isSingle ? 'procurement_manager_reason_cancel_btn_single' : 'procurement_manager_reason_cancel_btn')
+    };
+}
+
+function procurementManagerHasNewZero(isSingle = false) {
+    let hasZeroAny = false;
+    let hasZeroNew = false;
+    if (isSingle) {
+        const qtyInput = document.getElementById('procurement_cart_qty_0');
+        const row = document.getElementById('procurement_cart_row_0');
+        const origQty = row ? parseInt(row.dataset.origQty || '0', 10) : 0;
+        if (qtyInput) {
+            const qty = parseInt(qtyInput.value || '0', 10);
+            if (qty === 0) {
+                hasZeroAny = true;
+                if (origQty > 0) {
+                    hasZeroNew = true;
+                }
+            }
+        }
+    } else {
+        const quantityInputs = document.querySelectorAll('input[name="quantities[]"]');
+        quantityInputs.forEach(input => {
+            if (input.id && input.id.startsWith('procurement_cart_qty_')) {
+                const row = document.getElementById('procurement_cart_row_' + input.dataset.index);
+                const origQty = row ? parseInt(row.dataset.origQty || '0', 10) : 0;
+                const qty = parseInt(input.value || '0', 10);
+                if (qty === 0) {
+                    hasZeroAny = true;
+                    if (origQty > 0) {
+                        hasZeroNew = true;
+                    }
+                }
+            }
+        });
+    }
+    return { hasZeroAny, hasZeroNew };
+}
+
+function setProcurementManagerReasonReadonly(textarea, isReadonly) {
+    if (!textarea) return;
+    if (isReadonly) {
+        textarea.setAttribute('readonly', 'readonly');
+        textarea.style.backgroundColor = '#f1f5f9';
+        textarea.style.color = '#6b7280';
+        textarea.style.cursor = 'not-allowed';
+    } else {
+        textarea.removeAttribute('readonly');
+        textarea.style.backgroundColor = '#ffffff';
+        textarea.style.color = '';
+        textarea.style.cursor = 'text';
+    }
+}
+
+function enableProcurementManagerReasonEdit(context = 'multi') {
+    const { textarea, editBtn, cancelBtn } = getProcurementManagerReasonElements(context);
+    if (!textarea) return;
+    // Deprecated: field now editable immediately when visible
+}
+
+function cancelProcurementManagerReasonEdit(context = 'multi') {
+    const { textarea, editBtn, cancelBtn } = getProcurementManagerReasonElements(context);
+    if (!textarea) return;
+    // Deprecated: field now editable immediately when visible
+}
+
+function initializeProcurementManagerReasonFields() {
+    ['multi', 'single'].forEach(context => {
+        const { textarea, editBtn, cancelBtn } = getProcurementManagerReasonElements(context);
+        if (!textarea) return;
+        const defaultVal = textarea.dataset ? (textarea.dataset.defaultValue || '') : '';
+        if (!textarea.value.trim() && defaultVal) {
+            textarea.value = defaultVal;
+        }
+        if (textarea.dataset && !textarea.dataset.originalValue) {
+            textarea.dataset.originalValue = textarea.value || '';
+        }
+        const startReadonly = textarea.dataset ? (textarea.dataset.startReadonly === 'true') : textarea.hasAttribute('readonly');
+        setProcurementManagerReasonReadonly(textarea, startReadonly);
+        if (startReadonly) {
+            if (editBtn) editBtn.style.display = 'inline-flex';
+            if (cancelBtn) cancelBtn.style.display = 'none';
+        } else {
+            if (editBtn) editBtn.style.display = 'none';
+            if (cancelBtn) cancelBtn.style.display = 'none';
+        }
+    });
+}
+
+// Check if assigned procurement rejection reason is required (when any quantity is 0)
+function checkAssignedProcurementRejectionReasonRequired() {
+    const assignedForm = Array.from(document.querySelectorAll('form[action*="update_quantities"]')).find(f => {
+        const action = f.getAttribute('action') || '';
+        return !action.includes('update_quantities_manager') && !action.includes('update_quantities_procurement_manager');
+    });
+
+    const multiGroup = document.getElementById('assigned_rejection_reason_group');
+    const multiField = document.getElementById('assigned_quantity_rejection_reason');
+    const multiSavedGroup = document.getElementById('assigned_saved_rejection_reason_group');
+    const singleGroup = document.getElementById('assigned_rejection_reason_group_single');
+    const singleField = document.getElementById('assigned_quantity_rejection_reason_single');
+    const singleSavedGroup = document.getElementById('assigned_saved_rejection_reason_group_single');
+
+    if (!assignedForm) {
+        // Hide any assigned-specific reason fields if form not present
+        [multiGroup, singleGroup].forEach(g => { if (g) g.style.display = 'none'; });
+        [multiField, singleField].forEach(f => { if (f) f.removeAttribute('required'); });
+        if (multiSavedGroup) multiSavedGroup.style.display = 'none';
+        if (singleSavedGroup) singleSavedGroup.style.display = 'none';
+        return;
+    }
+
+    const quantityInputs = assignedForm.querySelectorAll('input[name="quantities[]"]');
+    let hasZero = false;
+    quantityInputs.forEach(input => {
+        const qty = parseInt(input.value || '0', 10);
+        if (qty === 0) {
+            hasZero = true;
+        }
+    });
+
+    // Multi-item form fields
+    if (multiGroup && multiField && quantityInputs.length > 1) {
+        if (hasZero) {
+            multiGroup.style.display = 'block';
+            multiField.setAttribute('required', 'required');
+            if (multiSavedGroup && multiSavedGroup.querySelector('p') && multiSavedGroup.querySelector('p').textContent.trim()) {
+                multiSavedGroup.style.display = 'block';
+            }
+        } else {
+            multiGroup.style.display = 'none';
+            multiField.removeAttribute('required');
+            if (multiSavedGroup) {
+                multiSavedGroup.style.display = 'none';
+            }
+        }
+    }
+
+    // Single-item form fields
+    if (singleGroup && singleField && quantityInputs.length === 1) {
+        if (hasZero) {
+            singleGroup.style.display = 'block';
+            singleField.setAttribute('required', 'required');
+            if (singleSavedGroup && singleSavedGroup.querySelector('p') && singleSavedGroup.querySelector('p').textContent.trim()) {
+                singleSavedGroup.style.display = 'block';
+            }
+        } else {
+            singleGroup.style.display = 'none';
+            singleField.removeAttribute('required');
+            if (singleSavedGroup) {
+                singleSavedGroup.style.display = 'none';
             }
         }
     }
@@ -4349,6 +5224,82 @@ function closeAmountValidationErrorDialog() {
             submitButton.disabled = false;
             submitButton.innerHTML = '<i class="fas fa-check"></i> Mark as Completed';
         }
+    }
+}
+
+// Function to show rejection reason error dialog (assigned procurement)
+function showAssignedRejectionReasonErrorDialog(message) {
+    let errorModal = document.getElementById('assigned-rejection-error-modal');
+    if (!errorModal) {
+        errorModal = document.createElement('div');
+        errorModal.id = 'assigned-rejection-error-modal';
+        errorModal.className = 'flash-error-modal';
+        errorModal.style.display = 'flex';
+        errorModal.innerHTML = `
+            <div class="flash-error-backdrop"></div>
+            <div class="flash-error-dialog">
+                <h3 class="flash-error-title"><i class="fas fa-exclamation-circle"></i> Error</h3>
+                <div class="flash-error-body">
+                    ${message || 'Please provide a reason for rejecting the item(s) with quantity set to 0.'}
+                </div>
+                <div class="flash-error-actions">
+                    <button type="button" class="flash-error-ok-btn" onclick="closeAssignedRejectionReasonErrorDialog()">OK</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(errorModal);
+        document.body.classList.add('flash-error-open');
+    } else {
+        const body = errorModal.querySelector('.flash-error-body');
+        if (body) {
+            body.innerHTML = message || 'Please provide a reason for rejecting the item(s) with quantity set to 0.';
+        }
+        errorModal.style.display = 'flex';
+        document.body.classList.add('flash-error-open');
+    }
+}
+
+function closeAssignedRejectionReasonErrorDialog() {
+    const errorModal = document.getElementById('assigned-rejection-error-modal');
+    if (errorModal) {
+        errorModal.style.display = 'none';
+        document.body.classList.remove('flash-error-open');
+    }
+}
+
+// Unified validation error modal for Mark as Completed
+function showMarkCompleteValidationErrorDialog(message) {
+    // Remove any existing modal to avoid duplicates
+    const existing = document.getElementById('mark-complete-error-modal');
+    if (existing) {
+        existing.remove();
+    }
+
+    const errorModal = document.createElement('div');
+    errorModal.id = 'mark-complete-error-modal';
+    errorModal.className = 'flash-error-modal';
+    errorModal.style.display = 'flex';
+    errorModal.innerHTML = `
+        <div class="flash-error-backdrop"></div>
+        <div class="flash-error-dialog">
+            <h3 class="flash-error-title"><i class="fas fa-exclamation-circle"></i> Error</h3>
+            <div class="flash-error-body">
+                ${message || 'Please fix the highlighted issues before completing the request.'}
+            </div>
+            <div class="flash-error-actions">
+                <button type="button" class="flash-error-ok-btn" onclick="closeMarkCompleteValidationErrorDialog()">OK</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(errorModal);
+    document.body.classList.add('flash-error-open');
+}
+
+function closeMarkCompleteValidationErrorDialog() {
+    const errorModal = document.getElementById('mark-complete-error-modal');
+    if (errorModal) {
+        errorModal.style.display = 'none';
+        document.body.classList.remove('flash-error-open');
     }
 }
 
@@ -4555,6 +5506,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const procurementManagerForm = document.querySelector('form[action*="update_quantities_procurement_manager"]');
     if (procurementManagerForm) {
         const quantityInputs = procurementManagerForm.querySelectorAll('input[name="quantities[]"]');
+        const procurementManagerSubmitButton = procurementManagerForm.querySelector('button[type="submit"]');
+        if (procurementManagerSubmitButton && !procurementManagerSubmitButton.dataset.originalLabel) {
+            procurementManagerSubmitButton.dataset.originalLabel = procurementManagerSubmitButton.innerHTML;
+        }
         quantityInputs.forEach(input => {
             const index = input.getAttribute('data-index') || input.id.replace('procurement_cart_qty_', '');
             originalQuantityValues['procurement_manager_' + index] = parseInt(input.value || '0', 10);
@@ -4564,6 +5519,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // Check if any quantity is 0
             const quantityInputs = this.querySelectorAll('input[name="quantities[]"]');
             let hasZero = false;
+            const resetSubmitButton = () => {
+                if (procurementManagerSubmitButton) {
+                    procurementManagerSubmitButton.disabled = false;
+                    procurementManagerSubmitButton.innerHTML = procurementManagerSubmitButton.dataset.originalLabel || procurementManagerSubmitButton.innerHTML;
+                }
+            };
             quantityInputs.forEach(input => {
                 const qty = parseInt(input.value || '0', 10);
                 if (qty === 0) {
@@ -4575,6 +5536,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const rejectionField = this.querySelector('textarea[name="quantity_rejection_reason"]');
                 if (rejectionField && !rejectionField.value.trim()) {
                     e.preventDefault();
+                    resetSubmitButton();
                     alert('Please provide a reason for rejecting the item(s) with quantity set to 0.');
                     rejectionField.focus();
                     return false;
@@ -4620,8 +5582,28 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Validation function that can be called from both form submit and button click
         const validateAndSubmit = function(formElement) {
-            // For Save Quantities & Amounts: allow blank/zero amounts; only update originals after submit
             const quantityInputs = formElement.querySelectorAll('input[name="quantities[]"]');
+            let hasZero = false;
+            quantityInputs.forEach(input => {
+                const qty = parseInt(input.value || '0', 10);
+                if (qty === 0) {
+                    hasZero = true;
+                }
+            });
+
+            if (hasZero) {
+                const rejectionField = formElement.querySelector('#assigned_quantity_rejection_reason') ||
+                                        formElement.querySelector('#assigned_quantity_rejection_reason_single') ||
+                                        formElement.querySelector('textarea[name="quantity_rejection_reason"]');
+                if (rejectionField && !rejectionField.value.trim()) {
+                    checkAssignedProcurementRejectionReasonRequired();
+                    showAssignedRejectionReasonErrorDialog('Please provide a reason for rejecting the item(s) with quantity set to 0.');
+                    rejectionField.focus();
+                    return false;
+                }
+            }
+
+            // For Save Quantities & Amounts: allow blank/zero amounts; only update originals after submit
             quantityInputs.forEach(input => {
                 const index = input.getAttribute('data-index') || input.id.replace('cart_qty_', '');
                 originalQuantityValues['assigned_' + index] = parseInt(input.value || '0', 10);
@@ -4708,6 +5690,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         index++;
     }
+
+    // Initialize visibility for assigned procurement rejection reason on load
+    checkAssignedProcurementRejectionReasonRequired();
     
     // Validate manager decision form
     const managerDecisionForm = document.querySelector('form[action*="item_request_manager_decision"]');
@@ -4747,6 +5732,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Initialize rejection reason fields on page load
+    initializeProcurementManagerReasonFields();
     checkManagerRejectionReasonRequired();
     checkProcurementManagerRejectionReasonRequired();
     
