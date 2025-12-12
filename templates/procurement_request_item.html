@@ -405,6 +405,8 @@
     overflow-y: auto;
     z-index: 1000;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .branch-group {
@@ -1033,9 +1035,12 @@ function initializeBranchSearch() {
     // Array to store selected branches {value: string, text: string}
     let selectedBranches = [];
     
-    // Flag to track if we're clicking on an option
-    let clickingOnOption = false;
+    // Flags to track selection state - much more robust than timeouts
+    let isSelectionInProgress = false;
     let blurTimeout = null;
+    
+    // Store dropdown visibility state to prevent unwanted closing
+    let shouldKeepDropdownOpen = false;
     
     // Function to update chips display
     function updateChips() {
@@ -1103,17 +1108,20 @@ function initializeBranchSearch() {
             optionDiv.setAttribute('data-value', option.value);
             optionDiv.setAttribute('data-restaurant', restaurant);
             
-            // Use mousedown instead of click for better trackpad support
-            // mousedown fires before blur, ensuring selection happens on trackpad taps
-            optionDiv.addEventListener('mousedown', function(e) {
+            // Use pointerdown for best trackpad support across all devices
+            // pointerdown fires reliably before blur on both mouse and trackpad
+            optionDiv.addEventListener('pointerdown', function(e) {
                 e.preventDefault(); // Prevent blur from firing
-                clickingOnOption = true;
+                e.stopPropagation(); // Prevent event bubbling
                 selectBranch(option.value, option.textContent);
             });
             
-            // Keep click as fallback for accessibility
-            optionDiv.addEventListener('click', function(e) {
-                if (!clickingOnOption) {
+            // Keep mousedown as fallback for older browsers
+            optionDiv.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                // Only call if pointerdown hasn't already handled it
+                if (!isSelectionInProgress) {
                     selectBranch(option.value, option.textContent);
                 }
             });
@@ -1125,45 +1133,50 @@ function initializeBranchSearch() {
     }
     
     function selectBranch(value, text) {
-        // Check if branch is already selected - if so, remove it (toggle behavior)
-        const existingIndex = selectedBranches.findIndex(b => b.value === value);
-        if (existingIndex !== -1) {
-            // Branch already selected, remove it
-            selectedBranches.splice(existingIndex, 1);
+        try {
+            // Mark selection as in progress FIRST
+            isSelectionInProgress = true;
+            shouldKeepDropdownOpen = true;
+            
+            // Clear any pending blur timeout immediately
+            if (blurTimeout) {
+                clearTimeout(blurTimeout);
+                blurTimeout = null;
+            }
+            
+            // Check if branch is already selected - if so, remove it (toggle behavior)
+            const existingIndex = selectedBranches.findIndex(b => b.value === value);
+            if (existingIndex !== -1) {
+                // Branch already selected, remove it
+                selectedBranches.splice(existingIndex, 1);
+            } else {
+                // Add to selected branches
+                selectedBranches.push({ value: value, text: text });
+            }
+            
+            // Update UI - these are deferred to ensure they happen after selection flag is set
             updateChips();
             updateDropdownSelection();
             
             // Clear search input but keep dropdown open so user can continue selecting
             searchInput.value = '';
             dropdown.style.display = 'block';
-            searchInput.focus();
             
-            setTimeout(() => {
-                clickingOnOption = false;
-            }, 100);
-            return;
+            // Re-focus AFTER DOM updates to ensure focus is properly restored
+            // Use a microtask (Promise) for more reliable timing than setTimeout
+            Promise.resolve().then(() => {
+                searchInput.focus();
+                // Ensure dropdown is still visible after focus
+                dropdown.style.display = 'block';
+            }).catch(err => console.error('Error in selectBranch focus:', err))
+            .finally(() => {
+                // Mark selection as complete after focus is restored
+                isSelectionInProgress = false;
+            });
+        } catch (error) {
+            console.error('Error in selectBranch:', error);
+            isSelectionInProgress = false;
         }
-        
-        // Clear any pending blur timeout
-        if (blurTimeout) {
-            clearTimeout(blurTimeout);
-            blurTimeout = null;
-        }
-        
-        // Add to selected branches
-        selectedBranches.push({ value: value, text: text });
-        updateChips();
-        updateDropdownSelection();
-        
-        // Clear search input but keep dropdown open so user can continue selecting
-        searchInput.value = '';
-        dropdown.style.display = 'block';
-        searchInput.focus(); // Keep focus so user can continue typing
-        
-        // Reset flag after a short delay
-        setTimeout(() => {
-            clickingOnOption = false;
-        }, 100);
     }
     
     function filterBranches(searchTerm) {
@@ -1225,24 +1238,55 @@ function initializeBranchSearch() {
         }
     });
     
-    searchInput.addEventListener('blur', function() {
+    searchInput.addEventListener('blur', function(e) {
+        // NEVER close dropdown if selection is in progress
+        if (isSelectionInProgress) {
+            return;
+        }
+        
         // Delay hiding to allow clicks on options
         // Clear any existing timeout first
         if (blurTimeout) {
             clearTimeout(blurTimeout);
         }
         blurTimeout = setTimeout(() => {
-            // Only hide if not clicking on an option
-            if (!clickingOnOption) {
+            // Skip if selection started while we were waiting
+            if (isSelectionInProgress) {
+                blurTimeout = null;
+                return;
+            }
+            
+            // Check if the relatedTarget is within the dropdown or container
+            const relatedTarget = e.relatedTarget;
+            const branchContainer = searchInput.closest('.branch-select-container');
+            const isClickingInsideContainer = relatedTarget && (
+                searchInput.contains(relatedTarget) || 
+                dropdown.contains(relatedTarget) || 
+                chipsContainer.contains(relatedTarget) ||
+                (branchContainer && branchContainer.contains(relatedTarget))
+            );
+            
+            // Only hide dropdown if clicking outside the entire container
+            if (!isClickingInsideContainer) {
                 dropdown.style.display = 'none';
+                shouldKeepDropdownOpen = false;
             }
             blurTimeout = null;
-        }, 200);
+        }, 100);
     });
     
     // Hide dropdown when clicking outside
     document.addEventListener('click', function(e) {
-        if (!searchInput.contains(e.target) && !dropdown.contains(e.target) && !chipsContainer.contains(e.target)) {
+        // Never close if selection is in progress
+        if (isSelectionInProgress) {
+            return;
+        }
+        
+        const branchContainer = searchInput.closest('.branch-select-container');
+        const isClickingInsideContainer = branchContainer && branchContainer.contains(e.target);
+        
+        // Only hide if clicking completely outside the container
+        if (!isClickingInsideContainer && !shouldKeepDropdownOpen) {
             dropdown.style.display = 'none';
         }
     });
