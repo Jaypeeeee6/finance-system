@@ -47,6 +47,8 @@ class Config:
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME') or 'noreply.financepin@gmail.com'
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD') or 'bjgkbjxtzfbzwoqp'  # App Password (spaces removed)
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER') or 'noreply.financepin@gmail.com'
+    NOTIFICATION_SENDER_NAME = os.environ.get('NOTIFICATION_SENDER_NAME') or 'Payment System - Notifications'
+    PIN_SENDER_NAME = os.environ.get('PIN_SENDER_NAME') or 'Payment System - PIN'
     
     # PIN configuration
     PIN_EXPIRY_MINUTES = 2  # PIN expires after 2 minutes

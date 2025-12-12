@@ -739,9 +739,10 @@ def get_item_request_datetime_for_sorting(req):
 def send_pin_email(user_email, user_name, pin):
     """Send PIN to user's email"""
     try:
+        sender_name = app.config.get('PIN_SENDER_NAME', 'Payment System - PIN')
         msg = Message(
             subject='Your Login PIN - Payment Request System',
-            sender=app.config['MAIL_DEFAULT_SENDER'],
+            sender=(sender_name, app.config['MAIL_DEFAULT_SENDER']),
             recipients=[user_email]
         )
         
@@ -861,6 +862,48 @@ def send_pin_email(user_email, user_name, pin):
         return False, f"Failed to send email: {str(e)}"
 
 
+def send_notification_email(user, title, message, request_id=None):
+    """Send status/approval notification emails (non-PIN)."""
+    if not user or not user.email:
+        return False, "User has no email"
+    
+    sender_name = app.config.get('NOTIFICATION_SENDER_NAME', 'Payment System - Notifications')
+    subject = title
+    
+    # Minimal HTML with request reference when available
+    html_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h3 style="margin-bottom: 8px;">{title}</h3>
+        <p style="margin-top: 0; white-space: pre-line;">{message}</p>
+        {'<p style="color: #555;">Request #: ' + str(request_id) + '</p>' if request_id else ''}
+        <p style="font-size: 12px; color: #777;">This is an automated message. Please do not reply.</p>
+    </body>
+    </html>
+    """
+    
+    text_body = f"""{title}
+
+{message}
+{f"Request #: {request_id}" if request_id else ""}
+
+This is an automated message. Please do not reply."""
+    
+    try:
+        msg = Message(
+            subject=subject,
+            sender=(sender_name, app.config['MAIL_DEFAULT_SENDER']),
+            recipients=[user.email]
+        )
+        msg.body = text_body
+        msg.html = html_body
+        mail.send(msg)
+        return True, "Notification email sent"
+    except Exception as e:
+        app.logger.error(f"Failed to send notification email to {user.email}: {str(e)}")
+        return False, f"Failed to send email: {str(e)}"
+
+
 def create_notification(user_id, title, message, notification_type, request_id=None, item_request_id=None):
     """Helper function to create notifications"""
     print(f"DEBUG: Creating notification for user_id: {user_id}")
@@ -882,6 +925,34 @@ def create_notification(user_id, title, message, notification_type, request_id=N
     db.session.commit()
     
     print(f"DEBUG: Notification created successfully with ID: {notification.notification_id}")
+    
+    # Send email for selected notification types (action-required only)
+    email_notification_types = {
+        'new_submission',           # Manager: new request submitted
+        'request_returned',         # Manager: returned by Finance to manager
+        'temporary_manager_assignment',  # Manager: assigned temporarily
+        'request_rejected',         # Requestor: rejected by manager
+        'proof_required',           # Requestor: proof needed
+        'proof_rejected'            # Requestor: proof rejected
+    }
+    if notification_type in email_notification_types:
+        user = User.query.get(user_id)
+        if user and user.email:
+            # For request_returned, only notify managers (avoid emailing requestor)
+            if notification_type == 'request_returned':
+                manager_roles = {'Department Manager', 'GM', 'Operation Manager'}
+                if user.role not in manager_roles:
+                    return notification
+            # For new_submission, email only manager-level recipients (skip submitter)
+            if notification_type == 'new_submission':
+                manager_roles = {'Department Manager', 'GM', 'Operation Manager'}
+                if user.role not in manager_roles:
+                    # Allow IT Department Manager (same role, IT dept) via role check above
+                    return notification
+            success, email_msg = send_notification_email(user, title, message, request_id)
+            if not success:
+                app.logger.error(f"Failed to send notification email for user_id={user_id}, type={notification_type}: {email_msg}")
+    
     return notification
 
 def check_and_notify_low_balance(available_balance):
