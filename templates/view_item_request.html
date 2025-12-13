@@ -510,6 +510,17 @@
     font-size: 0.9rem !important;
 }
 
+/* Make Submit for Final Approval button green */
+#submit-final-approval-btn {
+    background-color: #28a745 !important;
+    border-color: #28a745 !important;
+}
+
+#submit-final-approval-btn:hover {
+    background-color: #218838 !important;
+    border-color: #1e7e34 !important;
+}
+
 /* Highlight when procurement quantity is less than original requested quantity */
 .qty-less-than-original {
     background: #fff3cd;
@@ -597,6 +608,11 @@
 #item-request-complete-form,
 .card.your-approval-required {
     overflow: visible !important;
+    border-radius: 8px !important;
+}
+
+.card.your-approval-required .card-header {
+    border-radius: 8px 8px 0 0 !important;
 }
 
 /* Position tooltip using fixed positioning to avoid clipping */
@@ -3073,8 +3089,8 @@
                                             </button>
                                         </div>
                                         <div class="step-actions">
-                                            <button type="submit" class="btn btn-success">
-                                                <i class="fas fa-check"></i> Mark as Completed
+                                            <button type="submit" class="btn btn-success" id="submit-final-approval-btn" style="padding: 0.6rem 1.2rem !important; font-size: 1rem !important;">
+                                                <i class="fas fa-check"></i> Submit for Final Approval
                                             </button>
                                         </div>
                                     </form>
@@ -3261,8 +3277,8 @@
                                                 </div>
                                                 
                                                 {% if can_complete %}
-                                                <div class="step-actions" style="margin-top: 1rem;">
-                                                    <button type="button" class="btn btn-success save-quantities-amounts-btn">
+                                                <div class="step-actions" style="margin-bottom: 10px;">
+                                                    <button type="button" class="btn btn-success" id="save-quantities-amounts-btn" style="padding: 0.4rem 0.9rem !important; font-size: 0.9rem !important;">
                                                         <i class="fas fa-save"></i> Save Quantities & Amounts
                                                     </button>
                                                 </div>
