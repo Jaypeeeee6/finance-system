@@ -1901,38 +1901,37 @@
                             <p style="color: #6b7280; font-style: italic;">No items to display (all items were rejected with quantity 0).</p>
                             {% endif %}
 
-                            {% if item_request.procurement_manager_quantity_rejection_reason %}
+                            {# Find items with quantity 0 and only show the section if there are rejected items and a saved reason #}
+                            {% set rejected_items = [] %}
+                            {% for item in item_list %}
+                                {% set item_trimmed = item.strip() %}
+                                {% if item_trimmed %}
+                                    {% set qty = '' %}
+                                    {% if loop.index0 < quantity_list|length %}
+                                        {% set qty_raw = quantity_list[loop.index0] | trim %}
+                                        {% if qty_raw %}
+                                            {% if ':' in qty_raw %}
+                                                {% set parts = qty_raw.split(':', 1) %}
+                                                {% if parts|length > 1 %}
+                                                    {% set qty = parts[1].strip() %}
+                                                {% else %}
+                                                    {% set qty = qty_raw %}
+                                                {% endif %}
+                                            {% else %}
+                                                {% set qty = qty_raw %}
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                    {% set qty_num = qty|int(0) %}
+                                    {% if qty_num == 0 %}
+                                        {% set _ = rejected_items.append(item_trimmed) %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                            {% if rejected_items|length > 0 and item_request.procurement_manager_quantity_rejection_reason %}
                             <div class="form-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
                                 <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Reason for Rejecting Item(s)</label>
                                 <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
-                                    {# Find items with quantity 0 #}
-                                    {% set rejected_items = [] %}
-                                    {% for item in item_list %}
-                                        {% set item_trimmed = item.strip() %}
-                                        {% if item_trimmed %}
-                                            {% set qty = '' %}
-                                            {% if loop.index0 < quantity_list|length %}
-                                                {% set qty_raw = quantity_list[loop.index0] | trim %}
-                                                {% if qty_raw %}
-                                                    {% if ':' in qty_raw %}
-                                                        {% set parts = qty_raw.split(':', 1) %}
-                                                        {% if parts|length > 1 %}
-                                                            {% set qty = parts[1].strip() %}
-                                                        {% else %}
-                                                            {% set qty = qty_raw %}
-                                                        {% endif %}
-                                                    {% else %}
-                                                        {% set qty = qty_raw %}
-                                                    {% endif %}
-                                                {% endif %}
-                                            {% endif %}
-                                            {% set qty_num = qty|int(0) %}
-                                            {% if qty_num == 0 %}
-                                                {% set _ = rejected_items.append(item_trimmed) %}
-                                            {% endif %}
-                                        {% endif %}
-                                    {% endfor %}
-                                    {% if rejected_items|length > 0 %}
                                     <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #fecaca;">
                                         <strong style="color: #991b1b;">Rejected Items (Quantity set to 0):</strong>
                                         <ul style="color: #991b1b; margin: 5px 0 0 20px; padding: 0;">
@@ -1941,7 +1940,6 @@
                                             {% endfor %}
                                         </ul>
                                     </div>
-                                    {% endif %}
                                     <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.procurement_manager_quantity_rejection_reason }}</p>
                                 </div>
                             </div>
@@ -2013,17 +2011,15 @@
                                 </div>
                             </div>
 
-                            {% if item_request.procurement_manager_quantity_rejection_reason %}
+                            {% set qty_num = qty|int(0) %}
+                            {% if item_request.procurement_manager_quantity_rejection_reason and qty_num == 0 %}
                             <div class="form-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
                                 <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Reason for Rejecting Item</label>
                                 <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
-                                    {% set qty_num = qty|int(0) %}
-                                    {% if qty_num == 0 %}
                                     <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #fecaca;">
                                         <strong style="color: #991b1b;">Rejected Item (Quantity set to 0):</strong>
                                         <p style="color: #991b1b; margin: 5px 0 0 0;">{{ item_request.item_name }}</p>
                                     </div>
-                                    {% endif %}
                                     <p style="color: #991b1b; margin: 0; white-space: pre-wrap;">{{ item_request.procurement_manager_quantity_rejection_reason }}</p>
                                 </div>
                             </div>
@@ -2287,8 +2283,33 @@
                                         </div>
 
                                         {% if procurement_manager_can_edit_quantities %}
-                                        {# Previously saved reason display - only shown when editing is enabled and quantity is 0 #}
-                                        {% if item_request.procurement_manager_quantity_rejection_reason %}
+                                        {# Previously saved reason display - only shown when editing is enabled and at least one quantity is 0 #}
+                                        {% set _rejected_items_preview = [] %}
+                                        {% for item in item_list %}
+                                            {% set item_trimmed = item.strip() %}
+                                            {% if item_trimmed %}
+                                                {% set qty_preview = '' %}
+                                                {% if loop.index0 < quantity_list|length %}
+                                                    {% set qty_raw = quantity_list[loop.index0] | trim %}
+                                                    {% if qty_raw %}
+                                                        {% if ':' in qty_raw %}
+                                                            {% set parts = qty_raw.split(':', 1) %}
+                                                            {% if parts|length > 1 %}
+                                                                {% set qty_preview = parts[1].strip() %}
+                                                            {% else %}
+                                                                {% set qty_preview = qty_raw %}
+                                                            {% endif %}
+                                                        {% else %}
+                                                            {% set qty_preview = qty_raw %}
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endif %}
+                                                {% if qty_preview|int(0) == 0 %}
+                                                    {% set _ = _rejected_items_preview.append(item_trimmed) %}
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% if item_request.procurement_manager_quantity_rejection_reason and _rejected_items_preview|length > 0 %}
                                         <div id="procurement_manager_saved_rejection_reason_group" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
                                             <div class="form-group">
                                                 <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Previously Saved Reason for Rejecting Item(s)</label>
@@ -2488,7 +2509,7 @@
 
                                         {% if procurement_manager_can_edit_quantities %}
                                         {# Previously saved reason display - only shown when editing is enabled and quantity is 0 #}
-                                        {% if item_request.procurement_manager_quantity_rejection_reason %}
+                                        {% if item_request.procurement_manager_quantity_rejection_reason and mgr_qty_num == 0 %}
                                         <div id="procurement_manager_saved_rejection_reason_group_single" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6;">
                                             <div class="form-group">
                                                 <label style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Previously Saved Reason for Rejecting Item</label>
@@ -2648,8 +2669,8 @@
                     </div>
                     <div class="card-body">
                         {% set amount_list = (item_request.procurement_amounts or '').split(';') %}
-                        {# Prefer saved procurement quantities, then procurement manager approved, then original request #}
-                        {% set quantity_source = item_request.procurement_quantities or item_request.procurement_manager_quantities or item_request.quantity %}
+                        {# Prefer saved assigned procurement quantities if they exist, otherwise default to procurement manager-approved quantities, then manager quantities, then original request #}
+                        {% set quantity_source = item_request.assigned_procurement_quantities or item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
                         {% if ',' in item_request.item_name %}
                             {% set item_list = item_request.item_name.split(',') %}
                             {% set quantity_list = (quantity_source or '').split(';') if quantity_source else [] %}
@@ -3070,10 +3091,10 @@
                                         {% if ',' in item_request.item_name %}
                                             {# Multi-item request #}
                                             {% set item_list = item_request.item_name.split(',') %}
-                                            {# PRIORITY: Show procurement manager quantities if they exist (most recent approval), otherwise show manager quantities (if procurement manager hasn't acted), otherwise original #}
+                                            {# PRIORITY: Show saved assigned procurement quantities if they exist, otherwise default to procurement manager quantities, then manager quantities, then original #}
                                             {% set display_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
-                                            {# If procurement staff has edited AFTER procurement manager, show their edits; otherwise show display_source #}
-                                            {% set raw_quantity_source = item_request.procurement_quantities if quantities_edited else display_source %}
+                                            {# If assigned procurement staff has saved quantities, use those; otherwise default to procurement manager-approved quantities #}
+                                            {% set raw_quantity_source = item_request.assigned_procurement_quantities or display_source %}
                                             {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
                                             {# Baseline (for showing quantity comparison) is always the most recent approval from procurement manager #}
                                             {% set original_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
@@ -3251,10 +3272,10 @@
                                             {% endif %}
                                         {% else %}
                                             {# Single-item request #}
-                                            {# PRIORITY: Show procurement manager quantities if they exist (most recent approval), otherwise show manager quantities (if procurement manager hasn't acted), otherwise original #}
+                                            {# PRIORITY: Show saved assigned procurement quantities if they exist, otherwise default to procurement manager quantities, then manager quantities, then original #}
                                             {% set display_source_single = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
-                                            {# If procurement staff has edited AFTER procurement manager, show their edits; otherwise show display_source #}
-                                            {% set raw_quantity_source = item_request.procurement_quantities if quantities_edited else display_source_single %}
+                                            {# If assigned procurement staff has saved quantities, use those; otherwise default to procurement manager-approved quantity #}
+                                            {% set raw_quantity_source = item_request.assigned_procurement_quantities or display_source_single %}
                                             {% set current_raw = (raw_quantity_source or '').split(';')[0] %}
                                             {% set qty = (current_raw or '').strip() %}
                                             {# Baseline (for showing quantity comparison) is always the most recent approval from procurement manager #}
@@ -3513,7 +3534,8 @@
                         {# Read-only view of procurement quantities/amounts after completion #}
                         {% if item_request.item_name %}
                         {% set amount_list = (item_request.procurement_amounts or '').split(';') %}
-                        {% set quantity_source = item_request.procurement_quantities or item_request.procurement_manager_quantities or item_request.quantity %}
+                        {# Prefer saved assigned procurement quantities if they exist, otherwise default to procurement manager quantities, then manager quantities, then original #}
+                        {% set quantity_source = item_request.assigned_procurement_quantities or item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
                         <div class="card assigned-section procurement-cart-card" style="margin-top: 1.5rem;">
                             <div class="card-header">
                                 <h4><i class="fas fa-shopping-cart"></i> Billing and Completion (Read-Only)</h4>

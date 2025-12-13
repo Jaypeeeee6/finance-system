@@ -6486,8 +6486,8 @@ def update_item_request_quantities(request_id):
         return redirect(url_for('view_item_request_page', request_id=request_id))
 
     # Join using ";" separator (same convention used when displaying multiple quantities)
-    # Store in dedicated field so original requestor quantity remains unchanged
-    item_request.procurement_quantities = ';'.join(cleaned_quantities)
+    # Store in dedicated field so manager quantities (procurement_quantities) and procurement manager quantities (procurement_manager_quantities) remain unchanged
+    item_request.assigned_procurement_quantities = ';'.join(cleaned_quantities)
     item_request.procurement_amounts = ';'.join(cleaned_amounts)
     item_request.procurement_quantity_rejection_reason = quantity_rejection_reason if quantity_rejection_reason else None
     item_request.updated_at = datetime.utcnow()
