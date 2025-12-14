@@ -65,6 +65,8 @@ if (typeof MultipleFileUpload === 'undefined') {
             
             fileInput.addEventListener('change', (e) => {
                 this.handleFileSelection(e.target.files);
+                // Reset the input value so the same file can be selected again
+                e.target.value = '';
             });
         }
     }

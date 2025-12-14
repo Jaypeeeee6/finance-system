@@ -5634,8 +5634,13 @@ def item_request_save_uploads(request_id):
     has_new_receipts = receipt_files and any(f.filename for f in receipt_files)
     has_new_invoices = invoice_files and any(f.filename for f in invoice_files)
 
-    if not has_new_receipts and not has_new_invoices and not any([receipt_amount_str, invoice_amount_str, receipt_reference_number, completion_notes]):
-        return error_response('Please select at least one receipt or invoice file to save.')
+    # Check if there are any quantities or amounts from the right column
+    quantities = request.form.getlist('quantities[]')
+    amounts = request.form.getlist('amounts[]')
+    has_quantities_or_amounts = any(q.strip() for q in quantities if q.strip() and q.strip() != '0') or any(a.strip() for a in amounts if a.strip() and a.strip() != '0')
+
+    if not has_new_receipts and not has_new_invoices and not any([receipt_amount_str, receipt_reference_number, completion_notes]) and not has_quantities_or_amounts:
+        return error_response('Please upload at least one file or enter some data to save.')
 
     allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
     max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
@@ -5826,6 +5831,23 @@ def item_request_save_uploads(request_id):
     if completion_notes:
         item_request.completion_notes = completion_notes
 
+    # Save quantities and amounts from the right column if provided
+    quantities_list = request.form.getlist('quantities[]')
+    amounts_list = request.form.getlist('amounts[]')
+    
+    if quantities_list:
+        cleaned_quantities = [q.strip() for q in quantities_list if q.strip()]
+        item_request.assigned_procurement_quantities = ';'.join(cleaned_quantities) if cleaned_quantities else None
+    
+    if amounts_list:
+        cleaned_amounts = [a.strip() for a in amounts_list if a.strip()]
+        item_request.procurement_amounts = ';'.join(cleaned_amounts) if cleaned_amounts else None
+    
+    # Save rejection reason if provided
+    rejection_reason = request.form.get('quantity_rejection_reason', '').strip()
+    if rejection_reason:
+        item_request.procurement_quantity_rejection_reason = rejection_reason
+
     item_request.updated_at = datetime.utcnow()
     db.session.commit()
 
@@ -5846,9 +5868,9 @@ def item_request_save_uploads(request_id):
         for staff in procurement_staff:
             recipient_ids.add(staff.user_id)
 
-        title = f"Uploads saved for Item Request #{request_id}"
+        title = f"Changes saved for Item Request #{request_id}"
         who = current_user.name or 'assigned procurement staff'
-        message = f"{who} saved receipt/invoice uploads for Item Request #{request_id}."
+        message = f"{who} saved changes for Item Request #{request_id}."
         for uid in recipient_ids:
             create_notification(uid, title, message, 'item_request_updated', item_request_id=request_id)
     except Exception as e:
@@ -5860,7 +5882,7 @@ def item_request_save_uploads(request_id):
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({
             'success': True,
-            'message': 'Uploads saved successfully.',
+            'message': 'Changes saved successfully.',
             'receipt_files': all_receipts,
             'invoice_files': [
                 entry.get('filename') if isinstance(entry, dict) else entry
@@ -5869,7 +5891,7 @@ def item_request_save_uploads(request_id):
             ]
         })
 
-    flash('Uploads saved. You can add more before marking this request as completed.', 'success')
+    flash('Changes saved successfully. You can make more changes before marking this request as completed.', 'success')
     return redirect(url_for('view_item_request_page', request_id=request_id))
 
 

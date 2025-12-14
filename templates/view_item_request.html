@@ -376,21 +376,22 @@
 .procurement-cart-header-row {
     display: grid;
     grid-template-columns: 2fr 1fr;
-    padding: 10px 16px;
+    padding: 7px 12px;
     gap: 10px;
     background: #f8f9fb;
     border-radius: 8px;
     font-weight: 600;
     color: #555;
-    margin-bottom: 8px;
+    margin-bottom: 5px;
+    font-size: 0.85rem;
 }
 
 .procurement-cart-row {
     display: grid;
     grid-template-columns: 2fr 1fr;
     align-items: center;
-    padding: 6px 14px;
-    margin-bottom: 6px;
+    padding: 4px 10px;
+    margin-bottom: 4px;
     background: #ffffff;
     border-radius: 10px;
     box-shadow: 0 2px 4px rgba(15, 23, 42, 0.06);
@@ -400,7 +401,7 @@
 .procurement-cart-item-name {
     font-weight: 600;
     color: #374151;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
 }
 
 .procurement-cart-qty {
@@ -432,29 +433,29 @@
 .quantity-control {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     background: #f9fafb;
-    padding: 3px 6px;
+    padding: 2px 4px;
     border-radius: 999px;
     flex-shrink: 0;
 }
 
 .quantity-control input[type="number"] {
-    width: 70px;
-    min-width: 70px;
-    flex: 0 0 70px;
+    width: 60px;
+    min-width: 60px;
+    flex: 0 0 60px;
     border: none;
     background: transparent;
     text-align: center;
     font-weight: 600;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
 }
 
 .original-qty-inline {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: #374151;
-    margin: 0 4px;
+    margin: 0 3px;
 }
 
 .quantity-control input[type="number"]:focus {
@@ -464,10 +465,10 @@
 
 .qty-btn {
     border: none;
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 700;
     cursor: pointer;
     display: flex;
@@ -659,11 +660,49 @@
     font-size: 0.875rem;
 }
 
+/* Assignment Details form fields styling */
+.card.assigned-section .card-body .form-group {
+    margin-bottom: 0.85rem !important;
+}
+
+.card.assigned-section .card-body .form-group label {
+    font-size: 0.9rem !important;
+    margin-bottom: 0.3rem !important;
+}
+
+.card.assigned-section .card-body .form-control,
+.card.assigned-section .card-body input[type="text"] {
+    padding: 0.4rem 0.6rem !important;
+    font-size: 0.9rem !important;
+    height: auto !important;
+}
+
 /* Billing and Completion Two-Column Layout */
 .billing-completion-grid {
     display: grid !important;
     grid-template-columns: 1fr 1.5fr !important;
     gap: 30px !important;
+}
+
+.card.your-approval-required {
+    display: flex;
+    flex-direction: column;
+}
+
+.card.your-approval-required .card-body {
+    display: flex;
+    flex-direction: column;
+    max-height: 480px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    flex: 1;
+}
+
+.card.your-approval-required .card-footer {
+    padding: 1rem !important;
+    background: #f8f9fa !important;
+    border-top: 1px solid #dee2e6 !important;
+    flex-shrink: 0;
 }
 
 .billing-completion-grid > div:last-child {
@@ -708,12 +747,92 @@
         gap: 20px !important;
     }
     
+    .card.your-approval-required {
+        display: block !important;
+    }
+
+    .card.your-approval-required .card-body {
+        max-height: none !important;
+        overflow-y: visible !important;
+    }
+    
     .billing-completion-grid > div:last-child {
         border-left: none !important;
         border-top: 1px solid #e0e0e0 !important;
         padding-left: 0 !important;
         padding-top: 20px !important;
     }
+}
+
+/* Success Modal Styles (matching error modal but green) */
+.flash-success-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.flash-success-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.flash-success-dialog {
+    position: relative;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    max-width: 500px;
+    width: 90%;
+    overflow: hidden;
+}
+
+.flash-success-title {
+    background: #28a745;
+    color: white;
+    margin: 0;
+    padding: 20px;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.flash-success-body {
+    padding: 20px;
+    font-size: 1rem;
+    color: #333;
+    word-break: break-word;
+}
+
+.flash-success-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 15px 20px;
+    border-top: 1px solid #e9ecef;
+    gap: 10px;
+}
+
+.flash-success-ok-btn {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.flash-success-ok-btn:hover {
+    background: #218838;
+}
+
+body.flash-success-open {
+    overflow: hidden;
 }
 </style>
 {% endblock %}
@@ -2655,13 +2774,23 @@
                         <h4>Assignment Details</h4>
                     </div>
                     <div class="card-body">
-                        {% if assigned_to_name %}
+                        {% if assigned_to_name and item_request.assignment_date %}
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 1rem;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label>Assigned To</label>
+                                <input type="text" value="{{ assigned_to_name }}" readonly style="background: #f5f5f5; font-weight: bold;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label>Assignment Date</label>
+                                <input type="text" value="{{ item_request.assignment_date.strftime('%Y-%m-%d %H:%M:%S') }}" readonly style="background: #f5f5f5;">
+                            </div>
+                        </div>
+                        {% elif assigned_to_name %}
                         <div class="form-group">
                             <label>Assigned To</label>
                             <input type="text" value="{{ assigned_to_name }}" readonly style="background: #f5f5f5; font-weight: bold;">
                         </div>
-                        {% endif %}
-                        {% if item_request.assignment_date %}
+                        {% elif item_request.assignment_date %}
                         <div class="form-group">
                             <label>Assignment Date</label>
                             <input type="text" value="{{ item_request.assignment_date.strftime('%Y-%m-%d %H:%M:%S') }}" readonly style="background: #f5f5f5;">
@@ -2839,6 +2968,24 @@
                             </div>
                             {% endfor %}
                         </div>
+                        {% if item_request.receipt_amount %}
+                        <div class="form-group" style="margin-top: 10px;">
+                            <label>Receipt Amount (OMR)</label>
+                            <input type="text"
+                                   value="{{ '%.3f'|format(item_request.receipt_amount) }}"
+                                   readonly
+                                   style="background: #f5f5f5;">
+                        </div>
+                        {% endif %}
+                        {% if item_request.receipt_reference_number %}
+                        <div class="form-group">
+                            <label>Receipt Reference Number</label>
+                            <input type="text"
+                                   value="{{ item_request.receipt_reference_number }}"
+                                   readonly
+                                   style="background: #f5f5f5;">
+                        </div>
+                        {% endif %}
                         {% endif %}
                         {% if invoice_files %}
                         <div class="form-group" id="uploaded-invoices-list">
@@ -3082,17 +3229,6 @@
                                             <label for="completion_notes">Completion Notes (Optional)</label>
                                             <textarea name="completion_notes" id="completion_notes" rows="3" placeholder="Add any notes about the completion..."></textarea>
                                         </div>
-                                        
-                                        <div class="step-actions" style="margin-bottom: 10px;">
-                                            <button type="button" class="btn btn-success" id="save-uploads-btn">
-                                                <i class="fas fa-save"></i> Save Uploads
-                                            </button>
-                                        </div>
-                                        <div class="step-actions">
-                                            <button type="submit" class="btn btn-success" id="submit-final-approval-btn" style="padding: 0.6rem 1.2rem !important; font-size: 1rem !important;">
-                                                <i class="fas fa-check"></i> Submit for Final Approval
-                                            </button>
-                                        </div>
                                     </form>
                                     </div>
                                     
@@ -3276,13 +3412,6 @@
                                                     <div class="procurement-cart-total-value" id="assignedProcurementTotal">OMR {{ '%.3f'|format(assigned_ns.total) }}</div>
                                                 </div>
                                                 
-                                                {% if can_complete %}
-                                                <div class="step-actions" style="margin-bottom: 10px;">
-                                                    <button type="button" class="btn btn-success" id="save-quantities-amounts-btn" style="padding: 0.4rem 0.9rem !important; font-size: 0.9rem !important;">
-                                                        <i class="fas fa-save"></i> Save Quantities & Amounts
-                                                    </button>
-                                                </div>
-                                                {% endif %}
                                             {% if can_complete %}
                                             </form>
                                             {% endif %}
@@ -3420,13 +3549,6 @@
                                                     <div class="procurement-cart-total-value" id="assignedProcurementTotal">OMR {{ '%.3f'|format(assigned_ns.total) }}</div>
                                                 </div>
                                                 
-                                                {% if can_complete %}
-                                                <div class="step-actions" style="margin-top: 1rem;">
-                                                    <button type="button" class="btn btn-primary save-quantities-amounts-btn">
-                                                        <i class="fas fa-save"></i> Save Quantity
-                                                    </button>
-                                                </div>
-                                                {% endif %}
                                             {% if can_complete %}
                                             </form>
                                             {% endif %}
@@ -3436,6 +3558,14 @@
                                     </div>
                                 </div>
                         </div>
+                    </div>
+                    <div class="card-footer" style="display: flex; gap: 10px; align-items: center;">
+                        <button type="button" class="btn btn-success" id="save-uploads-btn" form="item-request-complete-form" style="padding: 0.6rem 1.2rem !important; font-size: 1rem !important;">
+                            <i class="fas fa-save"></i> Save Changes
+                        </button>
+                        <button type="submit" class="btn btn-success" id="submit-final-approval-btn" form="item-request-complete-form" style="padding: 0.6rem 1.2rem !important; font-size: 1rem !important;">
+                            <i class="fas fa-check"></i> Submit for Final Approval
+                        </button>
                     </div>
                 {% endif %}
             {% elif item_request.status == 'Completed' %}
@@ -3995,6 +4125,20 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             invoiceMappingWrapper.style.display = 'block';
+            
+            // Build a map of which items are already selected in other files
+            const selectedItemsByFile = {};
+            const allSelectedItems = new Set();
+            
+            invoiceItemOptions.forEach((itemName) => {
+                const checkboxes = document.querySelectorAll('input.invoice-item-checkbox[value="' + itemName.replace(/"/g, '\\"') + '"]');
+                checkboxes.forEach(cb => {
+                    if (cb.checked) {
+                        allSelectedItems.add(itemName);
+                    }
+                });
+            });
+            
             fileList.forEach((file, idx) => {
                 const fileRow = document.createElement('div');
                 fileRow.className = 'invoice-mapping-row';
@@ -4032,9 +4176,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     checkbox.id = optionId;
                     checkbox.value = itemName;
                     checkbox.className = 'invoice-item-checkbox';
+                    
+                    // Mark if quantity is 0 for later reference
                     if (qtyVal !== null && qtyVal <= 0) {
+                        checkbox.setAttribute('data-qty-zero', 'true');
                         checkbox.disabled = true;
+                        label.style.setProperty('opacity', '0.5', 'important');
                         label.title = 'This item has quantity 0 and cannot be selected.';
+                    }
+                    // Disable if this item is already selected in another file
+                    else if (allSelectedItems.has(itemName)) {
+                        checkbox.disabled = true;
+                        label.style.setProperty('opacity', '0.5', 'important');
+                        label.title = 'This item is already assigned to another invoice file.';
                     }
 
                     label.appendChild(checkbox);
@@ -4072,10 +4226,50 @@ document.addEventListener('DOMContentLoaded', function() {
         if (invoiceMappingList) {
             invoiceMappingList.addEventListener('change', function(e) {
                 if (e.target && e.target.classList.contains('invoice-item-checkbox')) {
+                    // Update disabled states of other checkboxes based on newly selected items
+                    updateCheckboxDisabledStates();
                     syncInvoiceItemMapInput();
                 }
             });
         }
+        
+        // Helper function to update disabled states without re-rendering
+        const updateCheckboxDisabledStates = () => {
+            // Collect all currently selected items
+            const selectedItems = new Set();
+            document.querySelectorAll('input.invoice-item-checkbox:checked').forEach(cb => {
+                selectedItems.add(cb.value);
+            });
+            
+            // Update disabled state for all checkboxes
+            document.querySelectorAll('input.invoice-item-checkbox').forEach(cb => {
+                const label = cb.closest('label');
+                if (!label) return;
+                
+                const itemName = cb.value;
+                const isChecked = cb.checked;
+                const isQtyZero = cb.hasAttribute('data-qty-zero');
+                
+                // ALWAYS disable and grey out if quantity is 0 (highest priority)
+                if (isQtyZero) {
+                    cb.disabled = true;
+                    label.style.setProperty('opacity', '0.5', 'important');
+                    label.title = 'This item has quantity 0 and cannot be selected.';
+                }
+                // Disable if this item is selected in another checkbox (and not qty zero)
+                else if (selectedItems.has(itemName) && !isChecked) {
+                    cb.disabled = true;
+                    label.style.setProperty('opacity', '0.5', 'important');
+                    label.title = 'This item is already assigned to another invoice file.';
+                }
+                // Enable if this item is not selected elsewhere or is the checked one
+                else {
+                    cb.disabled = false;
+                    label.style.opacity = '1';
+                    label.title = '';
+                }
+            });
+        };
 
         const refreshInvoiceMapping = () => {
             if (invoiceUploadContainer && invoiceUploadContainer.uploadComponent) {
@@ -4162,28 +4356,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (saveUploadsBtn) {
             const originalSaveHTML = saveUploadsBtn.innerHTML;
             saveUploadsBtn.addEventListener('click', function() {
-                if (hasUnsavedQuantityEdits()) {
-                    showQuantityEditErrorDialog();
-                    return;
-                }
-
                 const receiptComponent = receiptUploadContainer ? receiptUploadContainer.uploadComponent : null;
                 const invoiceComponent = invoiceUploadContainer ? invoiceUploadContainer.uploadComponent : null;
                 const receiptInput = itemRequestCompleteForm.querySelector('input[name="receipt_files"]');
                 const invoiceInput = itemRequestCompleteForm.querySelector('input[name="invoice_files"]');
 
-                const hasReceiptFiles = receiptComponent
-                    ? receiptComponent.getFiles().length > 0
-                    : (receiptInput && receiptInput.files && receiptInput.files.length > 0);
-                const hasInvoiceFiles = invoiceComponent
-                    ? invoiceComponent.getFiles().length > 0
-                    : (invoiceInput && invoiceInput.files && invoiceInput.files.length > 0);
-
-                if (!hasReceiptFiles && !hasInvoiceFiles) {
-                    showReceiptUploadErrorDialog('Please select at least one receipt or invoice file to save.');
-                    return;
-                }
-
+                const receiptFileList = receiptComponent
+                    ? receiptComponent.getFiles()
+                    : (receiptInput && receiptInput.files ? Array.from(receiptInput.files) : []);
                 const invoiceFileList = invoiceComponent
                     ? invoiceComponent.getFiles()
                     : (invoiceInput && invoiceInput.files ? Array.from(invoiceInput.files) : []);
@@ -4212,6 +4392,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (invoiceComponent) {
                     invoiceComponent.prepareFormData(formData);
                 }
+                
+                // Collect quantities and amounts from the right column
+                const quantityInputs = document.querySelectorAll('#step-assigned input[id^="cart_qty_"]');
+                const amountInputs = document.querySelectorAll('#step-assigned input[id^="cart_amount_"]');
+                
+                quantityInputs.forEach(input => {
+                    if (input.value) {
+                        formData.append('quantities[]', input.value);
+                    }
+                });
+                
+                amountInputs.forEach(input => {
+                    if (input.value) {
+                        formData.append('amounts[]', input.value);
+                    }
+                });
+                
+                // Collect rejection reason if present
+                const rejectionReasonField = document.querySelector('#assigned_quantity_rejection_reason') || 
+                                             document.querySelector('#assigned_quantity_rejection_reason_single');
+                if (rejectionReasonField && rejectionReasonField.value) {
+                    formData.append('quantity_rejection_reason', rejectionReasonField.value);
+                }
+                
                 formData.append('save_uploads', 'true');
 
                 fetch("{{ url_for('item_request_save_uploads', request_id=item_request.id) }}", {
@@ -4233,8 +4437,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         saveUploadsBtn.disabled = false;
                         saveUploadsBtn.innerHTML = originalSaveHTML;
                         // Provide immediate success feedback and refresh to sync UI
-                        alert(data.message || 'Uploads saved successfully.');
-                        window.location.reload();
+                        showSuccessDialog(data.message || 'Changes saved successfully.');
+                        // Reload page after user closes the modal
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
                         return;
                     }
 
@@ -5389,6 +5596,46 @@ function closeReceiptUploadErrorDialog() {
             submitButton.disabled = false;
             submitButton.innerHTML = '<i class="fas fa-check"></i> Mark as Completed';
         }
+    }
+}
+
+// Function to show success modal (matching error modal style but green)
+function showSuccessDialog(message) {
+    // Remove any existing success modal
+    const existingModal = document.getElementById('success-modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Create new success modal matching the error modal structure
+    const successModal = document.createElement('div');
+    successModal.id = 'success-modal';
+    successModal.className = 'flash-success-modal';
+    successModal.style.display = 'flex';
+    
+    successModal.innerHTML = `
+        <div class="flash-success-backdrop"></div>
+        <div class="flash-success-dialog">
+            <h3 class="flash-success-title"><i class="fas fa-check-circle"></i> Success</h3>
+            <div class="flash-success-body">
+                ${message}
+            </div>
+            <div class="flash-success-actions">
+                <button type="button" class="flash-success-ok-btn" onclick="closeSuccessDialog()">OK</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(successModal);
+    document.body.classList.add('flash-success-open');
+}
+
+// Function to close success modal
+function closeSuccessDialog() {
+    const successModal = document.getElementById('success-modal');
+    if (successModal) {
+        successModal.style.display = 'none';
+        document.body.classList.remove('flash-success-open');
     }
 }
 
