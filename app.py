@@ -2311,7 +2311,8 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
                         'installment_paid', 'finance_note_added', 'one_time_payment_scheduled',
-                        'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold'
+                        'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold',
+                        'request_pending_approval'
                     ]),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -2327,7 +2328,8 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                     'status_changed', 'recurring_due', 'proof_required', 'recurring_approved',
                     'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled',
-                        'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold'
+                        'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold',
+                    'request_pending_approval'
                 ])
             )
         ).order_by(Notification.created_at.desc())
@@ -2500,7 +2502,7 @@ def get_unread_count_for_user(user):
                         'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
                         'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
                         'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'item_request_updated',
-                        'request_returned', 'request_on_hold'
+                        'request_returned', 'request_on_hold', 'request_pending_approval'
                     ]),
                     Notification.notification_type == 'temporary_manager_assignment'
                 )
@@ -2513,7 +2515,7 @@ def get_unread_count_for_user(user):
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
-                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold'])
+                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold', 'request_pending_approval'])
             )
         ).count()
 
@@ -4018,40 +4020,62 @@ def procurement_item_requests():
         if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
             # Custom priority order for Procurement Department Manager:
             # 1. Pending Procurement Manager Approval
-            # 2. Assigned to Procurement
-            # 3. On Hold
-            # 4. Completed
-            # 5. Rejected by Procurement Manager
+            # 2. Final Approval (after Pending Procurement Manager Approval)
+            # 3. Assigned to Procurement
+            # 4. On Hold
+            # 5. Completed
+            # 6. Rejected by Procurement Manager
             procurement_manager_status_priority = {
                 'Pending Procurement Manager Approval': 1,
-                'Assigned to Procurement': 2,
-                'On Hold': 3,
-                'Completed': 4,
-                'Rejected by Procurement Manager': 5,
-                'Pending Manager Approval': 6,
-                'Rejected by Manager': 6,
+                'Final Approval': 2,
+                'Assigned to Procurement': 3,
+                'On Hold': 4,
+                'Completed': 5,
+                'Rejected by Procurement Manager': 6,
+                'Pending Manager Approval': 7,
+                'Rejected by Manager': 7,
             }
             status_priority = procurement_manager_status_priority.get(req.status, 99)
         # For other Procurement staff (not Department Manager), use different priority order
         elif current_user.department == 'Procurement':
             # Custom priority order for Procurement Staff:
             # 1. Assigned to Procurement
-            # 2. Pending Procurement Manager Approval
-            # 3. On Hold
-            # 4. Completed
+            # 2. Final Approval (after Assigned to Procurement)
+            # 3. Pending Procurement Manager Approval
+            # 4. On Hold
+            # 5. Completed
             procurement_staff_status_priority = {
                 'Assigned to Procurement': 1,
-                'Pending Procurement Manager Approval': 2,
-                'On Hold': 3,
-                'Completed': 4,
-                'Pending Manager Approval': 5,
-                'Rejected by Manager': 6,
-                'Rejected by Procurement Manager': 6,
+                'Final Approval': 2,
+                'Pending Procurement Manager Approval': 3,
+                'On Hold': 4,
+                'Completed': 5,
+                'Pending Manager Approval': 6,
+                'Rejected by Manager': 7,
+                'Rejected by Procurement Manager': 7,
             }
             status_priority = procurement_staff_status_priority.get(req.status, 99)
         else:
-            # For other users, use default priority order
-            status_priority = get_item_request_status_priority(req)
+            # For other users (Manager Approval authorized users and view-only users), use standard priority order:
+            # Pending Manager Approval
+            # Pending Procurement Manager Approval
+            # Assigned to Procurement
+            # Final Approval
+            # On Hold
+            # Completed
+            # Rejected by Manager
+            # Rejected by Procurement Manager
+            default_status_priority = {
+                'Pending Manager Approval': 1,
+                'Pending Procurement Manager Approval': 2,
+                'Assigned to Procurement': 3,
+                'Final Approval': 4,
+                'On Hold': 5,
+                'Completed': 6,
+                'Rejected by Manager': 7,
+                'Rejected by Procurement Manager': 8,
+            }
+            status_priority = default_status_priority.get(req.status, 99)
         
         dt = get_item_request_datetime_for_sorting(req)
         # Convert datetime to timestamp for negation (most recent = higher timestamp, so negate for descending)
@@ -4263,13 +4287,13 @@ def view_item_request(request_id):
     
     # Procurement Manager approval: Only Procurement Department Manager can approve
     # Also allow when status is 'On Hold' (if it was put on hold by procurement manager)
-    if item_request.status in ['Pending Procurement Manager Approval', 'On Hold']:
+    if item_request.status in ['Pending Procurement Manager Approval', 'On Hold', 'Final Approval']:
         if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
             # Check if it's on hold by procurement manager (not manager)
             if item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id:
                 can_approve_procurement_manager = True
                 can_reject_procurement_manager = True
-            elif item_request.status == 'Pending Procurement Manager Approval':
+            elif item_request.status in ['Pending Procurement Manager Approval', 'Final Approval']:
                 can_approve_procurement_manager = True
                 can_reject_procurement_manager = True
     
@@ -4532,13 +4556,13 @@ def view_item_request_page(request_id):
     
     # Procurement Manager approval: Only Procurement Department Manager can approve
     # Also allow when status is 'On Hold' (if it was put on hold by procurement manager)
-    if item_request.status in ['Pending Procurement Manager Approval', 'On Hold']:
+    if item_request.status in ['Pending Procurement Manager Approval', 'On Hold', 'Final Approval']:
         if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
             # Check if it's on hold by procurement manager (not manager)
             if item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id:
                 can_approve_procurement_manager = True
                 can_reject_procurement_manager = True
-            elif item_request.status == 'Pending Procurement Manager Approval':
+            elif item_request.status in ['Pending Procurement Manager Approval', 'Final Approval']:
                 can_approve_procurement_manager = True
                 can_reject_procurement_manager = True
     
@@ -5245,9 +5269,9 @@ def item_request_procurement_manager_decision(request_id):
     
     item_request = ProcurementItemRequest.query.get_or_404(request_id)
     
-    # Allow decisions when status is 'Pending Procurement Manager Approval' or 'On Hold'
-    if item_request.status not in ['Pending Procurement Manager Approval', 'On Hold']:
-        flash('This request is not pending procurement manager approval or on hold.', 'danger')
+    # Allow decisions when status is 'Pending Procurement Manager Approval', 'Final Approval', or 'On Hold'
+    if item_request.status not in ['Pending Procurement Manager Approval', 'Final Approval', 'On Hold']:
+        flash('This request is not pending procurement manager approval, final approval, or on hold.', 'danger')
         return redirect(url_for('procurement_item_requests'))
     
     approval_status = request.form.get('approval_status')
@@ -5268,7 +5292,7 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
     # Get and validate amount
     amount_str = request.form.get('amount', '').strip()
     
-    # Amount is optional when status is "Pending Procurement Manager Approval"
+    # Amount is optional when status is "Pending Procurement Manager Approval" or "Final Approval"
     amount = None
     if amount_str:
         try:
@@ -5279,7 +5303,7 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         except ValueError:
             flash('Invalid amount format.', 'danger')
             return redirect(url_for('view_item_request_page', request_id=request_id))
-    elif item_request.status != 'Pending Procurement Manager Approval':
+    elif item_request.status not in ['Pending Procurement Manager Approval', 'Final Approval']:
         # Amount is required for other statuses (e.g., "On Hold")
         flash('Please enter an amount.', 'danger')
         return redirect(url_for('view_item_request_page', request_id=request_id))
@@ -5321,8 +5345,19 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
     
     current_time = datetime.utcnow()
     
-    # Update request - set status to 'Assigned to Procurement' without assigning to specific user
-    item_request.status = 'Assigned to Procurement'
+    # Update request based on current status
+    if item_request.status == 'Final Approval':
+        # If status is 'Final Approval', set it to 'Completed'
+        item_request.status = 'Completed'
+        item_request.completion_date = current_time.date()
+        item_request.completed_by = current_user.name
+        item_request.completed_by_user_id = current_user.user_id
+    else:
+        # For 'Pending Procurement Manager Approval' or 'On Hold', set to 'Assigned to Procurement'
+        item_request.status = 'Assigned to Procurement'
+        item_request.assigned_by_user_id = current_user.user_id
+        item_request.assignment_date = current_time
+    
     item_request.procurement_manager_approval_date = current_time.date()
     item_request.procurement_manager_approver = current_user.name
     item_request.procurement_manager_approver_user_id = current_user.user_id
@@ -5330,9 +5365,6 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
     # Only update amount if it was provided
     if amount is not None:
         item_request.amount = amount
-    # Don't set assigned_to_user_id - let any procurement staff member complete it
-    item_request.assigned_by_user_id = current_user.user_id
-    item_request.assignment_date = current_time
     item_request.updated_at = current_time
 
     # If procurement manager did not edit quantities, persist the manager-approved quantities (or original) as the PM-approved baseline
@@ -5345,41 +5377,96 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
     
     db.session.commit()
     
-    log_action(f"Procurement Manager approved item request #{request_id} - available for all procurement staff")
+    # Format item names with comma and space separation
+    formatted_item_names = ', '.join([item.strip() for item in item_request.item_name.split(',') if item.strip()]) if item_request.item_name else 'Item'
     
-    # Notify requestor
-    if item_request.user_id:
-        create_notification(
-            user_id=item_request.user_id,
-            title="Item Request Approved by Procurement Manager",
-            message=f"Your item request #{request_id} has been approved and is now available for procurement staff to process.",
-            notification_type="request_approved",
-            item_request_id=request_id
-        )
+    # Check if this is a completion from Final Approval status
+    is_completion_from_final_approval = (item_request.status == 'Completed')
     
-    # Notify all procurement staff members
-    procurement_staff = User.query.filter_by(department='Procurement').all()
-    for staff_member in procurement_staff:
-        amount_text = f"OMR {amount:.3f}" if amount is not None else "Amount not specified"
-        create_notification(
-            user_id=staff_member.user_id,
-            title="New Item Request Available",
-            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) is now available for processing. Amount: {amount_text}",
-            notification_type="item_request_assigned",
-            item_request_id=request_id
-        )
-    
-    # Notify the manager who originally approved (they should know it progressed)
-    if item_request.manager_approver_user_id:
-        create_notification(
-            user_id=item_request.manager_approver_user_id,
-            title="Item Request Approved by Procurement Manager",
-            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) that you approved has been approved by Procurement Manager and assigned for processing.",
-            notification_type="request_approved",
-            item_request_id=request_id
-        )
-    
-    flash('Item request approved and assigned successfully!', 'success')
+    if is_completion_from_final_approval:
+        # COMPLETION NOTIFICATIONS - sent only when transitioning from "Final Approval" to "Completed"
+        log_action(f"Procurement Manager completed item request #{request_id}")
+        
+        # Notify original requestor about completion
+        if item_request.user_id:
+            create_notification(
+                user_id=item_request.user_id,
+                title="Item Request Completed",
+                message=f"Your item request #{request_id} for {formatted_item_names} has been completed by the Procurement Manager.",
+                notification_type="request_completed",
+                item_request_id=request_id
+            )
+        
+        # Notify the manager who originally approved
+        if item_request.manager_approver_user_id:
+            create_notification(
+                user_id=item_request.manager_approver_user_id,
+                title="Item Request Completed",
+                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {formatted_item_names} that you approved has been completed by the Procurement Manager.",
+                notification_type="request_completed",
+                item_request_id=request_id
+            )
+        
+        # Notify all authorized manager approvers
+        authorized_managers = get_authorized_manager_approvers_for_item_request(item_request)
+        for manager in authorized_managers:
+            if manager.user_id != item_request.manager_approver_user_id:
+                create_notification(
+                    user_id=manager.user_id,
+                    title="Item Request Completed",
+                    message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {formatted_item_names} has been completed by the Procurement Manager.",
+                    notification_type="request_completed",
+                    item_request_id=request_id
+                )
+        
+        # Notify all procurement staff members
+        procurement_staff = User.query.filter_by(department='Procurement').all()
+        for staff_member in procurement_staff:
+            create_notification(
+                user_id=staff_member.user_id,
+                title="Item Request Completed",
+                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {formatted_item_names} has been completed.",
+                notification_type="request_completed",
+                item_request_id=request_id
+            )
+        
+        flash('Item request completed successfully!', 'success')
+    else:
+        # APPROVAL NOTIFICATIONS - sent when transitioning from "Pending Procurement Manager Approval" or "On Hold" to "Assigned to Procurement"
+        log_action(f"Procurement Manager approved item request #{request_id} - available for all procurement staff")
+        
+        # Notify requestor
+        if item_request.user_id:
+            create_notification(
+                user_id=item_request.user_id,
+                title="Item Request Approved by Procurement Manager",
+                message=f"Your item request #{request_id} has been approved and is now available for procurement staff to process.",
+                notification_type="request_approved",
+                item_request_id=request_id
+            )
+        
+        # Notify all procurement staff members
+        procurement_staff = User.query.filter_by(department='Procurement').all()
+        for staff_member in procurement_staff:
+            create_notification(
+                user_id=staff_member.user_id,
+                title="New Item Request Available",
+                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) is now available for processing.",
+                notification_type="item_request_assigned",
+                item_request_id=request_id
+            )
+        
+        # Notify the manager who originally approved (they should know it progressed)
+        if item_request.manager_approver_user_id:
+            create_notification(
+                user_id=item_request.manager_approver_user_id,
+                title="Item Request Approved by Procurement Manager",
+                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) that you approved has been approved by Procurement Manager and assigned for processing.",
+                notification_type="request_approved",
+                item_request_id=request_id
+            )
+        
+        flash('Item request approved and assigned successfully!', 'success')
     return redirect(url_for('view_item_request_page', request_id=request_id))
 
 
@@ -6130,10 +6217,7 @@ def item_request_complete(request_id):
 
     invoice_total = _invoice_total(final_invoices)
 
-    item_request.status = 'Completed'
-    item_request.completed_by_user_id = current_user.user_id
-    item_request.completion_date = current_time
-    item_request.completion_notes = completion_notes
+    item_request.status = 'Final Approval'
     item_request.receipt_amount = receipt_amount_value
     if invoice_total is not None:
         item_request.invoice_amount = invoice_total
@@ -6144,39 +6228,55 @@ def item_request_complete(request_id):
     
     db.session.commit()
     
-    log_action(f"Procurement member completed item request #{request_id}")
+    log_action(f"Procurement member submitted item request #{request_id} for final approval")
     
-    # Notify requestor
+    # Format item names with comma and space separation
+    formatted_item_names = ', '.join([item.strip() for item in item_request.item_name.split(',') if item.strip()]) if item_request.item_name else 'Item'
+    
+    # Notify original requestor
     if item_request.user_id:
         create_notification(
             user_id=item_request.user_id,
-            title="Item Request Completed",
-            message=f"Your item request #{request_id} for {item_request.item_name} has been completed by the procurement team.",
-            notification_type="request_completed",
+            title="Item Request Submitted for Final Approval",
+            message=f"Your item request #{request_id} for {formatted_item_names} has been submitted for final approval by the procurement team.",
+            notification_type="request_pending_approval",
             item_request_id=request_id
         )
     
-    # Notify Procurement Manager (they should know it's completed)
-    if item_request.procurement_manager_approver_user_id:
-        create_notification(
-            user_id=item_request.procurement_manager_approver_user_id,
-            title="Item Request Completed",
-            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been completed by {current_user.name}.",
-            notification_type="request_completed",
-            item_request_id=request_id
-        )
-    
-    # Notify the manager who originally approved (they should know it's done)
+    # Notify the manager who originally approved the request
     if item_request.manager_approver_user_id:
         create_notification(
             user_id=item_request.manager_approver_user_id,
-            title="Item Request Completed",
-            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} that you approved has been completed by the procurement team.",
-            notification_type="request_completed",
+            title="Item Request Awaiting Final Approval",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {formatted_item_names} that you approved has been submitted for final approval.",
+            notification_type="request_pending_approval",
             item_request_id=request_id
         )
     
-    flash('Item request marked as completed!', 'success')
+    # Notify Procurement Manager for final approval
+    if item_request.procurement_manager_approver_user_id:
+        create_notification(
+            user_id=item_request.procurement_manager_approver_user_id,
+            title="Item Request Awaiting Final Approval",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {formatted_item_names} is ready for your final approval.",
+            notification_type="request_pending_approval",
+            item_request_id=request_id
+        )
+    
+    # Notify all authorized manager approvers for this request
+    authorized_managers = get_authorized_manager_approvers_for_item_request(item_request)
+    for manager in authorized_managers:
+        # Avoid duplicate notifications to already notified users
+        if manager.user_id != item_request.manager_approver_user_id:
+            create_notification(
+                user_id=manager.user_id,
+                title="Item Request Awaiting Final Approval",
+                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {formatted_item_names} is awaiting final approval.",
+                notification_type="request_pending_approval",
+                item_request_id=request_id
+            )
+    
+    flash('Item request submitted for final approval!', 'success')
     return redirect(url_for('view_item_request_page', request_id=request_id))
 
 
@@ -6516,39 +6616,23 @@ def update_item_request_quantities(request_id):
 
     db.session.commit()
 
-    # Notify all authorized people (requestor, GM, manager chain, op manager, temp manager if any, procurement dept manager)
+    # Notify requestor and authorized managers about changes
     try:
         recipient_ids = set()
-        # Assigned procurement name for message context
-        assigned_name = None
-        try:
-            if item_request.assigned_to_user_id:
-                assigned_user = User.query.get(item_request.assigned_to_user_id)
-                if assigned_user:
-                    assigned_name = assigned_user.name or "assigned procurement staff"
-        except Exception:
-            assigned_name = "assigned procurement staff"
-        # Requestor
+        # Original requestor
         if item_request.user_id:
             recipient_ids.add(item_request.user_id)
-        # Authorized approvers (GM, operation manager, manager chain, etc.)
+        # Authorized approvers
         for user in get_authorized_manager_approvers_for_item_request(item_request):
             recipient_ids.add(user.user_id)
-        # Procurement Department Manager(s)
-        procurement_mgrs = User.query.filter_by(department='Procurement', role='Department Manager').all()
-        for pm in procurement_mgrs:
-            recipient_ids.add(pm.user_id)
-        # All procurement staff
-        procurement_staff = User.query.filter_by(department='Procurement').all()
-        for staff in procurement_staff:
-            recipient_ids.add(staff.user_id)
-        # Send notifications
-        title = f"Quantities & amounts updated for Item Request #{request_id}"
-        message = f"Quantities and amounts were updated by {assigned_name or 'assigned procurement staff'} for Item Request #{request_id}."
+        
+        title = f"Changes saved for Item Request #{request_id}"
+        who = current_user.name or 'assigned procurement staff'
+        message = f"{who} saved changes for Item Request #{request_id}."
         for uid in recipient_ids:
             create_notification(uid, title, message, 'item_request_updated', item_request_id=request_id)
     except Exception as e:
-        print(f"DEBUG: Failed to send notifications for item request #{request_id}: {e}")
+        app.logger.warning(f"Failed to send notifications for item request #{request_id}: {e}")
 
     log_action(f"Updated item quantities for procurement item request #{request_id}")
     flash('Item quantities updated successfully.', 'success')

@@ -139,6 +139,7 @@
                         <option value="Pending Procurement Manager Approval" {% if status_filter == 'Pending Procurement Manager Approval' %}selected{% endif %}>Pending Procurement Manager Approval</option>
                         <option value="On Hold" {% if status_filter == 'On Hold' %}selected{% endif %}>On Hold</option>
                         <option value="Assigned to Procurement" {% if status_filter == 'Assigned to Procurement' %}selected{% endif %}>Assigned to Procurement</option>
+                        <option value="Final Approval" {% if status_filter == 'Final Approval' %}selected{% endif %}>Final Approval</option>
                         <option value="Completed" {% if status_filter == 'Completed' %}selected{% endif %}>Completed</option>
                         <option value="Rejected by Manager" {% if status_filter == 'Rejected by Manager' %}selected{% endif %}>Rejected by Manager</option>
                         <option value="Rejected by Procurement Manager" {% if status_filter == 'Rejected by Procurement Manager' %}selected{% endif %}>Rejected by Procurement Manager</option>
@@ -253,6 +254,8 @@
                                     <span class="badge" style="background: #28a745; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">✓ {{ req.status }}</span>
                                 {% elif req.status == 'On Hold' %}
                                     <span class="badge" style="background: #ffc107; color: #212529; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">⏸ On Hold</span>
+                                {% elif req.status == 'Final Approval' %}
+                                    <span class="badge" style="background: #9c27b0; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">👤 Final Approval</span>
                                 {% elif req.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval'] %}
                                     <span class="badge" style="background: #6c757d; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">⏳ {{ req.status }}</span>
                                 {% elif req.status == 'Assigned to Procurement' %}

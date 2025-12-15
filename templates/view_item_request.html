@@ -866,24 +866,24 @@ body.flash-success-open {
                     Submit Request
                 </div>
             </li>
-            <li class="step-tab {% if item_request.status == 'Rejected by Manager' %}rejected{% elif item_request.status == 'Pending Manager Approval' or (item_request.status == 'On Hold' and item_request.manager_on_hold_by_user_id) %}warning{% elif item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed'] or (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) %}completed{% else %}disabled{% endif %}" data-step="manager">
+            <li class="step-tab {% if item_request.status == 'Rejected by Manager' %}rejected{% elif item_request.status == 'Pending Manager Approval' or (item_request.status == 'On Hold' and item_request.manager_on_hold_by_user_id) %}warning{% elif item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed', 'Final Approval'] or (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) %}completed{% else %}disabled{% endif %}" data-step="manager">
                 <div class="step-tab-content">
                     Manager Approval
                 </div>
             </li>
-            <li class="step-tab {% if item_request.status == 'Rejected by Procurement Manager' %}rejected{% elif item_request.status == 'Pending Procurement Manager Approval' or (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) %}warning{% elif item_request.status in ['Assigned to Procurement', 'Completed'] %}completed{% else %}disabled{% endif %}" data-step="procurement">
+            <li class="step-tab {% if item_request.status == 'Rejected by Procurement Manager' %}rejected{% elif item_request.status == 'Pending Procurement Manager Approval' or (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) %}warning{% elif item_request.status in ['Assigned to Procurement', 'Completed', 'Final Approval'] %}completed{% else %}disabled{% endif %}" data-step="procurement">
                 <div class="step-tab-content">
                     Procurement Manager Approval
                 </div>
             </li>
-            <li class="step-tab {% if item_request.status == 'Assigned to Procurement' %}warning{% elif item_request.status == 'Completed' %}completed{% else %}disabled{% endif %}" data-step="assigned">
+            <li class="step-tab {% if item_request.status == 'Assigned to Procurement' %}warning{% elif item_request.status in ['Completed', 'Final Approval'] %}completed{% else %}disabled{% endif %}" data-step="assigned">
                 <div class="step-tab-content">
                     Assigned to Procurement
                 </div>
             </li>
-            <li class="step-tab {% if item_request.status == 'Completed' %}completed{% else %}disabled{% endif %}" data-step="completed">
+            <li class="step-tab {% if item_request.status == 'Final Approval' %}warning{% elif item_request.status == 'Completed' %}completed{% else %}disabled{% endif %}" data-step="completed">
                 <div class="step-tab-content">
-                    Completed
+                    Final Approval
                 </div>
             </li>
         </ul>
@@ -1102,7 +1102,7 @@ body.flash-success-open {
         <div class="step-content" id="step-manager">
             <h3><i class="fas fa-user-tie"></i> Manager Approval</h3>
             
-            {% if item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed', 'Rejected by Manager'] or (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) %}
+            {% if item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed', 'Final Approval', 'Rejected by Manager'] or (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) %}
                 <div class="admin-mode-warning" style="background: #28a745; color: white;">
                     <i class="fas fa-check-circle"></i>
                     <span>Manager Approval: {% if item_request.status == 'Rejected by Manager' %}Rejected{% else %}Completed{% endif %}</span>
@@ -1848,7 +1848,7 @@ body.flash-success-open {
         <div class="step-content" id="step-procurement">
             <h3><i class="fas fa-shopping-cart"></i> Procurement Manager Approval</h3>
             
-            {% if item_request.status in ['Assigned to Procurement', 'Completed', 'Rejected by Procurement Manager'] and item_request.status != 'On Hold' %}
+            {% if item_request.status in ['Assigned to Procurement', 'Completed', 'Final Approval', 'Rejected by Procurement Manager'] and item_request.status != 'On Hold' %}
                 <div class="admin-mode-warning" style="background: #28a745; color: white;">
                     <i class="fas fa-check-circle"></i>
                     <span>Procurement Manager Approval: {% if item_request.status == 'Rejected by Procurement Manager' %}Rejected{% else %}Completed{% endif %}</span>
@@ -2763,10 +2763,10 @@ body.flash-success-open {
         <div class="step-content" id="step-assigned">
             <h3><i class="fas fa-user-check"></i> Assigned to Procurement</h3>
             
-            {% if item_request.status == 'Assigned to Procurement' %}
-                <div class="admin-mode-warning" style="background: #17a2b8; color: white;">
+            {% if item_request.status in ['Assigned to Procurement', 'Final Approval', 'Completed'] %}
+                <div class="admin-mode-warning" style="background: {% if item_request.status == 'Completed' %}#28a745{% elif item_request.status == 'Final Approval' %}#17a2b8{% else %}#17a2b8{% endif %}; color: white;">
                     <i class="fas fa-user-check"></i>
-                    <span>Request has been assigned to a procurement member for processing</span>
+                    <span>{% if item_request.status == 'Completed' %}Request has been completed{% elif item_request.status == 'Final Approval' %}Request has been assigned to a procurement member for processing{% else %}Request has been assigned to a procurement member for processing{% endif %}</span>
                 </div>
                 
                 <div class="card assigned-section" style="margin-bottom: 1.5rem;">
@@ -2804,6 +2804,102 @@ body.flash-success-open {
                         {% endif %}
                     </div>
                 </div>
+
+                <!-- Display uploaded files (if any) - moved above Billing and Completion for completed status -->
+                {% if receipt_files or invoice_files %}
+                <div class="card assigned-section" style="margin-bottom: 1.5rem;" id="uploaded-files-card">
+                    <div class="card-header">
+                        <h4>Uploaded Files</h4>
+                    </div>
+                    <div class="card-body">
+                        {% if receipt_files %}
+                        <div class="form-group" id="uploaded-receipts-list">
+                            <label><i class="fas fa-check-circle"></i> Receipt (Proof of transfer made by the Procurement Manager)</label>
+                            {% for file in receipt_files %}
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
+                                    <i class="fas fa-download"></i> View Receipt {{ loop.index }}
+                                </a>
+                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% if item_request.receipt_amount %}
+                        <div class="form-group" style="margin-top: 10px;">
+                            <label>Receipt Amount (OMR)</label>
+                            <input type="text"
+                                   value="{{ '%.3f'|format(item_request.receipt_amount) }}"
+                                   readonly
+                                   style="background: #f5f5f5;">
+                        </div>
+                        {% endif %}
+                        {% if item_request.receipt_reference_number %}
+                        <div class="form-group">
+                            <label>Receipt Reference Number</label>
+                            <input type="text"
+                                   value="{{ item_request.receipt_reference_number }}"
+                                   readonly
+                                   style="background: #f5f5f5;">
+                        </div>
+                        {% endif %}
+                        {% endif %}
+                        {% if invoice_files %}
+                        <div class="form-group" id="uploaded-invoices-list">
+                            <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
+                            {% set invoice_amount_lookup = {} %}
+                            {% set invoice_items_lookup = {} %}
+                            {% set invoice_total_ns = namespace(total=0.0) %}
+                            {% for inv in invoice_entries or [] %}
+                                {% if inv.filename %}
+                                    {% set inv_amt = inv['amount'] if inv['amount'] is defined else None %}
+                                    {% set inv_items = inv['items'] if inv['items'] is defined else [] %}
+                                    {% if inv_items is none %}{% set inv_items = [] %}{% endif %}
+                                    {% set _ = invoice_amount_lookup.update({inv.filename: inv_amt}) %}
+                                    {% set _ = invoice_items_lookup.update({inv.filename: inv_items}) %}
+                                    {% if inv_amt %}
+                                        {% set invoice_total_ns.total = invoice_total_ns.total + (inv_amt | float) %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                            {% for file in invoice_files %}
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
+                                    <i class="fas fa-download"></i> View Invoice {{ loop.index }}
+                                </a>
+                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                                {% if invoice_amount_lookup.get(file) %}
+                                <div style="margin-top: 6px; font-weight: 600; color: #1f2937;">Amount: OMR {{ '%.3f'|format(invoice_amount_lookup.get(file)|float) }}</div>
+                                {% endif %}
+                                {% if invoice_items_lookup.get(file) %}
+                                <div style="margin-top: 4px; color: #374151;">
+                                    <strong>Items:</strong>
+                                    <ul style="margin: 4px 0 0 18px; padding: 0;">
+                                        {% for itm in invoice_items_lookup.get(file) %}
+                                        <li>{{ itm }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                            {% if invoice_total_ns is not defined %}
+                                {% set invoice_total_ns = namespace(total=0.0) %}
+                            {% endif %}
+                            {% set invoice_total_value = (invoice_total_ns.total if invoice_total_ns.total > 0 else item_request.invoice_amount) %}
+                            {% if invoice_total_value is not none %}
+                            <div class="form-group" style="margin-top: 10px;">
+                                <label>Invoice Amount (OMR)</label>
+                                <input type="text"
+                                       value="{{ '%.3f'|format(invoice_total_value) }}"
+                                       readonly
+                                       style="background: #f5f5f5;">
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
 
                 {# Read-only Billing & Completion view for authorized viewers (not the assigned procurement) #}
                 {% if not can_complete and item_request.item_name %}
@@ -2945,102 +3041,6 @@ body.flash-success-open {
                         <p style="margin-top: 0.75rem; font-size: 0.9rem; color: #6b7280;">
                             Click this button to assign this request to yourself for processing.
                         </p>
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- Display uploaded files (if any) -->
-                {% if receipt_files or invoice_files %}
-                <div class="card assigned-section" style="margin-bottom: 1.5rem;" id="uploaded-files-card">
-                    <div class="card-header">
-                        <h4>Uploaded Files</h4>
-                    </div>
-                    <div class="card-body">
-                        {% if receipt_files %}
-                        <div class="form-group" id="uploaded-receipts-list">
-                            <label><i class="fas fa-check-circle"></i> Receipt (Proof of transfer made by the Procurement Manager)</label>
-                            {% for file in receipt_files %}
-                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
-                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
-                                    <i class="fas fa-download"></i> View Receipt {{ loop.index }}
-                                </a>
-                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% if item_request.receipt_amount %}
-                        <div class="form-group" style="margin-top: 10px;">
-                            <label>Receipt Amount (OMR)</label>
-                            <input type="text"
-                                   value="{{ '%.3f'|format(item_request.receipt_amount) }}"
-                                   readonly
-                                   style="background: #f5f5f5;">
-                        </div>
-                        {% endif %}
-                        {% if item_request.receipt_reference_number %}
-                        <div class="form-group">
-                            <label>Receipt Reference Number</label>
-                            <input type="text"
-                                   value="{{ item_request.receipt_reference_number }}"
-                                   readonly
-                                   style="background: #f5f5f5;">
-                        </div>
-                        {% endif %}
-                        {% endif %}
-                        {% if invoice_files %}
-                        <div class="form-group" id="uploaded-invoices-list">
-                            <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
-                            {% set invoice_amount_lookup = {} %}
-                            {% set invoice_items_lookup = {} %}
-                            {% set invoice_total_ns = namespace(total=0.0) %}
-                            {% for inv in invoice_entries or [] %}
-                                {% if inv.filename %}
-                                    {% set inv_amt = inv['amount'] if inv['amount'] is defined else None %}
-                                    {% set inv_items = inv['items'] if inv['items'] is defined else [] %}
-                                    {% if inv_items is none %}{% set inv_items = [] %}{% endif %}
-                                    {% set _ = invoice_amount_lookup.update({inv.filename: inv_amt}) %}
-                                    {% set _ = invoice_items_lookup.update({inv.filename: inv_items}) %}
-                                    {% if inv_amt %}
-                                        {% set invoice_total_ns.total = invoice_total_ns.total + (inv_amt | float) %}
-                                    {% endif %}
-                                {% endif %}
-                            {% endfor %}
-                            {% for file in invoice_files %}
-                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
-                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
-                                    <i class="fas fa-download"></i> View Invoice {{ loop.index }}
-                                </a>
-                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
-                                {% if invoice_amount_lookup.get(file) %}
-                                <div style="margin-top: 6px; font-weight: 600; color: #1f2937;">Amount: OMR {{ '%.3f'|format(invoice_amount_lookup.get(file)|float) }}</div>
-                                {% endif %}
-                                {% if invoice_items_lookup.get(file) %}
-                                <div style="margin-top: 4px; color: #374151;">
-                                    <strong>Items:</strong>
-                                    <ul style="margin: 4px 0 0 18px; padding: 0;">
-                                        {% for itm in invoice_items_lookup.get(file) %}
-                                        <li>{{ itm }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                                {% endif %}
-                            </div>
-                            {% endfor %}
-                            {% if invoice_total_ns is not defined %}
-                                {% set invoice_total_ns = namespace(total=0.0) %}
-                            {% endif %}
-                            {% set invoice_total_value = (invoice_total_ns.total if invoice_total_ns.total > 0 else item_request.invoice_amount) %}
-                            {% if invoice_total_value is not none %}
-                            <div class="form-group" style="margin-top: 10px;">
-                                <label>Invoice Amount (OMR)</label>
-                                <input type="text"
-                                       value="{{ '%.3f'|format(invoice_total_value) }}"
-                                       readonly
-                                       style="background: #f5f5f5;">
-                            </div>
-                            {% endif %}
-                        </div>
-                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
@@ -3771,7 +3771,104 @@ body.flash-success-open {
         <div class="step-content" id="step-completed">
             <h3><i class="fas fa-check-circle"></i> Completed</h3>
             
-            {% if item_request.status == 'Completed' %}
+            {% if item_request.status == 'Final Approval' %}
+                <h3><i class="fas fa-user-tie"></i> Final Approval</h3>
+                <div class="admin-mode-warning" style="background: #fff3cd; color: #856404;">
+                    <i class="fas fa-clock"></i>
+                    <span>Final approval is required from Procurement Manager.</span>
+                </div>
+
+                <div class="card manager-approval-required" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h4><i class="fas fa-user-tie"></i> Final Approval Required</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="status-display" style="margin-bottom: 1.5rem;">
+                            <div style="font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 0.5rem;">Status</div>
+                            <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 12px 20px; text-align: center;">
+                                <span style="color: #856404; font-weight: bold; font-size: 1.1rem;">PENDING FINAL APPROVAL</span>
+                            </div>
+                            <div style="text-align: center; margin-top: 0.5rem; color: #666; font-size: 0.9rem;">
+                                <strong>Pending by:</strong> {{ procurement_manager_approver_name or item_request.procurement_manager_approver or 'Procurement Manager' }}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-8">
+                                <p style="margin-bottom: 0.5rem; font-size: 1.1rem;">
+                                    <strong>Status:</strong> Pending Final Approval
+                                </p>
+                                
+                                <p style="margin-bottom: 0.5rem; color: #666;">
+                                    <strong>Department:</strong> {{ item_request.department }}
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-right">
+                                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 1rem; text-align: center;">
+                                    <i class="fas fa-clock" style="font-size: 2rem; color: #f57c00; margin-bottom: 0.5rem;"></i>
+                                    <p style="margin: 0; font-weight: 600; color: #856404;">Pending Review</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if can_approve_procurement_manager or can_reject_procurement_manager %}
+                    <div class="card your-approval-required">
+                        <div class="card-header">
+                            <h4><i class="fas fa-check-circle"></i> Your Approval Required</h4>
+                            <p>As the Procurement Manager, please review and approve this request.</p>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('item_request_procurement_manager_decision', request_id=item_request.id) }}">
+                                <div class="form-group">
+                                    <label for="item_procurement_approval_status">Set Status *</label>
+                                    <select name="approval_status" id="item_procurement_approval_status" required onchange="toggleItemProcurementManagerApprovalFields()" data-item-status="{{ item_request.status }}">
+                                        <option value="">-- Select Status --</option>
+                                        <option value="approve">Approve</option>
+                                        <option value="reject">Reject</option>
+                                        <option value="on_hold">On Hold</option>
+                                    </select>
+                                </div>
+                                
+                                <div id="item_procurement_approve_fields" style="display: none;">
+                                    <div class="form-group" id="procurement_amount_group">
+                                        <label for="procurement_amount">Amount (OMR) *</label>
+                                        <div style="position: relative;">
+                                            <span style="position: absolute; left: 12px; top: 12px; color: #666; font-weight: 600;">OMR</span>
+                                            <input type="number" name="amount" id="procurement_amount" step="0.001" min="0" required style="padding-left: 55px; width: 100%;" placeholder="0.000">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="procurement_approval_reason">Approval Notes (Optional)</label>
+                                        <textarea name="approval_reason" id="procurement_approval_reason" rows="3" placeholder="Add any notes about this approval..."></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div id="item_procurement_reject_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="procurement_rejection_reason">Reason for Rejection *</label>
+                                        <textarea name="rejection_reason" id="procurement_rejection_reason" rows="3" placeholder="Please provide a clear reason for rejecting this request..." required></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div id="item_procurement_on_hold_fields" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="procurement_on_hold_reason">On Hold Reason (Optional)</label>
+                                        <textarea name="on_hold_reason" id="procurement_on_hold_reason" rows="3" placeholder="Add any notes about why this request is on hold..."></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div class="step-actions">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-check"></i> Submit Decision
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                {% endif %}
+            {% elif item_request.status == 'Completed' %}
                 <div class="admin-mode-warning" style="background: #28a745; color: white;">
                     <i class="fas fa-check-circle"></i>
                     <span>Request has been completed successfully</span>
@@ -3782,6 +3879,13 @@ body.flash-success-open {
                         <h4>Completion Details</h4>
                     </div>
                     <div class="card-body">
+                        <div class="status-display" style="margin-bottom: 1.5rem;">
+                            <div style="font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 0.5rem;">Status</div>
+                            <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
+                                <span style="color: #155724; font-weight: bold; font-size: 1.1rem;">COMPLETED</span>
+                            </div>
+                        </div>
+                        
                         {% if completed_by_name %}
                         <div class="form-group">
                             <label>Completed By</label>
@@ -3798,88 +3902,6 @@ body.flash-success-open {
                         <div class="form-group">
                             <label>Completion Notes</label>
                             <textarea readonly style="background: #f8f9fa;">{{ item_request.completion_notes }}</textarea>
-                        </div>
-                        {% endif %}
-                        {% if receipt_files %}
-                        <div class="form-group">
-                            <label><i class="fas fa-check-circle"></i> Receipt (Proof of transfer made by the Procurement Manager)</label>
-                            {% for file in receipt_files %}
-                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
-                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
-                                    <i class="fas fa-download"></i> View Receipt {{ loop.index }}
-                                </a>
-                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-                        {% if item_request.receipt_amount is not none or item_request.receipt_reference_number %}
-                        <div class="form-group">
-                            <label>Receipt Amount (OMR)</label>
-                            <input type="text"
-                                   value="{% if item_request.receipt_amount is not none %}{{ '%.3f'|format(item_request.receipt_amount) }}{% else %}-{% endif %}"
-                                   readonly
-                                   style="background: #f5f5f5;">
-                        </div>
-                        <div class="form-group">
-                            <label>Receipt Reference Number</label>
-                            <input type="text"
-                                   value="{{ item_request.receipt_reference_number or '-' }}"
-                                   readonly
-                                   style="background: #f5f5f5;">
-                        </div>
-                        {% endif %}
-
-                        {% if invoice_files %}
-                        <div class="form-group">
-                            <label><i class="fas fa-check-circle"></i> Invoice (Proof of payment made for the requested item)</label>
-                            {% set invoice_amount_lookup = {} %}
-                            {% set invoice_items_lookup = {} %}
-                            {% set invoice_total_ns = namespace(total=0.0) %}
-                            {% for inv in invoice_entries or [] %}
-                                {% if inv.filename %}
-                                    {% set inv_amt = inv['amount'] if inv['amount'] is defined else None %}
-                                    {% set inv_items = inv['items'] if inv['items'] is defined else [] %}
-                                    {% if inv_items is none %}{% set inv_items = [] %}{% endif %}
-                                    {% set _ = invoice_amount_lookup.update({inv.filename: inv_amt}) %}
-                                    {% set _ = invoice_items_lookup.update({inv.filename: inv_items}) %}
-                                    {% if inv_amt %}
-                                        {% set invoice_total_ns.total = invoice_total_ns.total + (inv_amt | float) %}
-                                    {% endif %}
-                                {% endif %}
-                            {% endfor %}
-                            {% for file in invoice_files %}
-                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
-                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
-                                    <i class="fas fa-download"></i> View Invoice {{ loop.index }}
-                                </a>
-                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
-                                {% if invoice_amount_lookup.get(file) %}
-                                <div style="margin-top: 6px; font-weight: 600; color: #1f2937;">Amount: OMR {{ '%.3f'|format(invoice_amount_lookup.get(file)|float) }}</div>
-                                {% endif %}
-                                {% if invoice_items_lookup.get(file) %}
-                                <div style="margin-top: 4px; color: #374151;">
-                                    <strong>Items:</strong>
-                                    <ul style="margin: 4px 0 0 18px; padding: 0;">
-                                        {% for itm in invoice_items_lookup.get(file) %}
-                                        <li>{{ itm }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                                {% endif %}
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-
-                        {% set invoice_total_value = invoice_total_ns.total if (invoice_total_ns is defined and invoice_total_ns.total > 0) else item_request.invoice_amount %}
-                        {% if invoice_total_value is not none %}
-                        <div class="form-group">
-                            <label>Invoice Amount (OMR)</label>
-                            <input type="text"
-                                   value="{{ '%.3f'|format(invoice_total_value) }}"
-                                   readonly
-                                   style="background: #f5f5f5;">
                         </div>
                         {% endif %}
                     </div>
@@ -3951,8 +3973,8 @@ function toggleItemProcurementManagerApprovalFields() {
     if (status === 'approve') {
         approveFields.style.display = 'block';
         
-        // Hide Amount field if status is "Pending Procurement Manager Approval" and approval status is "approve"
-        if (itemStatus === 'Pending Procurement Manager Approval') {
+        // Hide Amount field if status is "Pending Procurement Manager Approval" or "Final Approval" and approval status is "approve"
+        if (itemStatus === 'Pending Procurement Manager Approval' || itemStatus === 'Final Approval') {
             if (amountGroup) {
                 amountGroup.style.display = 'none';
             }
