@@ -3791,9 +3791,9 @@ def procurement_dashboard():
     # Adjust calculations: deduct from available balance, add to money spent
     # Money Spent = Assigned item requests + Completed item requests (only item requests, not payment requests)
     money_spent = item_requests_amount + completed_item_requests_amount
-    # Available Balance = Completed payment requests - Assigned item requests - Completed item requests
-    # (Both assigned and completed item requests reduce available balance since they represent money spent/committed)
-    available_balance = completed_amount - item_requests_amount - completed_item_requests_amount
+    # Available Balance = Completed payment requests - Completed item requests only
+    # (Only completed item requests reduce available balance, not assigned/pending items)
+    available_balance = completed_amount - completed_item_requests_amount
     
     # Check and notify if balance is low
     check_and_notify_low_balance(available_balance)
@@ -4204,9 +4204,9 @@ def procurement_item_requests():
         # Adjust calculations: deduct from available balance, add to money spent
         # Money Spent = Assigned item requests + Completed item requests (only item requests, not payment requests)
         completed_amount = item_requests_amount + completed_item_requests_amount
-        # Available Balance = Completed payment requests - Assigned item requests - Completed item requests
-        # (Both assigned and completed item requests reduce available balance since they represent money spent/committed)
-        available_balance = completed_amount_bm - item_requests_amount - completed_item_requests_amount
+        # Available Balance = Completed payment requests - Completed item requests only
+        # (Only completed item requests reduce available balance, not assigned/pending items)
+        available_balance = completed_amount_bm - completed_item_requests_amount
         
         # Check and notify if balance is low
         check_and_notify_low_balance(available_balance)
@@ -5332,8 +5332,9 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
         
         # Calculate available balance
-        # Available Balance = Completed payment requests - Assigned item requests - Completed item requests
-        available_balance = completed_amount_bm - item_requests_amount - completed_item_requests_amount
+        # Available Balance = Completed payment requests - Completed item requests only
+        # (Only completed item requests reduce available balance, not assigned/pending items)
+        available_balance = completed_amount_bm - completed_item_requests_amount
         
         # Check and notify if balance is low
         check_and_notify_low_balance(available_balance)
