@@ -509,7 +509,10 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-container view-request-page">
+<div class="dashboard-container view-request-page"
+     data-request-status="{{ request.status }}"
+     data-user-department="{{ user.department }}"
+     data-user-role="{{ user.role }}">
     <div class="dashboard-header">
         <h1><i class="fas fa-file-invoice"></i> Payment Request #{{ request.request_id }}
             {% if request.recurring != 'Recurring' and request.payment_date %}
@@ -3247,10 +3250,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set initial active tab based on request status
     const requestStatus = '{{ request.status }}';
     const requestRecurring = '{{ request.recurring }}';
+    const viewPageContainer = document.querySelector('.dashboard-container.view-request-page');
+    const userDepartment = viewPageContainer?.dataset.userDepartment;
     
     // Check for URL parameter first (preserves tab state on refresh)
     const urlParams = new URLSearchParams(window.location.search);
-    const requestedTab = urlParams.get('tab');
+    let requestedTab = urlParams.get('tab');
+    
+    // Auditing users should land on Finance tab for completed/paid/recurring requests
+    if (userDepartment === 'Auditing' && ['Completed', 'Paid', 'Recurring'].includes(requestStatus)) {
+        requestedTab = 'finance';
+        const url = new URL(window.location);
+        url.searchParams.set('tab', 'finance');
+        window.history.replaceState({}, '', url);
+    }
     
     // Always remove active class from all tabs and contents first (to clear default)
     stepTabs.forEach(t => t.classList.remove('active'));

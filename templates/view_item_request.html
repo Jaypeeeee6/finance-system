@@ -838,7 +838,10 @@ body.flash-success-open {
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-container view-request-page" data-request-status="{{ item_request.status }}">
+<div class="dashboard-container view-request-page"
+     data-request-status="{{ item_request.status }}"
+     data-user-department="{{ user.department }}"
+     data-user-role="{{ user.role }}">
     <div class="dashboard-header">
         <h1><i class="fas fa-shopping-cart"></i> Item Request #{{ item_request.id }}
             {% if item_request.is_urgent %}
@@ -4043,9 +4046,19 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check for URL parameter to set initial active tab (preserves tab state on refresh)
     const urlParams = new URLSearchParams(window.location.search);
     let requestedTab = urlParams.get('tab');
+    const viewPageContainer = document.querySelector('.dashboard-container.view-request-page');
+    const requestStatus = viewPageContainer?.dataset.requestStatus;
+    const userDepartment = viewPageContainer?.dataset.userDepartment;
+    
+    // Auditing should land on Assigned tab for completed requests
+    if (userDepartment === 'Auditing' && requestStatus === 'Completed') {
+        requestedTab = 'assigned';
+        const url = new URL(window.location);
+        url.searchParams.set('tab', 'assigned');
+        window.history.replaceState({}, '', url);
+    }
     
     // If no tab parameter and status is "Assigned to Procurement", default to assigned tab
-    const requestStatus = document.querySelector('.dashboard-container.view-request-page')?.getAttribute('data-request-status');
     if (!requestedTab && requestStatus === 'Assigned to Procurement') {
         requestedTab = 'assigned';
         // Update URL to include the tab parameter

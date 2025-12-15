@@ -3149,6 +3149,8 @@ def department_dashboard():
     search_query = request.args.get('search', None)
     status_filter = request.args.get('status', None)
     tab = request.args.get('tab', 'all')
+    if current_user.department == 'Auditing' and tab not in ['completed', 'my_requests']:
+        tab = 'completed'
     # Enforce visibility: only Auditing department users can access 'my_requests' tab
     if tab == 'my_requests' and (not current_user.department or current_user.department != 'Auditing'):
         tab = 'all'
@@ -3957,6 +3959,11 @@ def procurement_item_requests():
     all_requests = base_query.options(
         db.joinedload(ProcurementItemRequest.assigned_to_user)
     ).order_by(ProcurementItemRequest.created_at.desc()).all()
+
+    # For Auditing "my_requests", ensure we include their own requests regardless of filters
+    own_requests_unfiltered = []
+    if current_user.department == 'Auditing' and tab == 'my_requests':
+        own_requests_unfiltered = ProcurementItemRequest.query.filter_by(user_id=current_user.user_id).all()
     
     # Filter requests based on user role (after database-level filters)
     if current_user.department == 'Procurement':
@@ -4008,6 +4015,17 @@ def procurement_item_requests():
             item_requests = [r for r in base_item_requests if r.status == 'Completed']
         else:  # tab == 'all' or any other value
             item_requests = base_item_requests
+    elif current_user.department == 'Auditing':
+        # Auditing: show all completed; always include own requests (any status) even if filters were applied
+        merged = {r.id: r for r in base_item_requests}
+        for r in own_requests_unfiltered:
+            merged[r.id] = r
+        base_for_audit = list(merged.values())
+        if tab == 'my_requests':
+            # Show all requests created by the auditing user (any status)
+            item_requests = [r for r in base_for_audit if r.user_id == current_user.user_id]
+        else:  # default/all completed
+            item_requests = [r for r in base_for_audit if r.status == 'Completed']
     else:
         # For other non-procurement users, don't apply tab filtering
         item_requests = base_item_requests
