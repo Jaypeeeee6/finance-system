@@ -2111,6 +2111,13 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         </div>
                         {% endif %}
                         
+                        {% if request.payment_method == 'Cash' and request.cash_receiver %}
+                        <div class="form-group">
+                            <label><i class="fas fa-user-check"></i> Cash Receiver</label>
+                            <input type="text" value="{{ request.cash_receiver }}" readonly style="background: #f5f5f5; font-weight: bold; font-size: 1.1rem;">
+                        </div>
+                        {% endif %}
+                        
                         {% if request.proof_required %}
                         <div class="form-group">
                             <label>Proof Required</label>
