@@ -11,7 +11,7 @@
 
     <div class="card">
         <div class="card-body">
-            <form method="POST" action="{{ url_for('new_request') }}" id="requestForm" enctype="multipart/form-data">
+            <form method="POST" action="{% if draft %}{{ url_for('edit_draft', draft_id=draft.request_id) }}{% else %}{{ url_for('new_request') }}{% endif %}" id="requestForm" enctype="multipart/form-data">
                 <div class="form-row">
                     <div class="form-group">
                         <label for="request_type">Request Type *</label>
@@ -646,9 +646,14 @@
                 </div>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" onclick="saveConfigurationBeforeSubmit()">
-                        <i class="fas fa-paper-plane"></i> Submit Request
-                    </button>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button type="submit" class="btn btn-primary" onclick="saveConfigurationBeforeSubmit()">
+                            <i class="fas fa-paper-plane"></i> Submit Request
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="saveAsDraft()" style="background-color: #6c757d; border-color: #6c757d;">
+                            <i class="fas fa-save"></i> Save as Draft
+                        </button>
+                    </div>
                     <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
                         <i class="fas fa-times"></i> Cancel
                     </a>
@@ -1109,7 +1114,8 @@ function initializeBranchSearch() {
         updateDropdownSelection();
     }
     
-    function selectBranch(value, text) {
+    // Make selectBranch globally accessible for draft pre-fill
+    window.selectBranch = function(value, text) {
         // Clear any pending blur timeout
         if (blurTimeout) {
             clearTimeout(blurTimeout);
@@ -5082,6 +5088,266 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
         }
     });
 });
+// Function to save form as draft
+function saveAsDraft() {
+    const form = document.getElementById('requestForm');
+    if (!form) {
+        console.error('Form not found');
+        return;
+    }
+    
+    // Create FormData to ensure files are included
+    const formData = new FormData(form);
+    
+    // Ensure person_company value is set correctly if supplier dropdown is used
+    const personCompanyContainer = document.getElementById('person_company_select_container');
+    if (personCompanyContainer && personCompanyContainer.style.display !== 'none') {
+        const personCompanySelect = document.getElementById('person_company_select');
+        const personCompanyInput = document.getElementById('person_company');
+        
+        if (personCompanySelect && personCompanySelect.value) {
+            // Copy dropdown value to text input
+            if (personCompanyInput) {
+                personCompanyInput.value = personCompanySelect.value;
+            }
+            // Also explicitly set it in FormData to ensure it's sent
+            formData.set('person_company', personCompanySelect.value);
+        }
+    } else {
+        // For text input, make sure it's included in FormData
+        const personCompanyInput = document.getElementById('person_company');
+        if (personCompanyInput && personCompanyInput.value) {
+            formData.set('person_company', personCompanyInput.value);
+        }
+    }
+    
+    // Add save_as_draft flag
+    formData.set('save_as_draft', 'true');
+    
+    // Remove required attributes temporarily for draft saving
+    const requiredFields = form.querySelectorAll('[required]');
+    const originalRequired = [];
+    requiredFields.forEach(field => {
+        originalRequired.push({
+            element: field,
+            wasRequired: field.hasAttribute('required')
+        });
+        field.removeAttribute('required');
+    });
+    
+    // Ensure all selected files are included in FormData
+    // Use the allSelectedFiles array (same as regular form submission)
+    formData.delete('receipt_files');
+    
+    // Debug logging
+    console.log('Saving draft - allSelectedFiles:', typeof allSelectedFiles !== 'undefined' ? allSelectedFiles.length : 'undefined');
+    
+    if (typeof allSelectedFiles !== 'undefined' && allSelectedFiles && allSelectedFiles.length > 0) {
+        // Add all files from the allSelectedFiles array
+        console.log('Adding', allSelectedFiles.length, 'files to FormData');
+        allSelectedFiles.forEach((file, index) => {
+            console.log('Adding file', index + 1, ':', file.name, 'Size:', file.size);
+            formData.append('receipt_files', file);
+        });
+    } else {
+        // Fallback: try to get files from the input element
+        const receiptFileInput = document.getElementById('receipt_files');
+        if (receiptFileInput && receiptFileInput.files && receiptFileInput.files.length > 0) {
+            console.log('Using fallback - files from input element:', receiptFileInput.files.length);
+            for (let i = 0; i < receiptFileInput.files.length; i++) {
+                formData.append('receipt_files', receiptFileInput.files[i]);
+            }
+        } else {
+            console.log('No files to add to draft');
+        }
+    }
+    
+    // Debug: Log FormData contents
+    console.log('FormData entries:');
+    for (let pair of formData.entries()) {
+        if (pair[1] instanceof File) {
+            console.log(pair[0], ':', pair[1].name, '(', pair[1].size, 'bytes)');
+        } else {
+            console.log(pair[0], ':', pair[1]);
+        }
+    }
+    
+    // Submit using fetch to ensure FormData is properly sent
+    fetch(form.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.text();
+        }
+        throw new Error('Network response was not ok');
+    })
+    .then(html => {
+        // If response is HTML, redirect to drafts page
+        window.location.href = '/drafts';
+    })
+    .catch(error => {
+        console.error('Error saving draft:', error);
+        alert('Error saving draft. Please try again.');
+    });
+    
+    // Restore required attributes
+    originalRequired.forEach(item => {
+        if (item.wasRequired) {
+            item.element.setAttribute('required', 'required');
+        }
+    });
+}
+
+// Function to submit draft (convert to regular request)
+function submitDraft() {
+    const form = document.getElementById('requestForm');
+    if (!form) {
+        console.error('Form not found');
+        return;
+    }
+    
+    // Remove any existing draft inputs
+    const existingDraftInput = form.querySelector('input[name="save_as_draft"]');
+    if (existingDraftInput) existingDraftInput.remove();
+    
+    // Create hidden input to indicate this is a draft submission
+    const submitInput = document.createElement('input');
+    submitInput.type = 'hidden';
+    submitInput.name = 'submit_draft';
+    submitInput.value = 'true';
+    form.appendChild(submitInput);
+    
+    // Validate form before submitting
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+    
+    // Submit the form (validation will happen on server side)
+    form.submit();
+}
+
+{% if draft %}
+// Pre-fill form with draft data when editing
+document.addEventListener('DOMContentLoaded', function() {
+    const draft = {{ draft|tojson|safe }};
+    
+    if (draft) {
+        // Fill form fields with draft data
+        if (draft.request_type) {
+            const requestTypeSelect = document.getElementById('request_type');
+            if (requestTypeSelect) {
+                requestTypeSelect.value = draft.request_type;
+                handleRequestTypeChange();
+            }
+        }
+        
+        if (draft.requestor_name) {
+            const requestorNameInput = document.getElementById('requestor_name');
+            if (requestorNameInput) requestorNameInput.value = draft.requestor_name;
+        }
+        
+        // Handle branch name - populate chips if branch_name exists
+        if (draft.branch_name) {
+            // Split comma-separated branch names
+            const branchNames = draft.branch_name.split(',').map(b => b.trim()).filter(b => b);
+            if (branchNames.length > 0) {
+                // Wait for branch search to be initialized, then populate branches
+                setTimeout(function() {
+                    const hiddenSelect = document.getElementById('branch_name');
+                    const hiddenInput = document.getElementById('branch_names');
+                    const chipsContainer = document.getElementById('branch_chips_container');
+                    
+                    if (hiddenSelect && hiddenInput) {
+                        // Access the selectedBranches array from initializeBranchSearch scope
+                        // We need to populate it through the selectBranch function
+                        branchNames.forEach(function(branchName) {
+                            // Find the option in the select
+                            const option = Array.from(hiddenSelect.options).find(opt => opt.value === branchName);
+                            if (option && typeof window.selectBranch === 'function') {
+                                // Use the global selectBranch function
+                                window.selectBranch(option.value, option.textContent);
+                            }
+                        });
+                        
+                        // Also update the hidden input directly as fallback
+                        hiddenInput.value = branchNames.join(',');
+                    }
+                }, 800); // Wait for branch search initialization
+            }
+        }
+        
+        if (draft.purpose) {
+            const purposeInput = document.getElementById('purpose');
+            if (purposeInput) purposeInput.value = draft.purpose;
+        }
+        
+        if (draft.payment_method) {
+            const paymentMethodSelect = document.getElementById('payment_method');
+            if (paymentMethodSelect) {
+                paymentMethodSelect.value = draft.payment_method;
+                handlePaymentMethodChange();
+            }
+        }
+        
+        if (draft.account_name) {
+            const accountNameInput = document.getElementById('account_name');
+            if (accountNameInput) accountNameInput.value = draft.account_name;
+        }
+        
+        if (draft.account_number) {
+            const accountNumberInput = document.getElementById('account_number');
+            if (accountNumberInput) accountNumberInput.value = draft.account_number;
+        }
+        
+        if (draft.bank_name) {
+            const bankNameSelect = document.getElementById('bank_name');
+            if (bankNameSelect) bankNameSelect.value = draft.bank_name;
+        }
+        
+        if (draft.amount) {
+            const amountInput = document.getElementById('amount');
+            if (amountInput) amountInput.value = draft.amount;
+        }
+        
+        if (draft.recurring) {
+            const recurringSelect = document.getElementById('recurring');
+            if (recurringSelect) recurringSelect.value = draft.recurring;
+        }
+        
+        // Fill dynamic fields based on request type
+        if (draft.item_name) {
+            const itemNameInput = document.getElementById('item_name');
+            if (itemNameInput) itemNameInput.value = draft.item_name;
+        }
+        
+        // Handle person_company - check if it's a dropdown or text input
+        if (draft.person_company) {
+            const personCompanyInput = document.getElementById('person_company');
+            const personCompanySelect = document.getElementById('person_company_select');
+            
+            // Try dropdown first (for supplier types)
+            if (personCompanySelect) {
+                personCompanySelect.value = draft.person_company;
+                // Trigger change event to update bank fields if needed
+                personCompanySelect.dispatchEvent(new Event('change'));
+            }
+            
+            // Also set text input (for Person/Company types)
+            if (personCompanyInput) {
+                personCompanyInput.value = draft.person_company;
+            }
+        }
+        
+        if (draft.company_name) {
+            const companyNameInput = document.getElementById('company_name');
+            if (companyNameInput) companyNameInput.value = draft.company_name;
+        }
+    }
+});
+{% endif %}
 </script>
 
 {% endblock %}

@@ -10877,6 +10877,28 @@ def operation_dashboard():
 
 # ==================== PAYMENT REQUEST ROUTES ====================
 
+def draft_to_dict(draft):
+    """Helper function to convert draft PaymentRequest object to dictionary for JSON serialization"""
+    if not draft:
+        return None
+    return {
+        'request_id': draft.request_id,
+        'request_type': draft.request_type,
+        'requestor_name': draft.requestor_name,
+        'branch_name': draft.branch_name,
+        'purpose': draft.purpose,
+        'payment_method': draft.payment_method or 'Card',
+        'account_name': draft.account_name,
+        'account_number': draft.account_number,
+        'bank_name': draft.bank_name,
+        'amount': float(draft.amount) if draft.amount else None,
+        'recurring': draft.recurring,
+        'recurring_interval': draft.recurring_interval,
+        'item_name': draft.item_name,
+        'person_company': draft.person_company,
+        'company_name': draft.company_name
+    }
+
 def get_available_request_types():
     """Helper function to get available request types for the current user"""
     # Get user's department and role
@@ -10926,6 +10948,9 @@ def get_available_request_types():
 def new_request():
     """Create a new payment request"""
     if request.method == 'POST':
+        # Check if this is a draft save
+        is_draft = request.form.get('save_as_draft') == 'true'
+        
         request_type = request.form.get('request_type')
         requestor_name = request.form.get('requestor_name')
         # Check for multiple branch names first (new format), then fall back to single branch_name (backward compatibility)
@@ -10938,12 +10963,14 @@ def new_request():
         purpose = request.form.get('purpose')
         payment_method = request.form.get('payment_method', 'Card')  # Default to Card
         
-        # Validate required fields
-        if not branch_name:
-            flash('At least one branch name is required.', 'error')
-            available_request_types = get_available_request_types()
-            available_branches = get_branches_ordered_by_location()
-            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
+        # For drafts, skip validation - allow saving incomplete forms
+        if not is_draft:
+            # Validate required fields only for submitted requests
+            if not branch_name:
+                flash('At least one branch name is required.', 'error')
+                available_request_types = get_available_request_types()
+                available_branches = get_branches_ordered_by_location()
+                return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         account_name = request.form.get('account_name')
         account_number = request.form.get('account_number')
         # Clear account_number if payment method is Cheque or Cash
@@ -10954,63 +10981,81 @@ def new_request():
         recurring = request.form.get('recurring', 'One-Time')
         recurring_interval = request.form.get('recurring_interval')
         
-        # Validate account number only if payment method is Card
-        if payment_method == 'Card':
-            if not account_number:
-                flash('Account number is required when payment method is Card.', 'error')
+        # Skip validation for drafts - allow saving incomplete forms
+        if not is_draft:
+            # Validate account number only if payment method is Card
+            if payment_method == 'Card':
+                if not account_number:
+                    flash('Account number is required when payment method is Card.', 'error')
+                    available_request_types = get_available_request_types()
+                    available_branches = get_branches_ordered_by_location()
+                    return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
+            
+            # Validate account number length (maximum 16 digits) - only if payment method is Card
+            if payment_method == 'Card' and account_number and len(account_number) > 16:
+                flash('Account number cannot exceed 16 digits.', 'error')
                 available_request_types = get_available_request_types()
                 available_branches = get_branches_ordered_by_location()
                 return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
-        
-        # Validate account number length (maximum 16 digits) - only if payment method is Card
-        if payment_method == 'Card' and account_number and len(account_number) > 16:
-            flash('Account number cannot exceed 16 digits.', 'error')
-            available_request_types = get_available_request_types()
-            available_branches = get_branches_ordered_by_location()
-            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
-        
-        # Validate account number contains only digits - only if payment method is Card
-        if payment_method == 'Card' and account_number and not account_number.isdigit():
-            flash('Account number must contain only numbers.', 'error')
-            available_request_types = get_available_request_types()
-            available_branches = get_branches_ordered_by_location()
-            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
-        
-        # Validate bank name is selected (required for all payment methods)
-        if not bank_name:
-            flash('Please select a bank name.', 'error')
-            available_request_types = get_available_request_types()
-            available_branches = get_branches_ordered_by_location()
-            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
-        
-        # Validate "Others" description if "Others" is selected
-        if request_type == 'Others':
-            others_description = request.form.get('others_description')
-            if not others_description or not others_description.strip():
-                flash('Please specify the type of request when selecting "Others".', 'error')
+            
+            # Validate account number contains only digits - only if payment method is Card
+            if payment_method == 'Card' and account_number and not account_number.isdigit():
+                flash('Account number must contain only numbers.', 'error')
                 available_request_types = get_available_request_types()
-                return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
-        
-        # Handle comma-formatted amount
-        if amount:
-            # Remove commas from amount for processing
-            amount_clean = amount.replace(',', '')
-            try:
-                amount_float = float(amount_clean)
-                if amount_float <= 0:
-                    flash('Amount must be greater than 0.', 'error')
+                available_branches = get_branches_ordered_by_location()
+                return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
+            
+            # Validate bank name is selected (required for all payment methods)
+            if not bank_name:
+                flash('Please select a bank name.', 'error')
+                available_request_types = get_available_request_types()
+                available_branches = get_branches_ordered_by_location()
+                return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
+            
+            # Validate "Others" description if "Others" is selected
+            if request_type == 'Others':
+                others_description = request.form.get('others_description')
+                if not others_description or not others_description.strip():
+                    flash('Please specify the type of request when selecting "Others".', 'error')
                     available_request_types = get_available_request_types()
                     return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
-            except ValueError:
-                flash('Invalid amount format.', 'error')
-                available_request_types = get_available_request_types()
-                return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
+            
+            # Handle comma-formatted amount
+            if amount:
+                # Remove commas from amount for processing
+                amount_clean = amount.replace(',', '')
+                try:
+                    amount_float = float(amount_clean)
+                    if amount_float <= 0:
+                        flash('Amount must be greater than 0.', 'error')
+                        available_request_types = get_available_request_types()
+                        return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
+                except ValueError:
+                    flash('Invalid amount format.', 'error')
+                    available_request_types = get_available_request_types()
+                    return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types)
+        else:
+            # For drafts, clean amount if provided but don't validate
+            amount_clean = amount.replace(',', '') if amount else None
         
         # Handle multiple file uploads for receipts
         receipt_path = None  # Initialize receipt_path
         receipt_paths = []
+        
+        # Debug logging for draft saves
+        if is_draft:
+            print(f"DEBUG: Draft save - checking for receipt files")
+            print(f"DEBUG: request.files keys: {list(request.files.keys())}")
+        
         if 'receipt_files' in request.files:
             receipt_files = request.files.getlist('receipt_files')
+            if is_draft:
+                print(f"DEBUG: Draft save - receipt_files count: {len(receipt_files)}")
+                for i, f in enumerate(receipt_files):
+                    print(f"DEBUG: File {i}: filename={f.filename}, size={len(f.read()) if f else 0}")
+                    if f:
+                        f.seek(0)  # Reset file pointer
+            
             if receipt_files and any(f.filename for f in receipt_files):
                 import uuid
                 import json
@@ -11065,12 +11110,29 @@ def new_request():
         
         # Get dynamic fields based on request type
         item_name = request.form.get('item_name')
-        person_company = request.form.get('person_company')
+        
+        # Handle person_company - check both text input and dropdown
+        person_company_value = request.form.get('person_company', '').strip()
+        person_company_select = request.form.get('person_company_select', '').strip()
+        # Use select value if available, otherwise use text input
+        person_company = person_company_select if person_company_select else person_company_value
+        
+        # Debug logging for draft saves
+        if is_draft:
+            print(f"DEBUG: Draft save - person_company_value: '{person_company_value}'")
+            print(f"DEBUG: Draft save - person_company_select: '{person_company_select}'")
+            print(f"DEBUG: Draft save - final person_company: '{person_company}'")
+            print(f"DEBUG: Draft save - request.form keys: {list(request.form.keys())}")
+        
         company_name = request.form.get('company_name')
         others_description = request.form.get('others_description')
         
-        # All departments go to their manager first for approval
-        initial_status = 'Pending Manager Approval'
+        # Set status based on whether it's a draft
+        if is_draft:
+            initial_status = 'Draft'
+        else:
+            # All departments go to their manager first for approval
+            initial_status = 'Pending Manager Approval'
         
         # Create new request
         current_time = datetime.utcnow()
@@ -11080,35 +11142,43 @@ def new_request():
         if request_type == 'Others' and others_description:
             final_request_type = f"Others: {others_description}"
         
+        # For drafts, allow nullable fields
         new_req = PaymentRequest(
-            request_type=final_request_type,
-            requestor_name=requestor_name,
-            branch_name=branch_name,
+            request_type=final_request_type or 'Draft',
+            requestor_name=requestor_name or current_user.name,
+            branch_name=branch_name or '',
             item_name=item_name if request_type == 'Item' else None,
             person_company=person_company if person_company else None,
             company_name=company_name if request_type == 'Supplier/Rental' else None,
             department=current_user.department,
             date=date,
-            purpose=purpose,
+            purpose=purpose or '',
             payment_method=payment_method,
-            account_name=account_name,
+            account_name=account_name or '',
             account_number=account_number if payment_method == 'Card' else '',
-            bank_name=bank_name,
-            amount=amount_clean if amount else amount,  # Use cleaned amount without commas
+            bank_name=bank_name or '',
+            amount=amount_clean if amount_clean else (0 if is_draft else None),  # Use 0 for drafts if no amount
             recurring=recurring,
             recurring_interval=recurring_interval if recurring == 'Recurring' else None,
             status=initial_status,
             requestor_receipt_path=receipt_path,  # Store requestor receipts in separate column
             user_id=current_user.user_id,
-            # Start timing immediately when request is submitted
-            manager_approval_start_time=current_time
+            is_draft=is_draft,
+            # Only start timing when request is actually submitted (not draft)
+            manager_approval_start_time=current_time if not is_draft else None
         )
         
         
         db.session.add(new_req)
         db.session.commit()
         
-        # Handle recurring payment schedules (both variable amounts and custom)
+        # Skip notifications and schedules for drafts
+        if is_draft:
+            log_action(f"Saved payment request #{new_req.request_id} as draft - {request_type or 'Draft'}")
+            flash('Draft saved successfully! You can continue editing it later.', 'success')
+            return redirect(url_for('drafts'))
+        
+        # Handle recurring payment schedules (both variable amounts and custom) - only for submitted requests
         if recurring == 'Recurring':
             recurring_interval = request.form.get('recurring_interval', '')
             print(f"🔧 DEBUG: Processing recurring payment - interval: {recurring_interval}")
@@ -11259,11 +11329,219 @@ def new_request():
         flash('Payment request submitted successfully!', 'success')
         return redirect(url_for('dashboard'))
     
+    # Handle GET request - check if editing a draft
+    draft_id = request.args.get('draft_id')
+    draft_data = None
+    if draft_id:
+        draft = PaymentRequest.query.filter_by(request_id=draft_id, is_draft=True, user_id=current_user.user_id).first()
+        if draft:
+            draft_data = draft_to_dict(draft)
+    
     # Get available request types and branches for the New Request page
     available_request_types = get_available_request_types()
     available_branches = get_branches_ordered_by_location()
     today = datetime.utcnow().date().strftime('%Y-%m-%d')
-    return render_template('new_request.html', user=current_user, today=today, available_request_types=available_request_types, available_branches=available_branches)
+    return render_template('new_request.html', user=current_user, today=today, available_request_types=available_request_types, available_branches=available_branches, draft=draft_data)
+
+
+@app.route('/drafts')
+@login_required
+def drafts():
+    """View all drafts created by the current user"""
+    user_drafts = PaymentRequest.query.filter_by(
+        is_draft=True,
+        user_id=current_user.user_id,
+        is_archived=False
+    ).order_by(PaymentRequest.updated_at.desc()).all()
+    
+    return render_template('drafts.html', drafts=user_drafts, user=current_user)
+
+
+@app.route('/draft/<int:draft_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_draft(draft_id):
+    """Edit a draft"""
+    draft = PaymentRequest.query.filter_by(
+        request_id=draft_id,
+        is_draft=True,
+        user_id=current_user.user_id
+    ).first_or_404()
+    
+    if request.method == 'POST':
+        # Check if this is a draft save or submit
+        is_draft = request.form.get('save_as_draft') == 'true'
+        submit_draft = request.form.get('submit_draft') == 'true'
+        
+        # Update draft fields
+        draft.request_type = request.form.get('request_type') or draft.request_type
+        draft.requestor_name = request.form.get('requestor_name') or draft.requestor_name
+        
+        # Handle branch name - check for multiple branch names first (new format), then fall back to single branch_name
+        branch_names = request.form.get('branch_names', '').strip()
+        branch_name = request.form.get('branch_name', '').strip()
+        if branch_names:
+            draft.branch_name = branch_names
+        elif branch_name:
+            draft.branch_name = branch_name
+        # If both are empty and this is not a draft save, keep existing value (for validation errors)
+        # For draft saves, allow empty branch_name
+        
+        draft.purpose = request.form.get('purpose') or draft.purpose
+        draft.payment_method = request.form.get('payment_method', 'Card')
+        draft.account_name = request.form.get('account_name') or draft.account_name
+        draft.account_number = request.form.get('account_number') if draft.payment_method == 'Card' else ''
+        draft.bank_name = request.form.get('bank_name') or draft.bank_name
+        amount = request.form.get('amount')
+        if amount:
+            amount_clean = amount.replace(',', '')
+            try:
+                draft.amount = float(amount_clean)
+            except ValueError:
+                pass
+        
+        draft.recurring = request.form.get('recurring', 'One-Time')
+        draft.recurring_interval = request.form.get('recurring_interval') if draft.recurring == 'Recurring' else None
+        
+        # Handle dynamic fields based on request type
+        request_type = request.form.get('request_type') or draft.request_type
+        draft.item_name = request.form.get('item_name') if request_type == 'Item' else None
+        
+        # Handle person_company - check request type to determine if it should be set
+        # Check both person_company (text input) and person_company_select (dropdown)
+        person_company_value = request.form.get('person_company', '').strip()
+        person_company_select = request.form.get('person_company_select', '').strip()
+        # Use select value if available, otherwise use text input
+        final_person_company = person_company_select if person_company_select else person_company_value
+        
+        if request_type in ['Person', 'Company']:
+            draft.person_company = final_person_company if final_person_company else None
+        else:
+            draft.person_company = None
+        
+        # Handle company_name for Supplier/Rental type
+        draft.company_name = request.form.get('company_name') if request_type == 'Supplier/Rental' else None
+        
+        # Handle file uploads - always check for new files and preserve existing ones
+        import uuid
+        import json
+        import os
+        
+        receipt_files = request.files.getlist('receipt_files')
+        if receipt_files and any(f.filename for f in receipt_files):
+            upload_folder = os.path.join(app.root_path, 'uploads', 'receipts')
+            os.makedirs(upload_folder, exist_ok=True)
+            allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
+            receipt_paths = []
+            
+            # Parse existing receipts if any
+            if draft.requestor_receipt_path:
+                try:
+                    receipt_paths = json.loads(draft.requestor_receipt_path)
+                except:
+                    receipt_paths = []
+            
+            for receipt_file in receipt_files:
+                if receipt_file and receipt_file.filename:
+                    # Validate file size (50MB max)
+                    max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+                    file_size = len(receipt_file.read())
+                    if file_size > max_file_size:
+                        flash(f'File "{receipt_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'error')
+                        receipt_file.seek(0)
+                        continue
+                    
+                    # Reset file pointer
+                    receipt_file.seek(0)
+                    
+                    # Validate file extension
+                    file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
+                    if file_extension in allowed_extensions:
+                        filename = f"{uuid.uuid4()}_{receipt_file.filename}"
+                        full_path = os.path.join(upload_folder, filename)
+                        receipt_file.save(full_path)
+                        receipt_paths.append(filename)
+            
+            # Update receipt path if new files were added
+            if receipt_paths:
+                draft.requestor_receipt_path = json.dumps(receipt_paths)
+        # If no new files uploaded, keep existing receipts (don't overwrite)
+        
+        draft.updated_at = datetime.utcnow()
+        
+        # If submitting draft, convert to regular request
+        if submit_draft:
+            # Validate required fields
+            if not draft.branch_name:
+                flash('At least one branch name is required.', 'error')
+                available_request_types = get_available_request_types()
+                available_branches = get_branches_ordered_by_location()
+                return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches, draft=draft_to_dict(draft))
+            
+            if draft.payment_method == 'Card' and not draft.account_number:
+                flash('Account number is required when payment method is Card.', 'error')
+                available_request_types = get_available_request_types()
+                available_branches = get_branches_ordered_by_location()
+                return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches, draft=draft_to_dict(draft))
+            
+            if not draft.bank_name:
+                flash('Please select a bank name.', 'error')
+                available_request_types = get_available_request_types()
+                available_branches = get_branches_ordered_by_location()
+                return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches, draft=draft_to_dict(draft))
+            
+            # Convert draft to regular request
+            draft.is_draft = False
+            draft.status = 'Pending Manager Approval'
+            draft.manager_approval_start_time = datetime.utcnow()
+            
+            db.session.commit()
+            
+            log_action(f"Submitted draft #{draft_id} as payment request")
+            
+            # Create notifications
+            try:
+                notify_users_by_role(
+                    request=draft,
+                    notification_type="new_submission",
+                    title="New Payment Request for Approval",
+                    message=f"New {draft.request_type} request submitted by {draft.requestor_name} from {current_user.department} department for OMR {draft.amount} - requires your approval",
+                    request_id=draft.request_id
+                )
+            except Exception as e:
+                print(f"Error creating notifications: {e}")
+            
+            flash('Draft submitted successfully!', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            # Save as draft
+            db.session.commit()
+            log_action(f"Updated draft #{draft_id}")
+            flash('Draft updated successfully!', 'success')
+            return redirect(url_for('drafts'))
+    
+    # GET request - show edit form
+    available_request_types = get_available_request_types()
+    available_branches = get_branches_ordered_by_location()
+    today = datetime.utcnow().date().strftime('%Y-%m-%d')
+    return render_template('new_request.html', user=current_user, today=today, available_request_types=available_request_types, available_branches=available_branches, draft=draft_to_dict(draft))
+
+
+@app.route('/draft/<int:draft_id>/delete', methods=['POST'])
+@login_required
+def delete_draft(draft_id):
+    """Delete a draft"""
+    draft = PaymentRequest.query.filter_by(
+        request_id=draft_id,
+        is_draft=True,
+        user_id=current_user.user_id
+    ).first_or_404()
+    
+    db.session.delete(draft)
+    db.session.commit()
+    
+    log_action(f"Deleted draft #{draft_id}")
+    flash('Draft deleted successfully!', 'success')
+    return redirect(url_for('drafts'))
 
 
 @app.route('/populate-request-types')
@@ -18425,6 +18703,14 @@ if __name__ == '__main__':
                 print("✓ Added 'cash_receiver' column to payment_requests table")
             else:
                 print("✓ 'cash_receiver' column already exists in payment_requests table")
+            
+            # Migrate: Add is_draft column to payment_requests table if it doesn't exist
+            if 'is_draft' not in payment_request_columns:
+                cursor.execute("ALTER TABLE payment_requests ADD COLUMN is_draft BOOLEAN DEFAULT 0")
+                conn.commit()
+                print("✓ Added 'is_draft' column to payment_requests table")
+            else:
+                print("✓ 'is_draft' column already exists in payment_requests table")
             
             conn.close()
         except Exception as e:

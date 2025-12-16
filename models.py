@@ -147,6 +147,7 @@ class PaymentRequest(db.Model):
     recurring = db.Column(db.String(20))  # One-Time, Recurring
     recurring_interval = db.Column(db.String(50))  # Monthly, Quarterly, Annually
     status = db.Column(db.String(20), default='Pending')  # Pending, Send Proof, Received Proof, Approved
+    is_draft = db.Column(db.Boolean, default=False)  # Whether this request is a draft
     reason_pending = db.Column(db.Text)
     receipt_path = db.Column(db.Text)  # DEPRECATED: Use requestor_receipt_path and finance_admin_receipt_path instead
     requestor_receipt_path = db.Column(db.Text)  # JSON string containing multiple file paths uploaded by requestor when submitting
