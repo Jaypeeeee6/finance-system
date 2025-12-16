@@ -784,6 +784,10 @@
                             <input type="checkbox" name="payment_method" value="Cheque" {% if 'Cheque' in request.args.getlist('payment_method') %}checked{% endif %}>
                             Cheque
                         </label>
+                        <label class="payment-method-option {% if 'Cash' in request.args.getlist('payment_method') %}selected{% endif %}" onclick="togglePaymentMethod(event, 'Cash')">
+                            <input type="checkbox" name="payment_method" value="Cash" {% if 'Cash' in request.args.getlist('payment_method') %}checked{% endif %}>
+                            Cash
+                        </label>
                     </div>
                 </div>
 

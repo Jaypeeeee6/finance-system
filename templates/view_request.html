@@ -713,16 +713,17 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         Payment Method {% if 'payment_method' in edited_fields %}<span class="edited-badge" data-field="payment_method" role="button" tabindex="0">Edited</span>{% endif %}
                     </label>
                     {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') %}
-                    <select id="payment_method" name="payment_method" class="form-control" style="background: #ffffff;">
+                    <select id="payment_method" name="payment_method" class="form-control" style="background: #ffffff;" onchange="handlePaymentMethodChangeView()">
                         <option value="Card" {% if (request.payment_method or 'Card') == 'Card' %}selected{% endif %}>Card</option>
                         <option value="Cheque" {% if request.payment_method == 'Cheque' %}selected{% endif %}>Cheque</option>
+                        <option value="Cash" {% if request.payment_method == 'Cash' %}selected{% endif %}>Cash</option>
                     </select>
                     {% else %}
                     <input type="text" id="payment_method" value="{{ request.payment_method or 'Card' }}" readonly style="background: #f5f5f5;">
                     {% endif %}
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" id="bank_name_group">
                     <label for="bank_name">
                         {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="bank_name" required>{% endif %}
                         Bank Name {% if 'bank_name' in edited_fields %}<span class="edited-badge" data-field="bank_name" role="button" tabindex="0">Edited</span>{% endif %}
@@ -805,8 +806,8 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         {% endif %}
                     </div>
 
-                    {% if request.payment_method != 'Cheque' %}
-                    <div class="form-group">
+                    {% if request.payment_method != 'Cheque' and request.payment_method != 'Cash' %}
+                    <div class="form-group" id="account_number_group">
                         <label for="account_number">
                             {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="account_number" required>{% endif %}
                             Account Number {% if 'account_number' in edited_fields %}<span class="edited-badge" data-field="account_number" role="button" tabindex="0">Edited</span>{% endif %}
@@ -817,6 +818,15 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         {% else %}
                             <input type="text" id="account_number" name="account_number" value="{{ request.account_number }}" readonly style="background: #f5f5f5;">
                         {% endif %}
+                    </div>
+                    {% endif %}
+                    
+                    {% if request.payment_method == 'Cash' %}
+                    <div class="form-group" id="cash_receiver_display_group">
+                        <label for="cash_receiver_display">
+                            Cash Receiver
+                        </label>
+                        <input type="text" id="cash_receiver_display" value="{{ request.cash_receiver or 'Not specified' }}" readonly style="background: #f5f5f5;">
                     </div>
                     {% endif %}
                 </div>
@@ -2351,6 +2361,17 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                                title="Receipt reference number must contain only letters and numbers">
                                         <small class="form-text text-muted">
                                             Required field. Enter the receipt reference number (alphanumeric only).
+                                        </small>
+                                    </div>
+                                    
+                                    <!-- Cash Receiver Field (only visible when payment method is Cash) -->
+                                    <div class="form-group" id="cash_receiver_group" style="display: none;">
+                                        <label for="cash_receiver">Cash Receiver <span style="color: red;">*</span></label>
+                                        <input type="text" name="cash_receiver" id="cash_receiver" class="form-control" 
+                                               placeholder="Enter the name of the person receiving the cash" 
+                                               value="{{ request.cash_receiver or '' }}">
+                                        <small class="form-text text-muted">
+                                            Required field when payment method is Cash. Enter the name of the person who will receive the cash payment.
                                         </small>
                                     </div>
                                     
@@ -4424,6 +4445,8 @@ function toggleFinanceApprovalFields() {
         if (receiptUploadContainer) {
             receiptUploadContainer.setAttribute('data-required', 'true');
         }
+        // Check payment method and show/hide cash receiver field
+        toggleCashReceiverField();
     } else if (status === 'return_to_manager') {
         returnFields.style.display = 'block';
         returnReasonField.setAttribute('required', 'required');
@@ -4432,6 +4455,31 @@ function toggleFinanceApprovalFields() {
         if (receiptUploadContainer) {
             receiptUploadContainer.setAttribute('data-required', 'false');
         }
+    }
+}
+
+// Function to show/hide Cash Receiver field based on payment method
+function toggleCashReceiverField() {
+    const paymentMethodElement = document.getElementById('payment_method');
+    const cashReceiverGroup = document.getElementById('cash_receiver_group');
+    const cashReceiverInput = document.getElementById('cash_receiver');
+    
+    if (!paymentMethodElement || !cashReceiverGroup || !cashReceiverInput) {
+        return;
+    }
+    
+    // Get payment method value (from select or input)
+    const paymentMethod = paymentMethodElement.value || paymentMethodElement.textContent || '';
+    
+    if (paymentMethod.trim() === 'Cash') {
+        // Show cash receiver field and make it required
+        cashReceiverGroup.style.display = 'block';
+        cashReceiverInput.setAttribute('required', 'required');
+    } else {
+        // Hide cash receiver field and remove required attribute
+        cashReceiverGroup.style.display = 'none';
+        cashReceiverInput.removeAttribute('required');
+        cashReceiverInput.value = ''; // Clear the value when hidden
     }
 }
 
@@ -4542,6 +4590,40 @@ document.addEventListener('keydown', function(event) {
 <script src="{{ url_for('static', filename='js/multiple-file-upload.js') }}"></script>
 
 <script>
+// Handle payment method change in view request - hide/show account number and bank name fields
+function handlePaymentMethodChangeView() {
+    const paymentMethod = document.getElementById('payment_method');
+    const accountNumberGroup = document.getElementById('account_number_group');
+    const bankNameGroup = document.getElementById('bank_name_group');
+    const bankNameInput = document.getElementById('bank_name');
+    
+    if (paymentMethod) {
+        if (paymentMethod.value === 'Cheque') {
+            // Hide account number field when Cheque is selected
+            if (accountNumberGroup) accountNumberGroup.style.display = 'none';
+            // Show bank name field for Cheque
+            if (bankNameGroup) bankNameGroup.style.display = 'block';
+            if (bankNameInput) bankNameInput.setAttribute('required', 'required');
+        } else if (paymentMethod.value === 'Cash') {
+            // Hide account number field when Cash is selected, but keep bank name
+            if (accountNumberGroup) accountNumberGroup.style.display = 'none';
+            // Show bank name field for Cash (still required)
+            if (bankNameGroup) bankNameGroup.style.display = 'block';
+            if (bankNameInput) {
+                bankNameInput.setAttribute('required', 'required');
+            }
+        } else {
+            // Show account number and bank name fields when Card is selected
+            if (accountNumberGroup) accountNumberGroup.style.display = 'block';
+            if (bankNameGroup) bankNameGroup.style.display = 'block';
+            if (bankNameInput) bankNameInput.setAttribute('required', 'required');
+        }
+    }
+    
+    // Also toggle cash receiver field in finance admin form
+    toggleCashReceiverField();
+}
+
 // Form submission handlers for proof uploads
 document.addEventListener('DOMContentLoaded', function() {
     // Handle proof upload form submission
@@ -5008,6 +5090,12 @@ document.addEventListener('DOMContentLoaded', function() {
             subtree: true
         });
     }
+});
+
+// Initialize cash receiver field visibility on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if we're on the finance tab and initialize cash receiver field
+    toggleCashReceiverField();
 });
 
 // Go back to the previous page (reports, dashboard, etc.) with all parameters preserved

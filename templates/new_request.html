@@ -295,10 +295,11 @@
                     <select name="payment_method" id="payment_method" required onchange="handlePaymentMethodChange()">
                         <option value="Card" selected>Card</option>
                         <option value="Cheque">Cheque</option>
+                        <option value="Cash">Cash</option>
                     </select>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" id="bank_name_group">
                     <label for="bank_name">Bank Name *</label>
                     <select name="bank_name" id="bank_name" required onchange="showSwiftCode()">
                         <option value="">-- Select Bank --</option>
@@ -715,11 +716,13 @@ if (amountField) {
     });
 }
 
-// Handle payment method change - hide/show account number field
+// Handle payment method change - hide/show account number and bank name fields
 function handlePaymentMethodChange() {
     const paymentMethod = document.getElementById('payment_method');
     const accountNumberGroup = document.getElementById('account_number_group');
     const accountNumberInput = document.getElementById('account_number');
+    const bankNameGroup = document.getElementById('bank_name_group');
+    const bankNameInput = document.getElementById('bank_name');
     
     if (paymentMethod && accountNumberGroup && accountNumberInput) {
         if (paymentMethod.value === 'Cheque') {
@@ -728,11 +731,32 @@ function handlePaymentMethodChange() {
             accountNumberInput.removeAttribute('required');
             accountNumberInput.removeAttribute('pattern'); // Remove pattern validation
             accountNumberInput.value = ''; // Clear the value
+            // Show bank name field for Cheque
+            if (bankNameGroup) bankNameGroup.style.display = 'block';
+            if (bankNameInput) {
+                bankNameInput.setAttribute('required', 'required');
+            }
+        } else if (paymentMethod.value === 'Cash') {
+            // Hide account number field when Cash is selected, but keep bank name
+            accountNumberGroup.style.display = 'none';
+            accountNumberInput.removeAttribute('required');
+            accountNumberInput.removeAttribute('pattern');
+            accountNumberInput.value = ''; // Clear the value
+            // Show bank name field for Cash (still required)
+            if (bankNameGroup) bankNameGroup.style.display = 'block';
+            if (bankNameInput) {
+                bankNameInput.setAttribute('required', 'required');
+            }
         } else {
-            // Show account number field when Card is selected
+            // Show account number and bank name fields when Card is selected
             accountNumberGroup.style.display = 'block';
             accountNumberInput.setAttribute('required', 'required');
             accountNumberInput.setAttribute('pattern', '[0-9]+'); // Restore pattern validation
+            // Show bank name field for Card
+            if (bankNameGroup) bankNameGroup.style.display = 'block';
+            if (bankNameInput) {
+                bankNameInput.setAttribute('required', 'required');
+            }
         }
     }
 }

@@ -10946,8 +10946,8 @@ def new_request():
             return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         account_name = request.form.get('account_name')
         account_number = request.form.get('account_number')
-        # Clear account_number if payment method is Cheque
-        if payment_method == 'Cheque':
+        # Clear account_number if payment method is Cheque or Cash
+        if payment_method == 'Cheque' or payment_method == 'Cash':
             account_number = ''
         bank_name = request.form.get('bank_name')
         amount = request.form.get('amount')
@@ -10976,7 +10976,7 @@ def new_request():
             available_branches = get_branches_ordered_by_location()
             return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         
-        # Validate bank name is selected
+        # Validate bank name is selected (required for all payment methods)
         if not bank_name:
             flash('Please select a bank name.', 'error')
             available_request_types = get_available_request_types()
@@ -12512,11 +12512,23 @@ def edit_request(request_id):
         req.person_company = request.form.get('person_company') or req.person_company
         req.company_name = request.form.get('company_name') or req.company_name
         req.purpose = request.form.get('purpose') or req.purpose
-        req.bank_name = request.form.get('bank_name') or req.bank_name
         req.account_name = request.form.get('account_name') or req.account_name
-        req.account_number = request.form.get('account_number') or req.account_number
         req.item_name = request.form.get('item_name') or req.item_name
         req.payment_method = request.form.get('payment_method') or req.payment_method
+        
+        # Handle payment method specific fields
+        if req.payment_method == 'Cheque':
+            # Clear account_number for Cheque, keep bank_name
+            req.account_number = ''
+            req.bank_name = request.form.get('bank_name') or req.bank_name
+        elif req.payment_method == 'Cash':
+            # Clear account_number for Cash, keep bank_name
+            req.account_number = ''
+            req.bank_name = request.form.get('bank_name') or req.bank_name
+        else:
+            # Card - keep both account_number and bank_name
+            req.account_number = request.form.get('account_number') or req.account_number
+            req.bank_name = request.form.get('bank_name') or req.bank_name
         
         # Handle amount field
         amount_str = request.form.get('amount', '').strip()
@@ -13227,6 +13239,12 @@ def approve_request(request_id):
             flash('Reference number must contain only letters and numbers.', 'error')
             return redirect(url_for('view_request', request_id=request_id))
         
+        # Require cash receiver for Cash payment method
+        cash_receiver = request.form.get('cash_receiver', '').strip()
+        if req.payment_method == 'Cash' and not cash_receiver:
+            flash('Cash Receiver is required when payment method is Cash.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
+        
         # Require receipt upload for Finance Admin approval
         if 'receipt_files' not in request.files:
             flash('Receipt upload is required for Finance Admin approval.', 'error')
@@ -13278,6 +13296,14 @@ def approve_request(request_id):
         
         # Save reference number
         req.reference_number = reference_number
+        
+        # Save cash receiver (only for Cash payment method)
+        cash_receiver = request.form.get('cash_receiver', '').strip()
+        if req.payment_method == 'Cash' and cash_receiver:
+            req.cash_receiver = cash_receiver
+        elif req.payment_method != 'Cash':
+            # Clear cash_receiver if payment method is not Cash
+            req.cash_receiver = None
         
         req.approver = approver
         req.proof_required = proof_required
@@ -18391,6 +18417,14 @@ if __name__ == '__main__':
                     print(f"✓ Added '{col_name}' column to payment_requests table")
                 else:
                     print(f"✓ '{col_name}' column already exists in payment_requests table")
+            
+            # Migrate: Add cash_receiver column to payment_requests table if it doesn't exist
+            if 'cash_receiver' not in payment_request_columns:
+                cursor.execute("ALTER TABLE payment_requests ADD COLUMN cash_receiver VARCHAR(200)")
+                conn.commit()
+                print("✓ Added 'cash_receiver' column to payment_requests table")
+            else:
+                print("✓ 'cash_receiver' column already exists in payment_requests table")
             
             conn.close()
         except Exception as e:
