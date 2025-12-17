@@ -1011,6 +1011,18 @@ def check_and_notify_low_balance(available_balance):
                     # Silently handle WebSocket errors - don't log to audit
                     pass
 
+def get_department_text_for_notification(request):
+    """Generate department text for notification messages.
+    If request.department differs from request.user.department, mention both.
+    Otherwise, just mention the requestor's department."""
+    requestor_dept = request.user.department if request.user else 'Unknown'
+    request_dept = request.department if request.department else requestor_dept
+    
+    if requestor_dept.lower() != request_dept.lower():
+        return f"from {requestor_dept} and created for {request_dept}"
+    else:
+        return f"from {requestor_dept}"
+
 def get_authorized_manager_approvers(request):
     """Get all users who are authorized to approve this request at the manager stage.
     This mirrors the authorization logic in manager_approve_request."""
@@ -2057,10 +2069,11 @@ def check_recurring_payment_completion(request_id):
                     )
                 ).all()
                 for auditing_user in auditing_users:
+                    dept_text = get_department_text_for_notification(req)
                     create_notification(
                         user_id=auditing_user.user_id,
                         title="Recurring Payment Completed",
-                        message=f'All installments for recurring payment request #{request_id} from {req.department} department have been paid. Request marked as completed.',
+                        message=f'All installments for recurring payment request #{request_id} {dept_text} department have been paid. Request marked as completed.',
                         notification_type="recurring_completed",
                         request_id=request_id
                     )
@@ -11339,20 +11352,22 @@ def new_request():
         try:
             if new_req.status == 'Completed':
                 # Finance department requests are auto-approved - notify Finance Admin
+                dept_text = get_department_text_for_notification(new_req)
                 notify_users_by_role(
                     request=new_req,
                     notification_type="ready_for_finance_review",
                     title="New Payment Request Submitted",
-                    message=f"New {request_type} request submitted by {requestor_name} from {current_user.department} department for OMR {amount}",
+                    message=f"New {request_type} request submitted by {requestor_name} {dept_text} department for OMR {amount}",
                     request_id=new_req.request_id
                 )
             else:
                 # Other departments - notify based on RBAC rules
+                dept_text = get_department_text_for_notification(new_req)
                 notify_users_by_role(
                     request=new_req,
                     notification_type="new_submission",
                     title="New Payment Request for Approval",
-                    message=f"New {request_type} request submitted by {requestor_name} from {current_user.department} department for OMR {amount} - requires your approval",
+                    message=f"New {request_type} request submitted by {requestor_name} {dept_text} department for OMR {amount} - requires your approval",
                     request_id=new_req.request_id
                 )
                 
@@ -11594,11 +11609,12 @@ def edit_draft(draft_id):
             
             # Create notifications
             try:
+                dept_text = get_department_text_for_notification(draft)
                 notify_users_by_role(
                     request=draft,
                     notification_type="new_submission",
                     title="New Payment Request for Approval",
-                    message=f"New {draft.request_type} request submitted by {draft.requestor_name} from {current_user.department} department for OMR {draft.amount} - requires your approval",
+                    message=f"New {draft.request_type} request submitted by {draft.requestor_name} {dept_text} department for OMR {draft.amount} - requires your approval",
                     request_id=draft.request_id
                 )
             except Exception as e:
@@ -12780,15 +12796,16 @@ def schedule_one_time_payment(request_id):
     db.session.commit()
 
     # Audit and realtime
+    dept_text = get_department_text_for_notification(req)
     log_action(
-        f"Request #{request_id} from {getattr(req.user, 'name', 'Unknown')} in the {req.department} department has been scheduled for {payment_date_val} by {current_user.name}"
+        f"Request #{request_id} from {getattr(req.user, 'name', 'Unknown')} {dept_text} department has been scheduled for {payment_date_val} by {current_user.name}"
     )
     
     # Notify all authorized users
     try:
         title = "One-time Payment Date Scheduled"
         msg = (
-            f"Request #{request_id} from {getattr(req.user, 'name', 'Unknown')} in the {req.department} department "
+            f"Request #{request_id} from {getattr(req.user, 'name', 'Unknown')} {dept_text} department "
             f"has been scheduled for {payment_date_val.strftime('%B %d, %Y')} by {current_user.name}."
         )
         notified_user_ids = set()
@@ -13675,10 +13692,11 @@ def approve_request(request_id):
             if approver.user_id not in notified_user_ids:
                 try:
                     print(f"DEBUG: Notifying authorized approver: {approver.name} (ID: {approver.user_id}, Role: {approver.role}, Department: {approver.department})")
+                    dept_text = get_department_text_for_notification(req)
                     notification = create_notification(
                         user_id=approver.user_id,
                         title="Request Returned for Review",
-                        message=f"Payment request #{request_id} from {req.department} department has been returned by Finance Admin for review. Reason: {return_reason}",
+                        message=f"Payment request #{request_id} {dept_text} department has been returned by Finance Admin for review. Reason: {return_reason}",
                         notification_type="request_returned",
                         request_id=request_id
                     )
@@ -13693,7 +13711,7 @@ def approve_request(request_id):
                     app.logger.error(f"Failed to create notification for user {approver.user_id} when returning request #{request_id}: {str(e)}")
         
         # Also notify IT Department Manager if request is from IT department (they can edit and reassign managers)
-        if req.department == 'IT':
+        if req.user.department == 'IT':
             it_managers = User.query.filter_by(
                 department='IT',
                 role='Department Manager'
@@ -13701,10 +13719,11 @@ def approve_request(request_id):
             for it_manager in it_managers:
                 if it_manager.user_id not in notified_user_ids:
                     try:
+                        dept_text = get_department_text_for_notification(req)
                         create_notification(
                             user_id=it_manager.user_id,
                             title="Request Returned for Review",
-                            message=f"Payment request #{request_id} from IT department has been returned by Finance Admin for review. Reason: {return_reason}",
+                            message=f"Payment request #{request_id} {dept_text} department has been returned by Finance Admin for review. Reason: {return_reason}",
                             notification_type="request_returned",
                             request_id=request_id
                         )
@@ -13904,10 +13923,11 @@ def approve_request(request_id):
                     )
                 ).all()
                 for auditing_user in auditing_users:
+                    dept_text = get_department_text_for_notification(req)
                     create_notification(
                         user_id=auditing_user.user_id,
                         title="Recurring Payment Approved",
-                        message=f"Recurring payment request #{request_id} from {req.department} department has been approved by Finance. Payment schedule will be managed.",
+                        message=f"Recurring payment request #{request_id} {dept_text} department has been approved by Finance. Payment schedule will be managed.",
                         notification_type="recurring_approved",
                         request_id=request_id
                     )
@@ -13954,10 +13974,11 @@ def approve_request(request_id):
                     )
                 ).all()
                 for auditing_user in auditing_users:
+                    dept_text = get_department_text_for_notification(req)
                     create_notification(
                         user_id=auditing_user.user_id,
                         title="Request Completed",
-                        message=f"Payment request #{request_id} from {req.department} department has been completed.",
+                        message=f"Payment request #{request_id} {dept_text} department has been completed.",
                         notification_type="request_completed",
                         request_id=request_id
                     )
@@ -14156,10 +14177,11 @@ def approve_request(request_id):
                 )
             ).all()
             for auditing_user in auditing_users:
+                dept_text = get_department_text_for_notification(req)
                 create_notification(
                     user_id=auditing_user.user_id,
                     title="Request Completed",
-                    message=f"Payment request #{request_id} from {req.department} department has been completed (proof approved).",
+                    message=f"Payment request #{request_id} {dept_text} department has been completed (proof approved).",
                     notification_type="request_completed",
                     request_id=request_id
                 )
@@ -14449,10 +14471,11 @@ def close_request(request_id):
         )
     ).all()
     for auditing_user in auditing_users:
+        dept_text = get_department_text_for_notification(req)
         create_notification(
             user_id=auditing_user.user_id,
             title="Request Completed",
-            message=f"Payment request #{request_id} from {req.department} department has been completed and closed.",
+            message=f"Payment request #{request_id} {dept_text} department has been completed and closed.",
             notification_type="request_completed",
             request_id=request_id
         )
@@ -15090,11 +15113,12 @@ def manager_approve_request(request_id):
         )
         
         # Notify Finance Admin that request is ready for their review
+        dept_text = get_department_text_for_notification(req)
         notify_users_by_role(
             request=req,
             notification_type="ready_for_finance_review",
             title="Payment Request Ready for Review",
-            message=f"Payment request #{request_id} from {req.department} department has been approved by manager and is ready for Finance review",
+            message=f"Payment request #{request_id} {dept_text} department has been approved by manager and is ready for Finance review",
             request_id=request_id
         )
         
@@ -15324,10 +15348,11 @@ def reassign_manager(request_id):
     log_action(f"Reassigned temporary manager for request #{request_id} to {new_manager.name} (IT Staff only action)")
     
     # Notify the new temporary manager
+    dept_text = get_department_text_for_notification(req)
     create_notification(
         user_id=new_manager_id,
         title="Temporary Manager Assignment",
-        message=f"You have been temporarily assigned to review payment request #{request_id} from {req.department} department. The originally assigned manager is not available.",
+        message=f"You have been temporarily assigned to review payment request #{request_id} {dept_text} department. The originally assigned manager is not available.",
         notification_type="temporary_manager_assignment",
         request_id=request_id
     )
