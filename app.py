@@ -7358,8 +7358,8 @@ def procurement_request_item():
             item_name = item_names
         elif item_name_value:
             item_name = item_name_value
-        # Handle quantities - if item_quantities is provided, use it; otherwise fall back to single quantity field
-        quantity = request.form.get('quantity', '').strip()
+        # Handle quantities - always use item_quantities from per-item QTY fields
+        quantity = None
         if item_quantities_json:
             try:
                 import json
@@ -7378,7 +7378,6 @@ def procurement_request_item():
                 elif len(quantities) == 1 and quantities[0]:
                     quantity = quantities[0]
             except (json.JSONDecodeError, ValueError):
-                # If JSON parsing fails, fall back to single quantity field
                 pass
         purpose = request.form.get('purpose', '').strip()
         # Check for multiple branch names first (new format), then fall back to single branch_name (backward compatibility)
@@ -11598,7 +11597,7 @@ def edit_item_draft(draft_id):
         
         # Handle quantities
         item_quantities_json = request.form.get('item_quantities', '').strip()
-        quantity = request.form.get('quantity', '').strip()
+        quantity = None
         if item_quantities_json:
             try:
                 import json
@@ -11618,7 +11617,8 @@ def edit_item_draft(draft_id):
             except (json.JSONDecodeError, ValueError):
                 pass
         
-        draft.quantity = quantity if quantity else draft.quantity
+        if quantity:
+            draft.quantity = quantity
         draft.purpose = request.form.get('purpose', '').strip() or draft.purpose
         
         # Handle branch names
@@ -11722,7 +11722,7 @@ def delete_item_draft(draft_id):
     
     log_action(f"Deleted item request draft #{draft_id}")
     flash('Item request draft deleted successfully!', 'success')
-    return redirect(url_for('drafts'))
+    return redirect(url_for('drafts', _anchor='item-requests'))
 
 
 @app.route('/populate-request-types')

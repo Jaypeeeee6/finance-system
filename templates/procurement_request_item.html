@@ -115,12 +115,6 @@
                         {% endif %}
                     </div>
 
-                    <div class="form-group" id="quantity_field_group">
-                        <label for="quantity">Quantity</label>
-                        <input type="text" name="quantity" id="quantity" 
-                               placeholder="e.g., 10 units, 5 boxes, 1 set">
-                        <small class="form-text text-muted">Optional: Specify quantity if applicable</small>
-                    </div>
                 </div>
 
                 <div class="form-row">
@@ -567,11 +561,13 @@ function initializeItemSearch() {
             
             // Create quantity input
             const quantityInput = document.createElement('input');
-            quantityInput.type = 'text';
+            quantityInput.type = 'number';
             quantityInput.className = 'item-chip-quantity';
-            quantityInput.placeholder = 'e.g., 10 units, 5 boxes';
+            quantityInput.placeholder = 'e.g., 10';
             quantityInput.value = item.quantity || '';
             quantityInput.setAttribute('data-item-index', index);
+            quantityInput.min = '1';
+            quantityInput.setAttribute('inputmode', 'numeric');
             
             // Update quantity when input changes
             quantityInput.addEventListener('input', function() {
@@ -901,31 +897,6 @@ function initializeItemSearch() {
         }
     });
     
-    // Function to check if category has predefined items
-    function categoryHasPredefinedItems(categoryName) {
-        if (!categoryName || categoryName === 'Others') {
-            return false;
-        }
-        const options = hiddenSelect.querySelectorAll('option[data-category="' + categoryName + '"]');
-        return options.length > 0;
-    }
-    
-    // Function to toggle quantity field visibility
-    function toggleQuantityField() {
-        const quantityFieldGroup = document.getElementById('quantity_field_group');
-        if (!quantityFieldGroup) return;
-        
-        const categorySelect = document.getElementById('category');
-        const selectedCategory = categorySelect ? categorySelect.value : '';
-        
-        // Hide quantity field if category has predefined items (each item will have its own quantity)
-        // Show it if category is empty, "Others", or has no predefined items
-        if (selectedCategory && selectedCategory !== 'Others' && categoryHasPredefinedItems(selectedCategory)) {
-            quantityFieldGroup.style.display = 'none';
-        } else {
-            quantityFieldGroup.style.display = 'block';
-        }
-    }
     
     // Category change event listener
     const categorySelect = document.getElementById('category');
@@ -968,13 +939,8 @@ function initializeItemSearch() {
                 }
             }
             
-            // Toggle quantity field visibility based on category
-            toggleQuantityField();
         });
     }
-    
-    // Initial toggle of quantity field on page load
-    toggleQuantityField();
     
     // Initialize dropdown
     buildDropdown();

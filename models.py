@@ -655,7 +655,6 @@ class ProcurementItemRequest(db.Model):
     department = db.Column(db.String(100), nullable=False)
     category = db.Column(db.String(100), nullable=True)  # Category of the item
     item_name = db.Column(db.String(200), nullable=False)
-    quantity = db.Column(db.String(100), nullable=True)  # Can be "10 units", "5 boxes", etc.
     # Quantities adjusted by manager during Manager Approval (per-item, does NOT overwrite original requestor quantity)
     procurement_quantities = db.Column(db.Text, nullable=True)
     # Quantities adjusted by procurement manager during Procurement Manager Approval (per-item, separate from manager quantities)

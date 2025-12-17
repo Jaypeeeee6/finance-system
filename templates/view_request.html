@@ -642,15 +642,13 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="person_company" required>{% endif %}
                         Person/Company Name {% if 'person_company' in edited_fields %}<span class="edited-badge" data-field="person_company" role="button" tabindex="0">Edited</span>{% endif %}
                     </label>
-                    <!-- Base text input (always holds the actual value saved to the backend) -->
-                    <input type="text" id="person_company" name="person_company" value="{{ request.person_company or '' }}" readonly style="background: #f5f5f5;">
+                    <!-- Base text input (always rendered and always holds the actual value saved to the backend) -->
+                    <input type="text" id="person_company" name="person_company" value="{{ request.person_company or '' }}" readonly style="background: #f5f5f5; display: block;">
                     
-                    {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') %}
                     <!-- Simple dropdown used only when the chosen department + request type have options -->
                     <select id="person_company_select_edit" class="form-control" style="display: none; margin-top: 8px;">
                         <option value="">-- Select Person/Company --</option>
                     </select>
-                    {% endif %}
                 </div>
 
                 <div class="form-row">
@@ -3051,26 +3049,36 @@ document.addEventListener('DOMContentLoaded', function() {
     // Edit-mode person/company logic when Request Type is CHANGED by the editor.
     // - If DB has options for (department, request_type) → show dropdown and clear text.
     // - If no options → keep plain text input and clear text.
+    let currentPersonCompanyFetch = null; // Track fetch to prevent race conditions
     function updatePersonCompanyForEdit(department, requestType) {
         const personCompanyInput = document.getElementById('person_company');
         const personCompanySelect = document.getElementById('person_company_select_edit');
 
         if (!personCompanyInput || !personCompanySelect) return;
 
+        // Always ensure text input is visible first (default state)
+        personCompanyInput.style.display = 'block';
+        personCompanySelect.style.display = 'none';
+        
         // Clear current value only when request type is actually changed
         personCompanyInput.value = '';
         personCompanySelect.innerHTML = '<option value="">-- Select Person/Company --</option>';
 
         if (!department || !requestType) {
-            // Fall back to text input
-            personCompanyInput.style.display = 'block';
-            personCompanySelect.style.display = 'none';
+            // Fall back to text input - already set above
             return;
         }
+
+        // Create a unique token for this fetch to prevent stale responses
+        const fetchToken = {};
+        currentPersonCompanyFetch = fetchToken;
 
         fetch(`/api/person-company-options?department=${encodeURIComponent(department)}&request_type=${encodeURIComponent(requestType)}`)
             .then(response => response.json())
             .then(data => {
+                // Ignore response if a newer fetch has started
+                if (currentPersonCompanyFetch !== fetchToken) return;
+                
                 const options = data.options || [];
 
                 if (options.length > 0) {
@@ -3091,21 +3099,20 @@ document.addEventListener('DOMContentLoaded', function() {
                         personCompanyInput.value = this.value;
                     };
                 } else {
-                    // No DB options → keep as plain text input
-                    personCompanyInput.style.display = 'block';
-                    personCompanySelect.style.display = 'none';
+                    // No DB options → keep as plain text input (already set above)
                 }
             })
             .catch(() => {
-                // On error, fall back to text input
-                personCompanyInput.style.display = 'block';
-                personCompanySelect.style.display = 'none';
+                // Ignore error if a newer fetch has started
+                if (currentPersonCompanyFetch !== fetchToken) return;
+                // On error, fall back to text input (already set above)
             });
     }
 
     // Initial-load person/company logic:
     // If the ORIGINAL request type has supplier options, show dropdown and
     // pre-select the existing person/company value WITHOUT clearing it.
+    let initPersonCompanyFetch = null; // Track fetch to prevent race conditions
     function initPersonCompanyDropdownForEdit(department, requestType) {
         const personCompanyInput = document.getElementById('person_company');
         const personCompanySelect = document.getElementById('person_company_select_edit');
@@ -3114,16 +3121,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const existingValue = personCompanyInput.value || '';
 
+        // Always ensure text input is visible first (default state)
+        personCompanyInput.style.display = 'block';
+        personCompanySelect.style.display = 'none';
+
         if (!department || !requestType) {
-            // Fall back to text input
-            personCompanyInput.style.display = 'block';
-            personCompanySelect.style.display = 'none';
+            // Fall back to text input - already set above
             return;
         }
+
+        // Create a unique token for this fetch to prevent race conditions
+        const fetchToken = {};
+        initPersonCompanyFetch = fetchToken;
 
         fetch(`/api/person-company-options?department=${encodeURIComponent(department)}&request_type=${encodeURIComponent(requestType)}`)
             .then(response => response.json())
             .then(data => {
+                // Ignore response if a newer fetch has started
+                if (initPersonCompanyFetch !== fetchToken) return;
+                
                 const options = data.options || [];
 
                 if (options.length > 0) {
@@ -3148,15 +3164,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         personCompanyInput.value = this.value;
                     };
                 } else {
-                    // No options → keep as plain text input
-                    personCompanyInput.style.display = 'block';
-                    personCompanySelect.style.display = 'none';
+                    // No options → keep as plain text input (already set above)
                 }
             })
             .catch(() => {
-                // On error, fall back to text input
-                personCompanyInput.style.display = 'block';
-                personCompanySelect.style.display = 'none';
+                // Ignore error if a newer fetch has started
+                if (initPersonCompanyFetch !== fetchToken) return;
+                // On error, fall back to text input (already set above)
             });
     }
 

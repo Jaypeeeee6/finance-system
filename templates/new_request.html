@@ -1323,76 +1323,12 @@ function handleRequestTypeChange() {
         // We'll reset it when initializeSupplierSearch is called again
     }
     
-    // Check if this department and request type combination has supplier options from database
-    if (department && requestType) {
-        // Fetch options from API to check if dropdown should be shown
-        fetch(`/api/person-company-options?department=${encodeURIComponent(department)}&request_type=${encodeURIComponent(requestType)}`)
-            .then(response => response.json())
-            .then(data => {
-                const options = data.options || [];
-                
-                if (options.length > 0) {
-                    // Show dropdown, hide text input
-                    personCompanyInput.style.display = 'none';
-                    personCompanyInput.required = false;
-                    personCompanyContainer.style.display = 'block';
-                    personCompanySelect.required = true;
-                    
-                    // Populate supplier options
-                    populateSupplierOptions(department, requestType);
-                    
-                    // Initialize supplier search if not already initialized
-                    if (!window.supplierSearchInitialized) {
-                        initializeSupplierSearch();
-                        window.supplierSearchInitialized = true;
-                    }
-                } else {
-                    // Show text input, hide dropdown
-                    personCompanyInput.style.display = 'block';
-                    personCompanyInput.required = true;
-                    personCompanyContainer.style.display = 'none';
-                    personCompanySelect.required = false;
-                    
-                    // Clear supplier dropdown
-                    const searchInput = document.getElementById('person_company_search');
-                    const dropdown = document.getElementById('person_company_dropdown');
-                    if (searchInput) searchInput.value = '';
-                    if (dropdown) dropdown.style.display = 'none';
-                    
-                    // Clear person/company name and reset supplier selection
-                    if (personCompanyInput) personCompanyInput.value = '';
-                    if (personCompanySelect) personCompanySelect.value = '';
-                }
-            })
-            .catch(error => {
-                console.error('Error checking supplier options:', error);
-                // On error, show text input
-                personCompanyInput.style.display = 'block';
-                personCompanyInput.required = true;
-                personCompanyContainer.style.display = 'none';
-                personCompanySelect.required = false;
-                
-                // Clear person/company name
-                if (personCompanyInput) personCompanyInput.value = '';
-                if (personCompanySearch) personCompanySearch.value = '';
-                if (personCompanySelect) personCompanySelect.value = '';
-            });
-    } else {
-        // Show text input, hide dropdown if no department/request type
-        personCompanyInput.style.display = 'block';
-        personCompanyInput.required = true;
+    // SIMPLE APPROACH: Person/Company is ALWAYS a simple text input
+    // Never hide it, never show dropdowns - just keep it simple and consistent
+    personCompanyInput.style.display = 'block';
+    personCompanyInput.required = true;
+    if (personCompanyContainer) {
         personCompanyContainer.style.display = 'none';
-        personCompanySelect.required = false;
-        
-        // Clear supplier dropdown
-        const searchInput = document.getElementById('person_company_search');
-        const dropdown = document.getElementById('person_company_dropdown');
-        if (searchInput) searchInput.value = '';
-        if (dropdown) dropdown.style.display = 'none';
-        
-        // Clear person/company name
-        if (personCompanyInput) personCompanyInput.value = '';
-        if (personCompanySelect) personCompanySelect.value = '';
     }
     
     // Show appropriate field based on request type
