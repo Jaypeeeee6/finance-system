@@ -68,6 +68,19 @@ optgroup option { font-weight: normal; color: #212529; padding-left: 20px; }
     font-size: 0.8rem;
     font-weight: 600;
     vertical-align: middle;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.edited-badge:hover {
+    background: #ffe69c;
+    border-color: #ffd966;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.edited-badge:focus {
+    outline: 2px solid #ffc107;
+    outline-offset: 2px;
 }
 
 .edited-info {
@@ -2953,6 +2966,72 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // When user can edit (IT or authorized manager), initialize SWIFT code behavior
     if (canEdit) {
+        // Declare these at the top of canEdit block so they're available to all functions
+        let initPersonCompanyFetch = null; // Track fetch to prevent race conditions
+        function initPersonCompanyDropdownForEdit(department, requestType) {
+            const personCompanyInput = document.getElementById('person_company');
+            const personCompanySelect = document.getElementById('person_company_select_edit');
+
+            if (!personCompanyInput || !personCompanySelect) return;
+
+            const existingValue = personCompanyInput.value || '';
+
+            // Always ensure text input is visible first (default state)
+            personCompanyInput.style.display = 'block';
+            personCompanySelect.style.display = 'none';
+
+            if (!department || !requestType) {
+                // Fall back to text input - already set above
+                return;
+            }
+
+            // Create a unique token for this fetch to prevent race conditions
+            const fetchToken = {};
+            initPersonCompanyFetch = fetchToken;
+
+            fetch(`/api/person-company-options?department=${encodeURIComponent(department)}&request_type=${encodeURIComponent(requestType)}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Ignore response if a newer fetch has started
+                    if (initPersonCompanyFetch !== fetchToken) return;
+                    
+                    const options = data.options || [];
+
+                    if (options.length > 0) {
+                        // Show dropdown, hide text input
+                        personCompanyInput.style.display = 'none';
+                        personCompanySelect.style.display = 'block';
+
+                        personCompanySelect.innerHTML = '<option value="">-- Select Person/Company --</option>';
+                        options.forEach(option => {
+                            const optEl = document.createElement('option');
+                            const optionName = typeof option === 'string' ? option : option.name;
+                            optEl.value = optionName;
+                            optEl.textContent = optionName;
+                            if (existingValue && existingValue === optionName) {
+                                optEl.selected = true;
+                            }
+                            personCompanySelect.appendChild(optEl);
+                        });
+
+                        // Pre-select existing value if it's in the options
+                        if (existingValue) {
+                            personCompanySelect.value = existingValue;
+                        }
+                    } else {
+                        // No options - fall back to text input (keep displayed)
+                        personCompanyInput.style.display = 'block';
+                        personCompanySelect.style.display = 'none';
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching person/company options:', err);
+                    // Fall back to text input on error
+                    personCompanyInput.style.display = 'block';
+                    personCompanySelect.style.display = 'none';
+                });
+        }
+        
         // Toggle Others description visibility when request type changes
         const requestTypeSelect = document.getElementById('request_type');
         if (requestTypeSelect) {
@@ -3032,19 +3111,32 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('click', function(e) {
         const badge = e.target.closest('.edited-badge');
         if (!badge) return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
         const field = badge.getAttribute('data-field');
-        if (!field) return;
+        if (!field) {
+            console.warn('No data-field attribute found on badge');
+            return;
+        }
+        
+        console.log('Fetching history for field:', field);
         fetch(`{{ url_for('request_field_history', request_id=request.request_id) }}?field=${encodeURIComponent(field)}`)
             .then(r => r.json())
             .then(data => {
+                console.log('History data received:', data);
                 if (!data.success) {
                     alert(data.error || 'Failed to load history');
                     return;
                 }
                 openFieldHistoryModal(field, data.history || []);
             })
-            .catch(() => alert('Failed to load history'));
-    });
+            .catch(err => {
+                console.error('Error fetching history:', err);
+                alert('Failed to load history');
+            });
+    }, true);
 
     // Edit-mode person/company logic when Request Type is CHANGED by the editor.
     // - If DB has options for (department, request_type) → show dropdown and clear text.
@@ -3105,71 +3197,6 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(() => {
                 // Ignore error if a newer fetch has started
                 if (currentPersonCompanyFetch !== fetchToken) return;
-                // On error, fall back to text input (already set above)
-            });
-    }
-
-    // Initial-load person/company logic:
-    // If the ORIGINAL request type has supplier options, show dropdown and
-    // pre-select the existing person/company value WITHOUT clearing it.
-    let initPersonCompanyFetch = null; // Track fetch to prevent race conditions
-    function initPersonCompanyDropdownForEdit(department, requestType) {
-        const personCompanyInput = document.getElementById('person_company');
-        const personCompanySelect = document.getElementById('person_company_select_edit');
-
-        if (!personCompanyInput || !personCompanySelect) return;
-
-        const existingValue = personCompanyInput.value || '';
-
-        // Always ensure text input is visible first (default state)
-        personCompanyInput.style.display = 'block';
-        personCompanySelect.style.display = 'none';
-
-        if (!department || !requestType) {
-            // Fall back to text input - already set above
-            return;
-        }
-
-        // Create a unique token for this fetch to prevent race conditions
-        const fetchToken = {};
-        initPersonCompanyFetch = fetchToken;
-
-        fetch(`/api/person-company-options?department=${encodeURIComponent(department)}&request_type=${encodeURIComponent(requestType)}`)
-            .then(response => response.json())
-            .then(data => {
-                // Ignore response if a newer fetch has started
-                if (initPersonCompanyFetch !== fetchToken) return;
-                
-                const options = data.options || [];
-
-                if (options.length > 0) {
-                    // Show dropdown, hide text input
-                    personCompanyInput.style.display = 'none';
-                    personCompanySelect.style.display = 'block';
-
-                    personCompanySelect.innerHTML = '<option value="">-- Select Person/Company --</option>';
-                    options.forEach(option => {
-                        const optEl = document.createElement('option');
-                        const optionName = typeof option === 'string' ? option : option.name;
-                        optEl.value = optionName;
-                        optEl.textContent = optionName;
-                        if (existingValue && existingValue === optionName) {
-                            optEl.selected = true;
-                        }
-                        personCompanySelect.appendChild(optEl);
-                    });
-
-                    // Keep text input in sync so backend receives the right value
-                    personCompanySelect.onchange = function() {
-                        personCompanyInput.value = this.value;
-                    };
-                } else {
-                    // No options → keep as plain text input (already set above)
-                }
-            })
-            .catch(() => {
-                // Ignore error if a newer fetch has started
-                if (initPersonCompanyFetch !== fetchToken) return;
                 // On error, fall back to text input (already set above)
             });
     }

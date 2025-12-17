@@ -11266,21 +11266,21 @@ def new_request():
         # Handle recurring payment schedules (both variable amounts and custom) - only for submitted requests
         if recurring == 'Recurring':
             recurring_interval = request.form.get('recurring_interval', '')
-            print(f"🔧 DEBUG: Processing recurring payment - interval: {recurring_interval}")
+            print(f"[DEBUG] Processing recurring payment - interval: {recurring_interval}")
             
             # Check if it's a custom payment schedule
             if recurring_interval.startswith('custom:'):
-                print(f"🔧 DEBUG: Detected custom payment schedule")
+                print(f"[DEBUG] Detected custom payment schedule")
                 try:
                     # Parse custom payment schedule
                     custom_data = recurring_interval[7:]  # Remove 'custom:' prefix
-                    print(f"🔧 DEBUG: Custom data: {custom_data}")
+                    print(f"[DEBUG] Custom data: {custom_data}")
                     payment_schedule_data = []
                     
                     if custom_data:
                         # Split by comma to get individual date:amount pairs
                         date_amount_pairs = custom_data.split(',')
-                        print(f"🔧 DEBUG: Date amount pairs: {date_amount_pairs}")
+                        print(f"[DEBUG] Date amount pairs: {date_amount_pairs}")
                         
                         for i, pair in enumerate(date_amount_pairs, 1):
                             if ':' in pair:
@@ -11289,20 +11289,20 @@ def new_request():
                                     'date': date_str,
                                     'amount': float(amount_str)
                                 })
-                                print(f"🔧 DEBUG: Added payment {i}: {date_str} - {amount_str}")
+                                print(f"[DEBUG] Added payment {i}: {date_str} - {amount_str}")
                     
-                    print(f"🔧 DEBUG: Final payment schedule data: {payment_schedule_data}")
+                    print(f"[DEBUG] Final payment schedule data: {payment_schedule_data}")
                     
                     # Create the payment schedule
                     if payment_schedule_data:
                         success = create_recurring_payment_schedule(new_req.request_id, amount_clean if amount else amount, payment_schedule_data)
                         if success:
-                            print(f"🔧 DEBUG: Successfully created custom payment schedule for request #{new_req.request_id}")
+                            print(f"[DEBUG] Successfully created custom payment schedule for request #{new_req.request_id}")
                             log_action(f"Created custom payment schedule for request #{new_req.request_id}")
                         else:
-                            print(f"🔧 DEBUG: Failed to create custom payment schedule for request #{new_req.request_id}")
+                            print(f"[DEBUG] Failed to create custom payment schedule for request #{new_req.request_id}")
                     else:
-                        print(f"🔧 DEBUG: No payment schedule data to create")
+                        print(f"[DEBUG] No payment schedule data to create")
                         
                 except Exception as e:
                     print(f"Error creating custom payment schedule: {e}")
@@ -12444,14 +12444,14 @@ def view_request(request_id):
     total_paid_amount = 0
     
     # Process schedule if it's a recurring payment (monthly or custom)
-    print(f"🔧 DEBUG: view_request - recurring_interval: {req.recurring_interval}")
+    print(f"[DEBUG] view_request - recurring_interval: {req.recurring_interval}")
     if req.recurring_interval and ('monthly' in req.recurring_interval or req.recurring_interval.startswith('custom:')):
-        print(f"🔧 DEBUG: Processing recurring payment schedule")
+        print(f"[DEBUG] Processing recurring payment schedule")
         # Get variable payment schedule if exists - use single query with ordering
         schedule = RecurringPaymentSchedule.query.filter_by(
             request_id=request_id
         ).order_by(RecurringPaymentSchedule.payment_order).all()
-        print(f"🔧 DEBUG: Found {len(schedule)} schedule entries")
+        print(f"[DEBUG] Found {len(schedule)} schedule entries")
         
         if schedule:
             # Optimize: Get all paid notifications and late installments in single queries
@@ -12974,13 +12974,12 @@ def edit_request(request_id):
         'request_type': req.request_type or '',
         'branch_name': req.branch_name or '',
         'person_company': req.person_company or '',
-        'company_name': req.company_name or '',
+        'company_name': req.person_company or '',
         'purpose': req.purpose or '',
         'bank_name': req.bank_name or '',
         'account_name': req.account_name or '',
         'account_number': req.account_number or '',
         'amount': norm_amount(req.amount),
-        'item_name': req.item_name or '',
         'department': req.department or '',
         'payment_method': req.payment_method or ''
     }
@@ -13018,10 +13017,9 @@ def edit_request(request_id):
     if not is_finance_admin_edit and not (is_manager_pending_edit and req.status == 'Pending Manager Approval'):
         req.branch_name = request.form.get('branch_name') or req.branch_name
         req.person_company = request.form.get('person_company') or req.person_company
-        req.company_name = request.form.get('company_name') or req.company_name
+        req.person_company = request.form.get('company_name') or req.person_company
         req.purpose = request.form.get('purpose') or req.purpose
         req.account_name = request.form.get('account_name') or req.account_name
-        req.item_name = request.form.get('item_name') or req.item_name
         req.payment_method = request.form.get('payment_method') or req.payment_method
         
         # Handle payment method specific fields
@@ -13222,13 +13220,12 @@ def edit_request(request_id):
         'request_type': req.request_type or '',
         'branch_name': req.branch_name or '',
         'person_company': req.person_company or '',
-        'company_name': req.company_name or '',
+        'company_name': req.person_company or '',
         'purpose': req.purpose or '',
         'bank_name': req.bank_name or '',
         'account_name': req.account_name or '',
         'account_number': req.account_number or '',
         'amount': norm_amount(req.amount),  # Normalize amount for consistent comparison
-        'item_name': req.item_name or '',
         'department': req.department or '',
         'payment_method': req.payment_method or ''
     }
@@ -18239,7 +18236,7 @@ def api_admin_recurring_events():
                         'extendedProps': {
                             'requestId': req.request_id,
                             'requestType': req.request_type,
-                            'companyName': req.person_company or req.company_name or 'N/A',
+                            'companyName': req.person_company or 'N/A',
                             'department': req.department,
                             'purpose': req.purpose,
                             'baseAmount': f'OMR {req.amount:.3f}',
@@ -18284,7 +18281,7 @@ def api_admin_recurring_events():
                         'extendedProps': {
                             'requestId': req.request_id,
                             'requestType': req.request_type,
-                            'companyName': req.person_company or req.company_name or 'N/A',
+                            'companyName': req.person_company or 'N/A',
                             'department': req.department,
                             'purpose': req.purpose,
                             'baseAmount': None,
@@ -18370,7 +18367,7 @@ def api_admin_recurring_events():
                 'extendedProps': {
                     'requestId': req.request_id,
                     'requestType': req.request_type,
-                    'companyName': req.person_company or req.company_name or 'N/A',
+                    'companyName': req.person_company or 'N/A',
                     'department': req.department,
                     'purpose': req.purpose,
                     'baseAmount': f'OMR {float(req.amount):.3f}',
