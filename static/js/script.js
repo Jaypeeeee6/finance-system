@@ -221,7 +221,7 @@ document.querySelectorAll('input[type="file"]').forEach(input => {
 // ==================== FORM SUBMIT LOADING STATE ====================
 document.querySelectorAll('form').forEach(form => {
     // Skip manager approval forms as they have their own validation
-    if (form.action && form.action.includes('manager_approve')) {
+    if (form.action && typeof form.action === 'string' && form.action.includes('manager_approve')) {
         return;
     }
     

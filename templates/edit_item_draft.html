@@ -105,7 +105,7 @@
                             </select>
                             <input type="hidden" name="item_name_value" id="item_name_value" value="">
                             <input type="hidden" name="item_names" id="item_names" value="">
-                            <input type="hidden" name="item_quantities" id="item_quantities" value="">
+                            <input type="hidden" name="item_quantities" id="item_quantities" value="{{ (draft.procurement_quantities or '')|safe }}">
                             <div id="item_dropdown" class="item-dropdown" style="display: none;"></div>
                         </div>
                         {% if procurement_items and procurement_items|length > 0 %}
@@ -113,14 +113,6 @@
                         {% else %}
                             <small class="form-text text-muted">Enter the item name or description</small>
                         {% endif %}
-                    </div>
-
-                    <div class="form-group" id="quantity_field_group">
-                        <label for="quantity">Quantity</label>
-                        <input type="text" name="quantity" id="quantity" 
-                               value="{{ draft.quantity or '' }}"
-                               placeholder="e.g., 10 units, 5 boxes, 1 set">
-                        <small class="form-text text-muted">Optional: Specify quantity if applicable</small>
                     </div>
                 </div>
 
@@ -522,11 +514,22 @@ function clearErrorMessages() {
     });
 }
 
+function resetSubmitButton() {
+    const form = document.getElementById('itemRequestForm');
+    if (form) {
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Request';
+        }
+    }
+}
+
 // Store draft data for initialization
 const draftData = {
     item_names: `{{ draft.item_name or '' }}`,
     branch_names: `{{ draft.branch_name or '' }}`,
-    quantity: `{{ draft.quantity or '' }}`
+    procurement_quantities: `{{ (draft.procurement_quantities or '')|safe }}`
 };
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -543,19 +546,38 @@ function loadDraftData() {
     // Load item names if they exist
     if (draftData.item_names) {
         const itemNames = draftData.item_names.split(',').map(n => n.trim()).filter(n => n);
-        const quantitiesStr = document.getElementById('item_quantities').value;
         let quantities = [];
-        try {
-            if (quantitiesStr) {
-                quantities = JSON.parse(quantitiesStr);
+        
+        // Try to parse quantities from draftData.procurement_quantities first
+        if (draftData.procurement_quantities) {
+            try {
+                quantities = JSON.parse(draftData.procurement_quantities);
+                console.log('Loaded quantities from draftData:', quantities);
+            } catch (e) {
+                console.error('Error parsing quantities from draftData:', e);
             }
-        } catch (e) {}
+        }
+        
+        // Fallback to reading from hidden input if not in draftData
+        if (!draftData.procurement_quantities || quantities.length === 0) {
+            const quantitiesStr = document.getElementById('item_quantities').value;
+            try {
+                if (quantitiesStr) {
+                    quantities = JSON.parse(quantitiesStr);
+                    console.log('Loaded quantities from hidden input:', quantities);
+                }
+            } catch (e) {
+                console.error('Error parsing quantities from hidden input:', e);
+            }
+        }
         
         // Populate item chips
         const chipsContainer = document.getElementById('item_chips_container');
         if (chipsContainer && window.selectItemFromDraft) {
             itemNames.forEach((name, index) => {
-                window.selectItemFromDraft(name, (quantities[index] || ''));
+                const qty = (quantities[index] || '');
+                console.log(`Adding item ${index}: ${name} with quantity: ${qty}`);
+                window.selectItemFromDraft(name, qty);
             });
         }
     }
@@ -588,8 +610,10 @@ function initializeItemSearch() {
     let blurTimeout = null;
     
     function updateChips() {
+        console.log('updateChips called with selectedItems:', selectedItems);
         chipsContainer.innerHTML = '';
         selectedItems.forEach((item, index) => {
+            console.log(`Rendering chip ${index}: ${item.text} with quantity: "${item.quantity}"`);
             const row = document.createElement('div');
             row.className = 'item-chip-row';
             
@@ -609,6 +633,7 @@ function initializeItemSearch() {
             quantityInput.className = 'item-chip-quantity';
             quantityInput.placeholder = 'e.g., 10 units, 5 boxes';
             quantityInput.value = item.quantity || '';
+            console.log(`Quantity input set to: "${quantityInput.value}"`);
             quantityInput.setAttribute('data-item-index', index);
             
             quantityInput.addEventListener('input', function() {
@@ -730,11 +755,15 @@ function initializeItemSearch() {
     // Expose for draft loading
     window.selectItemFromDraft = function(value, quantity) {
         const text = value;
+        console.log(`selectItemFromDraft called: value="${value}", quantity="${quantity}"`);
         const existingIndex = selectedItems.findIndex(i => i.value === value);
         if (existingIndex === -1) {
+            console.log(`Adding item to selectedItems with quantity: "${quantity}"`);
             selectedItems.push({ value: value, text: text, quantity: quantity || '' });
             updateChips();
             updateDropdownSelection();
+        } else {
+            console.log(`Item already exists at index ${existingIndex}`);
         }
     };
     
@@ -908,8 +937,10 @@ function initializeItemSearch() {
             
             if (selectedItems.length === 0) {
                 e.preventDefault();
+                e.stopPropagation();
                 showErrorMessage('item_name', 'Please select at least one item name.');
                 searchInput.focus();
+                resetSubmitButton();
                 return false;
             }
             
@@ -923,6 +954,7 @@ function initializeItemSearch() {
             const itemsWithoutQuantity = selectedItems.filter(item => !item.quantity || item.quantity.trim() === '');
             if (itemsWithoutQuantity.length > 0) {
                 e.preventDefault();
+                e.stopPropagation();
                 showErrorMessage('item_name', 'Please enter a quantity for all selected items.');
                 const firstEmptyQuantityInput = Array.from(quantityInputs).find(input => !input.value || input.value.trim() === '');
                 if (firstEmptyQuantityInput) {
@@ -930,6 +962,7 @@ function initializeItemSearch() {
                 } else {
                     searchInput.focus();
                 }
+                resetSubmitButton();
                 return false;
             }
             
@@ -1193,8 +1226,10 @@ function initializeBranchSearch() {
         form.addEventListener('submit', function(e) {
             if (selectedBranches.length === 0) {
                 e.preventDefault();
+                e.stopPropagation();
                 showErrorMessage('branch_name', 'Please select at least one branch name.');
                 searchInput.focus();
+                resetSubmitButton();
                 return false;
             }
             

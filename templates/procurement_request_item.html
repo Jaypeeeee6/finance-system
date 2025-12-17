@@ -151,6 +151,26 @@
     </div>
 </div>
 
+<!-- Item Request Validation Error Modal -->
+<div id="itemRequestErrorModal" class="item-request-error-modal" style="display: none;">
+    <div class="item-request-error-overlay" onclick="closeItemRequestErrorModal()"></div>
+    <div class="item-request-error-container">
+        <div class="item-request-error-header">
+            <div class="item-request-error-icon">!</div>
+            <h3 class="item-request-error-title">Missing Required Fields</h3>
+        </div>
+        <div class="item-request-error-body">
+            <div class="item-request-error-message" id="itemRequestErrorMainMessage">
+                Please complete the following required fields:
+            </div>
+            <ul class="item-request-error-fields-list" id="itemRequestErrorFieldsList"></ul>
+        </div>
+        <div class="item-request-error-footer">
+            <button class="item-request-error-btn" onclick="closeItemRequestErrorModal()">OK</button>
+        </div>
+    </div>
+</div>
+
 <style>
 .form-row {
     display: flex;
@@ -464,9 +484,187 @@
         gap: 0;
     }
 }
+
+/* Item Request Error Modal Styles */
+.item-request-error-modal {
+    position: fixed !important;
+    inset: 0 !important;
+    display: none !important;
+    z-index: 9999 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: transparent !important;
+}
+
+.item-request-error-modal[style*="flex"] {
+    display: flex !important;
+}
+
+.item-request-error-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.item-request-error-container {
+    position: relative;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    max-width: 450px;
+    width: 90%;
+    overflow: hidden;
+}
+
+.item-request-error-header {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.item-request-error-icon {
+    width: 24px;
+    height: 24px;
+    background: #dc3545;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.item-request-error-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+    color: #dc3545;
+}
+
+.item-request-error-body {
+    padding: 20px;
+    color: #212529;
+}
+
+.item-request-error-message {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 12px;
+    color: #212529;
+    font-weight: 500;
+}
+
+.item-request-error-fields-list {
+    color: #212529;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 0;
+    padding-left: 20px;
+    list-style: disc;
+}
+
+.item-request-error-fields-list li {
+    margin-bottom: 6px;
+}
+
+.item-request-error-footer {
+    padding: 12px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.item-request-error-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 24px;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    text-transform: uppercase;
+}
+
+.item-request-error-btn:hover {
+    background: #c82333;
+}
+
+.item-request-error-btn:active {
+    background: #bd2130;
+}
 </style>
 
 <script>
+// Item Request Error Modal Functions
+window.showItemRequestErrorModal = function(missingFields) {
+    console.log('showItemRequestErrorModal called with:', missingFields);
+    const modal = document.getElementById('itemRequestErrorModal');
+    const mainMessage = document.getElementById('itemRequestErrorMainMessage');
+    const fieldsListEl = document.getElementById('itemRequestErrorFieldsList');
+    
+    console.log('Modal elements:', { modal: !!modal, mainMessage: !!mainMessage, fieldsListEl: !!fieldsListEl });
+    
+    if (!modal || !mainMessage || !fieldsListEl) {
+        console.error('Modal elements not found!');
+        // Fallback to alert
+        alert(`Please fill in all required fields:\n\n${missingFields.join('\n')}`);
+        return;
+    }
+    
+    // Clear previous list
+    fieldsListEl.innerHTML = '';
+    
+    // Add each missing field as a list item
+    missingFields.forEach(fieldName => {
+        const li = document.createElement('li');
+        li.textContent = fieldName;
+        fieldsListEl.appendChild(li);
+    });
+    
+    // Show modal
+    console.log('Showing modal...');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    console.log('Modal display set to:', modal.style.display);
+};
+
+window.closeItemRequestErrorModal = function() {
+    const modal = document.getElementById('itemRequestErrorModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+};
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('itemRequestErrorModal');
+        if (modal && modal.style.display === 'flex') {
+            closeItemRequestErrorModal();
+        }
+    }
+});
+
+// Field name mapping for form validation
+function getItemRequestFieldDisplayName(fieldKey) {
+    const map = {
+        requestor_name: 'Requestor Name',
+        category: 'Category',
+        item_name: 'Item Name/Description',
+        purpose: 'Purpose/Description',
+        branch_name: 'Branch Name'
+    };
+    return map[fieldKey] || fieldKey;
+}
+
 // Global error message functions
 function showErrorMessage(fieldName, message) {
     const field = document.getElementById(fieldName);
@@ -953,11 +1151,37 @@ function initializeItemSearch() {
             // Clear previous error messages
             clearErrorMessages();
             
-            // Validate that at least one item is selected
+            // Validate required fields
+            const missingFields = [];
+            
+            // Get form values
+            const requestorName = document.getElementById('requestor_name')?.value.trim();
+            const category = document.getElementById('category')?.value.trim();
+            const purpose = document.getElementById('purpose')?.value.trim();
+            const branchNames = document.getElementById('branch_names')?.value.trim();
+            
+            // Check for missing required fields
+            if (!requestorName) {
+                missingFields.push(getItemRequestFieldDisplayName('requestor_name'));
+            }
+            if (!category) {
+                missingFields.push(getItemRequestFieldDisplayName('category'));
+            }
             if (selectedItems.length === 0) {
+                missingFields.push(getItemRequestFieldDisplayName('item_name'));
+            }
+            if (!purpose) {
+                missingFields.push(getItemRequestFieldDisplayName('purpose'));
+            }
+            if (!branchNames) {
+                missingFields.push(getItemRequestFieldDisplayName('branch_name'));
+            }
+            
+            // If there are missing fields, show error modal and don't submit
+            if (missingFields.length > 0) {
                 e.preventDefault();
-                showErrorMessage('item_name', 'Please select at least one item name.');
-                searchInput.focus();
+                e.stopPropagation();
+                showItemRequestErrorModal(missingFields);
                 return false;
             }
             

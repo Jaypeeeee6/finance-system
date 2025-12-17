@@ -4804,8 +4804,32 @@ def get_item_request_quantity_history(request_id):
             
             # If it's a multi-item request, format as list
             item_names = (item_request.item_name or '').split(',')
-            old_list = old_quantities.split(';') if old_quantities else []
-            new_list = new_quantities.split(';') if new_quantities else []
+            
+            # Parse quantities - could be JSON array or semicolon-separated
+            old_list = []
+            new_list = []
+            
+            if old_quantities:
+                if old_quantities.strip().startswith('['):
+                    # JSON format
+                    try:
+                        old_list = json.loads(old_quantities)
+                    except:
+                        old_list = old_quantities.split(';') if ';' in old_quantities else [old_quantities]
+                else:
+                    # Semicolon-separated format
+                    old_list = old_quantities.split(';') if old_quantities else []
+            
+            if new_quantities:
+                if new_quantities.strip().startswith('['):
+                    # JSON format
+                    try:
+                        new_list = json.loads(new_quantities)
+                    except:
+                        new_list = new_quantities.split(';') if ';' in new_quantities else [new_quantities]
+                else:
+                    # Semicolon-separated format
+                    new_list = new_quantities.split(';') if new_quantities else []
             
             # Build formatted display strings (one per line)
             # Helper function to extract just the quantity value (in case old_value already has item names)
@@ -4827,8 +4851,9 @@ def get_item_request_quantity_history(request_id):
             for i, item_name in enumerate(item_names):
                 item_name = item_name.strip()
                 if item_name:
-                    old_qty_raw = old_list[i].strip() if i < len(old_list) else ''
-                    new_qty_raw = new_list[i].strip() if i < len(new_list) else ''
+                    # Convert to string in case they're from JSON (could be int or str)
+                    old_qty_raw = str(old_list[i]).strip() if i < len(old_list) else ''
+                    new_qty_raw = str(new_list[i]).strip() if i < len(new_list) else ''
                     # Extract just the quantity part (in case it already has item name from previous formatting)
                     old_qty = extract_quantity(old_qty_raw)
                     new_qty = extract_quantity(new_qty_raw)
@@ -6449,14 +6474,35 @@ def update_item_request_quantities_procurement_manager(request_id):
             if old_quantities_str != new_quantities_str:
                 # Parse quantities to show what changed
                 item_names_list = [name.strip() for name in (item_request.item_name or '').split(',') if name.strip()]
-                old_list = old_quantities_str.split(';') if old_quantities_str else []
-                new_list = new_quantities_str.split(';') if new_quantities_str else []
+                
+                # Parse quantities - could be JSON array or semicolon-separated
+                old_list = []
+                new_list = []
+                
+                if old_quantities_str:
+                    if old_quantities_str.strip().startswith('['):
+                        try:
+                            old_list = json.loads(old_quantities_str)
+                        except:
+                            old_list = old_quantities_str.split(';') if ';' in old_quantities_str else [old_quantities_str]
+                    else:
+                        old_list = old_quantities_str.split(';') if old_quantities_str else []
+                
+                if new_quantities_str:
+                    if new_quantities_str.strip().startswith('['):
+                        try:
+                            new_list = json.loads(new_quantities_str)
+                        except:
+                            new_list = new_quantities_str.split(';') if ';' in new_quantities_str else [new_quantities_str]
+                    else:
+                        new_list = new_quantities_str.split(';') if new_quantities_str else []
                 
                 # Find which items changed
                 changed_items = []
                 for i, item_name in enumerate(item_names_list):
-                    old_qty = old_list[i].strip() if i < len(old_list) else ''
-                    new_qty = new_list[i].strip() if i < len(new_list) else ''
+                    # Convert to string in case they're from JSON (could be int or str)
+                    old_qty = str(old_list[i]).strip() if i < len(old_list) else ''
+                    new_qty = str(new_list[i]).strip() if i < len(new_list) else ''
                     if old_qty != new_qty:
                         old_display = old_qty if old_qty else 'Not specified'
                         new_display = new_qty if new_qty else 'Not specified'
@@ -6779,14 +6825,35 @@ def update_item_request_quantities_manager(request_id):
         try:
             # Build a message showing what changed
             item_names_list = [name.strip() for name in (item_request.item_name or '').split(',') if name.strip()]
-            old_list = old_quantities_str.split(';') if old_quantities_str else []
-            new_list = new_quantities_str.split(';') if new_quantities_str else []
+            
+            # Parse quantities - could be JSON array or semicolon-separated
+            old_list = []
+            new_list = []
+            
+            if old_quantities_str:
+                if old_quantities_str.strip().startswith('['):
+                    try:
+                        old_list = json.loads(old_quantities_str)
+                    except:
+                        old_list = old_quantities_str.split(';') if ';' in old_quantities_str else [old_quantities_str]
+                else:
+                    old_list = old_quantities_str.split(';') if old_quantities_str else []
+            
+            if new_quantities_str:
+                if new_quantities_str.strip().startswith('['):
+                    try:
+                        new_list = json.loads(new_quantities_str)
+                    except:
+                        new_list = new_quantities_str.split(';') if ';' in new_quantities_str else [new_quantities_str]
+                else:
+                    new_list = new_quantities_str.split(';') if new_quantities_str else []
             
             # Find which items changed
             changed_items = []
             for i, item_name in enumerate(item_names_list):
-                old_qty = old_list[i].strip() if i < len(old_list) else ''
-                new_qty = new_list[i].strip() if i < len(new_list) else ''
+                # Convert to string in case they're from JSON (could be int or str)
+                old_qty = str(old_list[i]).strip() if i < len(old_list) else ''
+                new_qty = str(new_list[i]).strip() if i < len(new_list) else ''
                 if old_qty != new_qty:
                     old_display = old_qty if old_qty else 'Not specified'
                     new_display = new_qty if new_qty else 'Not specified'
@@ -7406,7 +7473,7 @@ def procurement_request_item():
             department=current_user.department if current_user else '',
             category=category if category else None,
             item_name=item_name,
-            quantity=quantity if quantity else None,
+            procurement_quantities=item_quantities_json if item_quantities_json else None,  # Store requested quantities as JSON
             purpose=purpose,
             branch_name=branch_name,
             request_date=request_date,
@@ -7484,10 +7551,12 @@ def procurement_request_item():
                 # Silently handle notification errors - don't log to audit
                 pass
         
-        flash(f'Item request submitted successfully! Item: {item_name}, Quantity: {quantity or "N/A"}', 'success')
+        # Build a readable quantity string for display
+        quantity_display = quantity or "N/A"
+        flash(f'Item request submitted successfully! Item: {item_name}, Quantity: {quantity_display}', 'success')
         
         # Log the action
-        log_action(f'Submitted procurement item request: {item_name} (Quantity: {quantity or "N/A"})')
+        log_action(f'Submitted procurement item request: {item_name} (Quantity: {quantity_display})')
         
         return redirect(url_for('procurement_item_requests'))
     
@@ -11595,30 +11664,10 @@ def edit_item_draft(draft_id):
         elif item_name:
             draft.item_name = item_name
         
-        # Handle quantities
+        # Handle quantities - store as JSON in procurement_quantities field
         item_quantities_json = request.form.get('item_quantities', '').strip()
-        quantity = None
         if item_quantities_json:
-            try:
-                import json
-                quantities = json.loads(item_quantities_json)
-                if item_names and len(quantities) > 1:
-                    item_list = item_names.split(',')
-                    quantity_parts = []
-                    for i, qty in enumerate(quantities):
-                        if qty and qty.strip():
-                            quantity_parts.append(f"{item_list[i].strip()}: {qty.strip()}")
-                    if quantity_parts:
-                        quantity = '; '.join(quantity_parts)
-                    elif len(quantities) == 1 and quantities[0]:
-                        quantity = quantities[0]
-                elif len(quantities) == 1 and quantities[0]:
-                    quantity = quantities[0]
-            except (json.JSONDecodeError, ValueError):
-                pass
-        
-        if quantity:
-            draft.quantity = quantity
+            draft.procurement_quantities = item_quantities_json
         draft.purpose = request.form.get('purpose', '').strip() or draft.purpose
         
         # Handle branch names

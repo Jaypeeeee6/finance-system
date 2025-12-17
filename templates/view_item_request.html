@@ -922,9 +922,19 @@ body.flash-success-open {
             {% if item_request.item_name and ',' in item_request.item_name %}
                 {# Multiple items - display as chips (show procurement manager quantities if exist, otherwise manager-approved quantities, otherwise original) #}
                         {% set item_list = item_request.item_name.split(',') %}
-                {# Use procurement manager quantities if they exist, otherwise manager-approved quantities, otherwise original requested quantities #}
-                {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
-                        {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
+                {# Use procurement manager quantities if they exist, otherwise original requested quantities (which are stored as JSON) #}
+                {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities %}
+                        {# procurement_quantities is stored as JSON array, so try to parse it; otherwise treat as semicolon-separated #}
+                {% set quantity_list = [] %}
+                {% if raw_quantity_source %}
+                    {% if raw_quantity_source.startswith('[') %}
+                        {# JSON array format - convert to list of strings #}
+                        {% set quantity_list = (raw_quantity_source | from_json) if raw_quantity_source else [] %}
+                    {% else %}
+                        {# Semicolon-separated format (for backward compatibility) #}
+                        {% set quantity_list = raw_quantity_source.split(';') %}
+                    {% endif %}
+                {% endif %}
                 {# Filter out items with quantity 0 #}
                 {% set items_to_display = [] %}
                         {% for item in item_list %}
@@ -970,11 +980,18 @@ body.flash-success-open {
                 </div>
                 {% endif %}
             {% else %}
-                {# Single item - display as normal input fields (show procurement manager quantities if exist, otherwise manager-approved quantity) #}
-                {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
-                {% set qty = (raw_quantity_source or '0') %}
-                {% if ';' in qty %}
-                    {% set qty = qty.split(';')[0] %}
+                {# Single item - display as normal input fields (show procurement manager quantities if exist, otherwise original quantity) #}
+                {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities %}
+                {% set qty = '0' %}
+                {% if raw_quantity_source %}
+                    {% if raw_quantity_source.startswith('[') %}
+                        {# JSON array format - get first element #}
+                        {% set qty_array = (raw_quantity_source | from_json) %}
+                        {% set qty = (qty_array[0] if qty_array|length > 0 else '0') %}
+                    {% else %}
+                        {# Semicolon-separated or single value #}
+                        {% set qty = raw_quantity_source.split(';')[0] if ';' in raw_quantity_source else raw_quantity_source %}
+                    {% endif %}
                 {% endif %}
                 {# Extract numeric quantity for comparison #}
                 {% set qty_num = qty|int(0) %}
@@ -1209,10 +1226,24 @@ body.flash-success-open {
                                 <strong>Note:</strong> These are the manager-approved quantities (read-only).
                             </p>
                             {% set item_list = item_request.item_name.split(',') %}
-                            {% set raw_quantity_source = item_request.procurement_quantities or item_request.quantity %}
-                            {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
-                            {% set original_source = item_request.quantity %}
-                            {% set original_list = (original_source or '').split(';') if original_source else [] %}
+                            {% set raw_quantity_source = item_request.procurement_quantities %}
+                            {# Parse quantity_list from JSON or semicolon-separated format #}
+                            {% set quantity_list = [] %}
+                            {% if raw_quantity_source %}
+                                {% if raw_quantity_source.startswith('[') %}
+                                    {% set quantity_list = (raw_quantity_source | from_json) %}
+                                {% else %}
+                                    {% set quantity_list = raw_quantity_source.split(';') %}
+                                {% endif %}
+                            {% endif %}
+                            {% set original_source = item_request.procurement_quantities %}
+                            {# original_list should be the same as quantity_list (already parsed) #}
+                            {% set original_list = quantity_list %}
+                            {# Debug: Convert to ensure it's a proper list #}
+                            {% if original_list is string %}
+                                {# If original_list is still a string (JSON wasn't parsed), parse it now #}
+                                {% set original_list = (original_list | from_json) if original_list.startswith('[') else original_list.split(';') %}
+                            {% endif %}
                             {# Filter out items with quantity 0 #}
                             {% set items_to_display = [] %}
                             {% for item in item_list %}
@@ -1239,17 +1270,16 @@ body.flash-success-open {
                                     {% if qty_num > 0 %}
                                         {% set orig_qty_raw = '' %}
                                         {% if loop.index0 < original_list|length %}
-                                            {% set oq = original_list[loop.index0] | trim %}
-                                            {% if oq %}
-                                                {% if ':' in oq %}
-                                                    {% set o_parts = oq.split(':', 1) %}
-                                                    {% if o_parts|length > 1 %}
-                                                        {% set orig_qty_raw = o_parts[1].strip() %}
-                                                    {% else %}
-                                                        {% set orig_qty_raw = oq %}
-                                                    {% endif %}
+                                            {% set oq = original_list[loop.index0]|string %}
+                                            {% if oq and oq != '' %}
+                                                {# Remove quotes and trim if it's a JSON string value #}
+                                                {% set oq_clean = oq|replace('"', '')|trim %}
+                                                {% if ':' in oq_clean %}
+                                                    {# Handle "Item Name: qty" format #}
+                                                    {% set o_parts = oq_clean.split(':', 1) %}
+                                                    {% set orig_qty_raw = o_parts[1].strip() if o_parts|length > 1 else oq_clean %}
                                                 {% else %}
-                                                    {% set orig_qty_raw = oq %}
+                                                    {% set orig_qty_raw = oq_clean %}
                                                 {% endif %}
                                             {% endif %}
                                         {% endif %}
@@ -1354,7 +1384,7 @@ body.flash-success-open {
 
                     {# Single-item requests: item_name is a single string #}
                     {% else %}
-                    {% set raw_quantity_source = item_request.procurement_quantities or item_request.quantity %}
+                    {% set raw_quantity_source = item_request.procurement_quantities %}
                     {% set qty = (raw_quantity_source or '0') %}
                     {% if ';' in qty %}
                         {% set qty = qty.split(';')[0] %}
@@ -1362,7 +1392,18 @@ body.flash-success-open {
                     {% set qty_num = qty|int(0) %}
                     {# Only display if quantity > 0 #}
                     {% if qty_num > 0 %}
-                    {% set orig_qty_raw = (item_request.quantity or '').strip() %}
+                    {# Parse orig_qty_raw from JSON if needed #}
+                    {% set orig_qty_raw = '' %}
+                    {% set proc_qty = item_request.procurement_quantities %}
+                    {% if proc_qty %}
+                        {% if proc_qty.startswith('[') %}
+                            {# JSON format - extract first element #}
+                            {% set qty_array = (proc_qty | from_json) %}
+                            {% set orig_qty_raw = (qty_array[0] if qty_array|length > 0 else '0')|string %}
+                        {% else %}
+                            {% set orig_qty_raw = proc_qty.strip() %}
+                        {% endif %}
+                    {% endif %}
                     {% set orig_qty_num = orig_qty_raw|int(0) %}
                     {% set mgr_qty_num = qty|int(0) %}
                     {% set is_less = mgr_qty_num < orig_qty_num %}
@@ -1519,11 +1560,26 @@ body.flash-success-open {
                                     </p>
                                     {% set item_list = item_request.item_name.split(',') %}
                                     {# Use procurement-adjusted quantities if they exist; otherwise fall back to original requested quantities #}
-                                    {% set raw_quantity_source = item_request.procurement_quantities or item_request.quantity %}
-                                    {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
+                                    {% set raw_quantity_source = item_request.procurement_quantities %}
+                                    {# Parse quantity_list from JSON or semicolon-separated format #}
+                                    {% set quantity_list = [] %}
+                                    {% if raw_quantity_source %}
+                                        {% if raw_quantity_source.startswith('[') %}
+                                            {% set quantity_list = (raw_quantity_source | from_json) %}
+                                        {% else %}
+                                            {% set quantity_list = raw_quantity_source.split(';') %}
+                                        {% endif %}
+                                    {% endif %}
                                     {# Original requestor quantities (for comparison only) #}
-                                    {% set original_source = item_request.quantity %}
-                                    {% set original_list = (original_source or '').split(';') if original_source else [] %}
+                                    {% set original_source = item_request.procurement_quantities %}
+                                    {% set original_list = [] %}
+                                    {% if original_source %}
+                                        {% if original_source.startswith('[') %}
+                                            {% set original_list = (original_source | from_json) %}
+                                        {% else %}
+                                            {% set original_list = original_source.split(';') %}
+                                        {% endif %}
+                                    {% endif %}
                                     
                                     {% if manager_can_edit_quantities %}
                                     <form method="POST" action="{{ url_for('update_item_request_quantities_manager', request_id=item_request.id) }}">
@@ -1551,7 +1607,7 @@ body.flash-success-open {
                                                                     {% set qty = qty_raw %}
                                                                 {% endif %}
                                                             {% else %}
-                                                                {% set qty = qty_raw %}
+                                                                    {% set qty = qty_raw %}
                                                             {% endif %}
                                                         {% endif %}
                                                     {% endif %}
@@ -1559,17 +1615,16 @@ body.flash-success-open {
                                                     {# Derive original numeric quantity for comparison #}
                                                     {% set orig_qty_raw = '' %}
                                                     {% if loop.index0 < original_list|length %}
-                                                        {% set oq = original_list[loop.index0] | trim %}
-                                                        {% if oq %}
-                                                            {% if ':' in oq %}
-                                                                {% set o_parts = oq.split(':', 1) %}
-                                                                {% if o_parts|length > 1 %}
-                                                                    {% set orig_qty_raw = o_parts[1].strip() %}
-                                                                {% else %}
-                                                                    {% set orig_qty_raw = oq %}
-                                                                {% endif %}
+                                                        {% set oq = original_list[loop.index0]|string %}
+                                                        {% if oq and oq != '' %}
+                                                            {# Remove quotes and trim if it's a JSON string value #}
+                                                            {% set oq_clean = oq|replace('"', '')|trim %}
+                                                            {% if ':' in oq_clean %}
+                                                                {# Handle "Item Name: qty" format #}
+                                                                {% set o_parts = oq_clean.split(':', 1) %}
+                                                                {% set orig_qty_raw = o_parts[1].strip() if o_parts|length > 1 else oq_clean %}
                                                             {% else %}
-                                                                {% set orig_qty_raw = oq %}
+                                                                {% set orig_qty_raw = oq_clean %}
                                                             {% endif %}
                                                         {% endif %}
                                                     {% endif %}
@@ -1669,12 +1724,23 @@ body.flash-success-open {
 
                             {# Single-item requests: item_name is a single string #}
                             {% else %}
-                            {% set raw_quantity_source = item_request.procurement_quantities or item_request.quantity %}
+                            {% set raw_quantity_source = item_request.procurement_quantities %}
                             {% set qty = (raw_quantity_source or '0') %}
                             {% if ';' in qty %}
                                 {% set qty = qty.split(';')[0] %}
                             {% endif %}
-                            {% set orig_qty_raw = (item_request.quantity or '').strip() %}
+                            {# Parse orig_qty_raw from JSON if needed #}
+                            {% set orig_qty_raw = '' %}
+                            {% set proc_qty = item_request.procurement_quantities %}
+                            {% if proc_qty %}
+                                {% if proc_qty.startswith('[') %}
+                                    {# JSON format - extract first element #}
+                                    {% set qty_array = (proc_qty | from_json) %}
+                                    {% set orig_qty_raw = (qty_array[0] if qty_array|length > 0 else '0')|string %}
+                                {% else %}
+                                    {% set orig_qty_raw = proc_qty.strip() %}
+                                {% endif %}
+                            {% endif %}
                             {% set orig_qty_num = orig_qty_raw|int(0) %}
                             {% set mgr_qty_num = qty|int(0) %}
                             {% set is_less = mgr_qty_num < orig_qty_num %}
@@ -1961,11 +2027,26 @@ body.flash-success-open {
                                 <strong>Note:</strong> These are the procurement manager-approved quantities (read-only).
                             </p>
                             {% set item_list = item_request.item_name.split(',') %}
-                            {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
-                            {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
+                            {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities %}
+                            {# Parse quantity_list from JSON or semicolon-separated format #}
+                            {% set quantity_list = [] %}
+                            {% if raw_quantity_source %}
+                                {% if raw_quantity_source.startswith('[') %}
+                                    {% set quantity_list = (raw_quantity_source | from_json) %}
+                                {% else %}
+                                    {% set quantity_list = raw_quantity_source.split(';') %}
+                                {% endif %}
+                            {% endif %}
                             {# Manager-approved quantities for comparison #}
-                            {% set manager_quantity_source = item_request.procurement_quantities or item_request.quantity %}
-                            {% set manager_quantity_list = (manager_quantity_source or '').split(';') if manager_quantity_source else [] %}
+                            {% set manager_quantity_source = item_request.procurement_quantities %}
+                            {% set manager_quantity_list = [] %}
+                            {% if manager_quantity_source %}
+                                {% if manager_quantity_source.startswith('[') %}
+                                    {% set manager_quantity_list = (manager_quantity_source | from_json) %}
+                                {% else %}
+                                    {% set manager_quantity_list = manager_quantity_source.split(';') %}
+                                {% endif %}
+                            {% endif %}
                             {# Filter out items with quantity 0 #}
                             {% set items_to_display = [] %}
                             {% for item in item_list %}
@@ -2106,14 +2187,14 @@ body.flash-success-open {
 
                     {# Single-item requests: item_name is a single string #}
                     {% else %}
-                    {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                    {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities %}
                     {% set qty = (raw_quantity_source or '0') %}
                     {% if ';' in qty %}
                         {% set qty = qty.split(';')[0] %}
                     {% endif %}
                     {% set qty_num = qty|int(0) %}
                     {# Manager-approved quantity for comparison #}
-                    {% set mgr_qty_raw = (item_request.procurement_quantities or item_request.quantity or '').strip() %}
+                    {% set mgr_qty_raw = (item_request.procurement_quantities or '').strip() %}
                     {% if ';' in mgr_qty_raw %}
                         {% set mgr_qty_raw = mgr_qty_raw.split(';')[0] %}
                     {% endif %}
@@ -2250,11 +2331,26 @@ body.flash-success-open {
                                     </p>
                                     {% set item_list = item_request.item_name.split(',') %}
                                     {# Use procurement manager quantities if they exist; otherwise use manager-approved quantities; otherwise original requested quantities #}
-                                    {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
-                                    {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
+                                    {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities %}
+                                    {# Parse quantity_list from JSON or semicolon-separated format #}
+                                    {% set quantity_list = [] %}
+                                    {% if raw_quantity_source %}
+                                        {% if raw_quantity_source.startswith('[') %}
+                                            {% set quantity_list = (raw_quantity_source | from_json) %}
+                                        {% else %}
+                                            {% set quantity_list = raw_quantity_source.split(';') %}
+                                        {% endif %}
+                                    {% endif %}
                                     {# Manager-approved quantities (for comparison - this is the "original" for procurement manager) #}
-                                    {% set original_source = item_request.procurement_quantities or item_request.quantity %}
-                                    {% set original_list = (original_source or '').split(';') if original_source else [] %}
+                                    {% set original_source = item_request.procurement_quantities %}
+                                    {% set original_list = [] %}
+                                    {% if original_source %}
+                                        {% if original_source.startswith('[') %}
+                                            {% set original_list = (original_source | from_json) %}
+                                        {% else %}
+                                            {% set original_list = original_source.split(';') %}
+                                        {% endif %}
+                                    {% endif %}
                                     
                                     {% if procurement_manager_can_edit_quantities %}
                                     <form method="POST" action="{{ url_for('update_item_request_quantities_procurement_manager', request_id=item_request.id) }}">
@@ -2290,17 +2386,16 @@ body.flash-success-open {
                                                     {# Derive original numeric quantity for comparison #}
                                                     {% set orig_qty_raw = '' %}
                                                     {% if loop.index0 < original_list|length %}
-                                                        {% set oq = original_list[loop.index0] | trim %}
-                                                        {% if oq %}
-                                                            {% if ':' in oq %}
-                                                                {% set o_parts = oq.split(':', 1) %}
-                                                                {% if o_parts|length > 1 %}
-                                                                    {% set orig_qty_raw = o_parts[1].strip() %}
-                                                                {% else %}
-                                                                    {% set orig_qty_raw = oq %}
-                                                                {% endif %}
+                                                        {% set oq = original_list[loop.index0]|string %}
+                                                        {% if oq and oq != '' %}
+                                                            {# Remove quotes and trim if it's a JSON string value #}
+                                                            {% set oq_clean = oq|replace('"', '')|trim %}
+                                                            {% if ':' in oq_clean %}
+                                                                {# Handle "Item Name: qty" format #}
+                                                                {% set o_parts = oq_clean.split(':', 1) %}
+                                                                {% set orig_qty_raw = o_parts[1].strip() if o_parts|length > 1 else oq_clean %}
                                                             {% else %}
-                                                                {% set orig_qty_raw = oq %}
+                                                                {% set orig_qty_raw = oq_clean %}
                                                             {% endif %}
                                                         {% endif %}
                                                     {% endif %}
@@ -2503,14 +2598,28 @@ body.flash-success-open {
 
                             {# Single-item requests: item_name is a single string #}
                             {% else %}
-                            {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
-                            {% set qty = (raw_quantity_source or '0') %}
-                            {% if ';' in qty %}
-                                {% set qty = qty.split(';')[0] %}
+                            {% set raw_quantity_source = item_request.procurement_manager_quantities or item_request.procurement_quantities %}
+                            {# Parse qty from JSON if needed #}
+                            {% set qty = '0' %}
+                            {% if raw_quantity_source %}
+                                {% if raw_quantity_source.startswith('[') %}
+                                    {% set qty_array = (raw_quantity_source | from_json) %}
+                                    {% set qty = (qty_array[0] if qty_array|length > 0 else '0')|string %}
+                                {% else %}
+                                    {% set qty = raw_quantity_source.split(';')[0] if ';' in raw_quantity_source else raw_quantity_source %}
+                                {% endif %}
                             {% endif %}
-                            {% set orig_qty_raw = (item_request.procurement_quantities or item_request.quantity or '').strip() %}
-                            {% if ';' in orig_qty_raw %}
-                                {% set orig_qty_raw = orig_qty_raw.split(';')[0] %}
+                            {# Parse orig_qty_raw from JSON if needed #}
+                            {% set orig_qty_raw = '' %}
+                            {% set proc_qty = item_request.procurement_quantities %}
+                            {% if proc_qty %}
+                                {% if proc_qty.startswith('[') %}
+                                    {# JSON format - extract first element #}
+                                    {% set qty_array = (proc_qty | from_json) %}
+                                    {% set orig_qty_raw = (qty_array[0] if qty_array|length > 0 else '0')|string %}
+                                {% else %}
+                                    {% set orig_qty_raw = proc_qty.split(';')[0] if ';' in proc_qty else proc_qty %}
+                                {% endif %}
                             {% endif %}
                             {% set orig_qty_num = orig_qty_raw|int(0) %}
                             {% set mgr_qty_num = qty|int(0) %}
@@ -2914,10 +3023,18 @@ body.flash-success-open {
                     <div class="card-body">
                         {% set amount_list = (item_request.procurement_amounts or '').split(';') %}
                         {# Prefer saved assigned procurement quantities if they exist, otherwise default to procurement manager-approved quantities, then manager quantities, then original request #}
-                        {% set quantity_source = item_request.assigned_procurement_quantities or item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                        {% set quantity_source = item_request.assigned_procurement_quantities or item_request.procurement_manager_quantities or item_request.procurement_quantities %}
                         {% if ',' in item_request.item_name %}
                             {% set item_list = item_request.item_name.split(',') %}
-                            {% set quantity_list = (quantity_source or '').split(';') if quantity_source else [] %}
+                            {# Parse quantity_list from JSON or semicolon-separated format #}
+                            {% set quantity_list = [] %}
+                            {% if quantity_source %}
+                                {% if quantity_source.startswith('[') %}
+                                    {% set quantity_list = (quantity_source | from_json) %}
+                                {% else %}
+                                    {% set quantity_list = quantity_source.split(';') %}
+                                {% endif %}
+                            {% endif %}
                             <div class="procurement-cart-table">
                                 <div class="procurement-cart-header-row">
                                     <div>Item</div>
@@ -3247,13 +3364,28 @@ body.flash-success-open {
                                             {# Multi-item request #}
                                             {% set item_list = item_request.item_name.split(',') %}
                                             {# PRIORITY: Show saved assigned procurement quantities if they exist, otherwise default to procurement manager quantities, then manager quantities, then original #}
-                                            {% set display_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                                            {% set display_source = item_request.procurement_manager_quantities or item_request.procurement_quantities %}
                                             {# If assigned procurement staff has saved quantities, use those; otherwise default to procurement manager-approved quantities #}
                                             {% set raw_quantity_source = item_request.assigned_procurement_quantities or display_source %}
-                                            {% set quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else [] %}
+                                            {# Parse quantity_list from JSON or semicolon-separated format #}
+                                            {% set quantity_list = [] %}
+                                            {% if raw_quantity_source %}
+                                                {% if raw_quantity_source.startswith('[') %}
+                                                    {% set quantity_list = (raw_quantity_source | from_json) %}
+                                                {% else %}
+                                                    {% set quantity_list = raw_quantity_source.split(';') %}
+                                                {% endif %}
+                                            {% endif %}
                                             {# Baseline (for showing quantity comparison) is always the most recent approval from procurement manager #}
-                                            {% set original_source = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
-                                            {% set original_list = (original_source or '').split(';') if original_source else [] %}
+                                            {% set original_source = item_request.procurement_manager_quantities or item_request.procurement_quantities %}
+                                            {% set original_list = [] %}
+                                            {% if original_source %}
+                                                {% if original_source.startswith('[') %}
+                                                    {% set original_list = (original_source | from_json) %}
+                                                {% else %}
+                                                    {% set original_list = original_source.split(';') %}
+                                                {% endif %}
+                                            {% endif %}
                                             
                                             {% if can_complete %}
                                             <form method="POST" action="{{ url_for('update_item_request_quantities', request_id=item_request.id) }}" style="margin-bottom: 1rem;" novalidate>
@@ -3421,15 +3553,21 @@ body.flash-success-open {
                                         {% else %}
                                             {# Single-item request #}
                                             {# PRIORITY: Show saved assigned procurement quantities if they exist, otherwise default to procurement manager quantities, then manager quantities, then original #}
-                                            {% set display_source_single = item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                                            {% set display_source_single = item_request.procurement_manager_quantities or item_request.procurement_quantities %}
                                             {# If assigned procurement staff has saved quantities, use those; otherwise default to procurement manager-approved quantity #}
                                             {% set raw_quantity_source = item_request.assigned_procurement_quantities or display_source_single %}
                                             {% set current_raw = (raw_quantity_source or '').split(';')[0] %}
                                             {% set qty = (current_raw or '').strip() %}
                                             {# Baseline (for showing quantity comparison) is always the most recent approval from procurement manager #}
-                                            {% set orig_qty_raw = (item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity or '').strip() %}
-                                            {% if ';' in orig_qty_raw %}
-                                                {% set orig_qty_raw = orig_qty_raw.split(';')[0] %}
+                                            {% set baseline_source = item_request.procurement_manager_quantities or item_request.procurement_quantities %}
+                                            {% set orig_qty_raw = '' %}
+                                            {% if baseline_source %}
+                                                {% if baseline_source.startswith('[') %}
+                                                    {% set qty_array = (baseline_source | from_json) %}
+                                                    {% set orig_qty_raw = (qty_array[0] if qty_array|length > 0 else '0')|string %}
+                                                {% else %}
+                                                    {% set orig_qty_raw = baseline_source.split(';')[0] if ';' in baseline_source else baseline_source %}
+                                                {% endif %}
                                             {% endif %}
                                             {% set orig_qty_num = orig_qty_raw|int(0) %}
                                             {% set proc_qty_num = qty|int(0) %}
@@ -3684,7 +3822,7 @@ body.flash-success-open {
                         {% if item_request.item_name %}
                         {% set amount_list = (item_request.procurement_amounts or '').split(';') %}
                         {# Prefer saved assigned procurement quantities if they exist, otherwise default to procurement manager quantities, then manager quantities, then original #}
-                        {% set quantity_source = item_request.assigned_procurement_quantities or item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity %}
+                        {% set quantity_source = item_request.assigned_procurement_quantities or item_request.procurement_manager_quantities or item_request.procurement_quantities %}
                         <div class="card assigned-section procurement-cart-card" style="margin-top: 1.5rem;">
                             <div class="card-header">
                                 <h4><i class="fas fa-shopping-cart"></i> Billing and Completion (Read-Only)</h4>
@@ -3693,7 +3831,15 @@ body.flash-success-open {
                             <div class="card-body">
                                 {% if ',' in item_request.item_name %}
                                     {% set item_list = item_request.item_name.split(',') %}
-                                    {% set quantity_list = (quantity_source or '').split(';') if quantity_source else [] %}
+                                    {# Parse quantity_list from JSON or semicolon-separated format #}
+                                    {% set quantity_list = [] %}
+                                    {% if quantity_source %}
+                                        {% if quantity_source.startswith('[') %}
+                                            {% set quantity_list = (quantity_source | from_json) %}
+                                        {% else %}
+                                            {% set quantity_list = quantity_source.split(';') %}
+                                        {% endif %}
+                                    {% endif %}
                                     <div class="procurement-cart-table">
                                         <div class="procurement-cart-header-row">
                                             <div>Item</div>
