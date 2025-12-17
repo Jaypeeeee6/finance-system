@@ -7391,10 +7391,14 @@ def procurement_request_item():
         request_date = datetime.utcnow().date()
         notes = request.form.get('notes', '').strip()
         
-        # Validation (date is no longer required from form)
-        if not all([requestor_name, category, item_name, purpose, branch_name]):
-            flash('Please fill in all required fields.', 'danger')
-            return redirect(url_for('procurement_request_item'))
+        # Check if this is a save as draft request
+        is_save_draft = request.form.get('action') == 'save_draft'
+        
+        # Validation for submit (more strict) vs draft (more lenient)
+        if not is_save_draft:
+            if not all([requestor_name, category, item_name, purpose, branch_name]):
+                flash('Please fill in all required fields.', 'danger')
+                return redirect(url_for('procurement_request_item'))
         
         # Create procurement item request record
         current_time = datetime.utcnow()
@@ -7409,13 +7413,19 @@ def procurement_request_item():
             request_date=request_date,
             is_urgent=False,  # Will be set by manager during approval
             notes=notes if notes else None,
-            status='Pending Manager Approval',
+            is_draft=is_save_draft,  # Mark as draft if saving as draft
+            status='Pending Manager Approval' if not is_save_draft else 'Draft',
             user_id=current_user.user_id if current_user else None,
-            manager_approval_start_time=current_time
+            manager_approval_start_time=current_time if not is_save_draft else None
         )
         
         db.session.add(item_request)
         db.session.commit()
+        
+        if is_save_draft:
+            flash('Item request draft saved successfully!', 'success')
+            log_action(f'Saved procurement item request as draft: {item_name}')
+            return redirect(url_for('drafts') + '#item-requests')
         
         # Refresh the item_request to ensure relationships are loaded
         db.session.refresh(item_request)
@@ -11355,13 +11365,23 @@ def new_request():
 @login_required
 def drafts():
     """View all drafts created by the current user"""
-    user_drafts = PaymentRequest.query.filter_by(
+    # Get payment request drafts
+    payment_drafts = PaymentRequest.query.filter_by(
         is_draft=True,
         user_id=current_user.user_id,
         is_archived=False
     ).order_by(PaymentRequest.updated_at.desc()).all()
     
-    return render_template('drafts.html', drafts=user_drafts, user=current_user)
+    # Get item request drafts
+    item_drafts = ProcurementItemRequest.query.filter_by(
+        is_draft=True,
+        user_id=current_user.user_id
+    ).order_by(ProcurementItemRequest.updated_at.desc()).all()
+    
+    return render_template('drafts.html', 
+                         drafts=payment_drafts, 
+                         item_drafts=item_drafts,
+                         user=current_user)
 
 
 @app.route('/draft/<int:draft_id>/edit', methods=['GET', 'POST'])
@@ -11547,6 +11567,161 @@ def delete_draft(draft_id):
     
     log_action(f"Deleted draft #{draft_id}")
     flash('Draft deleted successfully!', 'success')
+    return redirect(url_for('drafts'))
+
+
+@app.route('/edit-item-draft/<int:draft_id>', methods=['GET', 'POST'])
+@login_required
+def edit_item_draft(draft_id):
+    """Edit an item request draft"""
+    draft = ProcurementItemRequest.query.filter_by(
+        id=draft_id,
+        is_draft=True,
+        user_id=current_user.user_id
+    ).first_or_404()
+    
+    if request.method == 'POST':
+        # Update draft with form data
+        draft.requestor_name = request.form.get('requestor_name', '').strip() or draft.requestor_name
+        draft.category = request.form.get('category', '').strip() or draft.category
+        
+        # Handle item names
+        item_names = request.form.get('item_names', '').strip()
+        item_name_value = request.form.get('item_name_value', '').strip()
+        item_name = request.form.get('item_name', '').strip()
+        if item_names:
+            draft.item_name = item_names
+        elif item_name_value:
+            draft.item_name = item_name_value
+        elif item_name:
+            draft.item_name = item_name
+        
+        # Handle quantities
+        item_quantities_json = request.form.get('item_quantities', '').strip()
+        quantity = request.form.get('quantity', '').strip()
+        if item_quantities_json:
+            try:
+                import json
+                quantities = json.loads(item_quantities_json)
+                if item_names and len(quantities) > 1:
+                    item_list = item_names.split(',')
+                    quantity_parts = []
+                    for i, qty in enumerate(quantities):
+                        if qty and qty.strip():
+                            quantity_parts.append(f"{item_list[i].strip()}: {qty.strip()}")
+                    if quantity_parts:
+                        quantity = '; '.join(quantity_parts)
+                    elif len(quantities) == 1 and quantities[0]:
+                        quantity = quantities[0]
+                elif len(quantities) == 1 and quantities[0]:
+                    quantity = quantities[0]
+            except (json.JSONDecodeError, ValueError):
+                pass
+        
+        draft.quantity = quantity if quantity else draft.quantity
+        draft.purpose = request.form.get('purpose', '').strip() or draft.purpose
+        
+        # Handle branch names
+        branch_names = request.form.get('branch_names', '').strip()
+        branch_name = request.form.get('branch_name', '').strip()
+        if branch_names:
+            draft.branch_name = branch_names
+        elif branch_name:
+            draft.branch_name = branch_name
+        
+        draft.notes = request.form.get('notes', '').strip() or draft.notes
+        
+        # Check if submitting or saving as draft
+        is_save_draft = request.form.get('action') == 'save_draft'
+        
+        # Validation for submit (more strict) vs draft (more lenient)
+        if not is_save_draft:
+            if not all([draft.requestor_name, draft.category, draft.item_name, draft.purpose, draft.branch_name]):
+                flash('Please fill in all required fields to submit.', 'danger')
+                return redirect(url_for('edit_item_draft', draft_id=draft_id))
+        
+        if not is_save_draft:
+            # Submit the draft
+            draft.is_draft = False
+            draft.status = 'Pending Manager Approval'
+            draft.manager_approval_start_time = datetime.utcnow()
+            db.session.commit()
+            
+            # Send notifications (similar to new item request)
+            if current_user:
+                create_notification(
+                    user_id=current_user.user_id,
+                    title="Item Request Submitted",
+                    message=f"Your item request for {draft.item_name} has been submitted successfully and is awaiting manager approval.",
+                    notification_type="new_submission",
+                    item_request_id=draft.id
+                )
+            
+            authorized_approvers = get_authorized_manager_approvers_for_item_request(draft)
+            for approver in authorized_approvers:
+                try:
+                    create_notification(
+                        user_id=approver.user_id,
+                        title="New Item Request for Approval",
+                        message=f"New item request submitted by {draft.requestor_name} from {draft.department} department for {draft.item_name} - requires your approval",
+                        notification_type="item_request_submission",
+                        item_request_id=draft.id
+                    )
+                except Exception as e:
+                    pass
+            
+            flash(f'Item request submitted successfully! Item: {draft.item_name}', 'success')
+            log_action(f'Submitted item request draft #{draft_id}: {draft.item_name}')
+            return redirect(url_for('procurement_item_requests'))
+        else:
+            # Just save as draft
+            db.session.commit()
+            flash('Item request draft updated and saved!', 'success')
+            log_action(f'Updated item request draft #{draft_id}: {draft.item_name}')
+            return redirect(url_for('drafts') + '#item-requests')
+    
+    # GET request - show form with draft data
+    available_branches = get_branches_ordered_by_location()
+    user_department = current_user.department if current_user else None
+    procurement_categories = []
+    procurement_items = []
+    
+    if user_department:
+        procurement_categories = ProcurementCategory.query.filter_by(
+            department=user_department,
+            is_active=True
+        ).order_by(ProcurementCategory.name).all()
+        
+        procurement_items = ProcurementItem.query.filter_by(
+            department=user_department,
+            is_active=True
+        ).order_by(ProcurementItem.name).all()
+    
+    return render_template(
+        'edit_item_draft.html',
+        draft=draft,
+        available_branches=available_branches,
+        procurement_categories=procurement_categories,
+        procurement_items=procurement_items,
+        user=current_user
+    )
+
+
+@app.route('/delete-item-draft/<int:draft_id>', methods=['POST'])
+@login_required
+def delete_item_draft(draft_id):
+    """Delete an item request draft"""
+    draft = ProcurementItemRequest.query.filter_by(
+        id=draft_id,
+        is_draft=True,
+        user_id=current_user.user_id
+    ).first_or_404()
+    
+    db.session.delete(draft)
+    db.session.commit()
+    
+    log_action(f"Deleted item request draft #{draft_id}")
+    flash('Item request draft deleted successfully!', 'success')
     return redirect(url_for('drafts'))
 
 

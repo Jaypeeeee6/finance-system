@@ -1,34 +1,34 @@
 {% extends "base.html" %}
 
-{% block title %}Request Item from Procurement{% endblock %}
+{% block title %}Edit Item Request Draft{% endblock %}
 
 {% block content %}
 <div class="dashboard-container">
     <div class="dashboard-header">
-        <h1><i class="fas fa-shopping-cart"></i> Request Item from Procurement</h1>
-        <p>Submit a request for items needed from the Procurement department</p>
+        <h1><i class="fas fa-edit"></i> Edit Item Request Draft</h1>
+        <p>Update your item request draft and save it or submit</p>
     </div>
 
     <div style="background: #e7f3ff; border-left: 4px solid #2196F3; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
         <i class="fas fa-info-circle" style="color: #2196F3; margin-right: 8px;"></i>
-        <strong>Note:</strong> This form is for requesting items/materials from Procurement. <strong>This is different from payment requests.</strong> For payment requests, please use the "New Payment Request" option.
+        <strong>Draft ID:</strong> #{{ draft.id }} | <strong>Last Updated:</strong> {{ draft.updated_at.strftime('%Y-%m-%d %H:%M') if draft.updated_at else 'N/A' }}
     </div>
 
     <div class="card">
         <div class="card-body">
-            <form method="POST" action="{{ url_for('procurement_request_item') }}" id="itemRequestForm" novalidate>
+            <form method="POST" action="{{ url_for('edit_item_draft', draft_id=draft.id) }}" id="itemRequestForm" novalidate>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="requestor_name">Requestor Name <span class="required-star">*</span></label>
                         <input type="text" name="requestor_name" id="requestor_name" 
-                               value="{{ user.name if user else '' }}" required 
+                               value="{{ draft.requestor_name or (user.name if user else '') }}" required 
                                placeholder="Enter your name">
                     </div>
 
                     <div class="form-group">
                         <label for="department">Department <span class="required-star">*</span></label>
                         <input type="text" name="department" id="department" 
-                               value="{{ user.department if user else '' }}" 
+                               value="{{ draft.department or (user.department if user else '') }}" 
                                readonly style="background-color: #e9ecef;">
                         <small class="form-text text-muted">Auto-filled from your profile</small>
                     </div>
@@ -68,8 +68,8 @@
 
                     <div class="form-group">
                         <label for="date">Date of Submission</label>
-                        <input type="text" name="date" id="date" value="{{ today }}" readonly style="background: #f5f5f5; cursor: not-allowed;">
-                        <small style="color: #666;">Automatically set to today's date</small>
+                        <input type="text" name="date" id="date" value="{{ draft.request_date }}" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                        <small style="color: #666;">Date of draft creation</small>
                     </div>
                 </div>
 
@@ -80,10 +80,10 @@
                             <option value="">-- Select Category --</option>
                             {% if procurement_categories %}
                                 {% for category in procurement_categories %}
-                                <option value="{{ category.name }}">{{ category.name }}</option>
+                                <option value="{{ category.name }}" {% if draft.category == category.name %}selected{% endif %}>{{ category.name }}</option>
                                 {% endfor %}
                             {% endif %}
-                            <option value="Others">Others</option>
+                            <option value="Others" {% if draft.category == 'Others' %}selected{% endif %}>Others</option>
                         </select>
                         <small class="form-text text-muted">Select the category of the item</small>
                     </div>
@@ -118,6 +118,7 @@
                     <div class="form-group" id="quantity_field_group">
                         <label for="quantity">Quantity</label>
                         <input type="text" name="quantity" id="quantity" 
+                               value="{{ draft.quantity or '' }}"
                                placeholder="e.g., 10 units, 5 boxes, 1 set">
                         <small class="form-text text-muted">Optional: Specify quantity if applicable</small>
                     </div>
@@ -127,7 +128,7 @@
                     <div class="form-group" style="flex: 1;">
                         <label for="purpose">Purpose/Description <span class="required-star">*</span></label>
                         <textarea name="purpose" id="purpose" rows="4" required 
-                                  placeholder="Describe why you need this item and how it will be used"></textarea>
+                                  placeholder="Describe why you need this item and how it will be used">{{ draft.purpose or '' }}</textarea>
                         <small class="form-text text-muted">Provide details about the purpose and usage of the requested item</small>
                     </div>
                 </div>
@@ -136,7 +137,7 @@
                     <div class="form-group" style="flex: 1;">
                         <label for="notes">Additional Notes</label>
                         <textarea name="notes" id="notes" rows="3" 
-                                  placeholder="Any additional information, specifications, or special requirements"></textarea>
+                                  placeholder="Any additional information, specifications, or special requirements">{{ draft.notes or '' }}</textarea>
                         <small class="form-text text-muted">Optional: Add any additional details or specifications</small>
                     </div>
                 </div>
@@ -148,7 +149,7 @@
                     <button type="submit" name="action" value="save_draft" class="btn btn-warning">
                         <i class="fas fa-save"></i> Save as Draft
                     </button>
-                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                    <a href="{{ url_for('drafts') }}" class="btn btn-secondary">
                         <i class="fas fa-times"></i> Cancel
                     </a>
                 </div>
@@ -521,11 +522,56 @@ function clearErrorMessages() {
     });
 }
 
+// Store draft data for initialization
+const draftData = {
+    item_names: `{{ draft.item_name or '' }}`,
+    branch_names: `{{ draft.branch_name or '' }}`,
+    quantity: `{{ draft.quantity or '' }}`
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     initializeItemSearch();
     initializeBranchSearch();
+    
+    // Load draft data into the UI
+    setTimeout(function() {
+        loadDraftData();
+    }, 100);
 });
 
+function loadDraftData() {
+    // Load item names if they exist
+    if (draftData.item_names) {
+        const itemNames = draftData.item_names.split(',').map(n => n.trim()).filter(n => n);
+        const quantitiesStr = document.getElementById('item_quantities').value;
+        let quantities = [];
+        try {
+            if (quantitiesStr) {
+                quantities = JSON.parse(quantitiesStr);
+            }
+        } catch (e) {}
+        
+        // Populate item chips
+        const chipsContainer = document.getElementById('item_chips_container');
+        if (chipsContainer && window.selectItemFromDraft) {
+            itemNames.forEach((name, index) => {
+                window.selectItemFromDraft(name, (quantities[index] || ''));
+            });
+        }
+    }
+    
+    // Load branch names if they exist
+    if (draftData.branch_names) {
+        const branchNames = draftData.branch_names.split(',').map(n => n.trim()).filter(n => n);
+        if (window.selectBranchFromDraft) {
+            branchNames.forEach(name => {
+                window.selectBranchFromDraft(name);
+            });
+        }
+    }
+}
+
+// Shared init function for Item Search (copied from procurement_request_item.html)
 function initializeItemSearch() {
     const searchInput = document.getElementById('item_search');
     const hiddenSelect = document.getElementById('item_name');
@@ -537,22 +583,16 @@ function initializeItemSearch() {
     
     if (!searchInput || !hiddenSelect || !dropdown || !chipsContainer || !hiddenInput || !hiddenInputNames || !hiddenInputQuantities) return;
     
-    // Array to store selected items {value: string, text: string, quantity: string}
     let selectedItems = [];
-    
-    // Flag to track if we're clicking on an option
     let clickingOnOption = false;
     let blurTimeout = null;
     
-    // Function to update chips display
     function updateChips() {
         chipsContainer.innerHTML = '';
         selectedItems.forEach((item, index) => {
-            // Create row container
             const row = document.createElement('div');
             row.className = 'item-chip-row';
             
-            // Create chip
             const chip = document.createElement('div');
             chip.className = 'item-chip';
             chip.innerHTML = `
@@ -560,12 +600,10 @@ function initializeItemSearch() {
                 <button type="button" class="remove-chip" onclick="removeItemChip(${index})" title="Remove item">×</button>
             `;
             
-            // Create quantity label
             const quantityLabel = document.createElement('label');
             quantityLabel.className = 'item-chip-quantity-label';
             quantityLabel.textContent = 'QTY:';
             
-            // Create quantity input
             const quantityInput = document.createElement('input');
             quantityInput.type = 'text';
             quantityInput.className = 'item-chip-quantity';
@@ -573,7 +611,6 @@ function initializeItemSearch() {
             quantityInput.value = item.quantity || '';
             quantityInput.setAttribute('data-item-index', index);
             
-            // Update quantity when input changes
             quantityInput.addEventListener('input', function() {
                 const itemIndex = parseInt(this.getAttribute('data-item-index'));
                 if (selectedItems[itemIndex]) {
@@ -582,7 +619,6 @@ function initializeItemSearch() {
                 }
             });
             
-            // Append chip, label, and quantity to row
             row.appendChild(chip);
             row.appendChild(quantityLabel);
             row.appendChild(quantityInput);
@@ -592,24 +628,18 @@ function initializeItemSearch() {
         updateHiddenInputs();
     }
     
-    // Function to update hidden inputs
     function updateHiddenInputs() {
-        // Update hidden input with comma-separated values
         hiddenInputNames.value = selectedItems.map(i => i.value).join(',');
-        // Update quantities as JSON array matching item order
         hiddenInputQuantities.value = JSON.stringify(selectedItems.map(i => i.quantity || ''));
-        // Also update item_name_value for backward compatibility (use first item or empty)
         hiddenInput.value = selectedItems.length > 0 ? selectedItems[0].value : '';
     }
     
-    // Function to remove an item chip
     window.removeItemChip = function(index) {
         selectedItems.splice(index, 1);
         updateChips();
         updateDropdownSelection();
     };
     
-    // Function to update dropdown to show selected items
     function updateDropdownSelection() {
         const options = dropdown.querySelectorAll('.item-option');
         options.forEach(option => {
@@ -623,34 +653,29 @@ function initializeItemSearch() {
         });
     }
     
-    // Build dropdown from select options
     function buildDropdown() {
         dropdown.innerHTML = '';
         const options = hiddenSelect.querySelectorAll('option');
         
         options.forEach(option => {
-            if (option.value === '') return; // Skip placeholder
+            if (option.value === '') return;
             
-            // Create option
             const optionDiv = document.createElement('div');
             optionDiv.className = 'item-option';
             optionDiv.textContent = option.textContent;
             optionDiv.setAttribute('data-value', option.value);
             
-            // Copy category attribute if it exists
             const category = option.getAttribute('data-category');
             if (category) {
                 optionDiv.setAttribute('data-category', category);
             }
             
-            // Use mousedown instead of click for better trackpad support
             optionDiv.addEventListener('mousedown', function(e) {
-                e.preventDefault(); // Prevent blur from firing
+                e.preventDefault();
                 clickingOnOption = true;
                 selectItem(option.value, option.textContent);
             });
             
-            // Keep click as fallback for accessibility
             optionDiv.addEventListener('click', function(e) {
                 if (!clickingOnOption) {
                     selectItem(option.value, option.textContent);
@@ -661,19 +686,16 @@ function initializeItemSearch() {
         });
         
         updateDropdownSelection();
-        filterByCategory(); // Apply category filter after building
+        filterByCategory();
     }
     
     function selectItem(value, text) {
-        // Check if item is already selected - if so, remove it (toggle behavior)
         const existingIndex = selectedItems.findIndex(i => i.value === value);
         if (existingIndex !== -1) {
-            // Item already selected, remove it
             selectedItems.splice(existingIndex, 1);
             updateChips();
             updateDropdownSelection();
             
-            // Clear search input but keep dropdown open so user can continue selecting
             searchInput.value = '';
             dropdown.style.display = 'block';
             searchInput.focus();
@@ -684,37 +706,41 @@ function initializeItemSearch() {
             return;
         }
         
-        // Clear any pending blur timeout
         if (blurTimeout) {
             clearTimeout(blurTimeout);
             blurTimeout = null;
         }
         
-        // Set flag to prevent any immediate blur actions
         clickingOnOption = true;
         
-        // Add to selected items with empty quantity
         selectedItems.push({ value: value, text: text, quantity: '' });
         
-        // Update UI
         updateChips();
         updateDropdownSelection();
         
-        // Clear search input but keep dropdown open so user can continue selecting
         searchInput.value = '';
         dropdown.style.display = 'block';
         
-        // Restore focus so user can continue typing
-        // Since blur handler won't close dropdown when items are selected, we can simplify this
         setTimeout(() => {
             searchInput.focus();
             clickingOnOption = false;
         }, 100);
     }
     
+    // Expose for draft loading
+    window.selectItemFromDraft = function(value, quantity) {
+        const text = value;
+        const existingIndex = selectedItems.findIndex(i => i.value === value);
+        if (existingIndex === -1) {
+            selectedItems.push({ value: value, text: text, quantity: quantity || '' });
+            updateChips();
+            updateDropdownSelection();
+        }
+    };
+    
     function filterByCategory() {
         const categorySelect = document.getElementById('category');
-        if (!categorySelect) return; // Category select might not exist for non-Operation users
+        if (!categorySelect) return;
         
         const selectedCategory = categorySelect.value;
         const options = dropdown.querySelectorAll('.item-option');
@@ -722,21 +748,15 @@ function initializeItemSearch() {
         options.forEach(option => {
             const optionCategory = option.getAttribute('data-category');
             
-            // If a category is selected, only show items matching that category
-            // Items without a category attribute should be hidden when a category is selected
-            // If no category is selected, show all items (unless hidden by search)
             if (selectedCategory) {
                 if (optionCategory === selectedCategory) {
-                    // Show items matching the selected category (unless hidden by search)
                     if (!option.classList.contains('hidden-by-search')) {
                         option.classList.remove('hidden');
                     }
                 } else {
-                    // Hide items that don't match the selected category
                     option.classList.add('hidden');
                 }
             } else {
-                // No category selected - show all items (unless hidden by search)
                 if (!option.classList.contains('hidden-by-search')) {
                     option.classList.remove('hidden');
                 }
@@ -755,7 +775,6 @@ function initializeItemSearch() {
             const matchesSearch = text.includes(searchTerm.toLowerCase());
             const optionCategory = option.getAttribute('data-category');
             
-            // Check if item matches category filter
             const matchesCategory = !selectedCategory || optionCategory === selectedCategory;
             
             if (matchesSearch && matchesCategory) {
@@ -773,39 +792,30 @@ function initializeItemSearch() {
         dropdown.style.display = hasVisibleOptions ? 'block' : 'none';
     }
     
-    // Event listeners
     searchInput.addEventListener('input', function() {
         const isOthersMode = this.getAttribute('data-others-mode') === 'true';
         const searchTerm = this.value.trim();
         
-        // Handle "Others" mode - free text entry (for single custom item)
         if (isOthersMode) {
-            // In Others mode, allow typing a custom item name
-            // When user presses Enter or blurs, add it as a single item
             dropdown.style.display = 'none';
             return;
         }
         
-        // Normal mode - search and filter
         if (searchTerm.length > 0) {
-            // Filter dropdown options
             filterItems(searchTerm);
         } else {
-            // Show all options when search is empty (respecting category filter)
             filterByCategory();
             const visibleOptions = dropdown.querySelectorAll('.item-option:not(.hidden)');
             dropdown.style.display = visibleOptions.length > 0 ? 'block' : 'none';
         }
     });
     
-    // Handle Enter key in Others mode to add custom item
     searchInput.addEventListener('keydown', function(e) {
         const isOthersMode = this.getAttribute('data-others-mode') === 'true';
         if (isOthersMode && e.key === 'Enter') {
             e.preventDefault();
             const customValue = this.value.trim();
             if (customValue) {
-                // Check if already added
                 const existingIndex = selectedItems.findIndex(i => i.value === customValue);
                 if (existingIndex === -1) {
                     selectedItems.push({ value: customValue, text: customValue, quantity: '' });
@@ -819,7 +829,6 @@ function initializeItemSearch() {
     searchInput.addEventListener('focus', function() {
         const isOthersMode = this.getAttribute('data-others-mode') === 'true';
         
-        // Don't show dropdown in Others mode
         if (isOthersMode) {
             dropdown.style.display = 'none';
             return;
@@ -835,20 +844,14 @@ function initializeItemSearch() {
     });
     
     searchInput.addEventListener('blur', function(e) {
-        // If we have selected items, NEVER close dropdown via blur - only close when clicking outside
-        // This prevents the glitchy disappearing/reappearing behavior
         if (selectedItems.length > 0) {
-            // Don't set any timeout - just keep dropdown open
-            // The click-outside handler will close it if needed
             return;
         }
         
-        // Delay hiding to allow clicks on options (only when no items selected yet)
         if (blurTimeout) {
             clearTimeout(blurTimeout);
         }
         blurTimeout = setTimeout(() => {
-            // Don't close dropdown if we're clicking on an option
             if (clickingOnOption) {
                 blurTimeout = null;
                 return;
@@ -862,12 +865,10 @@ function initializeItemSearch() {
                 (searchInput.closest('.item-select-container') && searchInput.closest('.item-select-container').contains(relatedTarget))
             );
             
-            // No items selected yet, close dropdown if not clicking inside
             if (!isClickingInsideContainer) {
                 dropdown.style.display = 'none';
             }
             
-            // In Others mode, if user typed something and blurred, add it
             const isOthersMode = this.getAttribute('data-others-mode') === 'true';
             if (isOthersMode && !clickingOnOption) {
                 const customValue = this.value.trim();
@@ -884,110 +885,27 @@ function initializeItemSearch() {
         }, 200);
     });
     
-    // Hide dropdown when clicking outside
     document.addEventListener('click', function(e) {
-        // Don't hide if clicking inside the item-select-container
         const itemSelectContainer = searchInput.closest('.item-select-container');
         const isClickingInsideContainer = itemSelectContainer && itemSelectContainer.contains(e.target);
         
-        // Don't hide if clicking on quantity inputs or remove buttons
         const isQuantityInput = e.target.classList.contains('item-chip-quantity');
         const isRemoveButton = e.target.classList.contains('remove-chip') || e.target.closest('.remove-chip');
         const isQuantityLabel = e.target.classList.contains('item-chip-quantity-label');
         
-        // Only close if clicking completely outside the container
         if (!isClickingInsideContainer && !isQuantityInput && !isRemoveButton && !isQuantityLabel) {
             dropdown.style.display = 'none';
         }
     });
     
-    // Function to check if category has predefined items
-    function categoryHasPredefinedItems(categoryName) {
-        if (!categoryName || categoryName === 'Others') {
-            return false;
-        }
-        const options = hiddenSelect.querySelectorAll('option[data-category="' + categoryName + '"]');
-        return options.length > 0;
-    }
-    
-    // Function to toggle quantity field visibility
-    function toggleQuantityField() {
-        const quantityFieldGroup = document.getElementById('quantity_field_group');
-        if (!quantityFieldGroup) return;
-        
-        const categorySelect = document.getElementById('category');
-        const selectedCategory = categorySelect ? categorySelect.value : '';
-        
-        // Hide quantity field if category has predefined items (each item will have its own quantity)
-        // Show it if category is empty, "Others", or has no predefined items
-        if (selectedCategory && selectedCategory !== 'Others' && categoryHasPredefinedItems(selectedCategory)) {
-            quantityFieldGroup.style.display = 'none';
-        } else {
-            quantityFieldGroup.style.display = 'block';
-        }
-    }
-    
-    // Category change event listener
-    const categorySelect = document.getElementById('category');
-    if (categorySelect) {
-        categorySelect.addEventListener('change', function() {
-            const selectedCategory = this.value;
-            
-            // When category changes, clear any previously selected items and their quantities
-            selectedItems = [];
-            updateChips();
-            updateDropdownSelection();
-            
-            // Check if user is from Operation department (has predefined items)
-            const hasPredefinedItems = hiddenSelect.options.length > 1; // More than just the placeholder option
-            
-            // Handle "Others" category - allow free text entry
-            if (selectedCategory === 'Others') {
-                // Hide dropdown and change placeholder
-                dropdown.style.display = 'none';
-                searchInput.placeholder = 'Enter item name...';
-                searchInput.setAttribute('data-others-mode', 'true');
-            } else {
-                // Restore normal behavior for other categories
-                if (hasPredefinedItems) {
-                    searchInput.placeholder = 'Search items...';
-                } else {
-                    searchInput.placeholder = 'Enter item name...';
-                }
-                searchInput.removeAttribute('data-others-mode');
-                
-                // Apply category filter (only for Operation department with predefined items)
-                if (hasPredefinedItems) {
-                    filterByCategory();
-                    // Show dropdown with filtered items
-                    const visibleOptions = dropdown.querySelectorAll('.item-option:not(.hidden)');
-                    dropdown.style.display = visibleOptions.length > 0 ? 'block' : 'none';
-                } else {
-                    // For non-Operation departments, hide dropdown since there are no predefined items
-                    dropdown.style.display = 'none';
-                }
-            }
-            
-            // Toggle quantity field visibility based on category
-            toggleQuantityField();
-        });
-    }
-    
-    // Initial toggle of quantity field on page load
-    toggleQuantityField();
-    
-    // Initialize dropdown
     buildDropdown();
     updateChips();
     
-    // Update form submission to use hidden input value and validate
     const form = document.getElementById('itemRequestForm');
     if (form) {
         form.addEventListener('submit', function(e) {
-            // Clear previous error messages
             clearErrorMessages();
             
-            // Validate that at least one item is selected
             if (selectedItems.length === 0) {
                 e.preventDefault();
                 showErrorMessage('item_name', 'Please select at least one item name.');
@@ -995,8 +913,6 @@ function initializeItemSearch() {
                 return false;
             }
             
-            // Validate that all selected items have a quantity
-            // First, update quantities from DOM inputs to ensure we have the latest values
             const quantityInputs = document.querySelectorAll('.item-chip-quantity');
             quantityInputs.forEach((input, index) => {
                 if (selectedItems[index]) {
@@ -1008,7 +924,6 @@ function initializeItemSearch() {
             if (itemsWithoutQuantity.length > 0) {
                 e.preventDefault();
                 showErrorMessage('item_name', 'Please enter a quantity for all selected items.');
-                // Focus on the first quantity input that's empty
                 const firstEmptyQuantityInput = Array.from(quantityInputs).find(input => !input.value || input.value.trim() === '');
                 if (firstEmptyQuantityInput) {
                     firstEmptyQuantityInput.focus();
@@ -1018,9 +933,7 @@ function initializeItemSearch() {
                 return false;
             }
             
-            // Ensure item_names is set before submission
             hiddenInputNames.value = selectedItems.map(i => i.value).join(',');
-            // Also set item_name_value for backward compatibility
             hiddenInput.value = selectedItems.length > 0 ? selectedItems[0].value : '';
         });
     }
@@ -1035,17 +948,11 @@ function initializeBranchSearch() {
     
     if (!searchInput || !hiddenSelect || !dropdown || !chipsContainer || !hiddenInput) return;
     
-    // Array to store selected branches {value: string, text: string}
     let selectedBranches = [];
-    
-    // Flags to track selection state - much more robust than timeouts
     let isSelectionInProgress = false;
     let blurTimeout = null;
-    
-    // Store dropdown visibility state to prevent unwanted closing
     let shouldKeepDropdownOpen = false;
     
-    // Function to update chips display
     function updateChips() {
         chipsContainer.innerHTML = '';
         selectedBranches.forEach((branch, index) => {
@@ -1058,18 +965,15 @@ function initializeBranchSearch() {
             chipsContainer.appendChild(chip);
         });
         
-        // Update hidden input with comma-separated values
         hiddenInput.value = selectedBranches.map(b => b.value).join(',');
     }
     
-    // Function to remove a branch chip
     window.removeBranchChip = function(index) {
         selectedBranches.splice(index, 1);
         updateChips();
         updateDropdownSelection();
     };
     
-    // Function to update dropdown to show selected branches
     function updateDropdownSelection() {
         const options = dropdown.querySelectorAll('.branch-option');
         options.forEach(option => {
@@ -1083,18 +987,16 @@ function initializeBranchSearch() {
         });
     }
     
-    // Build dropdown from select options
     function buildDropdown() {
         dropdown.innerHTML = '';
         const options = hiddenSelect.querySelectorAll('option');
         let currentGroup = null;
         
         options.forEach(option => {
-            if (option.value === '') return; // Skip placeholder
+            if (option.value === '') return;
             
             const restaurant = option.getAttribute('data-restaurant') || 'Other';
             
-            // Create group header if needed
             if (!currentGroup || currentGroup !== restaurant) {
                 const groupDiv = document.createElement('div');
                 groupDiv.className = 'branch-group';
@@ -1104,26 +1006,21 @@ function initializeBranchSearch() {
                 currentGroup = restaurant;
             }
             
-            // Create option
             const optionDiv = document.createElement('div');
             optionDiv.className = 'branch-option';
             optionDiv.textContent = option.textContent;
             optionDiv.setAttribute('data-value', option.value);
             optionDiv.setAttribute('data-restaurant', restaurant);
             
-            // Use pointerdown for best trackpad support across all devices
-            // pointerdown fires reliably before blur on both mouse and trackpad
             optionDiv.addEventListener('pointerdown', function(e) {
-                e.preventDefault(); // Prevent blur from firing
-                e.stopPropagation(); // Prevent event bubbling
+                e.preventDefault();
+                e.stopPropagation();
                 selectBranch(option.value, option.textContent);
             });
             
-            // Keep mousedown as fallback for older browsers
             optionDiv.addEventListener('mousedown', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                // Only call if pointerdown hasn't already handled it
                 if (!isSelectionInProgress) {
                     selectBranch(option.value, option.textContent);
                 }
@@ -1137,43 +1034,32 @@ function initializeBranchSearch() {
     
     function selectBranch(value, text) {
         try {
-            // Mark selection as in progress FIRST
             isSelectionInProgress = true;
             shouldKeepDropdownOpen = true;
             
-            // Clear any pending blur timeout immediately
             if (blurTimeout) {
                 clearTimeout(blurTimeout);
                 blurTimeout = null;
             }
             
-            // Check if branch is already selected - if so, remove it (toggle behavior)
             const existingIndex = selectedBranches.findIndex(b => b.value === value);
             if (existingIndex !== -1) {
-                // Branch already selected, remove it
                 selectedBranches.splice(existingIndex, 1);
             } else {
-                // Add to selected branches
                 selectedBranches.push({ value: value, text: text });
             }
             
-            // Update UI - these are deferred to ensure they happen after selection flag is set
             updateChips();
             updateDropdownSelection();
             
-            // Clear search input but keep dropdown open so user can continue selecting
             searchInput.value = '';
             dropdown.style.display = 'block';
             
-            // Re-focus AFTER DOM updates to ensure focus is properly restored
-            // Use a microtask (Promise) for more reliable timing than setTimeout
             Promise.resolve().then(() => {
                 searchInput.focus();
-                // Ensure dropdown is still visible after focus
                 dropdown.style.display = 'block';
             }).catch(err => console.error('Error in selectBranch focus:', err))
             .finally(() => {
-                // Mark selection as complete after focus is restored
                 isSelectionInProgress = false;
             });
         } catch (error) {
@@ -1181,6 +1067,23 @@ function initializeBranchSearch() {
             isSelectionInProgress = false;
         }
     }
+    
+    // Expose for draft loading
+    window.selectBranchFromDraft = function(value) {
+        // Find the text from options
+        let text = value;
+        const option = hiddenSelect.querySelector(`option[value="${value}"]`);
+        if (option) {
+            text = option.textContent;
+        }
+        
+        const existingIndex = selectedBranches.findIndex(b => b.value === value);
+        if (existingIndex === -1) {
+            selectedBranches.push({ value: value, text: text });
+            updateChips();
+            updateDropdownSelection();
+        }
+    };
     
     function filterBranches(searchTerm) {
         const options = dropdown.querySelectorAll('.branch-option');
@@ -1201,7 +1104,6 @@ function initializeBranchSearch() {
             }
         });
         
-        // Show/hide groups based on visible options
         groups.forEach(group => {
             const restaurant = group.getAttribute('data-restaurant');
             const hasVisibleOptionsInGroup = Array.from(options).some(option => 
@@ -1218,13 +1120,11 @@ function initializeBranchSearch() {
         dropdown.style.display = hasVisibleOptions ? 'block' : 'none';
     }
     
-    // Event listeners
     searchInput.addEventListener('input', function() {
         const searchTerm = this.value.trim();
         if (searchTerm.length > 0) {
             filterBranches(searchTerm);
         } else {
-            // Show all options when search is empty
             dropdown.querySelectorAll('.branch-option').forEach(option => {
                 option.classList.remove('hidden');
             });
@@ -1242,24 +1142,19 @@ function initializeBranchSearch() {
     });
     
     searchInput.addEventListener('blur', function(e) {
-        // NEVER close dropdown if selection is in progress
         if (isSelectionInProgress) {
             return;
         }
         
-        // Delay hiding to allow clicks on options
-        // Clear any existing timeout first
         if (blurTimeout) {
             clearTimeout(blurTimeout);
         }
         blurTimeout = setTimeout(() => {
-            // Skip if selection started while we were waiting
             if (isSelectionInProgress) {
                 blurTimeout = null;
                 return;
             }
             
-            // Check if the relatedTarget is within the dropdown or container
             const relatedTarget = e.relatedTarget;
             const branchContainer = searchInput.closest('.branch-select-container');
             const isClickingInsideContainer = relatedTarget && (
@@ -1269,7 +1164,6 @@ function initializeBranchSearch() {
                 (branchContainer && branchContainer.contains(relatedTarget))
             );
             
-            // Only hide dropdown if clicking outside the entire container
             if (!isClickingInsideContainer) {
                 dropdown.style.display = 'none';
                 shouldKeepDropdownOpen = false;
@@ -1278,9 +1172,7 @@ function initializeBranchSearch() {
         }, 100);
     });
     
-    // Hide dropdown when clicking outside
     document.addEventListener('click', function(e) {
-        // Never close if selection is in progress
         if (isSelectionInProgress) {
             return;
         }
@@ -1288,24 +1180,17 @@ function initializeBranchSearch() {
         const branchContainer = searchInput.closest('.branch-select-container');
         const isClickingInsideContainer = branchContainer && branchContainer.contains(e.target);
         
-        // Only hide if clicking completely outside the container
         if (!isClickingInsideContainer && !shouldKeepDropdownOpen) {
             dropdown.style.display = 'none';
         }
     });
     
-    // Initialize dropdown
     buildDropdown();
     updateChips();
     
-    // Form submission handler - ensure branch_names is set
     const form = document.getElementById('itemRequestForm');
     if (form) {
-        // Get existing submit handler
-        const existingHandler = form.onsubmit;
-        
         form.addEventListener('submit', function(e) {
-            // Validate that at least one branch is selected
             if (selectedBranches.length === 0) {
                 e.preventDefault();
                 showErrorMessage('branch_name', 'Please select at least one branch name.');
@@ -1313,7 +1198,6 @@ function initializeBranchSearch() {
                 return false;
             }
             
-            // Ensure branch_names is set before submission
             hiddenInput.value = selectedBranches.map(b => b.value).join(',');
         });
     }

@@ -670,6 +670,7 @@ class ProcurementItemRequest(db.Model):
     is_urgent = db.Column(db.Boolean, default=False)
     notes = db.Column(db.Text, nullable=True)
     status = db.Column(db.String(50), default='Pending Manager Approval')  # Pending Manager Approval, Pending Procurement Manager Approval, Assigned to Procurement, Completed, Rejected by Manager, Rejected by Procurement Manager
+    is_draft = db.Column(db.Boolean, default=False)  # Flag to indicate if this is a draft
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
