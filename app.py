@@ -5037,10 +5037,11 @@ def item_request_manager_approve_handler(request_id, item_request):
     
     # Notify requestor
     if item_request.user_id:
+        formatted_items = ', '.join([item.strip() for item in item_request.item_name.split(',') if item.strip()]) if item_request.item_name else 'Item'
         create_notification(
             user_id=item_request.user_id,
             title="Item Request Approved by Manager",
-            message=f"Your item request #{request_id} for {item_request.item_name} has been approved by your manager and sent to Procurement Manager.",
+            message=f"Your item request #{request_id} for {formatted_items} has been approved by your manager and sent to Procurement Manager.",
             notification_type="request_approved",
             item_request_id=request_id
         )
@@ -5097,12 +5098,15 @@ def item_request_manager_reject_handler(request_id, item_request):
     
     log_action(f"Manager rejected item request #{request_id}")
     
+    # Format item names with spaces
+    formatted_items = ', '.join([item.strip() for item in item_request.item_name.split(',') if item.strip()]) if item_request.item_name else 'Item'
+    
     # Notify requestor
     if item_request.user_id:
         create_notification(
             user_id=item_request.user_id,
             title="Item Request Rejected by Manager",
-            message=f"Your item request #{request_id} for {item_request.item_name} has been rejected by your manager. Reason: {rejection_reason}",
+            message=f"Your item request #{request_id} for {formatted_items} has been rejected by your manager. Reason: {rejection_reason}",
             notification_type="request_rejected",
             item_request_id=request_id
         )
@@ -5116,7 +5120,7 @@ def item_request_manager_reject_handler(request_id, item_request):
         create_notification(
             user_id=pm.user_id,
             title="Item Request Rejected by Manager",
-            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been rejected by {current_user.name}. Reason: {rejection_reason}",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {formatted_items} has been rejected by {current_user.name}. Reason: {rejection_reason}",
             notification_type="request_rejected",
             item_request_id=request_id
         )
@@ -5128,7 +5132,7 @@ def item_request_manager_reject_handler(request_id, item_request):
             create_notification(
                 user_id=approver.user_id,
                 title="Item Request Rejected by Another Manager",
-                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been rejected by {current_user.name}. Reason: {rejection_reason}",
+                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {formatted_items} has been rejected by {current_user.name}. Reason: {rejection_reason}",
                 notification_type="request_rejected",
                 item_request_id=request_id
             )
@@ -5155,8 +5159,11 @@ def item_request_manager_on_hold_handler(request_id, item_request):
     
     log_action(f"Manager put item request #{request_id} on hold")
     
+    # Format item names with spaces
+    formatted_items = ', '.join([item.strip() for item in item_request.item_name.split(',') if item.strip()]) if item_request.item_name else 'Item'
+    
     # Build message
-    message_base = f"Item request #{request_id} for {item_request.item_name} has been put on hold by {current_user.name}."
+    message_base = f"Item request #{request_id} for {formatted_items} has been put on hold by {current_user.name}."
     if on_hold_reason:
         message_base += f" Reason: {on_hold_reason}"
     
@@ -5510,12 +5517,15 @@ def item_request_procurement_manager_reject_handler(request_id, item_request):
     
     log_action(f"Procurement Manager rejected item request #{request_id}")
     
+    # Format item names with spaces
+    formatted_items = ', '.join([item.strip() for item in item_request.item_name.split(',') if item.strip()]) if item_request.item_name else 'Item'
+    
     # Notify requestor
     if item_request.user_id:
         create_notification(
             user_id=item_request.user_id,
             title="Item Request Rejected by Procurement Manager",
-            message=f"Your item request #{request_id} for {item_request.item_name} has been rejected by Procurement Manager. Reason: {rejection_reason}",
+            message=f"Your item request #{request_id} for {formatted_items} has been rejected by Procurement Manager. Reason: {rejection_reason}",
             notification_type="request_rejected",
             item_request_id=request_id
         )
@@ -5525,7 +5535,7 @@ def item_request_procurement_manager_reject_handler(request_id, item_request):
         create_notification(
             user_id=item_request.manager_approver_user_id,
             title="Item Request Rejected by Procurement Manager",
-            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} that you approved has been rejected by Procurement Manager. Reason: {rejection_reason}",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {formatted_items} that you approved has been rejected by Procurement Manager. Reason: {rejection_reason}",
             notification_type="request_rejected",
             item_request_id=request_id
         )
@@ -5552,8 +5562,11 @@ def item_request_procurement_manager_on_hold_handler(request_id, item_request):
     
     log_action(f"Procurement Manager put item request #{request_id} on hold")
     
+    # Format item names with spaces
+    formatted_items = ', '.join([item.strip() for item in item_request.item_name.split(',') if item.strip()]) if item_request.item_name else 'Item'
+    
     # Build message
-    message_base = f"Item request #{request_id} for {item_request.item_name} has been put on hold by Procurement Manager {current_user.name}."
+    message_base = f"Item request #{request_id} for {formatted_items} has been put on hold by Procurement Manager {current_user.name}."
     if on_hold_reason:
         message_base += f" Reason: {on_hold_reason}"
     
@@ -5633,12 +5646,15 @@ def item_request_procurement_manager_reject(request_id):
     
     log_action(f"Procurement Manager rejected item request #{request_id}")
     
+    # Format item names with spaces
+    formatted_items = ', '.join([item.strip() for item in item_request.item_name.split(',') if item.strip()]) if item_request.item_name else 'Item'
+    
     # Notify requestor
     if item_request.user_id:
         create_notification(
             user_id=item_request.user_id,
             title="Item Request Rejected by Procurement Manager",
-            message=f"Your item request #{request_id} for {item_request.item_name} has been rejected by Procurement Manager. Reason: {rejection_reason}",
+            message=f"Your item request #{request_id} for {formatted_items} has been rejected by Procurement Manager. Reason: {rejection_reason}",
             notification_type="request_rejected",
             item_request_id=request_id
         )
@@ -5648,7 +5664,7 @@ def item_request_procurement_manager_reject(request_id):
         create_notification(
             user_id=item_request.manager_approver_user_id,
             title="Item Request Rejected by Procurement Manager",
-            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} that you approved has been rejected by Procurement Manager. Reason: {rejection_reason}",
+            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {formatted_items} that you approved has been rejected by Procurement Manager. Reason: {rejection_reason}",
             notification_type="request_rejected",
             item_request_id=request_id
         )
@@ -10894,9 +10910,7 @@ def draft_to_dict(draft):
         'amount': float(draft.amount) if draft.amount else None,
         'recurring': draft.recurring,
         'recurring_interval': draft.recurring_interval,
-        'item_name': draft.item_name,
-        'person_company': draft.person_company,
-        'company_name': draft.company_name
+        'person_company': draft.person_company
     }
 
 def get_available_request_types():
@@ -11108,9 +11122,6 @@ def new_request():
                 # Convert list to JSON string for storage
                 receipt_path = json.dumps(receipt_paths) if receipt_paths else None
         
-        # Get dynamic fields based on request type
-        item_name = request.form.get('item_name')
-        
         # Handle person_company - check both text input and dropdown
         person_company_value = request.form.get('person_company', '').strip()
         person_company_select = request.form.get('person_company_select', '').strip()
@@ -11123,8 +11134,6 @@ def new_request():
             print(f"DEBUG: Draft save - person_company_select: '{person_company_select}'")
             print(f"DEBUG: Draft save - final person_company: '{person_company}'")
             print(f"DEBUG: Draft save - request.form keys: {list(request.form.keys())}")
-        
-        company_name = request.form.get('company_name')
         others_description = request.form.get('others_description')
         
         # Set status based on whether it's a draft
@@ -11147,9 +11156,7 @@ def new_request():
             request_type=final_request_type or 'Draft',
             requestor_name=requestor_name or current_user.name,
             branch_name=branch_name or '',
-            item_name=item_name if request_type == 'Item' else None,
-            person_company=person_company if person_company else None,
-            company_name=company_name if request_type == 'Supplier/Rental' else None,
+            person_company=person_company or None,  # Store person_company regardless of type
             department=current_user.department,
             date=date,
             purpose=purpose or '',
@@ -11373,7 +11380,16 @@ def edit_draft(draft_id):
         submit_draft = request.form.get('submit_draft') == 'true'
         
         # Update draft fields
-        draft.request_type = request.form.get('request_type') or draft.request_type
+        request_type = request.form.get('request_type') or draft.request_type
+        others_description = request.form.get('others_description')
+        
+        # Handle "Others" request type with description
+        if request_type == 'Others' and others_description:
+            final_request_type = f"Others: {others_description}"
+        else:
+            final_request_type = request_type
+        
+        draft.request_type = final_request_type
         draft.requestor_name = request.form.get('requestor_name') or draft.requestor_name
         
         # Handle branch name - check for multiple branch names first (new format), then fall back to single branch_name
@@ -11402,24 +11418,14 @@ def edit_draft(draft_id):
         draft.recurring = request.form.get('recurring', 'One-Time')
         draft.recurring_interval = request.form.get('recurring_interval') if draft.recurring == 'Recurring' else None
         
-        # Handle dynamic fields based on request type
-        request_type = request.form.get('request_type') or draft.request_type
-        draft.item_name = request.form.get('item_name') if request_type == 'Item' else None
-        
-        # Handle person_company - check request type to determine if it should be set
-        # Check both person_company (text input) and person_company_select (dropdown)
+        # Handle person_company - check both text input and dropdown
+        # Store regardless of request type to preserve data across edits
         person_company_value = request.form.get('person_company', '').strip()
         person_company_select = request.form.get('person_company_select', '').strip()
         # Use select value if available, otherwise use text input
         final_person_company = person_company_select if person_company_select else person_company_value
         
-        if request_type in ['Person', 'Company']:
-            draft.person_company = final_person_company if final_person_company else None
-        else:
-            draft.person_company = None
-        
-        # Handle company_name for Supplier/Rental type
-        draft.company_name = request.form.get('company_name') if request_type == 'Supplier/Rental' else None
+        draft.person_company = final_person_company if final_person_company else None  # Store regardless of type
         
         # Handle file uploads - always check for new files and preserve existing ones
         import uuid

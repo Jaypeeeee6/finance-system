@@ -126,14 +126,12 @@ class PaymentRequest(db.Model):
     __tablename__ = 'payment_requests'
     
     request_id = db.Column(db.Integer, primary_key=True)
-    request_type = db.Column(db.String(50), nullable=False)  # Item, Person, Supplier/Rental, Company
+    request_type = db.Column(db.String(50), nullable=False)  # Request type (e.g., Person, Company, Supplier/Rental, Item, Others)
     requestor_name = db.Column(db.String(100), nullable=False)
     branch_name = db.Column(db.String(100), nullable=False)  # Branch name for the request
     
-    # Dynamic fields based on request type
-    item_name = db.Column(db.String(200))  # For Item type
+    # Dynamic field for Person/Company Name
     person_company = db.Column(db.String(200))  # For Person/Company type
-    company_name = db.Column(db.String(200))  # For Supplier/Rental type
     
     department = db.Column(db.String(100), nullable=False)
     date = db.Column(db.Date, nullable=False)

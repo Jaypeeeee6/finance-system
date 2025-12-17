@@ -637,17 +637,6 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     <input type="text" id="branch_name" value="{{ request.branch_name|replace(',', ', ') }}" readonly style="background: #f5f5f5; cursor: not-allowed;">
                 </div>
 
-                <!-- Dynamic fields based on request type -->
-                {% if request.item_name %}
-                <div class="form-group">
-                    <label for="item_name">
-                        {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="item_name" required>{% endif %}
-                        Item Name {% if 'item_name' in edited_fields %}<span class="edited-badge" data-field="item_name" role="button" tabindex="0">Edited</span>{% endif %}
-                    </label>
-                    <input type="text" id="item_name" name="item_name" value="{{ request.item_name }}" readonly style="background: #f5f5f5;">
-                </div>
-                {% endif %}
-
                 <div class="form-group" id="personCompanyGroupView">
                     <label for="person_company">
                         {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="person_company" required>{% endif %}
@@ -663,16 +652,6 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     </select>
                     {% endif %}
                 </div>
-
-                {% if request.company_name %}
-                <div class="form-group">
-                    <label for="company_name">
-                        {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="company_name" required>{% endif %}
-                        Company Name {% if 'company_name' in edited_fields %}<span class="edited-badge" data-field="company_name" role="button" tabindex="0">Edited</span>{% endif %}
-                    </label>
-                    <input type="text" id="company_name" name="company_name" value="{{ request.company_name }}" readonly style="background: #f5f5f5;">
-                </div>
-                {% endif %}
 
                 <div class="form-row">
                     <div class="form-group">
@@ -3219,13 +3198,11 @@ document.addEventListener('DOMContentLoaded', function() {
             request_type: 'Request Type',
             branch_name: 'Branch Name',
             person_company: 'Person/Company Name',
-            company_name: 'Company Name',
             purpose: 'Purpose/Description',
             bank_name: 'Bank Name',
             account_name: 'Account Name',
             account_number: 'Account Number',
-            amount: 'Amount (OMR)',
-            item_name: 'Item Name'
+            amount: 'Amount (OMR)'
         };
         return map[key] || key;
     }
@@ -3505,9 +3482,7 @@ function getFieldDisplayName(fieldKey) {
     const map = {
         request_type: 'Request Type',
         branch_name: 'Branch Name',
-        item_name: 'Item Name',
         person_company: 'Person/Company Name',
-        company_name: 'Company Name',
         department: 'Department',
         purpose: 'Purpose/Description',
         payment_method: 'Payment Method',

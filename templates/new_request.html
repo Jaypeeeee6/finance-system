@@ -237,12 +237,6 @@
                     </style>
                 </div>
 
-                <!-- Dynamic field based on request type -->
-                <div id="itemNameGroup" class="form-group" style="display: none;">
-                    <label for="item_name">Item Name *</label>
-                    <input type="text" name="item_name" id="item_name">
-                </div>
-
                 <div id="othersDescriptionGroup" class="form-group" style="display: none;">
                     <label for="others_description">Please specify the type of request *</label>
                     <input type="text" name="others_description" id="others_description" placeholder="Enter the specific type of request">
@@ -265,11 +259,6 @@
                     <small id="person_company_auto_note" class="auto-populated-note" style="display: none; color: #28a745; font-style: italic; margin-top: 4px;">
                         <i class="fas fa-info-circle"></i> Bank-related fields are automatically populated based on chosen Person/Company Name
                     </small>
-                </div>
-
-                <div id="companyNameGroup" class="form-group" style="display: none;">
-                    <label for="company_name">Company Name *</label>
-                    <input type="text" name="company_name" id="company_name">
                 </div>
 
                 <div class="form-row">
@@ -654,7 +643,7 @@
                             <i class="fas fa-save"></i> Save as Draft
                         </button>
                     </div>
-                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                    <a href="{% if draft %}{{ url_for('drafts') }}{% else %}{{ url_for('dashboard') }}{% endif %}" class="btn btn-secondary">
                         <i class="fas fa-times"></i> Cancel
                     </a>
                 </div>
@@ -972,6 +961,9 @@ function initializeBranchSearch() {
     let clickingOnOption = false;
     let blurTimeout = null;
     
+    // Flag to prevent dropdown from opening during initial draft population
+    let suppressDropdownOpen = false;
+    
     // Function to update chips display
     function updateChips() {
         chipsContainer.innerHTML = '';
@@ -1130,13 +1122,16 @@ function initializeBranchSearch() {
             updateChips();
             updateDropdownSelection();
             
-            // Clear search input but keep dropdown open so user can continue selecting
-            searchInput.value = '';
-            dropdown.style.display = 'block';
-            // Re-focus after a small delay to ensure it works with soft touches
-            setTimeout(() => {
-                searchInput.focus();
-            }, 50);
+            // Only open dropdown if not suppressed (during draft population)
+            if (!suppressDropdownOpen) {
+                // Clear search input but keep dropdown open so user can continue selecting
+                searchInput.value = '';
+                dropdown.style.display = 'block';
+                // Re-focus after a small delay to ensure it works with soft touches
+                setTimeout(() => {
+                    searchInput.focus();
+                }, 50);
+            }
             
             // Reset flag after a delay to allow for soft trackpad touches
             setTimeout(() => {
@@ -1150,19 +1145,27 @@ function initializeBranchSearch() {
         updateChips();
         updateDropdownSelection();
         
-        // Clear search input but keep dropdown open so user can continue selecting
-        searchInput.value = '';
-        dropdown.style.display = 'block';
-        // Re-focus after a small delay to ensure it works with soft touches
-        setTimeout(() => {
-            searchInput.focus();
-        }, 50);
+        // Only open dropdown if not suppressed (during draft population)
+        if (!suppressDropdownOpen) {
+            // Clear search input but keep dropdown open so user can continue selecting
+            searchInput.value = '';
+            dropdown.style.display = 'block';
+            // Re-focus after a small delay to ensure it works with soft touches
+            setTimeout(() => {
+                searchInput.focus();
+            }, 50);
+        }
         
         // Reset flag after a delay to allow for soft trackpad touches
         setTimeout(() => {
             clickingOnOption = false;
         }, 200);
     }
+    
+    // Expose the suppressDropdownOpen flag globally so draft loading can use it
+    window.setSuppressDropdownOpen = function(value) {
+        suppressDropdownOpen = value;
+    };
     
     function filterBranches(searchTerm) {
         const options = dropdown.querySelectorAll('.branch-option');
@@ -1275,14 +1278,10 @@ function handleRequestTypeChange() {
     const requestType = document.getElementById('request_type').value;
     const recurringFields = document.getElementById('recurringFields');
     
-    // Hide all dynamic fields first
-    document.getElementById('itemNameGroup').style.display = 'none';
-    document.getElementById('companyNameGroup').style.display = 'none';
+    // Hide others description field first
     document.getElementById('othersDescriptionGroup').style.display = 'none';
     
-    // Remove required attribute from all dynamic fields
-    document.getElementById('item_name').required = false;
-    document.getElementById('company_name').required = false;
+    // Remove required attribute from others description field
     document.getElementById('others_description').required = false;
     
     // Person/Company Name field is always visible and required
@@ -5235,12 +5234,35 @@ document.addEventListener('DOMContentLoaded', function() {
     const draft = {{ draft|tojson|safe }};
     
     if (draft) {
+        // Save the person_company value to restore it after handleRequestTypeChange
+        const savedPersonCompany = draft.person_company;
+        
         // Fill form fields with draft data
         if (draft.request_type) {
             const requestTypeSelect = document.getElementById('request_type');
             if (requestTypeSelect) {
-                requestTypeSelect.value = draft.request_type;
+                // Handle "Others" type with description
+                let requestType = draft.request_type;
+                let othersDescription = '';
+                
+                if (draft.request_type.startsWith('Others:')) {
+                    // Extract the description part
+                    othersDescription = draft.request_type.substring('Others:'.length).trim();
+                    requestType = 'Others';
+                }
+                
+                requestTypeSelect.value = requestType;
                 handleRequestTypeChange();
+                
+                // If it's an "Others" type, populate the description field
+                if (othersDescription) {
+                    setTimeout(function() {
+                        const othersDescInput = document.getElementById('others_description');
+                        if (othersDescInput) {
+                            othersDescInput.value = othersDescription;
+                        }
+                    }, 100);
+                }
             }
         }
         
@@ -5254,28 +5276,56 @@ document.addEventListener('DOMContentLoaded', function() {
             // Split comma-separated branch names
             const branchNames = draft.branch_name.split(',').map(b => b.trim()).filter(b => b);
             if (branchNames.length > 0) {
-                // Wait for branch search to be initialized, then populate branches
-                setTimeout(function() {
-                    const hiddenSelect = document.getElementById('branch_name');
-                    const hiddenInput = document.getElementById('branch_names');
-                    const chipsContainer = document.getElementById('branch_chips_container');
+                // Suppress dropdown opening during draft population
+                if (typeof window.setSuppressDropdownOpen === 'function') {
+                    window.setSuppressDropdownOpen(true);
+                }
+                
+                // Populate branches immediately - branch search should already be initialized
+                const hiddenSelect = document.getElementById('branch_name');
+                const hiddenInput = document.getElementById('branch_names');
+                const chipsContainer = document.getElementById('branch_chips_container');
+                
+                if (hiddenSelect && hiddenInput) {
+                    // Access the selectedBranches array from initializeBranchSearch scope
+                    // We need to populate it through the selectBranch function
+                    branchNames.forEach(function(branchName) {
+                        // Find the option in the select
+                        const option = Array.from(hiddenSelect.options).find(opt => opt.value === branchName);
+                        if (option && typeof window.selectBranch === 'function') {
+                            // Use the global selectBranch function
+                            window.selectBranch(option.value, option.textContent);
+                        }
+                    });
                     
-                    if (hiddenSelect && hiddenInput) {
-                        // Access the selectedBranches array from initializeBranchSearch scope
-                        // We need to populate it through the selectBranch function
-                        branchNames.forEach(function(branchName) {
-                            // Find the option in the select
-                            const option = Array.from(hiddenSelect.options).find(opt => opt.value === branchName);
-                            if (option && typeof window.selectBranch === 'function') {
-                                // Use the global selectBranch function
-                                window.selectBranch(option.value, option.textContent);
-                            }
-                        });
-                        
-                        // Also update the hidden input directly as fallback
-                        hiddenInput.value = branchNames.join(',');
+                    // Also update the hidden input directly as fallback
+                    hiddenInput.value = branchNames.join(',');
+                    
+                    // Re-enable dropdown opening after population
+                    if (typeof window.setSuppressDropdownOpen === 'function') {
+                        window.setSuppressDropdownOpen(false);
                     }
-                }, 800); // Wait for branch search initialization
+                } else {
+                    // If selectBranch is not yet available, retry with a short delay
+                    setTimeout(function() {
+                        const hiddenSelect = document.getElementById('branch_name');
+                        const hiddenInput = document.getElementById('branch_names');
+                        if (hiddenSelect && hiddenInput) {
+                            branchNames.forEach(function(branchName) {
+                                const option = Array.from(hiddenSelect.options).find(opt => opt.value === branchName);
+                                if (option && typeof window.selectBranch === 'function') {
+                                    window.selectBranch(option.value, option.textContent);
+                                }
+                            });
+                            hiddenInput.value = branchNames.join(',');
+                        }
+                        
+                        // Re-enable dropdown opening after population
+                        if (typeof window.setSuppressDropdownOpen === 'function') {
+                            window.setSuppressDropdownOpen(false);
+                        }
+                    }, 100); // Short retry delay only if needed
+                }
             }
         }
         
@@ -5317,33 +5367,25 @@ document.addEventListener('DOMContentLoaded', function() {
             if (recurringSelect) recurringSelect.value = draft.recurring;
         }
         
-        // Fill dynamic fields based on request type
-        if (draft.item_name) {
-            const itemNameInput = document.getElementById('item_name');
-            if (itemNameInput) itemNameInput.value = draft.item_name;
-        }
-        
-        // Handle person_company - check if it's a dropdown or text input
-        if (draft.person_company) {
-            const personCompanyInput = document.getElementById('person_company');
-            const personCompanySelect = document.getElementById('person_company_select');
-            
-            // Try dropdown first (for supplier types)
-            if (personCompanySelect) {
-                personCompanySelect.value = draft.person_company;
-                // Trigger change event to update bank fields if needed
-                personCompanySelect.dispatchEvent(new Event('change'));
-            }
-            
-            // Also set text input (for Person/Company types)
-            if (personCompanyInput) {
-                personCompanyInput.value = draft.person_company;
-            }
-        }
-        
-        if (draft.company_name) {
-            const companyNameInput = document.getElementById('company_name');
-            if (companyNameInput) companyNameInput.value = draft.company_name;
+        // Handle person_company - restore the saved value after handleRequestTypeChange completes
+        if (savedPersonCompany) {
+            // Use a slight delay to ensure handleRequestTypeChange async operations complete
+            setTimeout(function() {
+                const personCompanyInput = document.getElementById('person_company');
+                const personCompanySelect = document.getElementById('person_company_select');
+                
+                // Try dropdown first (for supplier types)
+                if (personCompanySelect && personCompanySelect.style.display !== 'none') {
+                    personCompanySelect.value = savedPersonCompany;
+                    // Trigger change event to update bank fields if needed
+                    personCompanySelect.dispatchEvent(new Event('change'));
+                }
+                
+                // Also set text input (for Person/Company types)
+                if (personCompanyInput && personCompanyInput.style.display !== 'none') {
+                    personCompanyInput.value = savedPersonCompany;
+                }
+            }, 100); // Wait for async operations to complete
         }
     }
 });
