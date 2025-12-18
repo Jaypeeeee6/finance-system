@@ -429,6 +429,75 @@
     color: var(--primary-color);
 }
 
+/* ==================== REPORTS DROPDOWN (Navbar) ==================== */
+.reports-dropdown {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+}
+
+.reports-dropdown .reports-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 100%;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.6rem 1rem;
+    font-size: inherit;
+    text-decoration: none;
+    color: var(--dark-color);
+    border-radius: 5px;
+    transition: var(--transition);
+}
+
+.reports-dropdown .reports-toggle:hover {
+    background: var(--light-color);
+    color: var(--dark-color);
+}
+
+.reports-dropdown .dropdown-caret {
+    font-size: 0.85em;
+}
+
+.reports-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    min-width: 260px;
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 12px 30px rgba(20, 20, 43, 0.2);
+    padding: 8px 0;
+    display: none;
+    z-index: 20;
+}
+
+.reports-dropdown.open .reports-menu {
+    display: block;
+}
+
+.reports-menu a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    color: #212529;
+    text-decoration: none;
+    font-weight: 500;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.reports-menu a i {
+    color: var(--primary-color);
+}
+
+.reports-menu a:hover {
+    background: rgba(12, 108, 242, 0.08);
+    color: var(--primary-color);
+}
+
 .card-header .filter-controls {
     display: flex;
     align-items: center;

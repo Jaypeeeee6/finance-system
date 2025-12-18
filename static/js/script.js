@@ -52,6 +52,47 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// ==================== REPORTS DROPDOWN (Navbar) ====================
+document.addEventListener('DOMContentLoaded', function() {
+    const reportsDropdowns = document.querySelectorAll('.reports-dropdown');
+    if (!reportsDropdowns.length) {
+        return;
+    }
+
+    const closeAllReports = () => {
+        reportsDropdowns.forEach(dropdown => dropdown.classList.remove('open'));
+    };
+
+    reportsDropdowns.forEach(dropdown => {
+        const toggle = dropdown.querySelector('.reports-toggle');
+        const links = dropdown.querySelectorAll('.reports-menu a');
+        if (!toggle) {
+            return;
+        }
+
+        toggle.addEventListener('click', function(event) {
+            event.preventDefault();
+            const isOpen = dropdown.classList.contains('open');
+            closeAllReports();
+            if (!isOpen) {
+                dropdown.classList.add('open');
+            }
+        });
+
+        links.forEach(link => {
+            link.addEventListener('click', () => {
+                closeAllReports();
+            });
+        });
+    });
+
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('.reports-dropdown')) {
+            closeAllReports();
+        }
+    });
+});
+
 // Animation for slide out
 const style = document.createElement('style');
 style.textContent = `

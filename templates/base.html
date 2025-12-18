@@ -123,7 +123,20 @@
                 
                 
                 {% if current_user.role in ['Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager'] %}
-                <li><a href="{{ url_for('reports') }}" class="nav-link"><i class="fas fa-chart-bar"></i> Reports</a></li>
+                <li class="reports-dropdown">
+                    <button type="button" class="nav-link reports-toggle">
+                        <i class="fas fa-chart-bar"></i> Reports
+                        <i class="fas fa-caret-down dropdown-caret"></i>
+                    </button>
+                    <div class="reports-menu">
+                        <a href="{{ url_for('reports') }}">
+                            <i class="fas fa-chart-line"></i> Payment Request Reports
+                        </a>
+                        <a href="{{ url_for('item_request_reports') }}">
+                            <i class="fas fa-chart-pie"></i> Item Request Reports
+                        </a>
+                    </div>
+                </li>
                 {% endif %}
                 
                 {% if current_user.role in ['Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'IT Department Manager'] %}
