@@ -16219,6 +16219,194 @@ def reports():
                          user=current_user)
 
 
+@app.route('/procurement/item-requests/reports')
+@login_required
+@role_required('Procurement Manager', 'Procurement Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager')
+def item_request_reports():
+    """View item request reports page"""
+    # Get filter parameters (support multiple values)
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    department_filter = request.args.getlist('department')  # List of departments
+    category_filter = request.args.getlist('category')  # List of categories
+    branch_filter = request.args.getlist('branch')  # List of branches
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    status_filter = request.args.getlist('status')  # List of statuses
+    urgent_filter = request.args.get('urgent', None)  # urgent, not_urgent, or None
+    
+    # Validate per_page to prevent abuse
+    if per_page not in [10, 20, 50, 100]:
+        per_page = 10
+    
+    # Build query
+    query = ProcurementItemRequest.query.filter(ProcurementItemRequest.is_draft == False)
+    
+    # GM, CEO, IT Staff, and Operation Manager can see ALL requests from all statuses
+    # Only filter for Department Managers
+    if current_user.role == 'Department Manager':
+        if current_user.department == 'IT':
+            # IT Department Manager can see ALL requests
+            pass
+        elif current_user.department == 'Procurement':
+            # Procurement Department Manager can only see: Assigned to Procurement, Completed, Pending Procurement Manager Approval
+            query = query.filter(ProcurementItemRequest.status.in_([
+                'Assigned to Procurement',
+                'Completed',
+                'Pending Procurement Manager Approval'
+            ]))
+        elif current_user.department == 'Auditing':
+            # Auditing Department Manager can see all completed requests
+            query = query.filter(ProcurementItemRequest.status == 'Completed')
+        else:
+            # Other Department Managers can ONLY see their own department's requests
+            query = query.filter(ProcurementItemRequest.department == current_user.department)
+    # GM, CEO, IT Staff, Operation Manager, and Procurement Staff can see all requests (no filtering)
+    
+    # Status filter
+    if status_filter:
+        status_conditions = []
+        for status in status_filter:
+            if status == 'All Pending':
+                # Show all pending statuses
+                status_conditions.append(ProcurementItemRequest.status.in_([
+                    'Pending Manager Approval', 
+                    'Pending Procurement Manager Approval',
+                    'Assigned to Procurement'
+                ]))
+            else:
+                status_conditions.append(ProcurementItemRequest.status == status)
+        if status_conditions:
+            query = query.filter(db.or_(*status_conditions))
+    else:
+        # If no status filter, exclude "Rejected by Manager" by default
+        query = query.filter(ProcurementItemRequest.status != 'Rejected by Manager')
+    
+    if department_filter:
+        query = query.filter(ProcurementItemRequest.department.in_(department_filter))
+    
+    if category_filter:
+        query = query.filter(ProcurementItemRequest.category.in_(category_filter))
+    
+    if branch_filter:
+        # Handle multiple branch filters (similar to payment requests)
+        all_branch_conditions = []
+        for branch_name in branch_filter:
+            selected_branch = Branch.query.filter_by(name=branch_name).first()
+            if selected_branch:
+                alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
+                names = [selected_branch.name] + alias_names
+                conditions = []
+                for name in names:
+                    conditions.append(ProcurementItemRequest.branch_name == name)
+                    conditions.append(ProcurementItemRequest.branch_name.like(f'{name},%'))
+                    conditions.append(ProcurementItemRequest.branch_name.like(f'%, {name}'))
+                    conditions.append(ProcurementItemRequest.branch_name.like(f'%,{name}'))
+                    conditions.append(ProcurementItemRequest.branch_name.like(f'%, {name},%'))
+                    conditions.append(ProcurementItemRequest.branch_name.like(f'%,{name},%'))
+                all_branch_conditions.append(db.or_(*conditions))
+            else:
+                conditions = [
+                    ProcurementItemRequest.branch_name == branch_name,
+                    ProcurementItemRequest.branch_name.like(f'{branch_name},%'),
+                    ProcurementItemRequest.branch_name.like(f'%, {branch_name}'),
+                    ProcurementItemRequest.branch_name.like(f'%,{branch_name}'),
+                    ProcurementItemRequest.branch_name.like(f'%, {branch_name},%'),
+                    ProcurementItemRequest.branch_name.like(f'%,{branch_name},%')
+                ]
+                all_branch_conditions.append(db.or_(*conditions))
+        if all_branch_conditions:
+            query = query.filter(db.or_(*all_branch_conditions))
+    
+    # Urgent filter
+    if urgent_filter == 'urgent':
+        query = query.filter(ProcurementItemRequest.is_urgent == True)
+    elif urgent_filter == 'not_urgent':
+        query = query.filter(ProcurementItemRequest.is_urgent == False)
+    
+    # Date filtering - use request_date
+    if date_from:
+        query = query.filter(ProcurementItemRequest.request_date >= datetime.strptime(date_from, '%Y-%m-%d').date())
+    if date_to:
+        query = query.filter(ProcurementItemRequest.request_date <= datetime.strptime(date_to, '%Y-%m-%d').date())
+    
+    # Get all filtered requests for stats calculation (before pagination)
+    all_filtered_requests = query.order_by(ProcurementItemRequest.created_at.desc()).all()
+    
+    # Calculate stats from all filtered requests
+    total_requests = len(all_filtered_requests)
+    completed_count = len([r for r in all_filtered_requests if r.status == 'Completed'])
+    pending_count = len([r for r in all_filtered_requests if r.status in [
+        'Pending Manager Approval', 
+        'Pending Procurement Manager Approval',
+        'Assigned to Procurement'
+    ]])
+    urgent_count = len([r for r in all_filtered_requests if r.is_urgent == True])
+    
+    # Calculate total amount (from amount field set by Procurement Manager)
+    total_amount = sum(float(r.amount) if r.amount else 0 for r in all_filtered_requests)
+    
+    # Paginate the query for display
+    pagination = query.order_by(ProcurementItemRequest.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    requests = pagination.items
+    
+    # Get unique departments for filter
+    # On reports page, Procurement Department Manager can see all departments
+    if current_user.role == 'Department Manager' and current_user.department not in ['IT', 'Auditing', 'Procurement']:
+        departments = [current_user.department] if current_user.department else []
+    else:
+        departments = db.session.query(ProcurementItemRequest.department).distinct().all()
+        departments = [d[0] for d in departments if d[0]]
+        departments.sort()
+    
+    # Get unique categories for filter
+    categories_query = db.session.query(ProcurementItemRequest.category).filter(
+        ProcurementItemRequest.category.isnot(None),
+        ProcurementItemRequest.category != ''
+    )
+    if status_filter:
+        status_conditions = []
+        for status in status_filter:
+            if status == 'All Pending':
+                status_conditions.append(ProcurementItemRequest.status.in_([
+                    'Pending Manager Approval', 
+                    'Pending Procurement Manager Approval',
+                    'Assigned to Procurement'
+                ]))
+            else:
+                status_conditions.append(ProcurementItemRequest.status == status)
+        if status_conditions:
+            categories_query = categories_query.filter(db.or_(*status_conditions))
+    categories = categories_query.distinct().all()
+    categories = [c[0] for c in categories if c[0]]
+    categories.sort()
+    
+    # Get unique branches for filter
+    branches = Branch.query.filter_by(is_active=True).order_by(Branch.name).all()
+    
+    return render_template('item_request_reports.html', 
+                         requests=requests, 
+                         pagination=pagination,
+                         departments=departments,
+                         categories=categories,
+                         branches=branches,
+                         category_filter=category_filter,
+                         branch_filter=branch_filter,
+                         status_filter=status_filter,
+                         department_filter=department_filter,
+                         date_from=date_from,
+                         date_to=date_to,
+                         urgent_filter=urgent_filter,
+                         total_requests=total_requests,
+                         completed_count=completed_count,
+                         pending_count=pending_count,
+                         urgent_count=urgent_count,
+                         total_amount=total_amount,
+                         user=current_user)
+
+
 @app.route('/cheque-register')
 @login_required
 def cheque_register():

@@ -1,0 +1,1609 @@
+{% extends "base.html" %}
+
+{% block title %}Item Request Reports{% endblock %}
+
+{% block content %}
+<style>
+    /* Filter Button and Active Filters */
+    .filters-container {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .filters-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 28px;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 500;
+        color: #495057;
+        transition: all 0.2s;
+    }
+
+    .filters-btn:hover {
+        background: #f8f9fa;
+        border-color: #adb5bd;
+    }
+
+    .filters-btn i {
+        font-size: 18px;
+    }
+
+    .active-filters {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        flex: 1;
+    }
+
+    .filter-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        background: #000;
+        color: white;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .filter-pill .remove-filter {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        border-radius: 50%;
+        color: white;
+        cursor: pointer;
+        font-size: 12px;
+        padding: 0;
+        transition: background 0.2s;
+    }
+
+    .filter-pill .remove-filter:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .clear-all-btn {
+        color: #007bff;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        padding: 0;
+        text-decoration: underline;
+        transition: color 0.2s;
+    }
+
+    .clear-all-btn:hover {
+        color: #0056b3;
+    }
+
+    /* Side Panel */
+    .filter-side-panel {
+        position: fixed;
+        top: 0;
+        right: -450px;
+        width: 450px;
+        height: 100vh;
+        background: white;
+        box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        transition: right 0.3s ease;
+        overflow-y: auto;
+    }
+
+    .filter-side-panel.open {
+        right: 0;
+    }
+
+    .filter-panel-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .filter-panel-overlay.show {
+        display: block;
+        opacity: 1;
+    }
+
+    .filter-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px;
+        border-bottom: 1px solid #dee2e6;
+        background: #f8f9fa;
+    }
+
+    .filter-panel-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #212529;
+    }
+
+    .filter-panel-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: #6c757d;
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        transition: background 0.2s;
+    }
+
+    .filter-panel-close:hover {
+        background: #e9ecef;
+    }
+
+    .filter-panel-body {
+        padding: 20px;
+    }
+
+    .filter-panel-body .form-group {
+        margin-bottom: 20px;
+    }
+
+    .filter-panel-body label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: #495057;
+        font-size: 14px;
+    }
+
+    .filter-panel-body select,
+    .filter-panel-body input[type="date"] {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    /* Checkbox Groups for Multi-Select Filters */
+    .checkbox-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 200px;
+        overflow-y: auto;
+        padding: 8px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        background: white;
+        margin-top: 8px;
+    }
+
+    .checkbox-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: background-color 0.2s;
+    }
+
+    .checkbox-option:hover {
+        background-color: #f8f9fa;
+    }
+
+    .checkbox-option input[type="checkbox"] {
+        margin: 0;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    .checkbox-option label {
+        margin: 0;
+        cursor: pointer;
+        font-weight: normal;
+        flex: 1;
+        user-select: none;
+    }
+    
+    .checkbox-option:has(input[type="checkbox"]:not(:checked)):hover {
+        background-color: #f8f9fa;
+    }
+    
+    .checkbox-option:has(input[type="checkbox"]:checked) {
+        background-color: #e7f3ff;
+    }
+
+    .filter-panel-actions {
+        padding: 20px;
+        border-top: 1px solid #dee2e6;
+        background: #f8f9fa;
+        display: flex;
+        gap: 10px;
+        position: sticky;
+        bottom: 0;
+    }
+
+    .filter-panel-actions .btn {
+        flex: 1;
+        padding: 10px;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    /* Inline Filters Section */
+    .inline-filters-section {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .inline-filters-header {
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #f8f9fa;
+    }
+
+    .inline-filters-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #212529;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .inline-filters-form {
+        width: 100%;
+    }
+
+    .inline-filters-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    @media (min-width: 768px) {
+        .inline-filter-group:has(.date-range-inputs) {
+            grid-column: span 2;
+        }
+    }
+
+    .inline-filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .inline-filter-group > label {
+        font-weight: 600;
+        color: #495057;
+        font-size: 14px;
+        margin-bottom: 8px;
+    }
+
+    .filter-select-container {
+        position: relative;
+        width: 100%;
+    }
+
+    .filter-chips-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 0;
+        min-height: 0;
+    }
+
+    .filter-chips-container:not(:empty) {
+        margin-bottom: 8px;
+    }
+
+    .filter-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        background: #000;
+        color: white;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .filter-chip .remove-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        border-radius: 50%;
+        color: white;
+        cursor: pointer;
+        font-size: 12px;
+        padding: 0;
+        transition: background 0.2s;
+        line-height: 1;
+    }
+
+    .filter-chip .remove-chip:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .filter-search-input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .filter-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        display: none;
+        margin-top: 4px;
+    }
+
+    .filter-option {
+        padding: 10px 12px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        border-bottom: 1px solid #f8f9fa;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+        user-select: none;
+    }
+
+    .filter-option:last-child {
+        border-bottom: none;
+    }
+
+    .filter-option:hover {
+        background-color: #f8f9fa;
+    }
+
+    .filter-option:active {
+        background-color: #dee2e6;
+    }
+
+    .filter-option.selected {
+        background-color: #e7f3ff;
+        font-weight: 500;
+    }
+
+    .filter-option.hidden {
+        display: none;
+    }
+
+    .date-range-inputs {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: nowrap;
+    }
+
+    .date-range-inputs input[type="date"] {
+        flex: 1;
+        min-width: 150px;
+        padding: 8px 12px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .date-range-inputs span {
+        color: #6c757d;
+        font-size: 14px;
+        white-space: nowrap;
+    }
+
+    .inline-filter-group:has(.date-range-inputs) {
+        grid-column: span 2;
+    }
+
+    .filter-panel-body .form-group:has(.date-range-inputs) {
+        width: 100%;
+    }
+
+    .inline-filters-actions {
+        display: flex;
+        gap: 10px;
+        padding-top: 15px;
+        border-top: 1px solid #dee2e6;
+    }
+
+    .inline-filters-actions .btn {
+        padding: 10px 20px;
+        font-size: 14px;
+        font-weight: 500;
+    }
+</style>
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-chart-bar"></i> Item Request Reports</h1>
+        <p>Filter and analyze item requests</p>
+    </div>
+
+    <!-- Active Filters -->
+    <div class="filters-container">
+        <div class="active-filters" id="active-filters">
+            {% set has_filters = False %}
+            {% if request.args.getlist('department') %}
+                <span class="filter-pill">
+                    Department: {{ request.args.getlist('department') | join(', ') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('department')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if request.args.getlist('category') %}
+                <span class="filter-pill">
+                    Category: {{ request.args.getlist('category') | join(', ') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('category')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if request.args.getlist('branch') %}
+                <span class="filter-pill">
+                    Branch: {{ request.args.getlist('branch') | join(', ') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('branch')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if request.args.getlist('status') %}
+                <span class="filter-pill">
+                    Status: {{ request.args.getlist('status') | join(', ') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('status')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if request.args.get('urgent') %}
+                <span class="filter-pill">
+                    Urgent: {{ request.args.get('urgent') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('urgent')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if request.args.get('date_from') %}
+                <span class="filter-pill">
+                    From: {{ request.args.get('date_from') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('date_from')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if request.args.get('date_to') %}
+                <span class="filter-pill">
+                    To: {{ request.args.get('date_to') }}
+                    <button type="button" class="remove-filter" onclick="removeFilter('date_to')" title="Remove filter">×</button>
+                </span>
+                {% set has_filters = True %}
+            {% endif %}
+            {% if has_filters %}
+                <button type="button" class="clear-all-btn" onclick="clearAllFilters()">Clear all</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Filter Side Panel -->
+    <div class="filter-panel-overlay" id="filter-overlay" onclick="closeFilterPanel()"></div>
+    <div class="filter-side-panel" id="filter-panel">
+        <div class="filter-panel-header">
+            <h3><i class="fas fa-filter"></i> Filters</h3>
+            <button type="button" class="filter-panel-close" onclick="closeFilterPanel()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="filter-panel-body">
+            <form method="GET" action="{{ url_for('item_request_reports') }}" id="filter-form">
+                <!-- Global Search Bar -->
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="filter-global-search" style="margin-bottom: 8px; display: block;">
+                        <i class="fas fa-search"></i> Search Filters
+                    </label>
+                    <input type="text" id="filter-global-search" class="form-control" placeholder="Search all filters..." autocomplete="off" style="width: 100%; padding: 10px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px;">
+                </div>
+                
+                <div class="form-group">
+                    <label>Department</label>
+                    <div id="department_chips_container" class="filter-chips-container"></div>
+                    <div class="checkbox-group" id="department-group">
+                        {% for dept in departments %}
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="department" id="dept_{{ loop.index }}" value="{{ dept }}" {% if dept in request.args.getlist('department') %}checked{% endif %}>
+                            <label for="dept_{{ loop.index }}">{{ dept }}</label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Category</label>
+                    <div id="category_chips_container" class="filter-chips-container"></div>
+                    <div class="checkbox-group" id="category-group">
+                        {% for cat in categories %}
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="category" id="cat_{{ loop.index }}" value="{{ cat }}" {% if cat in request.args.getlist('category') %}checked{% endif %}>
+                            <label for="cat_{{ loop.index }}">{{ cat }}</label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Branch Name</label>
+                    <div id="branch_chips_container" class="filter-chips-container"></div>
+                    <div class="checkbox-group" id="branch-group">
+                        {% for branch in branches %}
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="branch" id="branch_{{ loop.index }}" value="{{ branch.name }}" {% if branch.name in request.args.getlist('branch') %}checked{% endif %}>
+                            <label for="branch_{{ loop.index }}">{{ branch.name }}</label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Status</label>
+                    <div id="status_chips_container" class="filter-chips-container"></div>
+                    <div class="checkbox-group" id="status-group">
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_allpending" value="All Pending" {% if 'All Pending' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_allpending">All Pending</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_pendingmgr" value="Pending Manager Approval" {% if 'Pending Manager Approval' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_pendingmgr">Pending Manager Approval</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_pendingproc" value="Pending Procurement Manager Approval" {% if 'Pending Procurement Manager Approval' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_pendingproc">Pending Procurement Manager Approval</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_assigned" value="Assigned to Procurement" {% if 'Assigned to Procurement' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_assigned">Assigned to Procurement</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_rejectedmgr" value="Rejected by Manager" {% if 'Rejected by Manager' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_rejectedmgr">Rejected by Manager</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_rejectedproc" value="Rejected by Procurement Manager" {% if 'Rejected by Procurement Manager' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_rejectedproc">Rejected by Procurement Manager</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_completed" value="Completed" {% if 'Completed' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_completed">Completed</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Urgent</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-option">
+                            <input type="radio" name="urgent" id="urgent_all" value="" {% if not request.args.get('urgent') %}checked{% endif %}>
+                            <label for="urgent_all">All</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="radio" name="urgent" id="urgent_yes" value="urgent" {% if request.args.get('urgent') == 'urgent' %}checked{% endif %}>
+                            <label for="urgent_yes">Urgent Only</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="radio" name="urgent" id="urgent_no" value="not_urgent" {% if request.args.get('urgent') == 'not_urgent' %}checked{% endif %}>
+                            <label for="urgent_no">Not Urgent</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Date Range</label>
+                    <div class="date-range-inputs">
+                        <input type="date" name="date_from" id="date_from" value="{{ request.args.get('date_from', '') }}" placeholder="From">
+                        <span>to</span>
+                        <input type="date" name="date_to" id="date_to" value="{{ request.args.get('date_to', '') }}" placeholder="To">
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="filter-panel-actions">
+            <button type="button" class="btn btn-primary" onclick="applyFilters()">
+                <i class="fas fa-search"></i> Apply Filters
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="clearAllFilters()">
+                <i class="fas fa-redo"></i> Clear All
+            </button>
+        </div>
+    </div>
+
+    <!-- Inline Filters Section -->
+    <div class="inline-filters-section">
+        <div class="inline-filters-header">
+            <h3><i class="fas fa-filter"></i> Quick Filters</h3>
+        </div>
+        <form method="GET" action="{{ url_for('item_request_reports') }}" id="inline-filter-form" class="inline-filters-form">
+            <div class="inline-filters-grid">
+                <div class="inline-filter-group">
+                    <label>Department</label>
+                    <div class="filter-select-container">
+                        <div id="inline_department_chips_container" class="filter-chips-container"></div>
+                        <input type="text" id="inline_department_search" class="filter-search-input" placeholder="Search departments..." autocomplete="off">
+                        <div id="inline_department_dropdown" class="filter-dropdown"></div>
+                        <input type="hidden" name="department" id="inline_department_hidden" value="">
+                    </div>
+                </div>
+
+                <div class="inline-filter-group">
+                    <label>Category</label>
+                    <div class="filter-select-container">
+                        <div id="inline_category_chips_container" class="filter-chips-container"></div>
+                        <input type="text" id="inline_category_search" class="filter-search-input" placeholder="Search categories..." autocomplete="off">
+                        <div id="inline_category_dropdown" class="filter-dropdown"></div>
+                        <input type="hidden" name="category" id="inline_category_hidden" value="">
+                    </div>
+                </div>
+
+                <div class="inline-filter-group">
+                    <label>Branch Name</label>
+                    <div class="filter-select-container">
+                        <div id="inline_branch_chips_container" class="filter-chips-container"></div>
+                        <input type="text" id="inline_branch_search" class="filter-search-input" placeholder="Search branches..." autocomplete="off">
+                        <div id="inline_branch_dropdown" class="filter-dropdown"></div>
+                        <input type="hidden" name="branch" id="inline_branch_hidden" value="">
+                    </div>
+                </div>
+
+                <div class="inline-filter-group">
+                    <label>Status</label>
+                    <div class="filter-select-container">
+                        <div id="inline_status_chips_container" class="filter-chips-container"></div>
+                        <input type="text" id="inline_status_search" class="filter-search-input" placeholder="Search statuses..." autocomplete="off">
+                        <div id="inline_status_dropdown" class="filter-dropdown"></div>
+                        <input type="hidden" name="status" id="inline_status_hidden" value="">
+                    </div>
+                </div>
+
+                <div class="inline-filter-group">
+                    <label>Urgent</label>
+                    <select name="urgent" id="inline_urgent" class="filter-search-input">
+                        <option value="">All</option>
+                        <option value="urgent" {% if request.args.get('urgent') == 'urgent' %}selected{% endif %}>Urgent Only</option>
+                        <option value="not_urgent" {% if request.args.get('urgent') == 'not_urgent' %}selected{% endif %}>Not Urgent</option>
+                    </select>
+                </div>
+
+                <div class="inline-filter-group">
+                    <label>Date Range</label>
+                    <div class="date-range-inputs">
+                        <input type="date" name="date_from" id="inline_date_from" value="{{ request.args.get('date_from', '') }}" placeholder="From">
+                        <span>to</span>
+                        <input type="date" name="date_to" id="inline_date_to" value="{{ request.args.get('date_to', '') }}" placeholder="To">
+                    </div>
+                </div>
+            </div>
+            <div class="inline-filters-actions">
+                <button type="button" class="btn btn-primary" onclick="applyInlineFilters()">
+                    <i class="fas fa-search"></i> Apply Filters
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="clearAllFilters()">
+                    <i class="fas fa-redo"></i> Clear All
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Advanced Filters Button -->
+    <div style="margin-bottom: 20px;">
+        <button type="button" class="filters-btn" onclick="openFilterPanel()">
+            <i class="fas fa-filter"></i>
+            Advanced Filters
+        </button>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #2196F3;">
+                <i class="fas fa-file-invoice"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ total_requests }}</h3>
+                <p>Total Results</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #4CAF50;">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ completed_count }}</h3>
+                <p>Completed</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #FF9800;">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ pending_count }}</h3>
+                <p>Pending</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #dc3545;">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ urgent_count }}</h3>
+                <p>Urgent</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #9C27B0;">
+                <i class="fas fa-money-bill-wave"></i>
+            </div>
+            <div class="stat-info">
+                <h3>OMR {{ total_amount|format_currency }}</h3>
+                <p>Total Amount</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-table"></i> Report Results</h2>
+        </div>
+        <div class="card-body">
+            {% if requests %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Category</th>
+                                <th>Item Name</th>
+                                <th>Requestor</th>
+                                <th>Department</th>
+                                <th>Branch</th>
+                                <th>Request Date</th>
+                                <th>Status</th>
+                                <th>Urgent</th>
+                                <th>Amount</th>
+                                <th>Assigned To</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in requests %}
+                            <tr>
+                                <td>#{{ req.id }}</td>
+                                <td>{{ req.category or '-' }}</td>
+                                <td>{{ req.item_name }}</td>
+                                <td>{{ req.requestor_name }}</td>
+                                <td>{{ req.department }}</td>
+                                <td>
+                                    {% if req.branch_name %}
+                                        <span class="filter-pill" style="margin-right: 4px; margin-bottom: 4px; display: inline-block;">{{ req.branch_name }}</span>
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ req.request_date.strftime('%Y-%m-%d') if req.request_date else '-' }}</td>
+                                <td>
+                                    {% if req.status == 'Completed' %}
+                                        <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
+                                    {% elif req.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval', 'Assigned to Procurement'] %}
+                                        <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
+                                    {% elif req.status in ['Rejected by Manager', 'Rejected by Procurement Manager'] %}
+                                        <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
+                                    {% else %}
+                                        <span class="badge badge-warning">⏳ {{ req.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if req.is_urgent %}
+                                        <span class="badge" style="background: #dc3545; color: white;">⚠ Urgent</span>
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if req.amount %}
+                                        OMR {{ "%.3f"|format(req.amount) }}
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if req.assigned_to_user %}
+                                        {{ req.assigned_to_user.name }}
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('view_item_request_page', request_id=req.id) }}" class="btn btn-sm btn-info">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination Controls -->
+                {% if pagination %}
+                <div class="pagination-container">
+                    <div class="pagination-left">
+                        <div class="pagination-info">
+                            Showing {{ pagination.per_page * (pagination.page - 1) + 1 }} to 
+                            {{ pagination.per_page * (pagination.page - 1) + pagination.items|length }} 
+                            of {{ pagination.total }} requests
+                        </div>
+                        <div class="items-per-page">
+                            <label for="per_page">Show:</label>
+                            <select id="per_page" onchange="changeItemsPerPage(this.value)">
+                                <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10</option>
+                                <option value="20" {% if pagination.per_page == 20 %}selected{% endif %}>20</option>
+                                <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50</option>
+                                <option value="100" {% if pagination.per_page == 100 %}selected{% endif %}>100</option>
+                            </select>
+                            <span>per page</span>
+                        </div>
+                    </div>
+                    {% if pagination.pages > 1 %}
+                    <div class="pagination">
+                        {% if pagination.has_prev %}
+                            <a href="#" class="btn btn-sm btn-secondary pagination-link" data-page="{{ pagination.prev_num }}">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        {% endif %}
+                        
+                        {% for page_num in pagination.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != pagination.page %}
+                                    <a href="#" class="btn btn-sm btn-outline pagination-link" data-page="{{ page_num }}">{{ page_num }}</a>
+                                {% else %}
+                                    <span class="btn btn-sm btn-primary">{{ page_num }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="pagination-ellipsis">...</span>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if pagination.has_next %}
+                            <a href="#" class="btn btn-sm btn-secondary pagination-link" data-page="{{ pagination.next_num }}">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-search"></i>
+                    <p>No results found for the selected filters.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Filter Panel Functions
+function openFilterPanel() {
+    const panel = document.getElementById('filter-panel');
+    const overlay = document.getElementById('filter-overlay');
+    if (panel && overlay) {
+        panel.classList.add('open');
+        overlay.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeFilterPanel() {
+    const panel = document.getElementById('filter-panel');
+    const overlay = document.getElementById('filter-overlay');
+    if (panel && overlay) {
+        panel.classList.remove('open');
+        overlay.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+}
+
+function applyFilters() {
+    const form = document.getElementById('filter-form');
+    const inlineForm = document.getElementById('inline-filter-form');
+    
+    if (form) {
+        const url = new URL(form.action, window.location.origin);
+        
+        const filterData = {
+            department: [],
+            category: [],
+            branch: [],
+            status: [],
+            urgent: '',
+            date_from: '',
+            date_to: ''
+        };
+        
+        const formData = new FormData(form);
+        for (const [key, value] of formData.entries()) {
+            if (value) {
+                if (['department', 'category', 'branch', 'status'].includes(key)) {
+                    if (!filterData[key].includes(value)) {
+                        filterData[key].push(value);
+                    }
+                } else if (key === 'urgent') {
+                    filterData[key] = value;
+                } else if (key === 'date_from' || key === 'date_to') {
+                    filterData[key] = value;
+                }
+            }
+        }
+        
+        if (inlineForm) {
+            const inlineFormData = new FormData(inlineForm);
+            for (const [key, value] of inlineFormData.entries()) {
+                if (value) {
+                    if (['department', 'category', 'branch', 'status'].includes(key)) {
+                        if (!filterData[key].includes(value)) {
+                            filterData[key].push(value);
+                        }
+                    } else if (key === 'urgent' && !filterData[key]) {
+                        filterData[key] = value;
+                    } else if ((key === 'date_from' || key === 'date_to') && !filterData[key]) {
+                        filterData[key] = value;
+                    }
+                }
+            }
+        }
+        
+        const multiSelectFields = ['department', 'category', 'branch', 'status'];
+        
+        for (const key of multiSelectFields) {
+            url.searchParams.delete(key);
+            filterData[key].forEach(value => {
+                url.searchParams.append(key, value);
+            });
+        }
+        
+        if (filterData.urgent) {
+            url.searchParams.set('urgent', filterData.urgent);
+        }
+        
+        if (filterData.date_from) {
+            url.searchParams.set('date_from', filterData.date_from);
+        }
+        if (filterData.date_to) {
+            url.searchParams.set('date_to', filterData.date_to);
+        }
+        
+        url.searchParams.set('page', '1');
+        window.location.href = url.toString();
+    }
+}
+
+function applyInlineFilters() {
+    const form = document.getElementById('inline-filter-form');
+    if (form) {
+        const url = new URL(form.action, window.location.origin);
+        const formData = new FormData(form);
+        
+        const multiSelectFields = ['department', 'category', 'branch', 'status'];
+        const processedKeys = new Set();
+        
+        for (const [key, value] of formData.entries()) {
+            if (value) {
+                if (multiSelectFields.includes(key)) {
+                    if (!processedKeys.has(key)) {
+                        url.searchParams.delete(key);
+                        processedKeys.add(key);
+                    }
+                    url.searchParams.append(key, value);
+                } else {
+                    url.searchParams.set(key, value);
+                }
+            }
+        }
+        
+        url.searchParams.set('page', '1');
+        window.location.href = url.toString();
+    }
+}
+
+function removeFilter(filterName) {
+    const url = new URL(window.location);
+    url.searchParams.delete(filterName);
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}
+
+function clearAllFilters() {
+    window.location.href = "{{ url_for('item_request_reports') }}";
+}
+
+function changeItemsPerPage(perPage) {
+    const url = new URL(window.location);
+    url.searchParams.set('per_page', perPage);
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}
+
+// Handle pagination links
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.pagination-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const pageNum = this.getAttribute('data-page');
+            
+            const currentUrl = new URL(window.location);
+            const baseUrl = currentUrl.origin + currentUrl.pathname;
+            const paramParts = [];
+            
+            paramParts.push('page=' + encodeURIComponent(pageNum));
+            
+            const originalSearch = window.location.search;
+            if (originalSearch) {
+                const pairs = originalSearch.substring(1).split('&');
+                
+                pairs.forEach(pair => {
+                    const [key, value] = pair.split('=');
+                    if (key && key !== 'page') {
+                        paramParts.push(key + '=' + (value || ''));
+                    }
+                });
+            }
+            
+            window.location.href = baseUrl + '?' + paramParts.join('&');
+        });
+    });
+    
+    // Initialize filter dropdowns
+    const departments = (({{ departments|tojson }} || [])).map(d => ({ value: d, text: d }));
+    const selectedDepartments = {{ request.args.getlist('department') | tojson }};
+    initializeFilterDropdown({
+        searchInputId: 'inline_department_search',
+        dropdownId: 'inline_department_dropdown',
+        chipsContainerId: 'inline_department_chips_container',
+        hiddenInputId: 'inline_department_hidden',
+        options: departments,
+        selectedValues: selectedDepartments,
+        filterName: 'department',
+        placeholder: 'Search departments...'
+    });
+    
+    const categories = (({{ categories|tojson }} || [])).map(c => ({ value: c, text: c }));
+    const selectedCategories = {{ request.args.getlist('category') | tojson }};
+    initializeFilterDropdown({
+        searchInputId: 'inline_category_search',
+        dropdownId: 'inline_category_dropdown',
+        chipsContainerId: 'inline_category_chips_container',
+        hiddenInputId: 'inline_category_hidden',
+        options: categories,
+        selectedValues: selectedCategories,
+        filterName: 'category',
+        placeholder: 'Search categories...'
+    });
+    
+    const branches = [
+        {% for branch in branches %}
+        { value: '{{ branch.name }}', text: '{{ branch.name }}' }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    const selectedBranches = {{ request.args.getlist('branch') | tojson }};
+    initializeFilterDropdown({
+        searchInputId: 'inline_branch_search',
+        dropdownId: 'inline_branch_dropdown',
+        chipsContainerId: 'inline_branch_chips_container',
+        hiddenInputId: 'inline_branch_hidden',
+        options: branches,
+        selectedValues: selectedBranches,
+        filterName: 'branch',
+        placeholder: 'Search branches...'
+    });
+    
+    const statuses = [
+        { value: 'All Pending', text: 'All Pending' },
+        { value: 'Pending Manager Approval', text: 'Pending Manager Approval' },
+        { value: 'Pending Procurement Manager Approval', text: 'Pending Procurement Manager Approval' },
+        { value: 'Assigned to Procurement', text: 'Assigned to Procurement' },
+        { value: 'Rejected by Manager', text: 'Rejected by Manager' },
+        { value: 'Rejected by Procurement Manager', text: 'Rejected by Procurement Manager' },
+        { value: 'Completed', text: 'Completed' }
+    ];
+    const selectedStatuses = {{ request.args.getlist('status') | tojson }};
+    initializeFilterDropdown({
+        searchInputId: 'inline_status_search',
+        dropdownId: 'inline_status_dropdown',
+        chipsContainerId: 'inline_status_chips_container',
+        hiddenInputId: 'inline_status_hidden',
+        options: statuses,
+        selectedValues: selectedStatuses,
+        filterName: 'status',
+        placeholder: 'Search statuses...'
+    });
+    
+    // Update chips from checkboxes for side panel
+    updateChipsFromCheckboxes('department', 'department_chips_container');
+    updateChipsFromCheckboxes('category', 'category_chips_container');
+    updateChipsFromCheckboxes('branch', 'branch_chips_container');
+    updateChipsFromCheckboxes('status', 'status_chips_container');
+    
+    // Add change listeners
+    document.querySelectorAll('input[type="checkbox"][name="department"], input[type="checkbox"][name="category"], input[type="checkbox"][name="branch"], input[type="checkbox"][name="status"]').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const name = this.name;
+            const chipsId = name + '_chips_container';
+            updateChipsFromCheckboxes(name, chipsId);
+        });
+    });
+    
+    // Global search for filters in side panel
+    const globalSearchInput = document.getElementById('filter-global-search');
+    if (globalSearchInput) {
+        globalSearchInput.addEventListener('input', function() {
+            filterAllFilters(this.value);
+        });
+        
+        const filterPanel = document.getElementById('filter-panel');
+        if (filterPanel) {
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.attributeName === 'class') {
+                        if (!filterPanel.classList.contains('open')) {
+                            globalSearchInput.value = '';
+                            filterAllFilters('');
+                        }
+                    }
+                });
+            });
+            observer.observe(filterPanel, { attributes: true });
+        }
+    }
+    
+    // Prevent panel from closing when clicking inside it
+    const filterPanel = document.getElementById('filter-panel');
+    if (filterPanel) {
+        filterPanel.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+    }
+});
+
+// Initialize filter dropdown with chips (reusable function)
+function initializeFilterDropdown(config) {
+    const { 
+        searchInputId, 
+        dropdownId, 
+        chipsContainerId, 
+        hiddenInputId, 
+        options, 
+        selectedValues,
+        placeholder = "Search..."
+    } = config;
+    
+    const searchInput = document.getElementById(searchInputId);
+    const dropdown = document.getElementById(dropdownId);
+    const chipsContainer = document.getElementById(chipsContainerId);
+    const hiddenInput = document.getElementById(hiddenInputId);
+    
+    if (!searchInput || !dropdown || !chipsContainer || !hiddenInput) return;
+    
+    let selectedItems = [];
+    let clickingOnOption = false;
+    let blurTimeout = null;
+    
+    if (selectedValues && selectedValues.length > 0) {
+        selectedValues.forEach(value => {
+            const option = options.find(opt => opt.value === value);
+            if (option) {
+                selectedItems.push({ value: option.value, text: option.text });
+            }
+        });
+        updateChips();
+    }
+    
+    function updateChips() {
+        chipsContainer.innerHTML = '';
+        selectedItems.forEach((item, index) => {
+            const chip = document.createElement('div');
+            chip.className = 'filter-chip';
+            chip.innerHTML = `
+                <span>${item.text}</span>
+                <button type="button" class="remove-chip" onclick="removeFilterChip('${config.filterName}', ${index})" title="Remove">×</button>
+            `;
+            chipsContainer.appendChild(chip);
+        });
+        
+        updateHiddenInput();
+    }
+    
+    function updateHiddenInput() {
+        const container = hiddenInput.parentNode;
+        const existingInputs = container.querySelectorAll(`input[type="hidden"][name="${config.filterName}"]`);
+        existingInputs.forEach(input => {
+            if (input !== hiddenInput) input.remove();
+        });
+        
+        selectedItems.forEach((item, index) => {
+            if (index === 0) {
+                hiddenInput.value = item.value;
+            } else {
+                const newInput = document.createElement('input');
+                newInput.type = 'hidden';
+                newInput.name = config.filterName;
+                newInput.value = item.value;
+                container.insertBefore(newInput, hiddenInput.nextSibling);
+            }
+        });
+        
+        if (selectedItems.length === 0) {
+            hiddenInput.value = '';
+        }
+    }
+    
+    if (!window.filterChipRemovers) window.filterChipRemovers = {};
+    window.filterChipRemovers[config.filterName] = function(index) {
+        selectedItems.splice(index, 1);
+        updateChips();
+        updateDropdownSelection();
+    };
+    
+    function updateDropdownSelection() {
+        const optionDivs = dropdown.querySelectorAll('.filter-option');
+        optionDivs.forEach(optionDiv => {
+            const value = optionDiv.getAttribute('data-value');
+            const isSelected = selectedItems.some(item => item.value === value);
+            if (isSelected) {
+                optionDiv.classList.add('selected');
+            } else {
+                optionDiv.classList.remove('selected');
+            }
+        });
+    }
+    
+    function buildDropdown(opts = options) {
+        dropdown.innerHTML = '';
+        opts.forEach(option => {
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'filter-option';
+            optionDiv.textContent = option.text;
+            optionDiv.setAttribute('data-value', option.value);
+            
+            let optionHandled = false;
+            let optionTimeout = null;
+            
+            function handleOptionSelection(e) {
+                if (optionHandled) {
+                    return;
+                }
+                
+                e.preventDefault();
+                e.stopPropagation();
+                clickingOnOption = true;
+                optionHandled = true;
+                selectOption(option.value, option.text);
+                
+                if (optionTimeout) {
+                    clearTimeout(optionTimeout);
+                }
+                
+                optionTimeout = setTimeout(() => {
+                    optionHandled = false;
+                }, 400);
+            }
+            
+            optionDiv.addEventListener('mousedown', handleOptionSelection, { passive: false });
+            optionDiv.addEventListener('touchstart', handleOptionSelection, { passive: false });
+            optionDiv.addEventListener('pointerdown', function(e) {
+                handleOptionSelection(e);
+            }, { passive: false });
+            optionDiv.addEventListener('mouseup', function(e) {
+                setTimeout(() => {
+                    if (!optionHandled) {
+                        handleOptionSelection(e);
+                    }
+                }, 10);
+            }, { passive: false });
+            optionDiv.addEventListener('touchend', function(e) {
+                setTimeout(() => {
+                    if (!optionHandled) {
+                        handleOptionSelection(e);
+                    }
+                }, 10);
+            }, { passive: false });
+            optionDiv.addEventListener('click', function(e) {
+                setTimeout(() => {
+                    if (!optionHandled && !clickingOnOption) {
+                        handleOptionSelection(e);
+                    }
+                }, 50);
+            }, { passive: false });
+            
+            dropdown.appendChild(optionDiv);
+        });
+        
+        updateDropdownSelection();
+    }
+    
+    function selectOption(value, text) {
+        if (blurTimeout) {
+            clearTimeout(blurTimeout);
+            blurTimeout = null;
+        }
+        
+        const existingIndex = selectedItems.findIndex(item => item.value === value);
+        if (existingIndex !== -1) {
+            selectedItems.splice(existingIndex, 1);
+            updateChips();
+            updateDropdownSelection();
+            
+            searchInput.value = '';
+            dropdown.style.display = 'block';
+            setTimeout(() => {
+                searchInput.focus();
+            }, 50);
+            
+            setTimeout(() => {
+                clickingOnOption = false;
+            }, 200);
+            return;
+        }
+        
+        selectedItems.push({ value: value, text: text });
+        updateChips();
+        updateDropdownSelection();
+        
+        searchInput.value = '';
+        dropdown.style.display = 'block';
+        setTimeout(() => {
+            searchInput.focus();
+        }, 50);
+        
+        setTimeout(() => {
+            clickingOnOption = false;
+        }, 200);
+    }
+    
+    function filterOptions(searchTerm) {
+        const optionDivs = dropdown.querySelectorAll('.filter-option');
+        let hasVisible = false;
+        
+        optionDivs.forEach(optionDiv => {
+            const text = optionDiv.textContent.toLowerCase();
+            const matches = text.includes(searchTerm.toLowerCase());
+            if (matches) {
+                optionDiv.classList.remove('hidden');
+                hasVisible = true;
+            } else {
+                optionDiv.classList.add('hidden');
+            }
+        });
+        
+        dropdown.style.display = hasVisible ? 'block' : 'none';
+    }
+    
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.trim();
+        if (searchTerm.length > 0) {
+            filterOptions(searchTerm);
+        } else {
+            dropdown.querySelectorAll('.filter-option').forEach(opt => opt.classList.remove('hidden'));
+            dropdown.style.display = 'block';
+        }
+    });
+    
+    searchInput.addEventListener('focus', function() {
+        if (this.value.trim() === '') {
+            dropdown.style.display = 'block';
+        } else {
+            filterOptions(this.value.trim());
+        }
+    });
+    
+    searchInput.addEventListener('blur', function() {
+        if (blurTimeout) {
+            clearTimeout(blurTimeout);
+        }
+        blurTimeout = setTimeout(() => {
+            if (!clickingOnOption) {
+                dropdown.style.display = 'none';
+            }
+            blurTimeout = null;
+        }, 300);
+    });
+    
+    dropdown.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+    });
+    
+    dropdown.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+    });
+    
+    dropdown.addEventListener('pointerdown', function(e) {
+        e.preventDefault();
+    });
+    
+    document.addEventListener('click', function(e) {
+        const chipsContainer = document.getElementById(config.chipsContainerId);
+        if (!searchInput.contains(e.target) && 
+            !dropdown.contains(e.target) && 
+            !(chipsContainer && chipsContainer.contains(e.target))) {
+            dropdown.style.display = 'none';
+        }
+    });
+    
+    document.addEventListener('touchend', function(e) {
+        const chipsContainer = document.getElementById(config.chipsContainerId);
+        if (!searchInput.contains(e.target) && 
+            !dropdown.contains(e.target) && 
+            !(chipsContainer && chipsContainer.contains(e.target))) {
+            dropdown.style.display = 'none';
+        }
+    });
+    
+    buildDropdown();
+    
+    return {
+        getSelectedItems: () => selectedItems,
+        setSelectedItems: (items) => {
+            selectedItems = items;
+            updateChips();
+            updateDropdownSelection();
+        }
+    };
+}
+
+function removeFilterChip(filterName, index) {
+    if (window.filterChipRemovers && window.filterChipRemovers[filterName]) {
+        window.filterChipRemovers[filterName](index);
+    }
+}
+
+function updateChipsFromCheckboxes(filterName, chipsContainerId) {
+    const chipsContainer = document.getElementById(chipsContainerId);
+    if (!chipsContainer) return;
+    
+    const checkboxes = document.querySelectorAll(`input[type="checkbox"][name="${filterName}"]:checked`);
+    const selectedItems = Array.from(checkboxes).map(cb => ({
+        value: cb.value,
+        text: cb.nextElementSibling ? cb.nextElementSibling.textContent.trim() : cb.value
+    }));
+    
+    chipsContainer.innerHTML = '';
+    selectedItems.forEach((item, index) => {
+        const chip = document.createElement('div');
+        chip.className = 'filter-chip';
+        chip.innerHTML = `
+            <span>${item.text}</span>
+            <button type="button" class="remove-chip" onclick="removeFilterChipFromCheckbox('${filterName}', '${item.value.replace(/'/g, "\\'")}')" title="Remove">×</button>
+        `;
+        chipsContainer.appendChild(chip);
+    });
+}
+
+function removeFilterChipFromCheckbox(filterName, value) {
+    const checkbox = document.querySelector(`input[type="checkbox"][name="${filterName}"][value="${value}"]`);
+    if (checkbox) {
+        checkbox.checked = false;
+        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+}
+
+function filterAllFilters(searchTerm) {
+    const searchLower = searchTerm.toLowerCase().trim();
+    
+    if (searchLower === '') {
+        document.querySelectorAll('.filter-panel-body .form-group').forEach(group => {
+            if (group.querySelector('#filter-global-search')) {
+                return;
+            }
+            group.style.display = '';
+        });
+        document.querySelectorAll('.filter-panel-body .checkbox-option').forEach(option => {
+            option.style.display = '';
+        });
+        return;
+    }
+    
+    document.querySelectorAll('.filter-panel-body .form-group').forEach(group => {
+        if (group.querySelector('#filter-global-search')) {
+            return;
+        }
+        group.style.display = 'none';
+    });
+    
+    let hasMatches = false;
+    
+    document.querySelectorAll('.filter-panel-body .checkbox-option').forEach(option => {
+        const label = option.querySelector('label');
+        const checkbox = option.querySelector('input[type="checkbox"]');
+        const text = label ? label.textContent.toLowerCase() : '';
+        const value = checkbox ? checkbox.value.toLowerCase() : '';
+        
+        const matches = text.includes(searchLower) || value.includes(searchLower);
+        
+        if (matches) {
+            option.style.display = '';
+            hasMatches = true;
+            
+            let formGroup = option.closest('.form-group');
+            if (formGroup) {
+                formGroup.style.display = '';
+            }
+        } else {
+            option.style.display = 'none';
+        }
+    });
+    
+    const filterPanelBody = document.querySelector('.filter-panel-body');
+    let noResultsMsg = document.getElementById('no-filter-results');
+    if (!hasMatches && searchLower !== '') {
+        if (!noResultsMsg) {
+            noResultsMsg = document.createElement('div');
+            noResultsMsg.id = 'no-filter-results';
+            noResultsMsg.className = 'form-group';
+            noResultsMsg.style.padding = '20px';
+            noResultsMsg.style.textAlign = 'center';
+            noResultsMsg.style.color = '#6c757d';
+            filterPanelBody.appendChild(noResultsMsg);
+        }
+        noResultsMsg.innerHTML = '<i class="fas fa-search"></i> No filters found matching "' + searchTerm + '"';
+        noResultsMsg.style.display = '';
+    } else if (noResultsMsg) {
+        noResultsMsg.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}
+
