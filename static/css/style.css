@@ -821,6 +821,11 @@ body {
     color: var(--dark-color);
 }
 
+.nav-link.active {
+    background: #e8e9eb;
+    color: var(--dark-color);
+}
+
 .nav-link.logout {
     color: var(--danger-color);
 }

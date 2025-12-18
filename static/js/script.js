@@ -531,6 +531,21 @@ document.addEventListener('visibilitychange', function() {
 // Hide loading on page load (in case it got stuck)
 document.addEventListener('DOMContentLoaded', function() {
     hideLoading();
+    
+    // ==================== ACTIVE NAV LINK HIGHLIGHT ====================
+    // Highlight the active navigation link based on current URL
+    const navLinks = document.querySelectorAll('.nav-link:not(.logout)');
+    const currentPath = window.location.pathname;
+    
+    navLinks.forEach(link => {
+        const linkPath = new URL(link.href, window.location.href).pathname;
+        // Check if the current path matches the link path
+        if (linkPath === currentPath) {
+            link.classList.add('active');
+        } else {
+            link.classList.remove('active');
+        }
+    });
 });
 
 // Additional safety: Hide loading if it's been visible for more than 5 seconds
