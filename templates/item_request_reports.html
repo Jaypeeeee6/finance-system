@@ -4,6 +4,28 @@
 
 {% block content %}
 <style>
+    /* Make table section scrollable */
+    .table-responsive {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 8px;
+    }
+
+    .data-table {
+        min-width: 1400px;
+    }
+
+    /* Add more gap between Request Date and Status columns */
+    .data-table td:nth-child(7) {
+        padding-right: 40px !important;
+    }
+
+    .data-table th:nth-child(8),
+    .data-table td:nth-child(8) {
+        padding-left: 60px !important;
+    }
+
     /* Filter Button and Active Filters */
     .filters-container {
         display: flex;
@@ -502,13 +524,6 @@
                 </span>
                 {% set has_filters = True %}
             {% endif %}
-            {% if request.args.get('urgent') %}
-                <span class="filter-pill">
-                    Urgent: {{ request.args.get('urgent') }}
-                    <button type="button" class="remove-filter" onclick="removeFilter('urgent')" title="Remove filter">×</button>
-                </span>
-                {% set has_filters = True %}
-            {% endif %}
             {% if request.args.get('date_from') %}
                 <span class="filter-pill">
                     From: {{ request.args.get('date_from') }}
@@ -623,24 +638,6 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Urgent</label>
-                    <div class="checkbox-group">
-                        <div class="checkbox-option">
-                            <input type="radio" name="urgent" id="urgent_all" value="" {% if not request.args.get('urgent') %}checked{% endif %}>
-                            <label for="urgent_all">All</label>
-                        </div>
-                        <div class="checkbox-option">
-                            <input type="radio" name="urgent" id="urgent_yes" value="urgent" {% if request.args.get('urgent') == 'urgent' %}checked{% endif %}>
-                            <label for="urgent_yes">Urgent Only</label>
-                        </div>
-                        <div class="checkbox-option">
-                            <input type="radio" name="urgent" id="urgent_no" value="not_urgent" {% if request.args.get('urgent') == 'not_urgent' %}checked{% endif %}>
-                            <label for="urgent_no">Not Urgent</label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-group">
                     <label>Date Range</label>
                     <div class="date-range-inputs">
                         <input type="date" name="date_from" id="date_from" value="{{ request.args.get('date_from', '') }}" placeholder="From">
@@ -708,15 +705,6 @@
                 </div>
 
                 <div class="inline-filter-group">
-                    <label>Urgent</label>
-                    <select name="urgent" id="inline_urgent" class="filter-search-input">
-                        <option value="">All</option>
-                        <option value="urgent" {% if request.args.get('urgent') == 'urgent' %}selected{% endif %}>Urgent Only</option>
-                        <option value="not_urgent" {% if request.args.get('urgent') == 'not_urgent' %}selected{% endif %}>Not Urgent</option>
-                    </select>
-                </div>
-
-                <div class="inline-filter-group">
                     <label>Date Range</label>
                     <div class="date-range-inputs">
                         <input type="date" name="date_from" id="inline_date_from" value="{{ request.args.get('date_from', '') }}" placeholder="From">
@@ -773,15 +761,6 @@
             </div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon" style="background: #dc3545;">
-                <i class="fas fa-exclamation-triangle"></i>
-            </div>
-            <div class="stat-info">
-                <h3>{{ urgent_count }}</h3>
-                <p>Urgent</p>
-            </div>
-        </div>
-        <div class="stat-card">
             <div class="stat-icon" style="background: #9C27B0;">
                 <i class="fas fa-money-bill-wave"></i>
             </div>
@@ -795,6 +774,16 @@
     <div class="card">
         <div class="card-header">
             <h2><i class="fas fa-table"></i> Report Results</h2>
+            {% if requests and requests|length > 0 %}
+            <div class="header-actions">
+                <a class="btn btn-success" id="export-excel-btn" href="{{ url_for('export_item_request_reports_excel') }}{{ '?' + request.query_string.decode('utf-8') if request.query_string else '' }}" onclick="return showExportLoading(event)">
+                    <i class="fas fa-file-excel"></i> <span id="export-excel-text">Export Excel</span>
+                </a>
+                <a class="btn btn-secondary" id="export-pdf-btn" href="{{ url_for('export_item_request_reports_pdf') }}{{ '?' + request.query_string.decode('utf-8') if request.query_string else '' }}" onclick="return showExportLoading(event)">
+                    <i class="fas fa-file-pdf"></i> <span id="export-text">Export PDF</span>
+                </a>
+            </div>
+            {% endif %}
         </div>
         <div class="card-body">
             {% if requests %}
@@ -810,7 +799,6 @@
                                 <th>Branch</th>
                                 <th>Request Date</th>
                                 <th>Status</th>
-                                <th>Urgent</th>
                                 <th>Amount</th>
                                 <th>Assigned To</th>
                                 <th>Actions</th>
@@ -821,12 +809,46 @@
                             <tr>
                                 <td>#{{ req.id }}</td>
                                 <td>{{ req.category or '-' }}</td>
-                                <td>{{ req.item_name }}</td>
+                                <td>
+                                    {% if req.item_name %}
+                                        {% set items = req.item_name.split(',') %}
+                                        {% set quantity_source = req.assigned_procurement_quantities or req.procurement_manager_quantities or req.procurement_quantities or req.quantity or '' %}
+                                        {% set quantities = quantity_source.split(';') if quantity_source else [] %}
+                                        {% set filtered_items = [] %}
+                                        {% for item in items %}
+                                            {% set item_trimmed = item.strip() %}
+                                            {% if item_trimmed %}
+                                                {% set qty_val = '0' %}
+                                                {% if loop.index0 < quantities|length %}
+                                                    {% set qty_raw = quantities[loop.index0].strip() %}
+                                                    {% if qty_raw %}
+                                                        {% set qty_val = qty_raw %}
+                                                    {% endif %}
+                                                {% endif %}
+                                                {% if qty_val != '0' and qty_val|float != 0 %}
+                                                    {% if filtered_items.append(item_trimmed) %}{% endif %}
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% if filtered_items %}
+                                            {% for item in filtered_items %}
+                                                <div>{{ item }}</div>
+                                            {% endfor %}
+                                        {% else %}
+                                            <span style="color: #999;">-</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ req.requestor_name }}</td>
                                 <td>{{ req.department }}</td>
                                 <td>
                                     {% if req.branch_name %}
-                                        <span class="filter-pill" style="margin-right: 4px; margin-bottom: 4px; display: inline-block;">{{ req.branch_name }}</span>
+                                        {% set branches = req.branch_name.split(',') %}
+                                        {% for branch in branches %}
+                                            <div><span class="filter-pill" style="margin-right: 4px; margin-bottom: 4px; display: inline-block;">{{ branch.strip() }}</span></div>
+                                        {% endfor %}
                                     {% else %}
                                         <span style="color: #999;">-</span>
                                     {% endif %}
@@ -834,25 +856,24 @@
                                 <td>{{ req.request_date.strftime('%Y-%m-%d') if req.request_date else '-' }}</td>
                                 <td>
                                     {% if req.status == 'Completed' %}
-                                        <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
-                                    {% elif req.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval', 'Assigned to Procurement'] %}
-                                        <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
+                                        <span class="badge" style="background: #28a745; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">✓ {{ req.status }}</span>
+                                    {% elif req.status == 'On Hold' %}
+                                        <span class="badge" style="background: #ffc107; color: #212529; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">⏸ On Hold</span>
+                                    {% elif req.status == 'Final Approval' %}
+                                        <span class="badge" style="background: #9c27b0; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">👤 Final Approval</span>
+                                    {% elif req.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval'] %}
+                                        <span class="badge" style="background: #6c757d; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">⏳ {{ req.status }}</span>
+                                    {% elif req.status == 'Assigned to Procurement' %}
+                                        <span class="badge" style="background: #2196F3; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">⏳ {{ req.status }}</span>
                                     {% elif req.status in ['Rejected by Manager', 'Rejected by Procurement Manager'] %}
-                                        <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
+                                        <span class="badge" style="background: #dc3545; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">✗ {{ req.status }}</span>
                                     {% else %}
-                                        <span class="badge badge-warning">⏳ {{ req.status }}</span>
+                                        <span class="badge badge-warning" style="display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">{{ req.status }}</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if req.is_urgent %}
-                                        <span class="badge" style="background: #dc3545; color: white;">⚠ Urgent</span>
-                                    {% else %}
-                                        <span style="color: #999;">-</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if req.amount %}
-                                        OMR {{ "%.3f"|format(req.amount) }}
+                                    {% if req.receipt_amount %}
+                                        OMR {{ "%.3f"|format(req.receipt_amount) }}
                                     {% else %}
                                         <span style="color: #999;">-</span>
                                     {% endif %}
@@ -970,7 +991,6 @@ function applyFilters() {
             category: [],
             branch: [],
             status: [],
-            urgent: '',
             date_from: '',
             date_to: ''
         };
@@ -982,8 +1002,6 @@ function applyFilters() {
                     if (!filterData[key].includes(value)) {
                         filterData[key].push(value);
                     }
-                } else if (key === 'urgent') {
-                    filterData[key] = value;
                 } else if (key === 'date_from' || key === 'date_to') {
                     filterData[key] = value;
                 }
@@ -998,8 +1016,6 @@ function applyFilters() {
                         if (!filterData[key].includes(value)) {
                             filterData[key].push(value);
                         }
-                    } else if (key === 'urgent' && !filterData[key]) {
-                        filterData[key] = value;
                     } else if ((key === 'date_from' || key === 'date_to') && !filterData[key]) {
                         filterData[key] = value;
                     }
@@ -1014,10 +1030,6 @@ function applyFilters() {
             filterData[key].forEach(value => {
                 url.searchParams.append(key, value);
             });
-        }
-        
-        if (filterData.urgent) {
-            url.searchParams.set('urgent', filterData.urgent);
         }
         
         if (filterData.date_from) {
@@ -1604,6 +1616,50 @@ function filterAllFilters(searchTerm) {
         noResultsMsg.style.display = 'none';
     }
 }
+
+// Export loading function
+function showExportLoading(event) {
+    const excelBtn = document.getElementById('export-excel-btn');
+    const pdfBtn = document.getElementById('export-pdf-btn');
+    const excelText = document.getElementById('export-excel-text');
+    const pdfText = document.getElementById('export-text');
+    
+    if (event.target.closest('#export-excel-btn')) {
+        excelBtn.disabled = true;
+        excelText.innerHTML = 'Exporting...';
+        setTimeout(() => {
+            excelBtn.disabled = false;
+            excelText.innerHTML = 'Export Excel';
+        }, 3000);
+    } else if (event.target.closest('#export-pdf-btn')) {
+        pdfBtn.disabled = true;
+        pdfText.innerHTML = 'Exporting...';
+        setTimeout(() => {
+            pdfBtn.disabled = false;
+            pdfText.innerHTML = 'Export PDF';
+        }, 3000);
+    }
+    return true;
+}
+
+// Reset button state when user clicks anywhere on the page (except the export buttons)
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.header-actions')) {
+        const excelBtn = document.getElementById('export-excel-btn');
+        const pdfBtn = document.getElementById('export-pdf-btn');
+        const excelText = document.getElementById('export-excel-text');
+        const pdfText = document.getElementById('export-text');
+        
+        if (excelBtn) {
+            excelBtn.disabled = false;
+            excelText.innerHTML = 'Export Excel';
+        }
+        if (pdfBtn) {
+            pdfBtn.disabled = false;
+            pdfText.innerHTML = 'Export PDF';
+        }
+    }
+});
 </script>
 {% endblock %}
 

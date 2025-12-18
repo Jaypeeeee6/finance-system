@@ -16115,7 +16115,6 @@ def item_request_reports():
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
     status_filter = request.args.getlist('status')  # List of statuses
-    urgent_filter = request.args.get('urgent', None)  # urgent, not_urgent, or None
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -16200,12 +16199,6 @@ def item_request_reports():
         if all_branch_conditions:
             query = query.filter(db.or_(*all_branch_conditions))
     
-    # Urgent filter
-    if urgent_filter == 'urgent':
-        query = query.filter(ProcurementItemRequest.is_urgent == True)
-    elif urgent_filter == 'not_urgent':
-        query = query.filter(ProcurementItemRequest.is_urgent == False)
-    
     # Date filtering - use request_date
     if date_from:
         query = query.filter(ProcurementItemRequest.request_date >= datetime.strptime(date_from, '%Y-%m-%d').date())
@@ -16223,10 +16216,9 @@ def item_request_reports():
         'Pending Procurement Manager Approval',
         'Assigned to Procurement'
     ]])
-    urgent_count = len([r for r in all_filtered_requests if r.is_urgent == True])
     
-    # Calculate total amount (from amount field set by Procurement Manager)
-    total_amount = sum(float(r.amount) if r.amount else 0 for r in all_filtered_requests)
+    # Calculate total amount (from receipt_amount field)
+    total_amount = sum(float(r.receipt_amount) if r.receipt_amount else 0 for r in all_filtered_requests)
     
     # Paginate the query for display
     pagination = query.order_by(ProcurementItemRequest.created_at.desc()).paginate(
@@ -16234,20 +16226,82 @@ def item_request_reports():
     )
     requests = pagination.items
     
-    # Get unique departments for filter
-    # On reports page, Procurement Department Manager can see all departments
-    if current_user.role == 'Department Manager' and current_user.department not in ['IT', 'Auditing', 'Procurement']:
-        departments = [current_user.department] if current_user.department else []
+    # Get unique departments for filter (only those visible to current user)
+    if current_user.role == 'Department Manager':
+        if current_user.department == 'IT':
+            # IT Manager can see all departments
+            departments = db.session.query(ProcurementItemRequest.department).filter(
+                ProcurementItemRequest.is_draft == False,
+                ProcurementItemRequest.department.isnot(None),
+                ProcurementItemRequest.department != ''
+            ).distinct().all()
+        elif current_user.department == 'Procurement':
+            # Procurement Manager can only see departments with requests in visible statuses
+            departments = db.session.query(ProcurementItemRequest.department).filter(
+                ProcurementItemRequest.is_draft == False,
+                ProcurementItemRequest.department.isnot(None),
+                ProcurementItemRequest.department != '',
+                ProcurementItemRequest.status.in_([
+                    'Assigned to Procurement',
+                    'Completed',
+                    'Pending Procurement Manager Approval'
+                ])
+            ).distinct().all()
+        elif current_user.department == 'Auditing':
+            # Auditing Manager can only see departments with completed requests
+            departments = db.session.query(ProcurementItemRequest.department).filter(
+                ProcurementItemRequest.is_draft == False,
+                ProcurementItemRequest.department.isnot(None),
+                ProcurementItemRequest.department != '',
+                ProcurementItemRequest.status == 'Completed'
+            ).distinct().all()
+        else:
+            # Other Department Managers can only see their own department
+            departments = [current_user.department] if current_user.department else []
+        
+        # Extract department names from tuples for IT, Procurement, and Auditing managers
+        if current_user.department in ['IT', 'Procurement', 'Auditing']:
+            departments = [d[0] for d in departments if d[0]]
+            departments.sort()
     else:
-        departments = db.session.query(ProcurementItemRequest.department).distinct().all()
+        # GM, CEO, IT Staff, Operation Manager, and Procurement Staff can see all departments
+        departments = db.session.query(ProcurementItemRequest.department).filter(
+            ProcurementItemRequest.is_draft == False,
+            ProcurementItemRequest.department.isnot(None),
+            ProcurementItemRequest.department != ''
+        ).distinct().all()
         departments = [d[0] for d in departments if d[0]]
         departments.sort()
     
-    # Get unique categories for filter
+    # Get unique categories for filter (only those visible to current user)
     categories_query = db.session.query(ProcurementItemRequest.category).filter(
+        ProcurementItemRequest.is_draft == False,
         ProcurementItemRequest.category.isnot(None),
         ProcurementItemRequest.category != ''
     )
+    
+    # Apply role-based visibility filters
+    if current_user.role == 'Department Manager':
+        if current_user.department == 'Procurement':
+            # Procurement Manager can only see categories with requests in visible statuses
+            categories_query = categories_query.filter(
+                ProcurementItemRequest.status.in_([
+                    'Assigned to Procurement',
+                    'Completed',
+                    'Pending Procurement Manager Approval'
+                ])
+            )
+        elif current_user.department == 'Auditing':
+            # Auditing Manager can only see categories with completed requests
+            categories_query = categories_query.filter(
+                ProcurementItemRequest.status == 'Completed'
+            )
+        elif current_user.department != 'IT':
+            # Other Department Managers can only see their own department's categories
+            categories_query = categories_query.filter(
+                ProcurementItemRequest.department == current_user.department
+            )
+    
     if status_filter:
         status_conditions = []
         for status in status_filter:
@@ -16280,13 +16334,612 @@ def item_request_reports():
                          department_filter=department_filter,
                          date_from=date_from,
                          date_to=date_to,
-                         urgent_filter=urgent_filter,
                          total_requests=total_requests,
                          completed_count=completed_count,
                          pending_count=pending_count,
-                         urgent_count=urgent_count,
                          total_amount=total_amount,
                          user=current_user)
+
+
+@app.route('/export/item-request-reports/excel')
+@login_required
+def export_item_request_reports_excel():
+    """Export item request reports to Excel with professional formatting"""
+    import io
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        flash('Excel export requires openpyxl. Install with: pip install openpyxl', 'warning')
+        return redirect(url_for('item_request_reports', **request.args))
+    except Exception as e:
+        flash(f'Error importing Excel library: {str(e)}', 'error')
+        return redirect(url_for('item_request_reports', **request.args))
+
+    # Get same filters as item_request_reports view
+    department_filter = request.args.getlist('department')
+    category_filter = request.args.getlist('category')
+    branch_filter = request.args.getlist('branch')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    status_filter = request.args.getlist('status')
+    
+    # Build query (same logic as item_request_reports)
+    query = ProcurementItemRequest.query.filter(ProcurementItemRequest.is_draft == False)
+    
+    if current_user.role == 'Department Manager':
+        if current_user.department == 'IT':
+            pass
+        elif current_user.department == 'Procurement':
+            query = query.filter(ProcurementItemRequest.status.in_([
+                'Assigned to Procurement',
+                'Completed',
+                'Pending Procurement Manager Approval'
+            ]))
+        elif current_user.department == 'Auditing':
+            query = query.filter(ProcurementItemRequest.status == 'Completed')
+        else:
+            query = query.filter(ProcurementItemRequest.department == current_user.department)
+    
+    if status_filter:
+        status_conditions = []
+        for status in status_filter:
+            if status == 'All Pending':
+                status_conditions.append(ProcurementItemRequest.status.in_([
+                    'Pending Manager Approval', 
+                    'Pending Procurement Manager Approval',
+                    'Assigned to Procurement'
+                ]))
+            else:
+                status_conditions.append(ProcurementItemRequest.status == status)
+        if status_conditions:
+            query = query.filter(db.or_(*status_conditions))
+    else:
+        query = query.filter(ProcurementItemRequest.status != 'Rejected by Manager')
+    
+    if department_filter:
+        query = query.filter(ProcurementItemRequest.department.in_(department_filter))
+    
+    if category_filter:
+        query = query.filter(ProcurementItemRequest.category.in_(category_filter))
+    
+    if branch_filter:
+        all_branch_conditions = []
+        for branch_name in branch_filter:
+            selected_branch = Branch.query.filter_by(name=branch_name).first()
+            if selected_branch:
+                alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
+                names = [selected_branch.name] + alias_names
+                conditions = []
+                for name in names:
+                    conditions.append(ProcurementItemRequest.branch_name == name)
+                    conditions.append(ProcurementItemRequest.branch_name.like(f'{name},%'))
+                    conditions.append(ProcurementItemRequest.branch_name.like(f'%, {name}'))
+                    conditions.append(ProcurementItemRequest.branch_name.like(f'%,{name}'))
+                    conditions.append(ProcurementItemRequest.branch_name.like(f'%, {name},%'))
+                    conditions.append(ProcurementItemRequest.branch_name.like(f'%,{name},%'))
+                all_branch_conditions.append(db.or_(*conditions))
+            else:
+                conditions = [
+                    ProcurementItemRequest.branch_name == branch_name,
+                    ProcurementItemRequest.branch_name.like(f'{branch_name},%'),
+                    ProcurementItemRequest.branch_name.like(f'%, {branch_name}'),
+                    ProcurementItemRequest.branch_name.like(f'%,{branch_name}'),
+                    ProcurementItemRequest.branch_name.like(f'%, {branch_name},%'),
+                    ProcurementItemRequest.branch_name.like(f'%,{branch_name},%')
+                ]
+                all_branch_conditions.append(db.or_(*conditions))
+        if all_branch_conditions:
+            query = query.filter(db.or_(*all_branch_conditions))
+    
+    if date_from:
+        query = query.filter(ProcurementItemRequest.request_date >= datetime.strptime(date_from, '%Y-%m-%d').date())
+    if date_to:
+        query = query.filter(ProcurementItemRequest.request_date <= datetime.strptime(date_to, '%Y-%m-%d').date())
+    
+    # Get all filtered requests
+    all_requests = query.order_by(ProcurementItemRequest.created_at.desc()).all()
+    
+    # Helper function to convert to float
+    def to_float(value):
+        try:
+            return float(value)
+        except Exception:
+            return 0.0
+    
+    # Sum all amounts
+    total_amount = sum(to_float(r.receipt_amount) for r in all_requests)
+    
+    try:
+        # Create Excel workbook
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Item Request Reports"
+        
+        # Add report header information
+        ws['A1'] = 'Item Request Reports'
+        ws['A1'].font = Font(size=16, bold=True)
+        
+        generation_date = datetime.now().strftime('%Y-%m-%d %H:%M')
+        ws['A2'] = f"Report Generated: {generation_date}"
+        
+        # Build comprehensive filters line
+        filter_parts = []
+        filter_parts.append(f"Dept: {', '.join(department_filter) if department_filter else 'All'}")
+        filter_parts.append(f"Category: {', '.join(category_filter) if category_filter else 'All'}")
+        filter_parts.append(f"Branch: {', '.join(branch_filter) if branch_filter else 'All'}")
+        filter_parts.append(f"Status: {', '.join(status_filter) if status_filter else 'All'}")
+        filters_line = " | ".join(filter_parts)
+        ws['A3'] = filters_line
+        
+        # Date scope
+        if date_from and date_to:
+            ws['A4'] = f"Date Range: {date_from} to {date_to}"
+        elif date_from:
+            ws['A4'] = f"Date From: {date_from} (no end date)"
+        elif date_to:
+            ws['A4'] = f"Date To: {date_to} (no start date)"
+        else:
+            ws['A4'] = "Date Range: All dates (no filter applied)"
+        
+        ws['A5'] = f"Total Amount: OMR {total_amount:.3f}"
+        ws['A5'].font = Font(size=12, bold=True)
+        
+        # Add headers starting from row 7
+        headers = ['ID', 'Category', 'Item Name', 'Quantity', 'Requestor', 'Department', 'Branch', 'Request Date', 'Status', 'Amount (OMR)', 'Assigned To']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=7, column=col, value=str(header))
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            ws.row_dimensions[7].height = 20
+        
+        # Add data rows
+        for row_idx, req in enumerate(all_requests, 8):
+            request_date_str = req.request_date.strftime('%Y-%m-%d') if req.request_date else '-'
+            amount_value = to_float(req.receipt_amount)
+            # Get quantity from assigned procurement staff (preferred), then manager, then original
+            quantity_source = req.assigned_procurement_quantities or req.procurement_manager_quantities or req.procurement_quantities or req.quantity or ''
+            
+            # Format Item Name with line breaks instead of commas, filtering out items with quantity 0
+            item_names = req.item_name.split(',') if req.item_name else []
+            quantities = quantity_source.split(';') if quantity_source else []
+            
+            # Filter items where quantity is not 0
+            filtered_items = []
+            filtered_quantities = []
+            for idx, item in enumerate(item_names):
+                item_trimmed = item.strip()
+                if item_trimmed:
+                    qty_val = ''
+                    if idx < len(quantities):
+                        qty_raw = quantities[idx].strip()
+                        qty_val = qty_raw if qty_raw else '0'
+                    else:
+                        qty_val = '0'
+                    
+                    # Only include if quantity is not '0'
+                    try:
+                        qty_num = float(qty_val) if qty_val else 0
+                        if qty_num != 0:
+                            filtered_items.append(item_trimmed)
+                            filtered_quantities.append(qty_val)
+                    except:
+                        # If we can't parse as float, include it (might be non-numeric)
+                        if qty_val != '0':
+                            filtered_items.append(item_trimmed)
+                            filtered_quantities.append(qty_val)
+            
+            item_display = '\n'.join(filtered_items) if filtered_items else ''
+            quantity_display = '\n'.join(filtered_quantities) if filtered_quantities else ''
+            
+            # Format Branch with line breaks instead of commas
+            branches = req.branch_name.split(',') if req.branch_name else []
+            branch_display = '\n'.join([branch.strip() for branch in branches if branch.strip()]) if branches else ''
+            
+            row_data = [
+                f"#{req.id}",
+                str(req.category or ''),
+                item_display or '',
+                quantity_display or '',
+                str(req.requestor_name or ''),
+                str(req.department or ''),
+                branch_display or '',
+                request_date_str,
+                str(req.status or ''),
+                amount_value,
+                str(req.assigned_to_user.name if req.assigned_to_user else '')
+            ]
+            
+            for col, data in enumerate(row_data, 1):
+                # For Amount column (column 10), explicitly set as float
+                if col == 10:
+                    numeric_value = float(amount_value) if amount_value is not None else 0.0
+                    cell = ws.cell(row=row_idx, column=col, value=numeric_value)
+                    cell.number_format = '#,##0.000'
+                    cell.alignment = Alignment(horizontal='right', vertical='top')
+                else:
+                    cell = ws.cell(row=row_idx, column=col, value=str(data) if data is not None else '')
+                    if col in [3, 4, 7]:  # Item Name, Quantity, Branch columns - enable wrapping
+                        cell.alignment = Alignment(wrap_text=True, vertical='top')
+                    else:
+                        cell.alignment = Alignment(vertical='top', horizontal='left')
+        
+        # Auto-adjust column widths
+        for col_idx in range(1, len(headers) + 1):
+            max_length = 0
+            column_letter = get_column_letter(col_idx)
+            
+            for row in range(7, ws.max_row + 1):
+                cell = ws.cell(row=row, column=col_idx)
+                try:
+                    cell_value = str(cell.value) if cell.value is not None else ''
+                    if col_idx in [3, 6]:  # Item Name, Branch
+                        lines = cell_value.split('\n')
+                        max_line_length = max(len(line) for line in lines) if lines else 0
+                        max_length = max(max_length, max_line_length)
+                    else:
+                        max_length = max(max_length, len(cell_value))
+                except:
+                    pass
+            
+            # Special handling for specific columns
+            if column_letter == 'A':  # ID column
+                adjusted_width = min(max_length + 2, 12)
+            elif column_letter == 'D':  # Requestor column
+                adjusted_width = min(max_length + 2, 20)
+            elif column_letter == 'I':  # Amount column
+                adjusted_width = max(max_length + 2, 18)
+            else:
+                adjusted_width = min(max_length + 2, 50)
+            
+            adjusted_width = max(adjusted_width, 10)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # Auto-adjust row heights for rows with wrapped text
+        for row_idx in range(7, ws.max_row + 1):
+            max_height = 15
+            for col_idx in [3, 6]:  # Columns with wrapped text
+                cell = ws.cell(row=row_idx, column=col_idx)
+                if cell.value:
+                    cell_value = str(cell.value)
+                    column_letter = get_column_letter(col_idx)
+                    column_width = ws.column_dimensions[column_letter].width
+                    chars_per_line = max(1, int(column_width * 7))
+                    lines = len(cell_value.split('\n'))
+                    estimated_lines = max(lines, (len(cell_value) // chars_per_line) + 1)
+                    row_height = max(max_height, estimated_lines * 15)
+                    max_height = row_height
+            
+            ws.row_dimensions[row_idx].height = max_height
+        
+        # Create response
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'item_request_reports_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        )
+    except Exception as e:
+        flash(f'Error generating Excel export: {str(e)}', 'error')
+        return redirect(url_for('item_request_reports', **request.args))
+
+
+@app.route('/export/item-request-reports/pdf')
+@login_required
+def export_item_request_reports_pdf():
+    """Export item request reports to PDF using canvas approach (matching payment reports)"""
+    import io
+    import os
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.units import mm
+    except ImportError:
+        flash('PDF export requires reportlab. Install with: pip install reportlab', 'warning')
+        return redirect(url_for('item_request_reports', **request.args))
+    
+    # Get same filters as item_request_reports view
+    department_filter = request.args.getlist('department')
+    category_filter = request.args.getlist('category')
+    branch_filter = request.args.getlist('branch')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    status_filter = request.args.getlist('status')
+    
+    # Build query (same logic as item_request_reports)
+    query = ProcurementItemRequest.query.filter(ProcurementItemRequest.is_draft == False)
+    
+    if current_user.role == 'Department Manager':
+        if current_user.department == 'IT':
+            pass
+        elif current_user.department == 'Procurement':
+            query = query.filter(ProcurementItemRequest.status.in_([
+                'Assigned to Procurement',
+                'Completed',
+                'Pending Procurement Manager Approval'
+            ]))
+        elif current_user.department == 'Auditing':
+            query = query.filter(ProcurementItemRequest.status == 'Completed')
+        else:
+            query = query.filter(ProcurementItemRequest.department == current_user.department)
+    
+    if status_filter:
+        status_conditions = []
+        for status in status_filter:
+            if status == 'All Pending':
+                status_conditions.append(ProcurementItemRequest.status.in_([
+                    'Pending Manager Approval', 
+                    'Pending Procurement Manager Approval',
+                    'Assigned to Procurement'
+                ]))
+            else:
+                status_conditions.append(ProcurementItemRequest.status == status)
+        if status_conditions:
+            query = query.filter(db.or_(*status_conditions))
+    else:
+        query = query.filter(ProcurementItemRequest.status != 'Rejected by Manager')
+    
+    if department_filter:
+        query = query.filter(ProcurementItemRequest.department.in_(department_filter))
+    
+    if category_filter:
+        query = query.filter(ProcurementItemRequest.category.in_(category_filter))
+    
+    if branch_filter:
+        all_branch_conditions = []
+        for branch_name in branch_filter:
+            selected_branch = Branch.query.filter_by(name=branch_name).first()
+            if selected_branch:
+                alias_names = [a.alias_name for a in getattr(selected_branch, 'aliases', [])]
+                names = [selected_branch.name] + alias_names
+                conditions = []
+                for name in names:
+                    conditions.append(ProcurementItemRequest.branch_name == name)
+                    conditions.append(ProcurementItemRequest.branch_name.like(f'{name},%'))
+                    conditions.append(ProcurementItemRequest.branch_name.like(f'%, {name}'))
+                    conditions.append(ProcurementItemRequest.branch_name.like(f'%,{name}'))
+                    conditions.append(ProcurementItemRequest.branch_name.like(f'%, {name},%'))
+                    conditions.append(ProcurementItemRequest.branch_name.like(f'%,{name},%'))
+                all_branch_conditions.append(db.or_(*conditions))
+            else:
+                conditions = [
+                    ProcurementItemRequest.branch_name == branch_name,
+                    ProcurementItemRequest.branch_name.like(f'{branch_name},%'),
+                    ProcurementItemRequest.branch_name.like(f'%, {branch_name}'),
+                    ProcurementItemRequest.branch_name.like(f'%,{branch_name}'),
+                    ProcurementItemRequest.branch_name.like(f'%, {branch_name},%'),
+                    ProcurementItemRequest.branch_name.like(f'%,{branch_name},%')
+                ]
+                all_branch_conditions.append(db.or_(*conditions))
+        if all_branch_conditions:
+            query = query.filter(db.or_(*all_branch_conditions))
+    
+    if date_from:
+        query = query.filter(ProcurementItemRequest.request_date >= datetime.strptime(date_from, '%Y-%m-%d').date())
+    if date_to:
+        query = query.filter(ProcurementItemRequest.request_date <= datetime.strptime(date_to, '%Y-%m-%d').date())
+    
+    # Get all filtered requests
+    result_requests = query.order_by(ProcurementItemRequest.created_at.desc()).all()
+    
+    # Helper function to convert to float
+    def to_float(value):
+        try:
+            return float(value)
+        except Exception:
+            return 0.0
+    
+    # Sum all amounts
+    total_amount = sum(to_float(r.receipt_amount) for r in result_requests)
+    
+    try:
+        # Build PDF in landscape orientation (matching payment reports)
+        buffer = io.BytesIO()
+        from reportlab.lib.pagesizes import landscape
+        c = canvas.Canvas(buffer, pagesize=landscape(A4))
+        width, height = landscape(A4)
+        
+        body_font = 'Helvetica'
+        
+        # Margins
+        left = 8 * mm
+        right = width - 8 * mm
+        top = height - 8 * mm
+        y = top
+        
+        # Header
+        c.setFont('Helvetica-Bold', 14)
+        c.drawString(left, y, 'Item Request Reports')
+        c.setFont(body_font, 10)
+        y -= 14
+        
+        # Report generation date
+        generation_date = datetime.now().strftime('%Y-%m-%d %H:%M')
+        c.drawString(left, y, f"Report Generated: {generation_date}")
+        y -= 12
+        
+        # Filters
+        filters_line = f"Dept: {', '.join(department_filter) if department_filter else 'All'} | Category: {', '.join(category_filter) if category_filter else 'All'} | Branch: {', '.join(branch_filter) if branch_filter else 'All'} | Status: {', '.join(status_filter) if status_filter else 'All'}"
+        c.drawString(left, y, filters_line)
+        y -= 12
+        
+        # Date scope
+        if date_from and date_to:
+            c.drawString(left, y, f"Date Range: {date_from} to {date_to}")
+        elif date_from:
+            c.drawString(left, y, f"Date From: {date_from} (no end date)")
+        elif date_to:
+            c.drawString(left, y, f"Date To: {date_to} (no start date)")
+        else:
+            c.drawString(left, y, "Date Range: All dates (no filter applied)")
+        y -= 12
+        
+        # Total amount
+        c.setFont('Helvetica-Bold', 11)
+        c.drawString(left, y, f"Total Amount: OMR {total_amount:.3f}")
+        y -= 18
+        
+        # Table header
+        c.setFont('Helvetica-Bold', 9)
+        headers = ['ID', 'Category', 'Item Name', 'Quantity', 'Requestor', 'Department', 'Branch', 'Request Date', 'Status', 'Amount', 'Assigned To']
+        # Column widths optimized for landscape A4
+        col_widths = [12*mm, 16*mm, 26*mm, 14*mm, 18*mm, 16*mm, 20*mm, 18*mm, 17*mm, 14*mm, 18*mm]
+        column_gap = 4 * mm
+        col_x = [left]
+        for i in range(1, len(col_widths)):
+            col_x.append(col_x[i-1] + col_widths[i-1] + column_gap)
+        
+        for i, (hx, text) in enumerate(zip(col_x, headers)):
+            c.drawString(hx, y, text)
+        y -= 10
+        c.line(left, y, right, y)
+        y -= 8
+        
+        # Helper function to wrap text
+        def wrap_text(text, max_width, font_name='Helvetica', font_size=9):
+            """Wrap text to fit within specified width"""
+            s = '' if text is None else str(text)
+            if not s:
+                return ['']
+            
+            try:
+                from reportlab.pdfbase import pdfmetrics
+                def string_width(t):
+                    return pdfmetrics.stringWidth(t, font_name, font_size)
+            except:
+                def string_width(t):
+                    return len(t) * font_size * 0.5
+            
+            effective_width = max_width - 2*mm
+            words = s.split()
+            wrapped_lines = []
+            current = ''
+            
+            for word in words:
+                candidate = (current + ' ' + word).strip()
+                if current and string_width(candidate) > effective_width:
+                    wrapped_lines.append(current)
+                    current = word
+                else:
+                    current = candidate
+            
+            if current:
+                wrapped_lines.append(current)
+            
+            return wrapped_lines or ['']
+        
+        # Rows
+        c.setFont(body_font, 9)
+        row_height = 10
+        bottom_margin = 15 * mm
+        for r in result_requests:
+            # Calculate maximum height needed for this row
+            max_height = 0
+            wrapped_lines_per_col = []
+            
+            # Get quantity from assigned procurement staff (preferred), then manager, then original
+            quantity_source = r.assigned_procurement_quantities or r.procurement_manager_quantities or r.procurement_quantities or r.quantity or ''
+            
+            # Format Item Name with line breaks instead of commas, filtering out items with quantity 0
+            item_names = (r.item_name or '').split(',')
+            quantities = quantity_source.split(';') if quantity_source else []
+            
+            # Filter items where quantity is not 0
+            filtered_items = []
+            filtered_quantities = []
+            for idx, item in enumerate(item_names):
+                item_trimmed = item.strip()
+                if item_trimmed:
+                    qty_val = ''
+                    if idx < len(quantities):
+                        qty_raw = quantities[idx].strip()
+                        qty_val = qty_raw if qty_raw else '0'
+                    else:
+                        qty_val = '0'
+                    
+                    # Only include if quantity is not '0'
+                    try:
+                        qty_num = float(qty_val) if qty_val else 0
+                        if qty_num != 0:
+                            filtered_items.append(item_trimmed)
+                            filtered_quantities.append(qty_val)
+                    except:
+                        # If we can't parse as float, include it (might be non-numeric)
+                        if qty_val != '0':
+                            filtered_items.append(item_trimmed)
+                            filtered_quantities.append(qty_val)
+            
+            item_display = '\n'.join(filtered_items) if filtered_items else ''
+            quantity_display = '\n'.join(filtered_quantities) if filtered_quantities else ''
+            
+            # Format Branch with line breaks instead of commas
+            branches = (r.branch_name or '').split(',')
+            branch_display = '\n'.join([branch.strip() for branch in branches if branch.strip()]) if branches else ''
+            
+            row_data = [
+                f"#{r.id}",
+                str(r.category or ''),
+                item_display or '',
+                quantity_display or '',
+                str(r.requestor_name or ''),
+                str(r.department or ''),
+                branch_display or '',
+                r.request_date.strftime('%Y-%m-%d') if r.request_date else '-',
+                str(r.status or ''),
+                f"OMR {to_float(r.receipt_amount):.3f}",
+                str(r.assigned_to_user.name if r.assigned_to_user else '')
+            ]
+            
+            # Pre-wrap and measure
+            for i, (data, width) in enumerate(zip(row_data, col_widths)):
+                if data:
+                    lines = wrap_text(str(data), width, body_font, 9)
+                else:
+                    lines = ['']
+                wrapped_lines_per_col.append(lines)
+                max_height = max(max_height, len(lines) * 10)
+            
+            # If row overflows page, create new page
+            if y - max_height < bottom_margin:
+                c.showPage()
+                y = top
+                c.setFont('Helvetica-Bold', 9)
+                for i, (hx, text) in enumerate(zip(col_x, headers)):
+                    c.drawString(hx, y, text)
+                y -= 10
+                c.line(left, y, right, y)
+                y -= 8
+                c.setFont(body_font, 9)
+            
+            # Draw columns
+            for i, lines in enumerate(wrapped_lines_per_col):
+                for j, line in enumerate(lines):
+                    c.drawString(col_x[i], y - (j * 10), line)
+            
+            y -= max_height + 3
+        
+        c.showPage()
+        c.save()
+        pdf_value = buffer.getvalue()
+        buffer.close()
+        
+        from flask import make_response
+        response = make_response(pdf_value)
+        response.headers['Content-Type'] = 'application/pdf'
+        ts = datetime.now().strftime('%Y-%m-%d_%H-%M')
+        response.headers['Content-Disposition'] = f'attachment; filename=item_request_reports_{ts}.pdf'
+        response.headers['Content-Length'] = str(len(pdf_value))
+        return response
+        
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'error')
+        return redirect(url_for('item_request_reports', **request.args))
 
 
 @app.route('/cheque-register')
