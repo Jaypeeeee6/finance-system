@@ -83,6 +83,11 @@
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-brand">
+                <button class="hamburger-menu-desktop" id="hamburger-menu-desktop" aria-label="Toggle menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
                 <i class="fas fa-file-invoice-dollar"></i>
                 <span>Payment System</span>
             </div>
@@ -119,24 +124,27 @@
                 </div>
             </div>
             <ul class="nav-menu" id="nav-menu">
-                <li><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="fas fa-home"></i> Dashboard</a></li>
-                
+                <li class="nav-menu-desktop-hidden"><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="fas fa-home"></i> Dashboard</a></li>
                 
                 {% if current_user.role in ['Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager'] %}
-                <li class="reports-dropdown">
+                <li class="reports-dropdown nav-menu-desktop-hidden">
                     <button type="button" class="nav-link reports-toggle">
                         <i class="fas fa-chart-bar"></i> Reports
                         <i class="fas fa-caret-down dropdown-caret"></i>
                     </button>
                     <div class="reports-menu">
                         <a href="{{ url_for('reports') }}">
-                            <i class="fas fa-chart-line"></i> Payment Request Reports
+                            <span>Payment Request Reports</span>
                         </a>
                         <a href="{{ url_for('item_request_reports') }}">
-                            <i class="fas fa-chart-pie"></i> Item Request Reports
+                            <span>Item Request Reports</span>
                         </a>
                     </div>
                 </li>
+                {% endif %}
+                
+                {% if show_item_requests_flag %}
+                <li class="nav-menu-desktop-hidden"><a href="{{ url_for('procurement_item_requests') }}" class="nav-link"><i class="fas fa-shopping-cart"></i> Item Requests</a></li>
                 {% endif %}
                 
                 {% if current_user.role in ['Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'IT Department Manager'] %}
@@ -203,6 +211,49 @@
             </ul>
         </div>
     </nav>
+    
+    <!-- Desktop Hamburger Side Popup Menu -->
+    <div class="desktop-sidebar-menu" id="desktop-sidebar-menu">
+        <div class="desktop-sidebar-overlay" id="desktop-sidebar-overlay"></div>
+        <div class="desktop-sidebar-content">
+            <button class="desktop-sidebar-close" id="desktop-sidebar-close" aria-label="Close menu">
+                <i class="fas fa-times"></i>
+            </button>
+            <nav class="desktop-sidebar-nav">
+                <a href="{{ url_for('dashboard') }}" class="desktop-sidebar-item">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                {% if current_user.role in ['Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager'] %}
+                <div class="desktop-sidebar-dropdown">
+                    <button class="desktop-sidebar-item desktop-sidebar-dropdown-toggle" id="reports-dropdown-toggle">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Reports</span>
+                        <i class="fas fa-chevron-down dropdown-chevron"></i>
+                    </button>
+                    <div class="desktop-sidebar-submenu" id="reports-submenu">
+                        <a href="{{ url_for('reports') }}" class="desktop-sidebar-submenu-item">
+                            <span>Payment Request Reports</span>
+                        </a>
+                        <a href="{{ url_for('item_request_reports') }}" class="desktop-sidebar-submenu-item">
+                            <span>Item Request Reports</span>
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+                {% if show_item_requests_flag %}
+                <a href="{{ url_for('procurement_item_requests') }}" class="desktop-sidebar-item">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span>Item Requests</span>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('archives') }}" class="desktop-sidebar-item">
+                    <i class="fas fa-archive"></i>
+                    <span>Archives</span>
+                </a>
+            </nav>
+        </div>
+    </div>
     {% endif %}
 
     <main class="main-content">
@@ -365,8 +416,13 @@
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         const hamburgerMenu = document.getElementById('hamburger-menu');
+        const hamburgerMenuDesktop = document.getElementById('hamburger-menu-desktop');
         const navMenu = document.getElementById('nav-menu');
+        const desktopSidebar = document.getElementById('desktop-sidebar-menu');
+        const desktopSidebarClose = document.getElementById('desktop-sidebar-close');
+        const desktopSidebarOverlay = document.getElementById('desktop-sidebar-overlay');
         
+        // Handle responsive hamburger menu
         if (hamburgerMenu && navMenu) {
             hamburgerMenu.addEventListener('click', function() {
                 hamburgerMenu.classList.toggle('active');
@@ -384,12 +440,82 @@
                 }
             });
             
-            // Close menu when clicking on a nav link
-            const navLinks = navMenu.querySelectorAll('.nav-link');
+            // Close menu when clicking on a nav link (but not the Reports toggle)
+            const navLinks = navMenu.querySelectorAll('.nav-link:not(.reports-toggle)');
             navLinks.forEach(link => {
                 link.addEventListener('click', function() {
                     hamburgerMenu.classList.remove('active');
                     navMenu.classList.remove('active');
+                });
+            });
+            
+            // Close menu when clicking on reports submenu items (after toggling reports dropdown)
+            const reportsMenuLinks = navMenu.querySelectorAll('.reports-menu a');
+            reportsMenuLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    hamburgerMenu.classList.remove('active');
+                    navMenu.classList.remove('active');
+                });
+            });
+        }
+        
+        // Handle desktop hamburger menu (opens sidebar)
+        if (hamburgerMenuDesktop && desktopSidebar) {
+            hamburgerMenuDesktop.addEventListener('click', function(e) {
+                e.preventDefault();
+                hamburgerMenuDesktop.classList.toggle('active');
+                desktopSidebar.classList.toggle('active');
+            });
+        }
+        
+        // Close desktop sidebar when clicking close button
+        if (desktopSidebarClose && desktopSidebar) {
+            desktopSidebarClose.addEventListener('click', function() {
+                desktopSidebar.classList.remove('active');
+                hamburgerMenuDesktop.classList.remove('active');
+            });
+        }
+        
+        // Close desktop sidebar when clicking overlay
+        if (desktopSidebarOverlay && desktopSidebar) {
+            desktopSidebarOverlay.addEventListener('click', function() {
+                desktopSidebar.classList.remove('active');
+                hamburgerMenuDesktop.classList.remove('active');
+            });
+        }
+        
+        // Handle Reports dropdown in sidebar
+        const reportsDropdownToggle = document.getElementById('reports-dropdown-toggle');
+        const reportsSubmenu = document.getElementById('reports-submenu');
+        
+        if (reportsDropdownToggle && reportsSubmenu) {
+            reportsDropdownToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                reportsDropdownToggle.classList.toggle('active');
+                reportsSubmenu.classList.toggle('active');
+            });
+        }
+        
+        // Close desktop sidebar when clicking on a non-dropdown sidebar link
+        if (desktopSidebar) {
+            const sidebarLinks = desktopSidebar.querySelectorAll('.desktop-sidebar-item:not(.desktop-sidebar-dropdown-toggle)');
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    desktopSidebar.classList.remove('active');
+                    hamburgerMenuDesktop.classList.remove('active');
+                });
+            });
+        }
+        
+        // Close sidebar and reset dropdown when clicking on a submenu link
+        if (reportsSubmenu) {
+            const submenuLinks = reportsSubmenu.querySelectorAll('.desktop-sidebar-submenu-item');
+            submenuLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    desktopSidebar.classList.remove('active');
+                    hamburgerMenuDesktop.classList.remove('active');
+                    reportsDropdownToggle.classList.remove('active');
+                    reportsSubmenu.classList.remove('active');
                 });
             });
         }

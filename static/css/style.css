@@ -439,13 +439,15 @@
 .reports-dropdown .reports-toggle {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 0.5rem;
     height: 100%;
     background: none;
     border: none;
     cursor: pointer;
     padding: 0.6rem 1rem;
-    font-size: inherit;
+    font-size: 0.95rem;
+    font-family: inherit;
+    font-weight: inherit;
     text-decoration: none;
     color: var(--dark-color);
     border-radius: 5px;
@@ -490,7 +492,11 @@
 }
 
 .reports-menu a i {
-    color: var(--primary-color);
+    display: none;
+}
+
+.reports-menu a span {
+    flex: 1;
 }
 
 .reports-menu a:hover {
@@ -856,7 +862,7 @@ body {
 }
 
 .hamburger-menu.active span:nth-child(1) {
-    transform: rotate(45deg) translate(8px, 8px);
+    transform: rotate(45deg) translate(5.5px, 5.5px);
 }
 
 .hamburger-menu.active span:nth-child(2) {
@@ -864,7 +870,188 @@ body {
 }
 
 .hamburger-menu.active span:nth-child(3) {
-    transform: rotate(-45deg) translate(7px, -7px);
+    transform: rotate(-45deg) translate(5.5px, -5.5px);
+}
+
+/* Desktop Hamburger Menu Button (left of Payment System) */
+.hamburger-menu-desktop {
+    display: flex;
+    flex-direction: column;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    gap: 4px;
+    margin-right: 1.5rem;
+    z-index: 1001;
+}
+
+.hamburger-menu-desktop span {
+    width: 25px;
+    height: 3px;
+    background-color: var(--dark-color);
+    border-radius: 3px;
+    transition: var(--transition);
+}
+
+.hamburger-menu-desktop.active span:nth-child(1) {
+    transform: rotate(45deg) translate(5.5px, 5.5px);
+}
+
+.hamburger-menu-desktop.active span:nth-child(2) {
+    opacity: 0;
+}
+
+.hamburger-menu-desktop.active span:nth-child(3) {
+    transform: rotate(-45deg) translate(5.5px, -5.5px);
+}
+
+/* Desktop Sidebar Menu */
+.desktop-sidebar-menu {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 999;
+}
+
+.desktop-sidebar-menu.active {
+    display: flex;
+}
+
+.desktop-sidebar-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.desktop-sidebar-content {
+    position: relative;
+    width: 280px;
+    height: 100%;
+    background: var(--white);
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem 0;
+    z-index: 1000;
+}
+
+.desktop-sidebar-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.5rem;
+    color: var(--dark-color);
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.desktop-sidebar-close:hover {
+    color: var(--secondary-color);
+}
+
+.desktop-sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 5rem 0 0 0;
+}
+
+.desktop-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    text-decoration: none;
+    color: var(--dark-color);
+    font-size: 1rem;
+    transition: var(--transition);
+    border-left: 3px solid transparent;
+}
+
+.desktop-sidebar-item:hover {
+    background: var(--light-color);
+    border-left-color: var(--primary-color);
+}
+
+.desktop-sidebar-item i {
+    font-size: 1.3rem;
+}
+
+/* Desktop Sidebar Dropdown */
+.desktop-sidebar-dropdown {
+    display: flex;
+    flex-direction: column;
+}
+
+.desktop-sidebar-dropdown-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 1rem 1.5rem;
+    text-decoration: none;
+    color: var(--dark-color);
+    transition: var(--transition);
+}
+
+.desktop-sidebar-dropdown-toggle:hover {
+    background: var(--light-color);
+}
+
+.desktop-sidebar-dropdown-toggle .dropdown-chevron {
+    font-size: 0.8rem;
+    transition: transform 0.3s ease;
+    margin-left: auto;
+}
+
+.desktop-sidebar-dropdown-toggle.active .dropdown-chevron {
+    transform: rotate(180deg);
+}
+
+.desktop-sidebar-submenu {
+    display: none;
+    flex-direction: column;
+    background: #f9f9f9;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.desktop-sidebar-submenu.active {
+    display: flex;
+    max-height: 500px;
+}
+
+.desktop-sidebar-submenu-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.85rem 1.5rem 0.85rem 3rem;
+    text-decoration: none;
+    color: var(--dark-color);
+    font-size: 0.95rem;
+    transition: var(--transition);
+    border-left: 3px solid transparent;
+}
+
+.desktop-sidebar-submenu-item:hover {
+    background: var(--light-color);
+    border-left-color: var(--primary-color);
 }
 
 .nav-menu {
@@ -872,6 +1059,11 @@ body {
     list-style: none;
     align-items: center;
     gap: 0.5rem;
+}
+
+/* Hide Dashboard, Reports, and Item Requests from desktop navbar (they're in the sidebar) */
+.nav-menu-desktop-hidden {
+    display: none;
 }
 
 .nav-link {

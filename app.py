@@ -3178,8 +3178,11 @@ def department_dashboard():
     if current_user.role in ['Department Manager', 'Operation Manager']:
         # Get requests from their department(s) (including completed/paid ones)
         if current_user.role == 'Operation Manager':
-            # Operation Manager can see ALL departments (exclude archived)
-            base_query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
+            # Operation Manager can see ALL departments (exclude archived and drafts)
+            base_query = PaymentRequest.query.filter(
+                PaymentRequest.is_archived == False,
+                PaymentRequest.is_draft == False
+            )
         elif current_user.department == 'Auditing':
             # Auditing Department Manager can see:
             # 1. All their own requests (regardless of status or department)
@@ -3187,9 +3190,10 @@ def department_dashboard():
             # 3. Completed and Recurring requests from OTHER departments (view-only)
             # 4. Any request where they are the temporary manager
             # 5. Any request where they are an authorized manager approver (even if department changed)
-            # Exclude archived requests
+            # Exclude archived requests and drafts
             all_non_archived = PaymentRequest.query.filter(
-                PaymentRequest.is_archived == False
+                PaymentRequest.is_archived == False,
+                PaymentRequest.is_draft == False
             ).all()
             
             visible_request_ids = set()
@@ -3223,7 +3227,8 @@ def department_dashboard():
             if visible_request_ids:
                 base_query = PaymentRequest.query.filter(
                     PaymentRequest.request_id.in_(visible_request_ids),
-                    PaymentRequest.is_archived == False
+                    PaymentRequest.is_archived == False,
+                    PaymentRequest.is_draft == False
                 )
             else:
                 # No requests visible - return empty query
@@ -3274,7 +3279,8 @@ def department_dashboard():
             if all_visible_ids:
                 base_query = PaymentRequest.query.filter(
                     PaymentRequest.request_id.in_(all_visible_ids),
-                    PaymentRequest.is_archived == False
+                    PaymentRequest.is_archived == False,
+                    PaymentRequest.is_draft == False
                 )
             else:
                 # No requests visible - return empty query
@@ -3285,7 +3291,7 @@ def department_dashboard():
         # Auditing Staff can see:
         # 1. All their own requests (regardless of status or department)
         # 2. Completed and Recurring requests from OTHER departments (view-only)
-        # Exclude archived requests
+        # Exclude archived requests and drafts
         base_query = PaymentRequest.query.filter(
             db.or_(
                 PaymentRequest.user_id == current_user.user_id,
@@ -3294,13 +3300,15 @@ def department_dashboard():
                     PaymentRequest.status.in_(['Completed', 'Recurring'])
                 )
             ),
-            PaymentRequest.is_archived == False
+            PaymentRequest.is_archived == False,
+            PaymentRequest.is_draft == False
         )
     else:
-        # For regular users, show their own requests (exclude archived)
+        # For regular users, show their own requests (exclude archived and drafts)
         base_query = PaymentRequest.query.filter(
             PaymentRequest.user_id == current_user.user_id,
-            PaymentRequest.is_archived == False
+            PaymentRequest.is_archived == False,
+            PaymentRequest.is_draft == False
         )
     
     # Exclude CEO-submitted requests for non-authorized roles (visibility hardening)
@@ -3594,9 +3602,10 @@ def procurement_dashboard():
         # Exclude archived requests
         user_dept = current_user.department.strip() if current_user.department else ''
         
-        # First, get all non-archived requests to check for authorized approver status
+        # First, get all non-archived non-draft requests to check for authorized approver status
         all_non_archived = PaymentRequest.query.filter(
-            PaymentRequest.is_archived == False
+            PaymentRequest.is_archived == False,
+            PaymentRequest.is_draft == False
         ).all()
         
         # Find requests where user is an authorized approver (handles cases where department was edited)
@@ -3932,6 +3941,9 @@ def procurement_item_requests():
     # Build base query for procurement item requests
     # Start with a query object that we can filter at database level
     base_query = ProcurementItemRequest.query
+    
+    # Exclude draft items - only show submitted requests
+    base_query = base_query.filter(ProcurementItemRequest.is_draft == False)
     
     # Apply search filter at database level (same logic as dashboard)
     if search_query:
@@ -7682,7 +7694,8 @@ def admin_dashboard():
                     PaymentRequest.user.has(User.role.in_(special_submitter_roles))
                 )
             ),
-            PaymentRequest.is_archived == False
+            PaymentRequest.is_archived == False,
+            PaymentRequest.is_draft == False
         )
     else:
         # Other Finance Admins only see finance-related statuses plus temporary assignments awaiting manager approval
@@ -7696,7 +7709,8 @@ def admin_dashboard():
                     PaymentRequest.temporary_manager_id == current_user.user_id
                 )
             ),
-            PaymentRequest.is_archived == False
+            PaymentRequest.is_archived == False,
+            PaymentRequest.is_draft == False
         )
     
     # Apply department filter (before tab filtering)
@@ -7826,27 +7840,29 @@ def finance_dashboard():
     # Abdalaziz can see finance-related statuses + Pending Manager Approval + Rejected by Manager for Finance department only (or his own requests)
     finance_statuses = ['Pending Finance Approval', 'Returned to Manager', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
     
-    # Base query for finance-related statuses (exclude archived)
+    # Base query for finance-related statuses (exclude archived and drafts)
     query = PaymentRequest.query.filter(
         PaymentRequest.status.in_(finance_statuses),
-        PaymentRequest.is_archived == False
+        PaymentRequest.is_archived == False,
+        PaymentRequest.is_draft == False
     )
     # Visibility hardening: Finance Staff must not see CEO-submitted requests
     if current_user.role == 'Finance Staff':
         query = query.filter(~PaymentRequest.user.has(User.role == 'CEO'))
     
-    # Add Finance Staff's own requests with Pending Manager Approval and Rejected by Manager (exclude archived)
+    # Add Finance Staff's own requests with Pending Manager Approval and Rejected by Manager (exclude archived and drafts)
     if current_user.role == 'Finance Staff':
         own_pending_requests = PaymentRequest.query.filter(
             db.and_(
                 PaymentRequest.user_id == current_user.user_id,
                 PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager']),
-                PaymentRequest.is_archived == False
+                PaymentRequest.is_archived == False,
+                PaymentRequest.is_draft == False
             )
         )
         query = query.union(own_pending_requests)
     
-    # Add Abdalaziz's special permissions: Finance department requests OR his own requests (exclude archived)
+    # Add Abdalaziz's special permissions: Finance department requests OR his own requests (exclude archived and drafts)
     elif current_user.name == 'Abdalaziz Al-Brashdi':
         abdalaziz_special_requests = PaymentRequest.query.filter(
             db.and_(
@@ -7855,7 +7871,8 @@ def finance_dashboard():
                     PaymentRequest.department == 'Finance',
                     PaymentRequest.user_id == current_user.user_id
                 ),
-                PaymentRequest.is_archived == False
+                PaymentRequest.is_archived == False,
+                PaymentRequest.is_draft == False
             )
         )
         query = query.union(abdalaziz_special_requests)
@@ -7980,8 +7997,11 @@ def gm_dashboard():
     
     # Build query with optional department and search filters
     # GM can see ALL requests from ALL departments including rejected by manager
-    # Exclude archived requests
-    query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
+    # Exclude archived requests and drafts
+    query = PaymentRequest.query.filter(
+        PaymentRequest.is_archived == False,
+        PaymentRequest.is_draft == False
+    )
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     if search_query:
@@ -8037,8 +8057,11 @@ def gm_dashboard():
             page=page, per_page=per_page, error_out=False
         )
     
-    # Calculate statistics (all requests from all departments - exclude archived)
-    all_requests = PaymentRequest.query.filter(PaymentRequest.is_archived == False).all()
+    # Calculate statistics (all requests from all departments - exclude archived and drafts)
+    all_requests = PaymentRequest.query.filter(
+        PaymentRequest.is_archived == False,
+        PaymentRequest.is_draft == False
+    ).all()
     total_requests = len(all_requests)
     approved = len([r for r in all_requests if r.status == 'Approved'])
     pending = len([r for r in all_requests if r.status == 'Pending'])
@@ -8126,8 +8149,11 @@ def ceo_dashboard():
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
 
-    # Exclude archived requests
-    query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
+    # Exclude archived requests and drafts
+    query = PaymentRequest.query.filter(
+        PaymentRequest.is_archived == False,
+        PaymentRequest.is_draft == False
+    )
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
     if search_query:
@@ -8177,8 +8203,11 @@ def ceo_dashboard():
             page=page, per_page=per_page, error_out=False
         )
 
-    # Exclude archived requests from stats
-    all_requests = PaymentRequest.query.filter(PaymentRequest.is_archived == False).all()
+    # Exclude archived requests and drafts from stats
+    all_requests = PaymentRequest.query.filter(
+        PaymentRequest.is_archived == False,
+        PaymentRequest.is_draft == False
+    ).all()
     stats = {
         'total_requests': len(all_requests),
         'approved': len([r for r in all_requests if r.status == 'Approved']),
@@ -10743,8 +10772,11 @@ def operation_dashboard():
         per_page = 10
     
     # Build query with optional status, department, and search filters - Operation Manager sees ALL departments
-    # Exclude archived requests
-    query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
+    # Exclude archived requests and drafts
+    query = PaymentRequest.query.filter(
+        PaymentRequest.is_archived == False,
+        PaymentRequest.is_draft == False
+    )
     
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)

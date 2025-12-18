@@ -33,13 +33,6 @@
         <a href="{{ url_for('drafts') }}" class="btn btn-secondary">
             <i class="fas fa-file-alt"></i> My Drafts
         </a>
-        {% if show_item_requests_flag %}
-        <a href="{{ url_for('procurement_item_requests') }}" class="btn btn-secondary">
-            <i class="fas fa-shopping-cart"></i> Item Requests
-        </a>
-        {% else %}
-        <!-- Item Requests button temporarily hidden -->
-        {% endif %}
     </div>
 
     <!-- Tab Navigation -->
