@@ -5355,7 +5355,7 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
     # Get and validate amount
     amount_str = request.form.get('amount', '').strip()
     
-    # Amount is optional when status is "Pending Procurement Manager Approval" or "Final Approval"
+    # Amount is always optional for Procurement Manager approval
     amount = None
     if amount_str:
         try:
@@ -5366,10 +5366,6 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         except ValueError:
             flash('Invalid amount format.', 'danger')
             return redirect(url_for('view_item_request_page', request_id=request_id))
-    elif item_request.status not in ['Pending Procurement Manager Approval', 'Final Approval']:
-        # Amount is required for other statuses (e.g., "On Hold")
-        flash('Please enter an amount.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
     
     # Only perform balance check if amount is provided
     if amount is not None:
@@ -6510,113 +6506,59 @@ def update_item_request_quantities_procurement_manager(request_id):
                     else:
                         new_list = new_quantities_str.split(';') if new_quantities_str else []
                 
-                # Find which items changed
-                changed_items = []
-                for i, item_name in enumerate(item_names_list):
-                    # Convert to string in case they're from JSON (could be int or str)
-                    old_qty = str(old_list[i]).strip() if i < len(old_list) else ''
-                    new_qty = str(new_list[i]).strip() if i < len(new_list) else ''
-                    if old_qty != new_qty:
-                        old_display = old_qty if old_qty else 'Not specified'
-                        new_display = new_qty if new_qty else 'Not specified'
-                        changed_items.append(f"{item_name}: {old_display} → {new_display}")
+                # Build recipient list for notifications
+                recipient_ids = set()
                 
-                if changed_items:
-                    # Format the message nicely
-                    if len(changed_items) == 1:
-                        items_changed_text = changed_items[0]
-                    elif len(changed_items) <= 3:
-                        items_changed_text = ', '.join(changed_items)
-                    else:
-                        items_changed_text = ', '.join(changed_items[:3]) + f" and {len(changed_items) - 3} more item(s)"
-                    
-                    # Notify requestor
-                    if item_request.user_id:
-                        create_notification(
-                            user_id=item_request.user_id,
-                            title="Item Request Quantities Updated",
-                            message=f"{current_user.name} has updated the quantities for your item request #{request_id}. Changes: {items_changed_text}.",
-                            notification_type="item_request_updated",
-                            item_request_id=request_id
-                        )
-                    
-                    # Reload item_request to ensure user relationship is fresh
-                    db.session.refresh(item_request)
-                    item_request = ProcurementItemRequest.query.get(request_id)
-                    requestor = User.query.get(item_request.user_id) if item_request.user_id else None
-                    
-                    # Track notified users to avoid duplicates
-                    notified_user_ids = set()
-                    
-                    # Notify all authorized approvers (excluding the one who made the edit)
-                    authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
-                    for approver in authorized_approvers:
-                        if approver.user_id != current_user.user_id and approver.user_id not in notified_user_ids:
-                            notified_user_ids.add(approver.user_id)
-                            create_notification(
-                                user_id=approver.user_id,
-                                title="Item Request Quantities Updated",
-                                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
-                                notification_type="item_request_updated",
-                                item_request_id=request_id
-                            )
-                    
-                    # Explicitly notify Operation Manager if it's an Operation or Project department request
-                    if requestor and (requestor.department == 'Operation' or requestor.department == 'Project'):
-                        op_managers = User.query.filter_by(role='Operation Manager').all()
-                        for op_manager in op_managers:
-                            if op_manager.user_id != current_user.user_id and op_manager.user_id not in notified_user_ids:
-                                notified_user_ids.add(op_manager.user_id)
-                                create_notification(
-                                    user_id=op_manager.user_id,
-                                    title="Item Request Quantities Updated",
-                                    message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
-                                    notification_type="item_request_updated",
-                                    item_request_id=request_id
-                                )
-                    
-                    # Explicitly notify Department Manager of the requestor's department
-                    if requestor and requestor.department:
-                        dept_managers = User.query.filter_by(
-                            role='Department Manager',
-                            department=requestor.department
-                        ).all()
-                        for dept_manager in dept_managers:
-                            if dept_manager.user_id != current_user.user_id and dept_manager.user_id not in notified_user_ids:
-                                notified_user_ids.add(dept_manager.user_id)
-                                create_notification(
-                                    user_id=dept_manager.user_id,
-                                    title="Item Request Quantities Updated",
-                                    message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
-                                    notification_type="item_request_updated",
-                                    item_request_id=request_id
-                                )
-                    
-                    # Explicitly notify the requestor's direct manager (manager_id)
-                    if requestor and requestor.manager_id:
-                        direct_manager = User.query.get(requestor.manager_id)
-                        if direct_manager and direct_manager.user_id != current_user.user_id and direct_manager.user_id not in notified_user_ids:
-                            notified_user_ids.add(direct_manager.user_id)
-                            create_notification(
-                                user_id=direct_manager.user_id,
-                                title="Item Request Quantities Updated",
-                                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
-                                notification_type="item_request_updated",
-                                item_request_id=request_id
-                            )
-                    
-                    # Notify GM (all GMs)
-                    gms = User.query.filter_by(role='GM').all()
-                    for gm in gms:
-                        if gm.user_id != current_user.user_id and gm.user_id not in notified_user_ids:
-                            notified_user_ids.add(gm.user_id)
-                            create_notification(
-                                user_id=gm.user_id,
-                                title="Item Request Quantities Updated",
-                                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
-                                notification_type="item_request_updated",
-                                item_request_id=request_id
-                            )
+                # Original requestor
+                if item_request.user_id:
+                    recipient_ids.add(item_request.user_id)
+                
+                # Authorized approvers
+                authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
+                for approver in authorized_approvers:
+                    if approver.user_id != current_user.user_id:
+                        recipient_ids.add(approver.user_id)
+                
+                # Requestor's direct manager
+                requestor = User.query.get(item_request.user_id) if item_request.user_id else None
+                if requestor and requestor.manager_id:
+                    recipient_ids.add(requestor.manager_id)
+                
+                # Department Manager of requestor's department
+                if requestor and requestor.department:
+                    dept_managers = User.query.filter_by(role='Department Manager', department=requestor.department).all()
+                    for dept_manager in dept_managers:
+                        if dept_manager.user_id != current_user.user_id:
+                            recipient_ids.add(dept_manager.user_id)
+                
+                # Operation Manager if Operation or Project department
+                if requestor and (requestor.department == 'Operation' or requestor.department == 'Project'):
+                    op_managers = User.query.filter_by(role='Operation Manager').all()
+                    for op_manager in op_managers:
+                        if op_manager.user_id != current_user.user_id:
+                            recipient_ids.add(op_manager.user_id)
+                
+                # General Managers
+                gm_users = User.query.filter_by(role='GM').all()
+                for gm_user in gm_users:
+                    if gm_user.user_id != current_user.user_id:
+                        recipient_ids.add(gm_user.user_id)
+                
+                # IT Department
+                it_users = User.query.filter(
+                    User.department == 'IT'
+                ).filter(
+                    User.role.in_(['IT Staff', 'Department Manager'])
+                ).all()
+                for it_user in it_users:
+                    if it_user.user_id != current_user.user_id:
+                        recipient_ids.add(it_user.user_id)
+                
+                # Send notifications to all recipients
+                title = f"Changes saved for Item Request #{request_id}"
+                message = f"Item request #{request_id} quantities have been updated by {current_user.name}."
+                for uid in recipient_ids:
+                    create_notification(uid, title, message, 'item_request_updated', item_request_id=request_id)
     except Exception as e:
         app.logger.warning(f"Failed to persist quantity edit history: {e}")
 
@@ -6872,125 +6814,65 @@ def update_item_request_quantities_manager(request_id):
                     new_display = new_qty if new_qty else 'Not specified'
                     changed_items.append(f"{item_name}: {old_display} → {new_display}")
             
-            if changed_items:
-                # Format the message nicely
-                if len(changed_items) == 1:
-                    items_changed_text = changed_items[0]
-                elif len(changed_items) <= 3:
-                    items_changed_text = ', '.join(changed_items)
-                else:
-                    items_changed_text = ', '.join(changed_items[:3]) + f" and {len(changed_items) - 3} more item(s)"
-                
-                # Notify requestor
-                if item_request.user_id:
-                    create_notification(
-                        user_id=item_request.user_id,
-                        title="Item Request Quantities Updated",
-                        message=f"{current_user.name} has updated the quantities for your item request #{request_id}. Changes: {items_changed_text}.",
-                        notification_type="item_request_updated",
-                        item_request_id=request_id
-                    )
-                
-                # Reload item_request to ensure user relationship is fresh
-                db.session.refresh(item_request)
-                item_request = ProcurementItemRequest.query.get(request_id)
-                requestor = User.query.get(item_request.user_id) if item_request.user_id else None
-                
-                # Track notified users to avoid duplicates
-                notified_user_ids = set()
-                
-                # Notify all authorized approvers (excluding the one who made the edit)
-                authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
-                for approver in authorized_approvers:
-                    if approver.user_id != current_user.user_id and approver.user_id not in notified_user_ids:
-                        notified_user_ids.add(approver.user_id)
-                        create_notification(
-                            user_id=approver.user_id,
-                            title="Item Request Quantities Updated",
-                            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
-                            notification_type="item_request_updated",
-                            item_request_id=request_id
-                        )
-                
-                # Explicitly notify Operation Manager if it's an Operation or Project department request
-                if requestor and (requestor.department == 'Operation' or requestor.department == 'Project'):
-                    op_managers = User.query.filter_by(role='Operation Manager').all()
-                    for op_manager in op_managers:
-                        if op_manager.user_id != current_user.user_id and op_manager.user_id not in notified_user_ids:
-                            notified_user_ids.add(op_manager.user_id)
-                            create_notification(
-                                user_id=op_manager.user_id,
-                                title="Item Request Quantities Updated",
-                                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
-                                notification_type="item_request_updated",
-                                item_request_id=request_id
-                            )
-                
-                # Explicitly notify Department Manager of the requestor's department
-                if requestor and requestor.department:
-                    dept_managers = User.query.filter_by(
-                        role='Department Manager',
-                        department=requestor.department
-                    ).all()
-                    for dept_manager in dept_managers:
-                        if dept_manager.user_id != current_user.user_id and dept_manager.user_id not in notified_user_ids:
-                            notified_user_ids.add(dept_manager.user_id)
-                            create_notification(
-                                user_id=dept_manager.user_id,
-                                title="Item Request Quantities Updated",
-                                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
-                                notification_type="item_request_updated",
-                                item_request_id=request_id
-                            )
-                
-                # Explicitly notify the requestor's direct manager (manager_id)
-                if requestor and requestor.manager_id:
-                    direct_manager = User.query.get(requestor.manager_id)
-                    if direct_manager and direct_manager.user_id != current_user.user_id and direct_manager.user_id not in notified_user_ids:
-                        notified_user_ids.add(direct_manager.user_id)
-                        create_notification(
-                            user_id=direct_manager.user_id,
-                            title="Item Request Quantities Updated",
-                            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
-                            notification_type="item_request_updated",
-                            item_request_id=request_id
-                        )
-                
-                # Explicitly notify General Manager (GM) - they should know about all changes
-                gm_users = User.query.filter_by(role='GM').all()
-                for gm_user in gm_users:
-                    if gm_user.user_id != current_user.user_id and gm_user.user_id not in notified_user_ids:
-                        notified_user_ids.add(gm_user.user_id)
-                        create_notification(
-                            user_id=gm_user.user_id,
-                            title="Item Request Quantities Updated",
-                            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
-                            notification_type="item_request_updated",
-                            item_request_id=request_id
-                        )
-                
-                # Also notify IT Department (all IT Staff and IT Department Manager) - they should know about all changes
-                it_users = User.query.filter(
-                    User.department == 'IT'
-                ).filter(
-                    User.role.in_(['IT Staff', 'Department Manager'])
-                ).all()
-                for it_user in it_users:
-                    if it_user.user_id != current_user.user_id and it_user.user_id not in notified_user_ids:
-                        notified_user_ids.add(it_user.user_id)
-                        create_notification(
-                            user_id=it_user.user_id,
-                            title="Item Request Quantities Updated",
-                            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) has had quantities updated by {current_user.name}. Changes: {items_changed_text}.",
-                            notification_type="item_request_updated",
-                            item_request_id=request_id
-                        )
+            # Build recipient list for notifications
+            recipient_ids = set()
+            
+            # Original requestor
+            if item_request.user_id:
+                recipient_ids.add(item_request.user_id)
+            
+            # Authorized approvers
+            authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
+            for approver in authorized_approvers:
+                if approver.user_id != current_user.user_id:
+                    recipient_ids.add(approver.user_id)
+            
+            # Requestor's direct manager
+            requestor = User.query.get(item_request.user_id) if item_request.user_id else None
+            if requestor and requestor.manager_id:
+                recipient_ids.add(requestor.manager_id)
+            
+            # Department Manager of requestor's department
+            if requestor and requestor.department:
+                dept_managers = User.query.filter_by(role='Department Manager', department=requestor.department).all()
+                for dept_manager in dept_managers:
+                    if dept_manager.user_id != current_user.user_id:
+                        recipient_ids.add(dept_manager.user_id)
+            
+            # Operation Manager if Operation or Project department
+            if requestor and (requestor.department == 'Operation' or requestor.department == 'Project'):
+                op_managers = User.query.filter_by(role='Operation Manager').all()
+                for op_manager in op_managers:
+                    if op_manager.user_id != current_user.user_id:
+                        recipient_ids.add(op_manager.user_id)
+            
+            # General Managers
+            gm_users = User.query.filter_by(role='GM').all()
+            for gm_user in gm_users:
+                if gm_user.user_id != current_user.user_id:
+                    recipient_ids.add(gm_user.user_id)
+            
+            # IT Department
+            it_users = User.query.filter(
+                User.department == 'IT'
+            ).filter(
+                User.role.in_(['IT Staff', 'Department Manager'])
+            ).all()
+            for it_user in it_users:
+                if it_user.user_id != current_user.user_id:
+                    recipient_ids.add(it_user.user_id)
+            
+            # Send notifications to all recipients
+            title = f"Changes saved for Item Request #{request_id}"
+            message = f"Item request #{request_id} quantities have been updated by {current_user.name}."
+            for uid in recipient_ids:
+                create_notification(uid, title, message, 'item_request_updated', item_request_id=request_id)
         except Exception as e:
             app.logger.error(f"Failed to create notification for item request quantity update: {e}")
 
     log_action(f"Manager-stage quantities updated for item request #{request_id}")
     flash('Item quantities updated successfully for manager approval.', 'success')
-    return redirect(url_for('view_item_request_page', request_id=request_id))
+    return redirect(url_for('view_item_request_page', request_id=request_id, tab='manager'))
 
 
 @app.route('/procurement/item-requests/bulk-assign', methods=['POST'])

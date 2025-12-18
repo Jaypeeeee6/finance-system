@@ -641,6 +641,16 @@ window.closeItemRequestErrorModal = function() {
         modal.style.display = 'none';
         document.body.style.overflow = '';
     }
+    
+    // Reset the submit button state if it was set to "Processing..."
+    const form = document.getElementById('itemRequestForm');
+    if (form) {
+        const submitBtn = form.querySelector('button[type="submit"][name="action"][value="submit"]');
+        if (submitBtn && submitBtn.disabled) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Request';
+        }
+    }
 };
 
 // Close modal on Escape key
@@ -650,6 +660,13 @@ document.addEventListener('keydown', function(e) {
         if (modal && modal.style.display === 'flex') {
             closeItemRequestErrorModal();
         }
+    }
+});
+
+// Close modal on overlay click
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('item-request-error-overlay')) {
+        closeItemRequestErrorModal();
     }
 });
 

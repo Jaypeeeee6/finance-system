@@ -230,10 +230,34 @@
                             <td>
                                 {% if req.item_name %}
                                     {% set item_list = req.item_name.split(',') %}
+                                    {# Get quantities - use procurement_manager_quantities if available, else procurement_quantities, else original quantity #}
+                                    {% set raw_quantity_source = req.procurement_manager_quantities or req.procurement_quantities or req.quantity or '' %}
+                                    {% set quantity_list = [] %}
+                                    {% if raw_quantity_source %}
+                                        {% if raw_quantity_source.startswith('[') %}
+                                            {% set quantity_list = (raw_quantity_source | from_json) %}
+                                        {% else %}
+                                            {% set quantity_list = raw_quantity_source.split(';') %}
+                                        {% endif %}
+                                    {% endif %}
+                                    {# Display only items with quantity > 0 #}
                                     {% for item in item_list %}
                                         {% set item_trimmed = item.strip() %}
                                         {% if item_trimmed %}
-                                            <span class="filter-pill item-chip" style="margin-bottom: 4px; display: block;">{{ item_trimmed }}</span>
+                                            {% set qty = '' %}
+                                            {% if loop.index0 < quantity_list|length %}
+                                                {% set qty_raw = quantity_list[loop.index0]|string|trim %}
+                                                {% if ':' in qty_raw %}
+                                                    {% set parts = qty_raw.split(':', 1) %}
+                                                    {% set qty = parts[1].strip() if parts|length > 1 else qty_raw %}
+                                                {% else %}
+                                                    {% set qty = qty_raw %}
+                                                {% endif %}
+                                            {% endif %}
+                                            {% set qty_num = qty|int(0) %}
+                                            {% if qty_num > 0 %}
+                                                <span class="filter-pill item-chip" style="margin-bottom: 4px; display: block;">{{ item_trimmed }}</span>
+                                            {% endif %}
                                         {% endif %}
                                     {% endfor %}
                                 {% else %}
@@ -362,9 +386,6 @@
             <button type="button" class="btn btn-primary btn-sm" onclick="bulkAssignToSelf()" style="padding: 6px 12px; font-size: 0.875rem;">
                 <i class="fas fa-user-check"></i> Bulk Assign to Self
             </button>
-            <button type="button" id="bulkUploadBtn" class="btn btn-success btn-sm" onclick="openBulkUploadModal()" style="padding: 6px 12px; font-size: 0.875rem;">
-                <i class="fas fa-upload"></i> Bulk Upload Invoice/Receipt
-            </button>
             <button type="button" class="btn btn-secondary btn-sm" onclick="clearSelection()" style="padding: 6px 12px; font-size: 0.875rem;">
                 <i class="fas fa-times"></i> Clear Selection
             </button>
@@ -372,95 +393,6 @@
     </div>
     {% endif %}
 </div>
-
-<!-- Bulk Upload Modal -->
-{% if user.department == 'Procurement' %}
-<div id="bulkUploadModal" class="modal" style="display: none;">
-    <div class="modal-content" style="max-width: 600px;">
-        <span class="close" onclick="closeBulkUploadModal()">&times;</span>
-        <form id="bulkUploadForm" method="POST" action="{{ url_for('bulk_upload_item_files') }}" enctype="multipart/form-data">
-            <input type="hidden" name="request_ids" id="bulkUploadRequestIds">
-            <div class="form-group" style="margin-bottom: 20px;">
-                <p style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem;">
-                    <strong>Upload Receipt:</strong> This is for the proof of transfer made by the Procurement Manager to the assigned Procurement Staff.
-                </p>
-                <div id="bulk-receipt-upload-container" 
-                     data-multiple-file-upload
-                     data-input-name="receipt_files"
-                     data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                     data-max-size="10485760"
-                     data-max-files="10"
-                     data-required="true"
-                     data-label="Upload Receipt"
-                     data-help-text="Required (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
-                </div>
-            </div>
-
-            <div class="form-group" style="margin-bottom: 20px;">
-                <label for="bulk_receipt_amount">Receipt Amount (OMR) <span style="color: red;">*</span></label>
-                <input type="number"
-                       name="receipt_amount"
-                       id="bulk_receipt_amount"
-                       class="form-control"
-                       step="0.001"
-                       min="0"
-                       placeholder="Enter amount transferred to procurement staff in OMR"
-                       required>
-                <small class="form-text text-muted">This receipt amount will be applied to all selected item requests.</small>
-            </div>
-            
-            <div class="form-group" style="margin-bottom: 20px;">
-                <label for="bulk_receipt_reference_number">Receipt Reference Number <span style="color: red;">*</span></label>
-                <input type="text"
-                       name="receipt_reference_number"
-                       id="bulk_receipt_reference_number"
-                       class="form-control"
-                       placeholder="Enter the bank transfer or receipt reference number (letters and numbers only)"
-                       pattern="[A-Za-z0-9]+"
-                       oninput="this.value = this.value.replace(/[^a-zA-Z0-9]/g, '')"
-                       required>
-                <small class="form-text text-muted">Reference number related to the uploaded receipt.</small>
-            </div>
-            
-            <div class="form-group" style="margin-bottom: 20px;">
-                <p style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem;">
-                    <strong>Upload Invoice:</strong> This is for the proof of payment made for the requested item.
-                </p>
-                <div id="bulk-invoice-upload-container" 
-                     data-multiple-file-upload
-                     data-input-name="invoice_files"
-                     data-accepted-types=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                     data-max-size="10485760"
-                     data-max-files="10"
-                     data-required="true"
-                     data-label="Upload Invoice"
-                     data-help-text="Required (PDF, JPG, PNG, DOC, DOCX - Max 10MB each)">
-                </div>
-            </div>
-
-            <div class="form-group" style="margin-bottom: 20px;">
-                <label for="bulk_invoice_amount">Invoice Amount (OMR) <span style="color: red;">*</span></label>
-                <input type="number"
-                       name="invoice_amount"
-                       id="bulk_invoice_amount"
-                       class="form-control"
-                       step="0.001"
-                       min="0"
-                       placeholder="Enter invoice amount paid to supplier in OMR"
-                       required>
-                <small class="form-text text-muted">This invoice amount will be applied to all selected item requests.</small>
-            </div>
-            
-            <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
-                <button type="button" class="btn btn-secondary" onclick="closeBulkUploadModal()">Cancel</button>
-                <div id="bulkUploadSubmitBtnWrapper" style="position: relative; display: inline-block;" title="Upload receipt and invoice files for the selected item requests and mark them as completed">
-                    <button type="button" id="bulkUploadSubmitBtn" class="btn btn-success" onclick="confirmBulkUpload()" disabled>Upload Files and Mark as Completed</button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-{% endif %}
 
 <!-- View Request Modal -->
 <div id="viewRequestModal" class="modal" style="display: none;">
