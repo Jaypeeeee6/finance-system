@@ -573,6 +573,77 @@
         user-select: none; /* Prevent text selection */
     }
 
+    /* Make filter option contents align horizontally so we can show an info icon beside the name */
+    .filter-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        justify-content: flex-start;
+    }
+
+    /* Tooltip styling (match new_request.html) */
+    .tooltip-wrapper {
+        position: relative;
+        display: inline-block;
+    }
+
+    .tooltip-wrapper .tooltip-icon {
+        color: #6c757d;
+        margin-left: 6px;
+        cursor: help;
+        font-size: 0.95rem;
+        vertical-align: middle;
+    }
+
+    .tooltip-wrapper .tooltip-text {
+        visibility: hidden;
+        width: auto;
+        max-width: 320px;
+        background-color: #333;
+        color: #fff;
+        text-align: left;
+        border-radius: 6px;
+        padding: 8px 12px;
+        position: fixed !important;
+        z-index: 99999 !important;
+        bottom: auto;
+        left: auto;
+        margin-left: 0;
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-size: 0.875rem;
+        font-weight: normal;
+        line-height: 1.4;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        pointer-events: none;
+        white-space: normal;
+        word-wrap: break-word;
+        display: inline-block;
+    }
+
+    .tooltip-wrapper .tooltip-text::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 8px;
+        margin-left: 0;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #333 transparent transparent transparent;
+    }
+
+    .tooltip-wrapper:hover .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+    }
+
+    /* Show tooltip when wrapper has tooltip-visible (used for tap on mobile) */
+    .tooltip-wrapper.tooltip-visible .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+        pointer-events: auto;
+    }
+
     .filter-option:last-child {
         border-bottom: none;
     }
@@ -1815,7 +1886,38 @@ function initializeFilterDropdown(config) {
         opts.forEach(option => {
             const optionDiv = document.createElement('div');
             optionDiv.className = 'filter-option';
-            optionDiv.textContent = option.text;
+            // Build option content with a text span so we can add an info icon when available
+            const textSpan = document.createElement('span');
+            textSpan.textContent = option.text;
+            optionDiv.appendChild(textSpan);
+            // If option has a description, add styled tooltip wrapper (matches new_request)
+            if (option.description) {
+                const tooltipWrapper = document.createElement('span');
+                tooltipWrapper.className = 'tooltip-wrapper';
+                const descText = option.description || '';
+                const escapeHtml = (s) => String(s || '').replace(/[&<>"]/g, function(c) {
+                    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+                });
+                tooltipWrapper.innerHTML = '<i class="fas fa-info-circle tooltip-icon" aria-hidden="true"></i>' +
+                                           '<span class="tooltip-text">' + escapeHtml(descText) + '</span>';
+                // Prevent icon clicks from selecting the option and toggle persistent tooltip on click
+                tooltipWrapper.addEventListener('click', function(e){
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const currentlyVisible = tooltipWrapper.classList.contains('tooltip-visible');
+                    document.querySelectorAll('.tooltip-wrapper.tooltip-visible').forEach(w => {
+                        if (w !== tooltipWrapper) w.classList.remove('tooltip-visible');
+                    });
+                    if (currentlyVisible) {
+                        tooltipWrapper.classList.remove('tooltip-visible');
+                    } else {
+                        tooltipWrapper.classList.add('tooltip-visible');
+                        positionTooltip(tooltipWrapper);
+                    }
+                }, { passive: false });
+                bindTooltipPositioning(tooltipWrapper);
+                optionDiv.appendChild(tooltipWrapper);
+            }
             optionDiv.setAttribute('data-value', option.value);
             
             let optionHandled = false;
@@ -1978,6 +2080,70 @@ function initializeFilterDropdown(config) {
         }
     });
     
+    // Tooltip positioning helpers (copy from new_request.html)
+    function positionTooltip(tooltipWrapper) {
+        var icon = tooltipWrapper.querySelector('.tooltip-icon');
+        var tooltip = tooltipWrapper.querySelector('.tooltip-text');
+        if (icon && tooltip) {
+            var iconRect = icon.getBoundingClientRect();
+            var iconCenter = iconRect.left + (iconRect.width / 2);
+            var arrowOffset = 8; // arrow sits at 8px from tooltip left edge
+            tooltip.style.left = (iconCenter - arrowOffset) + 'px';
+            // Keep tooltip slightly above icon for desktop; if visible via tap, move slightly closer
+            var isMobileViewport = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+            var isTapVisible = tooltipWrapper.classList && tooltipWrapper.classList.contains('tooltip-visible');
+            if (isMobileViewport || isTapVisible) {
+                tooltip.style.top = (iconRect.top - tooltip.offsetHeight + 4) + 'px';
+            } else {
+                tooltip.style.top = (iconRect.top - tooltip.offsetHeight - 8) + 'px';
+            }
+        }
+    }
+
+    function bindTooltipPositioning(wrapper) {
+        if (!wrapper || wrapper.dataset.tooltipBound === 'true') return;
+        wrapper.dataset.tooltipBound = 'true';
+        ['mouseenter', 'touchstart'].forEach(evt => {
+            wrapper.addEventListener(evt, function() { positionTooltip(wrapper); }, { passive: true });
+        });
+        ['scroll', 'resize'].forEach(evt => {
+            window.addEventListener(evt, function() {
+                var tooltip = wrapper.querySelector('.tooltip-text');
+                if (tooltip && tooltip.style.visibility === 'visible') {
+                    positionTooltip(wrapper);
+                }
+            });
+        });
+    }
+    
+    // Enable tap-to-open behavior on mobile for tooltips
+    function enableTapTooltipsOnMobile() {
+        const supportsTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        const isMobileViewport = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+        const enableTap = supportsTouch || isMobileViewport;
+        if (!enableTap) return;
+        document.querySelectorAll('.tooltip-wrapper').forEach(wrapper => {
+            if (wrapper._tapHandlerBound) return;
+            wrapper._tapHandlerBound = true;
+            wrapper.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const currentlyVisible = wrapper.classList.contains('tooltip-visible');
+                document.querySelectorAll('.tooltip-wrapper.tooltip-visible').forEach(w => {
+                    if (w !== wrapper) w.classList.remove('tooltip-visible');
+                });
+                if (currentlyVisible) {
+                    wrapper.classList.remove('tooltip-visible');
+                } else {
+                    wrapper.classList.add('tooltip-visible');
+                    positionTooltip(wrapper);
+                }
+            }, { passive: false });
+        });
+        document.addEventListener('click', function() {
+            document.querySelectorAll('.tooltip-wrapper.tooltip-visible').forEach(w => w.classList.remove('tooltip-visible'));
+        });
+    }
+    
     searchInput.addEventListener('focus', function() {
         if (this.value.trim() === '') {
             dropdown.style.display = 'block';
@@ -2037,6 +2203,8 @@ function initializeFilterDropdown(config) {
     
     // Initialize
     buildDropdown();
+    // Enable tooltips tap behavior after build
+    setTimeout(enableTapTooltipsOnMobile, 100);
     
     // Return the selectedItems array for external access
     return {
@@ -2253,11 +2421,7 @@ document.addEventListener('DOMContentLoaded', function() {
         placeholder: 'Search request types...'
     });
     
-    const companies = [
-        {% for company in companies %}
-        { value: '{{ company }}', text: '{{ company }}' }{% if not loop.last %},{% endif %}
-        {% endfor %}
-    ];
+    const companies = {{ companies | tojson }};
     const selectedCompanies = {{ request.args.getlist('company') | tojson }};
     initializeFilterDropdown({
         searchInputId: 'inline_company_search',

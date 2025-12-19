@@ -16091,9 +16091,21 @@ def reports():
                 status_conditions.append(PaymentRequest.status == status)
         if status_conditions:
             companies_query = companies_query.filter(db.or_(*status_conditions))
-    companies = companies_query.distinct().all()
-    companies = [c[0] for c in companies if c[0]]
-    companies.sort()  # Sort alphabetically
+    companies_raw = companies_query.distinct().all()
+    companies_list = [c[0] for c in companies_raw if c[0]]
+    companies_list = sorted(companies_list)  # Sort alphabetically
+
+    # Enrich companies with optional descriptions from PersonCompanyOption table
+    companies = []
+    for comp_name in companies_list:
+        # Try to find a matching PersonCompanyOption (exact match)
+        opt = PersonCompanyOption.query.filter_by(name=comp_name).first()
+        description = opt.description if opt and getattr(opt, 'description', None) else ''
+        companies.append({
+            'value': comp_name,
+            'text': comp_name,
+            'description': description or ''
+        })
     
     # Get unique branches for filter
     branches = Branch.query.filter_by(is_active=True).order_by(Branch.name).all()
