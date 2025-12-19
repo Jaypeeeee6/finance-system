@@ -247,10 +247,12 @@
                     <span>Item Requests</span>
                 </a>
                 {% endif %}
+                {% if current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT') %}
                 <a href="{{ url_for('archives') }}" class="desktop-sidebar-item">
                     <i class="fas fa-archive"></i>
                     <span>Archives</span>
                 </a>
+                {% endif %}
             </nav>
         </div>
     </div>
