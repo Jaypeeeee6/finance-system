@@ -469,6 +469,7 @@ class PersonCompanyOption(db.Model):
     account_name = db.Column(db.String(200), nullable=True)  # Account name for payment requests
     account_number = db.Column(db.String(50), nullable=True)  # Account number for payment requests
     bank_name = db.Column(db.String(200), nullable=True)  # Bank name for payment requests
+    description = db.Column(db.Text, nullable=True)  # Optional description for the person/company option
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
@@ -481,6 +482,7 @@ class PersonCompanyOption(db.Model):
         return {
             'id': self.id,
             'name': self.name,
+            'description': self.description,
             'department': self.department,
             'request_type': self.request_type,
             'is_active': self.is_active,

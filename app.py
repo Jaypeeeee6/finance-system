@@ -9185,6 +9185,7 @@ def add_person_company_option():
         account_name = request.form.get('account_name', '').strip() or None
         account_number = request.form.get('account_number', '').strip() or None
         bank_name = request.form.get('bank_name', '').strip() or None
+        description = request.form.get('description', '').strip() or None
         
         if not name or not department or not request_type:
             flash('Name, department, and request type are required.', 'danger')
@@ -9210,6 +9211,7 @@ def add_person_company_option():
                 account_name=account_name,
                 account_number=account_number,
                 bank_name=bank_name,
+                description=description,
                 created_by_user_id=current_user.user_id
             )
             
@@ -9274,6 +9276,7 @@ def edit_person_company_option(option_id):
         account_name = request.form.get('account_name', '').strip() or None
         account_number = request.form.get('account_number', '').strip() or None
         bank_name = request.form.get('bank_name', '').strip() or None
+        description = request.form.get('description', '').strip() or None
         
         if not name or not department or not request_type:
             flash('Name, department, and request type are required.', 'danger')
@@ -9303,6 +9306,7 @@ def edit_person_company_option(option_id):
             option.account_name = account_name
             option.account_number = account_number
             option.bank_name = bank_name
+            option.description = description
             option.updated_at = datetime.utcnow()
             
             db.session.commit()
