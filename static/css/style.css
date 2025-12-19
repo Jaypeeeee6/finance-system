@@ -1773,14 +1773,15 @@ body {
 
 .data-table th:nth-child(7),
 .data-table td:nth-child(7) {
-    padding-right: 0 !important;
-    margin-right: -0.5rem !important;
+    /* Restore reasonable spacing between the Completed and Amount columns */
+    padding-right: 0.75rem !important;
+    margin-right: 0 !important;
 }
 
 .data-table th:nth-child(8),
 .data-table td:nth-child(8) {
-    padding-left: 0 !important;
-    margin-left: -0.5rem !important;
+    padding-left: 0.75rem !important;
+    margin-left: 0 !important;
 }
 
 /* ==================== BADGES ==================== */

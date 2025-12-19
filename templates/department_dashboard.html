@@ -478,10 +478,11 @@
                                 <tr>
                                     <th>ID</th>
                                     <th>Type</th>
+                                    <th>Payment Method</th>
                                     <th>Requestor</th>
                                     <th>Department</th>
                                     <th>Submitted</th>
-                                    <th>Rejected Date</th>
+                                    <th>Rejected</th>
                                     <th>Amount</th>
                                     <th>Status</th>
                                     <th>Actions</th>
@@ -498,6 +499,7 @@
                                     {% endif %}
                                 </td>
                                     <td><span class="badge badge-info">{{ req.request_type }}</span></td>
+                                    <td>{{ req.payment_method or 'Card' }}</td>
                                     <td>{{ req.requestor_name }}</td>
                                     <td>{{ req.department }}</td>
                                     <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
