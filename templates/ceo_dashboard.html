@@ -141,8 +141,8 @@
                                 <th>Payment Method</th>
                                 <th>Requestor</th>
                                 <th>Department</th>
-                                <th>Submission Date</th>
-                                <th>Completed Date</th>
+                                <th>Submitted</th>
+                                <th>Completed</th>
                                 <th>Amount</th>
                                 <th>Status</th>
                                 <th>Approver</th>
@@ -210,8 +210,8 @@
                                 </td>
                                 <td>{{ req.approver or 'N/A' }}</td>
                                 <td>
-                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
-                                        <i class="fas fa-eye"></i> View
+                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info" title="View">
+                                        <i class="fas fa-eye"></i>
                                     </a>
                                 </td>
                             </tr>
@@ -240,8 +240,8 @@
                                     <th>Payment Method</th>
                                     <th>Requestor</th>
                                     <th>Department</th>
-                                    <th>Submission Date</th>
-                                    <th>Completed Date</th>
+                                    <th>Submitted</th>
+                                    <th>Completed</th>
                                     <th>Amount</th>
                                     <th>Status</th>
                                     <th>Actions</th>
@@ -302,8 +302,8 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
-                                            <i class="fas fa-eye"></i> View
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info" title="View">
+                                            <i class="fas fa-eye"></i>
                                         </a>
                                     </td>
                                 </tr>
@@ -332,8 +332,8 @@
                                     <th>Payment Method</th>
                                     <th>Requestor</th>
                                     <th>Department</th>
-                                    <th>Submission Date</th>
-                                    <th>Completed Date</th>
+                                    <th>Submitted</th>
+                                    <th>Completed</th>
                                     <th>Amount</th>
                                     <th>Status</th>
                                     <th>Actions</th>
@@ -374,8 +374,8 @@
                                         <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
-                                            <i class="fas fa-eye"></i> View
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info" title="View">
+                                            <i class="fas fa-eye"></i>
                                         </a>
                                     </td>
                                 </tr>
@@ -400,11 +400,9 @@
                                 <tr>
                                     <th>ID</th>
                                     <th>Type</th>
-                                    <th>Payment Type</th>
-                                    <th>Payment Method</th>
                                     <th>Requestor</th>
                                     <th>Department</th>
-                                    <th>Submission Date</th>
+                                    <th>Submitted</th>
                                     <th>Rejected Date</th>
                                     <th>Amount</th>
                                     <th>Status</th>
@@ -422,24 +420,17 @@
                                     {% endif %}
                                 </td>
                                     <td><span class="badge badge-info">{{ req.request_type }}</span></td>
-                                    <td>
-                                        {% if req.recurring == 'Recurring' %}
-                                            <span class="badge" style="background: #ffc107; color: #212529;">↻ Recurring</span>
-                                        {% else %}
-                                            <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
-                                        {% endif %}
-                                    </td>
                                     <td>{{ req.requestor_name }}</td>
                                     <td>{{ req.department }}</td>
                                     <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
-                                    <td>{{ req.manager_rejection_date.strftime('%Y-%m-%d') if req.manager_rejection_date else req.finance_rejection_date.strftime('%Y-%m-%d') if req.finance_rejection_date else 'N/A' }}</td>
+                                    <td>{% if req.manager_rejection_date %}{{ req.manager_rejection_date.strftime('%Y-%m-%d') }}{% elif req.finance_rejection_date %}{{ req.finance_rejection_date.strftime('%Y-%m-%d') }}{% else %}<span style="color: #999;">-</span>{% endif %}</td>
                                     <td>OMR {{ "%.3f"|format(req.amount) }}</td>
                                     <td>
                                         <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
-                                            <i class="fas fa-eye"></i> View
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info" title="View">
+                                            <i class="fas fa-eye"></i>
                                         </a>
                                     </td>
                                 </tr>

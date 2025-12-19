@@ -152,8 +152,8 @@
                                 <th>Payment Type</th>
                                 <th>Payment Method</th>
                                 <th>Requestor</th>
-                                <th>Submission Date</th>
-                                <th>Completed Date</th>
+                                <th>Submitted</th>
+                                <th>Completed</th>
                                 <th>Amount</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -213,8 +213,8 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
-                                        <i class="fas fa-eye"></i> View
+                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info" title="View">
+                                        <i class="fas fa-eye"></i>
                                     </a>
                                     {% if req.status == 'Proof Pending' and req.user_id == user.user_id %}
                                     <a href="{{ url_for('view_request', request_id=req.request_id) }}?tab=finance" class="btn btn-sm btn-success">
@@ -344,8 +344,8 @@
                                     <th>Payment Type</th>
                                     <th>Payment Method</th>
                                     <th>Requestor</th>
-                                    <th>Submission Date</th>
-                                    <th>Completed Date</th>
+                                    <th>Submitted</th>
+                                    <th>Completed</th>
                                     <th>Amount</th>
                                     <th>Status</th>
                                     <th>Actions</th>
@@ -410,8 +410,8 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
-                                            <i class="fas fa-eye"></i> View
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info" title="View">
+                                            <i class="fas fa-eye"></i>
                                         </a>
                                         {% if req.status == 'Proof Pending' and req.user_id == user.user_id %}
                                         <a href="{{ url_for('view_request', request_id=req.request_id) }}?tab=finance" class="btn btn-sm btn-success">
@@ -444,8 +444,8 @@
                                     <th>Payment Type</th>
                                     <th>Payment Method</th>
                                     <th>Requestor</th>
-                                    <th>Submission Date</th>
-                                    <th>Completed Date</th>
+                                    <th>Submitted</th>
+                                    <th>Completed</th>
                                     <th>Amount</th>
                                     <th>Status</th>
                                     <th>Actions</th>
@@ -484,8 +484,8 @@
                                         <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
-                                            <i class="fas fa-eye"></i> View
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info" title="View">
+                                            <i class="fas fa-eye"></i>
                                         </a>
                                     </td>
                                 </tr>
@@ -553,8 +553,8 @@
                                         <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
-                                            <i class="fas fa-eye"></i> View
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info" title="View">
+                                            <i class="fas fa-eye"></i>
                                         </a>
                                     </td>
                                 </tr>
@@ -635,8 +635,8 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
-                                            <i class="fas fa-eye"></i> View
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info" title="View">
+                                            <i class="fas fa-eye"></i>
                                         </a>
                                     </td>
                                 </tr>

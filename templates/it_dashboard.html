@@ -185,8 +185,8 @@
                                     <th>Payment Method</th>
                                     <th>Requestor</th>
                                     <th>Department</th>
-                                    <th>Submission Date</th>
-                                    <th>Completed Date</th>
+                                    <th>Submitted</th>
+                                    <th>Completed</th>
                                     <th>Amount</th>
                                     <th>Status</th>
                                     <th>Actions</th>
@@ -292,8 +292,8 @@
                                         <th>Payment Method</th>
                                         <th>Requestor</th>
                                         <th>Department</th>
-                                        <th>Submission Date</th>
-                                        <th>Completed Date</th>
+                                        <th>Submitted</th>
+                                        <th>Completed</th>
                                         <th>Amount</th>
                                         <th>Status</th>
                                         <th>Actions</th>
@@ -384,8 +384,8 @@
                                         <th>Type</th>
                                         <th>Requestor</th>
                                         <th>Department</th>
-                                        <th>Submission Date</th>
-                                        <th>Completed Date</th>
+                                        <th>Submitted</th>
+                                        <th>Completed</th>
                                         <th>Amount</th>
                                         <th>Status</th>
                                         <th>Actions</th>
@@ -534,7 +534,7 @@
                                         <th>Type</th>
                                         <th>Requestor</th>
                                         <th>Department</th>
-                                        <th>Submission Date</th>
+                                        <th>Submitted</th>
                                         <th>Rejected Date</th>
                                         <th>Amount</th>
                                         <th>Status</th>
@@ -571,8 +571,8 @@
                                             <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
                                         </td>
                                         <td>
-                                            <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info">
-                                                <i class="fas fa-eye"></i> View
+                                            <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info" title="View">
+                                                <i class="fas fa-eye"></i>
                                             </a>
                                         </td>
                                     </tr>
