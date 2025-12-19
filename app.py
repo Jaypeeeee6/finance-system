@@ -17198,7 +17198,8 @@ def api_person_company_options():
                 'name': opt.name,
                 'account_name': opt.account_name,
                 'account_number': opt.account_number,
-                'bank_name': opt.bank_name
+                'bank_name': opt.bank_name,
+                'description': opt.description or ''
             })
     else:
         options = []

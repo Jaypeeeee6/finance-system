@@ -234,6 +234,108 @@
                     .supplier-option.hidden {
                         display: none;
                     }
+    
+    /* Tooltip styling (match view_item_request.html tooltip) */
+    .tooltip-wrapper {
+        position: relative;
+        display: inline-block;
+    }
+
+    .tooltip-wrapper .tooltip-icon {
+        color: #6c757d;
+        margin-left: 8px;
+        cursor: help;
+        font-size: 0.9em;
+        vertical-align: middle;
+    }
+
+    .tooltip-wrapper .tooltip-text {
+        visibility: hidden;
+        /* Let the tooltip size to its content but constrain maximum width */
+        width: auto;
+        max-width: 320px;
+        background-color: #333;
+        color: #fff;
+        text-align: left;
+        border-radius: 6px;
+        padding: 8px 12px;
+        position: fixed !important;
+        z-index: 99999 !important;
+        bottom: auto;
+        left: auto;
+        margin-left: 0;
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-size: 0.875rem;
+        font-weight: normal;
+        line-height: 1.4;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        pointer-events: none;
+        white-space: normal;
+        word-wrap: break-word;
+        display: inline-block;
+    }
+
+    .tooltip-wrapper .tooltip-text::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        /* place arrow near the very left side of the tooltip box (inside padding area) */
+        left: 8px;
+        margin-left: 0;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #333 transparent transparent transparent;
+    }
+
+    .tooltip-wrapper:hover .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+    }
+    /* Show tooltip when wrapper has tooltip-visible (used for tap on mobile) */
+    .tooltip-wrapper.tooltip-visible .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+        pointer-events: auto;
+    }
+    /* Responsive-only adjustments: slightly larger icon and touch-friendly spacing */
+    @media (max-width: 768px) {
+        .tooltip-wrapper {
+            display: none !important; /* hide info icon and tooltip wrapper on mobile */
+        }
+        .tooltip-wrapper .tooltip-icon {
+            font-size: 1.15rem; /* larger icon on mobile */
+            margin-left: 6px;
+        }
+        .tooltip-wrapper .tooltip-text {
+            font-size: 0.95rem;
+            max-width: 280px;
+        }
+    }
+
+    /* Ensure supplier option text and icon are vertically centered */
+    .supplier-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        justify-content: flex-start;
+    }
+
+    .supplier-option .supplier-option-text {
+        display: inline-block;
+        flex: 0 1 auto;
+        min-width: 0; /* allow text to truncate if needed */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .tooltip-wrapper {
+        display: inline-flex;
+        align-items: center;
+        flex: 0 0 auto;
+        margin-left: 0px; /* moved slightly more left */
+    }
                     </style>
                 </div>
 
@@ -1412,14 +1514,17 @@ function populateSupplierOptions(department, requestType) {
                     optionElement.textContent = optionName;
                     
                     // Store account information if available
-                    if (typeof option === 'object' && (option.account_name || option.account_number || option.bank_name)) {
-                        optionElement.setAttribute('data-account-name', option.account_name || '');
-                        optionElement.setAttribute('data-account-number', option.account_number || '');
-                        optionElement.setAttribute('data-bank-name', option.bank_name || '');
+                    if (typeof option === 'object') {
+                        if (option.account_name) optionElement.setAttribute('data-account-name', option.account_name);
+                        if (option.account_number) optionElement.setAttribute('data-account-number', option.account_number);
+                        if (option.bank_name) optionElement.setAttribute('data-bank-name', option.bank_name);
+                        if (option.description) optionElement.setAttribute('data-description', option.description);
+
                         window.supplierOptionsData[optionName] = {
                             account_name: option.account_name || '',
                             account_number: option.account_number || '',
-                            bank_name: option.bank_name || ''
+                            bank_name: option.bank_name || '',
+                            description: option.description || ''
                         };
                     }
                     
@@ -1474,15 +1579,20 @@ function initializeSupplierSearch() {
         dropdown.innerHTML = '';
         const options = hiddenSelect.querySelectorAll('option');
         
-        options.forEach(option => {
+            options.forEach(option => {
             if (option.value === '') return; // Skip placeholder
             
             // Create option
             const optionDiv = document.createElement('div');
             optionDiv.className = 'supplier-option';
-            optionDiv.textContent = option.textContent;
             optionDiv.setAttribute('data-value', option.value);
             
+            // Text container
+            const textSpan = document.createElement('span');
+            textSpan.className = 'supplier-option-text';
+            textSpan.textContent = option.textContent;
+            optionDiv.appendChild(textSpan);
+
             // Store account information if available
             if (option.getAttribute('data-account-name')) {
                 optionDiv.setAttribute('data-account-name', option.getAttribute('data-account-name'));
@@ -1492,6 +1602,39 @@ function initializeSupplierSearch() {
             }
             if (option.getAttribute('data-bank-name')) {
                 optionDiv.setAttribute('data-bank-name', option.getAttribute('data-bank-name'));
+            }
+            if (option.getAttribute('data-description')) {
+                optionDiv.setAttribute('data-description', option.getAttribute('data-description'));
+                // Create tooltip wrapper matching view_item_request style
+                const tooltipWrapper = document.createElement('span');
+                tooltipWrapper.className = 'tooltip-wrapper';
+                const descText = option.getAttribute('data-description') || '';
+                // Escape HTML for safer insertion
+                const escapeHtml = (s) => String(s || '').replace(/[&<>"]/g, function(c) {
+                    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+                });
+                tooltipWrapper.innerHTML = '<i class=\"fas fa-info-circle tooltip-icon\" aria-hidden=\"true\"></i>' +
+                                           '<span class=\"tooltip-text\">' + escapeHtml(descText) + '</span>';
+                optionDiv.appendChild(tooltipWrapper);
+                // Prevent the option from being selected when interacting with the icon.
+                // Use a click handler that prevents default and stops propagation, and toggles persistent tooltip visibility.
+                tooltipWrapper.addEventListener('click', function(e){
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const currentlyVisible = tooltipWrapper.classList.contains('tooltip-visible');
+                    // Close other visible tooltips first
+                    document.querySelectorAll('.tooltip-wrapper.tooltip-visible').forEach(w => {
+                        if (w !== tooltipWrapper) w.classList.remove('tooltip-visible');
+                    });
+                    if (currentlyVisible) {
+                        tooltipWrapper.classList.remove('tooltip-visible');
+                    } else {
+                        tooltipWrapper.classList.add('tooltip-visible');
+                        positionTooltip(tooltipWrapper);
+                    }
+                }, { passive: false });
+                // Bind positioning handlers so tooltip positions like the view page
+                bindTooltipPositioning(tooltipWrapper);
             }
             
             // Use mousedown instead of click for better trackpad support
@@ -1515,6 +1658,81 @@ function initializeSupplierSearch() {
             });
             
             dropdown.appendChild(optionDiv);
+        });
+    }
+
+    // Tooltip positioning helpers (mirrors view_item_request behavior)
+    function positionTooltip(tooltipWrapper) {
+        var icon = tooltipWrapper.querySelector('.tooltip-icon');
+        var tooltip = tooltipWrapper.querySelector('.tooltip-text');
+        if (icon && tooltip) {
+            var iconRect = icon.getBoundingClientRect();
+            // Align tooltip so its left edge positions such that the arrow (at left:8px)
+            // points to the icon center. Compute left = iconCenter - arrowOffset.
+            var iconCenter = iconRect.left + (iconRect.width / 2);
+            var arrowOffset = 18; // reduced to shift tooltip slightly right relative to previous position
+            tooltip.style.left = (iconCenter - arrowOffset) + 'px';
+
+            // For responsive/tap mode, bring the tooltip closer to the icon vertically.
+            var isMobileViewport = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+            var isTapVisible = tooltipWrapper.classList && tooltipWrapper.classList.contains('tooltip-visible');
+            if (isMobileViewport || isTapVisible) {
+                // Move tooltip down a bit so it's closer to the icon on mobile/tap (smaller offset)
+                tooltip.style.top = (iconRect.top - tooltip.offsetHeight + 4) + 'px';
+            } else {
+                tooltip.style.top = (iconRect.top - tooltip.offsetHeight - 8) + 'px';
+            }
+        }
+    }
+
+    function bindTooltipPositioning(wrapper) {
+        if (!wrapper || wrapper.dataset.tooltipBound === 'true') return;
+        wrapper.dataset.tooltipBound = 'true';
+        ['mouseenter', 'touchstart'].forEach(evt => {
+            wrapper.addEventListener(evt, function() { positionTooltip(wrapper); }, { passive: true });
+        });
+        // Re-position on scroll/resize while visible
+        ['scroll', 'resize'].forEach(evt => {
+            window.addEventListener(evt, function() {
+                var tooltip = wrapper.querySelector('.tooltip-text');
+                if (tooltip && tooltip.style.visibility === 'visible') {
+                    positionTooltip(wrapper);
+                }
+            });
+        });
+    }
+    
+    // Responsive: enable tap-to-open behavior on touch/small screens
+    function enableTapTooltipsOnMobile() {
+        const supportsTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        // consider mobile if touch-capable or narrow viewport
+        const isMobileViewport = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+        const enableTap = supportsTouch || isMobileViewport;
+
+        document.querySelectorAll('.tooltip-wrapper').forEach(wrapper => {
+            if (wrapper._tapHandlerBound) return;
+            wrapper._tapHandlerBound = true;
+            wrapper.addEventListener('click', function (e) {
+                if (!enableTap) return;
+                e.stopPropagation();
+                // Toggle visible class
+                const currentlyVisible = wrapper.classList.contains('tooltip-visible');
+                // Close other visible tooltips
+                document.querySelectorAll('.tooltip-wrapper.tooltip-visible').forEach(w => {
+                    if (w !== wrapper) w.classList.remove('tooltip-visible');
+                });
+                if (currentlyVisible) {
+                    wrapper.classList.remove('tooltip-visible');
+                } else {
+                    wrapper.classList.add('tooltip-visible');
+                    positionTooltip(wrapper);
+                }
+            }, { passive: false });
+        });
+
+        // Close tooltips when tapping outside
+        document.addEventListener('click', function () {
+            document.querySelectorAll('.tooltip-wrapper.tooltip-visible').forEach(w => w.classList.remove('tooltip-visible'));
         });
     }
     
