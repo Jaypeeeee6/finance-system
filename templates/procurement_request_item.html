@@ -107,6 +107,9 @@
                             <input type="hidden" name="item_names" id="item_names" value="">
                             <input type="hidden" name="item_quantities" id="item_quantities" value="">
                             <div id="item_dropdown" class="item-dropdown" style="display: none;"></div>
+                            <small id="item_no_options_info" class="form-text text-muted" style="display: none; margin-top:8px;">
+                                Press Enter if you want to add multiple items that are all in this same category.
+                            </small>
                         </div>
                         {% if procurement_items and procurement_items|length > 0 %}
                             <small class="form-text text-muted">Type to search or select from predefined items</small>
@@ -743,6 +746,7 @@ function initializeItemSearch() {
     const hiddenInput = document.getElementById('item_name_value');
     const hiddenInputNames = document.getElementById('item_names');
     const hiddenInputQuantities = document.getElementById('item_quantities');
+    const noOptionsInfo = document.getElementById('item_no_options_info');
     
     if (!searchInput || !hiddenSelect || !dropdown || !chipsContainer || !hiddenInput || !hiddenInputNames || !hiddenInputQuantities) return;
     
@@ -884,8 +888,8 @@ function initializeItemSearch() {
             updateChips();
             updateDropdownSelection();
             
-            // Clear search input but keep dropdown open so user can continue selecting
-            searchInput.value = '';
+            // Keep the current search input so the user can clear it manually if desired.
+            // Keep dropdown open so user can continue selecting.
             dropdown.style.display = 'block';
             searchInput.focus();
             
@@ -911,8 +915,7 @@ function initializeItemSearch() {
         updateChips();
         updateDropdownSelection();
         
-        // Clear search input but keep dropdown open so user can continue selecting
-        searchInput.value = '';
+        // Keep the current search input value so the user can clear it manually to reset the dropdown.
         dropdown.style.display = 'block';
         
         // Restore focus so user can continue typing
@@ -932,24 +935,27 @@ function initializeItemSearch() {
         
         options.forEach(option => {
             const optionCategory = option.getAttribute('data-category');
-            
-            // If a category is selected, only show items matching that category
-            // Items without a category attribute should be hidden when a category is selected
-            // If no category is selected, show all items (unless hidden by search)
+
             if (selectedCategory) {
+                // When a category is selected, only show matching items.
                 if (optionCategory === selectedCategory) {
-                    // Show items matching the selected category (unless hidden by search)
-                    if (!option.classList.contains('hidden-by-search')) {
-                        option.classList.remove('hidden');
-                    }
+                    option.classList.remove('hidden');
+                    option.classList.remove('hidden-by-search');
+                    option.style.display = ''; // allow CSS to control visible options
                 } else {
-                    // Hide items that don't match the selected category
                     option.classList.add('hidden');
+                    option.classList.remove('hidden-by-search');
+                    option.style.display = 'none'; // force hide non-matching options
                 }
             } else {
-                // No category selected - show all items (unless hidden by search)
-                if (!option.classList.contains('hidden-by-search')) {
+                // No category selected - restore visibility for items not hidden by search
+                if (option.classList.contains('hidden-by-search')) {
+                    option.classList.add('hidden');
+                    option.style.display = 'none';
+                } else {
                     option.classList.remove('hidden');
+                    option.classList.remove('hidden-by-search');
+                    option.style.display = '';
                 }
             }
         });
@@ -972,18 +978,86 @@ function initializeItemSearch() {
             if (matchesSearch && matchesCategory) {
                 option.classList.remove('hidden');
                 option.classList.remove('hidden-by-search');
+                option.style.display = '';
                 hasVisibleOptions = true;
             } else {
+                // Hide the option. If it doesn't match the search, mark it as search-hidden.
                 option.classList.add('hidden');
                 if (!matchesSearch) {
                     option.classList.add('hidden-by-search');
                 }
+                option.style.display = 'none';
             }
         });
         
         dropdown.style.display = hasVisibleOptions ? 'block' : 'none';
     }
     
+    // Determine if there are predefined items available
+    const hasPredefinedItems = hiddenSelect.options.length > 1; // More than just the placeholder option
+
+    // Helper to toggle Others (free-text) mode
+    function setOthersMode(enable) {
+        if (enable) {
+            searchInput.setAttribute('data-others-mode', 'true');
+            searchInput.placeholder = 'Enter item name...';
+            dropdown.style.display = 'none';
+        } else {
+            searchInput.removeAttribute('data-others-mode');
+            if (hasPredefinedItems) {
+                searchInput.placeholder = 'Search items...';
+            } else {
+                searchInput.placeholder = 'Enter item name...';
+            }
+        }
+    }
+
+    // Function to update input mode based on selected category
+    function updateInputModeBasedOnCategory() {
+        const categorySelect = document.getElementById('category');
+        const selectedCategory = categorySelect ? categorySelect.value : '';
+
+        // If no category is chosen yet, treat it like "no predefined items" (only allow typing)
+        if (!selectedCategory) {
+            setOthersMode(true);
+            if (noOptionsInfo) noOptionsInfo.style.display = 'none';
+            return;
+        }
+
+        // If "Others" category explicitly chosen, enable free-text mode
+        if (selectedCategory === 'Others') {
+            setOthersMode(true);
+            if (noOptionsInfo) noOptionsInfo.style.display = 'block';
+            return;
+        }
+
+        // A specific category is chosen: if we have predefined items, enable dropdown/search
+        if (hasPredefinedItems) {
+            // Check if there are predefined items for the selected category specifically
+            const optionElements = Array.from(hiddenSelect.querySelectorAll('option'));
+            const hasOptionsForCategory = optionElements.some(opt => opt.value && opt.getAttribute('data-category') === selectedCategory);
+
+            if (!hasOptionsForCategory) {
+                // No predefined items for this category — allow free-text entry
+                setOthersMode(true);
+                if (noOptionsInfo) {
+                    noOptionsInfo.style.display = 'block';
+                }
+                return;
+            }
+
+            // There are predefined items for this category — enable search/dropdown
+            setOthersMode(false);
+            if (noOptionsInfo) noOptionsInfo.style.display = 'none';
+            filterByCategory();
+            const visibleOptions = dropdown.querySelectorAll('.item-option:not(.hidden)');
+            dropdown.style.display = visibleOptions.length > 0 ? 'block' : 'none';
+        } else {
+            // No predefined items for this user/department - free-text entry
+            setOthersMode(true);
+        }
+    }
+
     // Event listeners
     searchInput.addEventListener('input', function() {
         const isOthersMode = this.getAttribute('data-others-mode') === 'true';
@@ -1125,34 +1199,8 @@ function initializeItemSearch() {
             updateDropdownSelection();
             
             // Check if user is from Operation department (has predefined items)
-            const hasPredefinedItems = hiddenSelect.options.length > 1; // More than just the placeholder option
-            
-            // Handle "Others" category - allow free text entry
-            if (selectedCategory === 'Others') {
-                // Hide dropdown and change placeholder
-                dropdown.style.display = 'none';
-                searchInput.placeholder = 'Enter item name...';
-                searchInput.setAttribute('data-others-mode', 'true');
-            } else {
-                // Restore normal behavior for other categories
-                if (hasPredefinedItems) {
-                    searchInput.placeholder = 'Search items...';
-                } else {
-                    searchInput.placeholder = 'Enter item name...';
-                }
-                searchInput.removeAttribute('data-others-mode');
-                
-                // Apply category filter (only for Operation department with predefined items)
-                if (hasPredefinedItems) {
-                    filterByCategory();
-                    // Show dropdown with filtered items
-                    const visibleOptions = dropdown.querySelectorAll('.item-option:not(.hidden)');
-                    dropdown.style.display = visibleOptions.length > 0 ? 'block' : 'none';
-                } else {
-                    // For non-Operation departments, hide dropdown since there are no predefined items
-                    dropdown.style.display = 'none';
-                }
-            }
+            // Update input mode and dropdown visibility based on new category selection
+            updateInputModeBasedOnCategory();
             
         });
     }
@@ -1160,6 +1208,9 @@ function initializeItemSearch() {
     // Initialize dropdown
     buildDropdown();
     updateChips();
+
+    // Ensure input mode matches initial category state
+    updateInputModeBasedOnCategory();
     
     // Update form submission to use hidden input value and validate
     const form = document.getElementById('itemRequestForm');
