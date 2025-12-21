@@ -111,11 +111,9 @@
 // Store categories by department
 const categoriesByDept = {};
 {% for category in categories %}
-    const dept = {{ category.department|tojson }};
-    if (!categoriesByDept[dept]) {
-        categoriesByDept[dept] = [];
-    }
-    categoriesByDept[dept].push({
+    // Avoid declaring the same identifier repeatedly; index directly by department
+    categoriesByDept[{{ category.department|tojson }}] = categoriesByDept[{{ category.department|tojson }}] || [];
+    categoriesByDept[{{ category.department|tojson }}].push({
         id: {{ category.id }},
         name: {{ category.name|tojson }}
     });
@@ -153,6 +151,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Attach event listener to department select
     if (departmentSelect) {
         departmentSelect.addEventListener('change', updateCategories);
+        // Initialize categories for selected department on page load
+        updateCategories();
     }
     
     form.addEventListener('submit', function(e) {
