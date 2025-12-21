@@ -209,7 +209,8 @@
                         <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
                             {% if user.department == 'Procurement' %}
                             <td>
-                                {% if req.status in ['Completed', 'On Hold', 'Pending Procurement Manager Approval'] %}
+                                {# Do not allow selection for requests that are completed, on hold, pending procurement manager approval, or in final approval #}
+                                {% if req.status in ['Completed', 'On Hold', 'Pending Procurement Manager Approval', 'Final Approval'] %}
                                 <input type="checkbox" class="request-checkbox" value="{{ req.id }}" disabled title="Cannot select requests with status: {{ req.status }}">
                                 {% else %}
                                 <input type="checkbox" class="request-checkbox" value="{{ req.id }}" 

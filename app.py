@@ -4710,7 +4710,10 @@ def view_item_request_page(request_id):
     # Current quantities aligned with assigned items (used to disable zero-qty items in invoice mapping)
     assigned_item_quantities = []
     try:
-        raw_quantity_source = item_request.procurement_quantities or item_request.procurement_manager_quantities or item_request.quantity
+        # Prefer quantities saved by the assigned procurement staff. If not present,
+        # fall back to procurement manager-approved quantities, then manager quantities,
+        # and finally the original requested quantity.
+        raw_quantity_source = item_request.assigned_procurement_quantities or item_request.procurement_manager_quantities or item_request.procurement_quantities or item_request.quantity
         quantity_list = (raw_quantity_source or '').split(';') if raw_quantity_source else []
         for idx, itm in enumerate(assigned_items):
             qty_raw = quantity_list[idx].strip() if idx < len(quantity_list) else ''
