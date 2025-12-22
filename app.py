@@ -7352,11 +7352,11 @@ def procurement_request_item():
                 quantities = json.loads(item_quantities_json)
                 # Combine quantities into a formatted string if multiple items
                 if item_names and len(quantities) > 1:
-                    item_list = item_names.split(',')
+                    # Store only the numeric quantities in order, separated by semicolons
                     quantity_parts = []
-                    for i, qty in enumerate(quantities):
+                    for qty in quantities:
                         if qty and qty.strip():
-                            quantity_parts.append(f"{item_list[i].strip()}: {qty.strip()}")
+                            quantity_parts.append(qty.strip())
                     if quantity_parts:
                         quantity = '; '.join(quantity_parts)
                     elif len(quantities) == 1 and quantities[0]:
@@ -7392,7 +7392,7 @@ def procurement_request_item():
             department=current_user.department if current_user else '',
             category=category if category else None,
             item_name=item_name,
-            procurement_quantities=item_quantities_json if item_quantities_json else None,  # Store requested quantities as JSON
+            procurement_quantities=quantity if quantity else None,  # Store requested quantities as formatted string (not raw JSON)
             purpose=purpose,
             branch_name=branch_name,
             request_date=request_date,
@@ -11647,10 +11647,31 @@ def edit_item_draft(draft_id):
         elif item_name:
             draft.item_name = item_name
         
-        # Handle quantities - store as JSON in procurement_quantities field
+        # Handle quantities - convert JSON input into a formatted string and store (avoid raw JSON)
         item_quantities_json = request.form.get('item_quantities', '').strip()
+        quantity = None
         if item_quantities_json:
-            draft.procurement_quantities = item_quantities_json
+            try:
+                import json
+                quantities = json.loads(item_quantities_json)
+                # Combine quantities into a formatted string if multiple items
+                if draft.item_name and ',' in draft.item_name and len(quantities) > 1:
+                    # Store only the numeric quantities in order, separated by semicolons
+                    quantity_parts = []
+                    for qty in quantities:
+                        if qty and qty.strip():
+                            quantity_parts.append(qty.strip())
+                    if quantity_parts:
+                        quantity = '; '.join(quantity_parts)
+                    elif len(quantities) == 1 and quantities[0]:
+                        quantity = quantities[0]
+                elif len(quantities) == 1 and quantities[0]:
+                    quantity = quantities[0]
+            except Exception:
+                # If parsing fails, fallback to leaving the field unchanged
+                quantity = None
+        if quantity:
+            draft.procurement_quantities = quantity
         draft.purpose = request.form.get('purpose', '').strip() or draft.purpose
         
         # Handle branch names
