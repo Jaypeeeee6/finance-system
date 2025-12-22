@@ -137,6 +137,20 @@
                         <small class="form-text text-muted">Optional: Add any additional details or specifications</small>
                     </div>
                 </div>
+                
+                <div class="form-group">
+                    <label>Upload Files <span class="required-star">*</span></label>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                        <button type="button" id="item_add-files-btn" class="btn btn-primary" style="white-space: nowrap;">
+                            <i class="fas fa-plus"></i> Upload Files
+                        </button>
+                    </div>
+                    <small>Upload multiple files (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)</small>
+                    <div id="item_file-preview" style="margin-top: 10px;"></div>
+                    
+                    <!-- Hidden file input for actual file selection -->
+                    <input type="file" name="upload_files" id="item_receipt_files" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" multiple style="display: none;" aria-required="true">
+                </div>
 
                 <div class="form-actions">
                     <button type="submit" name="action" value="submit" class="btn btn-success" style="background:#28a745;border-color:#28a745;color:#ffffff;">
@@ -1215,7 +1229,36 @@ function initializeItemSearch() {
     // Update form submission to use hidden input value and validate
     const form = document.getElementById('itemRequestForm');
     if (form) {
+        // Capture which action button was clicked for browsers that don't provide e.submitter
+        const actionButtons = form.querySelectorAll('button[name="action"]');
+        actionButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                form.dataset.clickedAction = this.value;
+            });
+        });
+
         form.addEventListener('submit', function(e) {
+            // Determine action that triggered submit (prefer e.submitter when available)
+            let action = 'submit';
+            if (typeof e.submitter !== 'undefined' && e.submitter) {
+                action = e.submitter.value || action;
+            } else if (form.dataset.clickedAction) {
+                action = form.dataset.clickedAction;
+            } else if (document.activeElement && document.activeElement.name === 'action') {
+                action = document.activeElement.value;
+            }
+
+            // If saving as draft, skip required-field validation
+            if (action === 'save_draft') {
+                try {
+                    hiddenInputNames.value = selectedItems.map(i => i.value).join(',');
+                    hiddenInput.value = selectedItems.length > 0 ? selectedItems[0].value : '';
+                } catch (err) {
+                    // ignore if hidden inputs not available
+                }
+                return; // allow submit to proceed without validation
+            }
+
             // Clear previous error messages
             clearErrorMessages();
             
@@ -1243,6 +1286,11 @@ function initializeItemSearch() {
             }
             if (!branchNames) {
                 missingFields.push(getItemRequestFieldDisplayName('branch_name'));
+            }
+            // Require receipt/proof of payment files
+            const itemFilesCount = window.itemAllSelectedFiles ? window.itemAllSelectedFiles.length : 0;
+            if (itemFilesCount === 0) {
+                missingFields.push('Upload Files');
             }
             
             // If there are missing fields, show error modal and don't submit
@@ -1563,6 +1611,26 @@ function initializeBranchSearch() {
         const existingHandler = form.onsubmit;
         
         form.addEventListener('submit', function(e) {
+            // Determine action that triggered submit (supports e.submitter, dataset, and activeElement fallbacks)
+            let action = 'submit';
+            if (typeof e.submitter !== 'undefined' && e.submitter) {
+                action = e.submitter.value || action;
+            } else if (form.dataset && form.dataset.clickedAction) {
+                action = form.dataset.clickedAction;
+            } else if (document.activeElement && document.activeElement.name === 'action') {
+                action = document.activeElement.value;
+            }
+
+            // If saving as draft, skip required branch validation but ensure hidden input is set
+            if (action === 'save_draft') {
+                try {
+                    hiddenInput.value = selectedBranches.map(b => b.value).join(',');
+                } catch (err) {
+                    // ignore if hidden input not available
+                }
+                return; // allow submit to proceed
+            }
+
             // Validate that at least one branch is selected
             if (selectedBranches.length === 0) {
                 e.preventDefault();
@@ -1576,6 +1644,202 @@ function initializeBranchSearch() {
         });
     }
 }
+</script>
+
+<script>
+// File upload handling for Item Request (required)
+window.itemAllSelectedFiles = window.itemAllSelectedFiles || [];
+
+(function() {
+    const addBtn = document.getElementById('item_add-files-btn');
+    const fileInput = document.getElementById('item_receipt_files');
+    const previewEl = document.getElementById('item_file-preview');
+    if (!addBtn || !fileInput || !previewEl) return;
+
+    addBtn.addEventListener('click', function() {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function(e) {
+        const newFiles = Array.from(e.target.files || []);
+        const maxFileSize = 50 * 1024 * 1024; // 50MB
+        const allowedExtensions = ['pdf','jpg','jpeg','png','doc','docx','xls','xlsx'];
+        const validFiles = [];
+        const errors = [];
+
+        newFiles.forEach(file => {
+            const exists = window.itemAllSelectedFiles.some(f => f.name === file.name && f.size === file.size);
+            if (exists) return;
+            if (file.size > maxFileSize) {
+                errors.push(`File "${file.name}" is too large. Maximum size is 50MB.`);
+                return;
+            }
+            const ext = (file.name.split('.').pop() || '').toLowerCase();
+            if (!allowedExtensions.includes(ext)) {
+                errors.push(`Invalid file type for "${file.name}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX`);
+                return;
+            }
+            validFiles.push(file);
+        });
+
+        if (errors.length > 0) {
+            alert(errors.join('\\n\\n'));
+        }
+
+        if (validFiles.length > 0) {
+            window.itemAllSelectedFiles.push(...validFiles);
+            updateItemFilePreview();
+        }
+
+        e.target.value = '';
+    });
+
+    window.removeItemSelectedFile = function(index) {
+        if (typeof index !== 'number') return;
+        window.itemAllSelectedFiles.splice(index, 1);
+        updateItemFilePreview();
+    };
+
+    function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+        return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+    }
+
+    function updateItemFilePreview() {
+        const preview = previewEl;
+        const button = addBtn;
+        preview.innerHTML = '';
+
+        if (window.itemAllSelectedFiles.length > 0) {
+            // Update button text when files are selected
+            button.innerHTML = '<i class="fas fa-plus"></i> Upload More Files';
+            button.className = 'btn btn-outline-primary';
+
+            const fileList = document.createElement('div');
+            fileList.style.cssText = 'border: 1px solid #28a745; border-radius: 4px; padding: 10px; background: #d4edda;';
+
+            // Calculate total size of all files
+            const totalSize = window.itemAllSelectedFiles.reduce((sum, file) => sum + file.size, 0);
+
+            const header = document.createElement('div');
+            header.style.cssText = 'font-weight: bold; margin-bottom: 8px; color: #155724; display: flex; align-items: center; justify-content: space-between;';
+
+            const headerLeft = document.createElement('div');
+            headerLeft.style.cssText = 'display: flex; align-items: center;';
+            headerLeft.innerHTML = `<i class="fas fa-check-circle" style="margin-right: 8px; color: #28a745;"></i>Selected Files (${window.itemAllSelectedFiles.length}):`;
+
+            const headerRight = document.createElement('div');
+            headerRight.style.cssText = 'display: flex; align-items: center; gap: 10px;';
+
+            const totalSizeDiv = document.createElement('div');
+            totalSizeDiv.style.cssText = 'font-size: 13px; color: #155724; font-weight: normal;';
+            totalSizeDiv.textContent = `Total: ${formatFileSize(totalSize)}`;
+            headerRight.appendChild(totalSizeDiv);
+
+            // Add "Compress All" button if total size is >= 1 MB and there are image files
+            const minSizeForCompressAll = 1024 * 1024; // 1 MB
+            const hasImageFiles = window.itemAllSelectedFiles.some(file => {
+                const ext = file.name.split('.').pop().toLowerCase();
+                return ['jpg', 'jpeg', 'png'].includes(ext);
+            });
+
+            if (totalSize >= minSizeForCompressAll && hasImageFiles) {
+                const compressAllBtn = document.createElement('button');
+                compressAllBtn.type = 'button';
+                compressAllBtn.innerHTML = '<i class="fas fa-compress-arrows-alt"></i> Compress All Images';
+                compressAllBtn.style.cssText = 'background: #17a2b8; color: white; border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; white-space: nowrap;';
+                compressAllBtn.onclick = function() {
+                    compressAllImages();
+                };
+                headerRight.appendChild(compressAllBtn);
+            }
+
+            header.appendChild(headerLeft);
+            header.appendChild(headerRight);
+            fileList.appendChild(header);
+
+            window.itemAllSelectedFiles.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 8px; background: white; border-radius: 4px; margin-bottom: 5px; border: 1px solid #c3e6cb;';
+
+                const fileInfo = document.createElement('div');
+                fileInfo.style.cssText = 'display: flex; align-items: center; color: #333; font-size: 14px;';
+
+                // Add file type icon
+                const fileIcon = document.createElement('i');
+                const extension = file.name.split('.').pop().toLowerCase();
+                if (['jpg', 'jpeg', 'png', 'gif'].includes(extension)) {
+                    fileIcon.className = 'fas fa-image';
+                    fileIcon.style.cssText = 'color: #17a2b8; margin-right: 8px;';
+                } else if (extension === 'pdf') {
+                    fileIcon.className = 'fas fa-file-pdf';
+                    fileIcon.style.cssText = 'color: #dc3545; margin-right: 8px;';
+                } else if (['doc', 'docx'].includes(extension)) {
+                    fileIcon.className = 'fas fa-file-word';
+                    fileIcon.style.cssText = 'color: #007bff; margin-right: 8px;';
+                } else {
+                    fileIcon.className = 'fas fa-file';
+                    fileIcon.style.cssText = 'color: #6c757d; margin-right: 8px;';
+                }
+
+                const fileName = document.createElement('span');
+                fileName.textContent = `${file.name} (${formatFileSize(file.size)})`;
+
+                fileInfo.appendChild(fileIcon);
+                fileInfo.appendChild(fileName);
+
+                // Create button container
+                const buttonContainer = document.createElement('div');
+                buttonContainer.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+
+                // Add Compress Image button for image files larger than 500KB
+                const minSizeForCompression = 500 * 1024; // 500KB
+                if (['jpg', 'jpeg', 'png'].includes(extension) && file.size > minSizeForCompression) {
+                    const compressBtn = document.createElement('button');
+                    compressBtn.type = 'button';
+                    compressBtn.innerHTML = '<i class="fas fa-compress"></i> Compress Image';
+                    compressBtn.style.cssText = 'background: #17a2b8; color: white; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; white-space: nowrap;';
+                    compressBtn.onclick = function() {
+                        compressImage(file);
+                    };
+                    buttonContainer.appendChild(compressBtn);
+                }
+
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+                removeBtn.style.cssText = 'background: #dc3545; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;';
+                removeBtn.onclick = function() {
+                    removeFileFromList(file);
+                };
+
+                buttonContainer.appendChild(removeBtn);
+
+                fileItem.appendChild(fileInfo);
+                fileItem.appendChild(buttonContainer);
+                fileList.appendChild(fileItem);
+            });
+
+            preview.appendChild(fileList);
+        } else {
+            // Reset button when no files are selected
+            button.innerHTML = '<i class="fas fa-plus"></i> Upload Files';
+            button.className = 'btn btn-primary';
+        }
+    }
+
+    // Minimal stubs for compression functions so buttons are safe on this page
+    async function compressAllImages() {
+        alert('Image compression is not available on this page.');
+    }
+    function compressImage(file) {
+        alert('Image compression is not available on this page.');
+    }
+
+    // Initialize preview if there are preloaded files
+    updateItemFilePreview();
+})();
 </script>
 
 {% endblock %}
