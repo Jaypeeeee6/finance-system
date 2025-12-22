@@ -111,7 +111,7 @@
                             <option value="Maintenance" {% if department_filter == 'Maintenance' %}selected{% endif %}>Maintenance</option>
                         </select>
                         {% endif %}
-                        {% if active_tab == 'all' %}
+                        {% if active_tab in ['all', 'my_requests'] %}
                         <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
                             <option value="">All Statuses</option>
                             <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
@@ -800,7 +800,7 @@
                                                 <form method="POST" action="{{ url_for('delete_location', location_id=location.id) }}" style="display: inline;">
                                                     <button type="submit" class="btn btn-sm btn-danger" 
                                                             title="Delete"
-                                                            onclick="return confirm('Are you sure you want to delete location \"{{ location.location_name }}\"? This will only work if no branches are using this location.')">
+                                                            onclick="return confirm('Are you sure you want to delete location &quot;{{ location.location_name }}&quot;? This will only work if no branches are using this location.')">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
                                                 </form>

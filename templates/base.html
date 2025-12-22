@@ -126,20 +126,36 @@
             <ul class="nav-menu" id="nav-menu">
                 <li class="nav-menu-desktop-hidden"><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="fas fa-home"></i> Dashboard</a></li>
                 
-                {% if current_user.role in ['Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager'] %}
+                {# Determine who can see each report separately. Payment reports keep existing roles; Item reports limited to GM, CEO, Operation Manager, IT department users, and Procurement Department Manager #}
+                {% set can_view_payment_reports = current_user.role in ['Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager'] %}
+                {% set can_view_item_reports = (current_user.role in ['GM', 'CEO', 'Operation Manager']) or (current_user.department == 'IT') or (current_user.role == 'Department Manager' and current_user.department == 'Procurement') %}
+
+                {# If item reports are available, show a dropdown containing available report links.
+                   If item reports are NOT available but payment reports are, show a direct Reports link that
+                   redirects immediately to Payment Request Reports. #}
+                {% if can_view_item_reports %}
                 <li class="reports-dropdown nav-menu-desktop-hidden">
                     <button type="button" class="nav-link reports-toggle">
                         <i class="fas fa-chart-bar"></i> Reports
                         <i class="fas fa-caret-down dropdown-caret"></i>
                     </button>
                     <div class="reports-menu">
+                        {% if can_view_payment_reports %}
                         <a href="{{ url_for('reports') }}">
                             <span>Payment Request Reports</span>
                         </a>
+                        {% endif %}
+
                         <a href="{{ url_for('item_request_reports') }}">
                             <span>Item Request Reports</span>
                         </a>
                     </div>
+                </li>
+                {% elif can_view_payment_reports %}
+                <li class="nav-menu-desktop-hidden">
+                    <a href="{{ url_for('reports') }}" class="nav-link">
+                        <i class="fas fa-chart-bar"></i> Reports
+                    </a>
                 </li>
                 {% endif %}
                 
@@ -200,10 +216,7 @@
                             <button id="maintenance-toggle" class="btn btn-sm btn-warning" type="button" style="width: 100%; margin-bottom: 0.5rem;">
                                 <i class="fas fa-tools"></i> Enable Maintenance
                             </button>
-                            <button class="btn btn-sm btn-secondary" type="button" style="width: 100%; margin-bottom: 0.35rem;" onclick="toggleItemRequests()">
-                                <i class="fas fa-boxes"></i>
-                                {% if show_item_requests_flag %}Hide Item Requests{% else %}Show Item Requests{% endif %}
-                            </button>
+                            {# Removed 'Show Item Requests' toggle per request - Item Requests always visible #}
                             <button class="btn btn-sm btn-secondary" type="button" style="width: 100%;" onclick="toggleLoginTesting()">
                                 <i class="fas fa-flask"></i>
                                 {% if show_test_login_flag %}Hide Login for Testing{% else %}Show Login for Testing{% endif %}
@@ -229,7 +242,7 @@
                     <i class="fas fa-home"></i>
                     <span>Dashboard</span>
                 </a>
-                {% if current_user.role in ['Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager'] %}
+                {% if can_view_item_reports %}
                 <div class="desktop-sidebar-dropdown">
                     <button class="desktop-sidebar-item desktop-sidebar-dropdown-toggle" id="reports-dropdown-toggle">
                         <i class="fas fa-chart-bar"></i>
@@ -237,14 +250,21 @@
                         <i class="fas fa-chevron-down dropdown-chevron"></i>
                     </button>
                     <div class="desktop-sidebar-submenu" id="reports-submenu">
+                        {% if can_view_payment_reports %}
                         <a href="{{ url_for('reports') }}" class="desktop-sidebar-submenu-item">
                             <span>Payment Request Reports</span>
                         </a>
+                        {% endif %}
                         <a href="{{ url_for('item_request_reports') }}" class="desktop-sidebar-submenu-item">
                             <span>Item Request Reports</span>
                         </a>
                     </div>
                 </div>
+                {% elif can_view_payment_reports %}
+                <a href="{{ url_for('reports') }}" class="desktop-sidebar-item">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Reports</span>
+                </a>
                 {% endif %}
                 {% if show_item_requests_flag %}
                 <a href="{{ url_for('procurement_item_requests') }}" class="desktop-sidebar-item">
@@ -596,25 +616,7 @@
         userSettingsDropdownOpen = false;
     }
 
-    async function toggleItemRequests() {
-        if (!confirm('Toggle visibility of Item Requests buttons and New Item Request?')) return;
-        try {
-            const resp = await fetch('/it/tools/toggle_item_requests', {
-                method: 'POST',
-                headers: { 'X-Requested-With': 'fetch' }
-            });
-            const data = await resp.json();
-            if (data && data.success) {
-                alert(data.message || 'Item Requests visibility updated.');
-                location.reload();
-            } else {
-                alert(data.message || 'Failed to toggle Item Requests visibility.');
-            }
-        } catch (e) {
-            console.error(e);
-            alert('Error toggling Item Requests visibility. Please try again.');
-        }
-    }
+    // 'toggleItemRequests' removed — Item Requests are always visible now.
 
     async function toggleLoginTesting() {
         if (!confirm('Toggle visibility of the Login for Testing button on the login page?')) return;

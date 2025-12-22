@@ -88,7 +88,7 @@
                         <option value="Maintenance" {% if department_filter == 'Maintenance' %}selected{% endif %}>Maintenance</option>
                     </select>
                     {% endif %}
-                    {% if active_tab == 'all' %}
+                    {% if active_tab in ['all', 'my_requests'] %}
                     <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
                         <option value="">All Statuses</option>
                         <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>

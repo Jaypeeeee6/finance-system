@@ -90,8 +90,8 @@
     </div>
     {% endif %}
 
-    <!-- Tab Navigation (for Procurement, IT, and Auditing users) -->
-    {% if user.department in ['Procurement', 'IT', 'Auditing'] %}
+    <!-- Tab Navigation (for Procurement, IT, Auditing users, and GM/CEO/Operation Manager) -->
+    {% if user.department in ['Procurement', 'IT', 'Auditing'] or user.role in ['GM', 'CEO', 'Operation Manager'] %}
     <div class="tab-navigation">
         {% if user.department != 'Auditing' %}
         <button class="tab-button {% if active_tab == 'all' %}active{% endif %}" onclick="switchTab('all')" id="tab-all">
@@ -103,7 +103,7 @@
         <button class="tab-button {% if active_tab == 'assigned_to_self' %}active{% endif %}" onclick="switchTab('assigned_to_self')" id="tab-assigned_to_self">
             <i class="fas fa-user"></i> Assigned to Self
         </button>
-        {% elif user.department == 'IT' %}
+        {% elif user.department == 'IT' or user.role in ['GM', 'CEO', 'Operation Manager'] %}
         <button class="tab-button {% if active_tab == 'my_requests' %}active{% endif %}" onclick="switchTab('my_requests')" id="tab-my_requests">
             <i class="fas fa-user"></i> My Item Requests
         </button>
@@ -135,8 +135,9 @@
         <div class="card-header">
             <div class="header-top">
                 <div class="filter-controls">
-                    {# Hide department filter specifically for IT department on My Item Requests tab #}
-                    {% if not (user.department == 'IT' and active_tab == 'my_requests') %}
+                    {# Show department filter only to users who can view across departments (Procurement, IT, GM/CEO/Operation Manager).
+                       Hide for users who only see their own or their department's requests. Also hide on My Requests tab. #}
+                    {% if (user.department in ['Procurement', 'IT'] or user.role in ['GM', 'CEO', 'Operation Manager']) and active_tab != 'my_requests' %}
                     <select id="departmentFilter" onchange="applyDepartmentFilter()" class="form-select">
                         <option value="">All Departments</option>
                         {% for dept in departments %}
@@ -144,6 +145,7 @@
                         {% endfor %}
                     </select>
                     {% endif %}
+                    {% if active_tab != 'completed' %}
                     <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
                         <option value="">All Statuses</option>
                         <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
@@ -155,6 +157,7 @@
                         <option value="Rejected by Manager" {% if status_filter == 'Rejected by Manager' %}selected{% endif %}>Rejected by Manager</option>
                         <option value="Rejected by Procurement Manager" {% if status_filter == 'Rejected by Procurement Manager' %}selected{% endif %}>Rejected by Procurement Manager</option>
                     </select>
+                    {% endif %}
                     <select id="urgentFilter" onchange="applyUrgentFilter()" class="form-select">
                         <option value="">All Requests</option>
                         <option value="urgent" {% if urgent_filter == 'urgent' %}selected{% endif %}>🔴 Urgent Only</option>
@@ -321,8 +324,8 @@
                 </table>
             </div>
             
-            <!-- Pagination Controls -->
-            {% if (user.department == 'Procurement' or user.department == 'IT') and active_tab == 'all' and pagination %}
+            <!-- Pagination Controls: show for all tabs/users when pagination is present -->
+            {% if pagination %}
             <div class="pagination-container">
                 <div class="pagination-left">
                     <div class="pagination-info">
