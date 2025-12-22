@@ -802,9 +802,20 @@
                     <div id="company_chips_container" class="filter-chips-container"></div>
                     <div class="checkbox-group" id="company-group">
                         {% for company in companies %}
+                        {% set company_value = company.value if company is mapping else company %}
+                        {% set company_text = company.text if company is mapping else company_value %}
+                        {% set company_description = company.description if company is mapping else '' %}
                         <div class="checkbox-option">
-                            <input type="checkbox" name="company" id="company_{{ loop.index }}" value="{{ company }}" {% if company in request.args.getlist('company') %}checked{% endif %}>
-                            <label for="company_{{ loop.index }}">{{ company }}</label>
+                            <input type="checkbox" name="company" id="company_{{ loop.index }}" value="{{ company_value }}" {% if company_value in request.args.getlist('company') %}checked{% endif %}>
+                            <label for="company_{{ loop.index }}">
+                                {{ company_text }}
+                                {% if company_description %}
+                                <span class="tooltip-wrapper">
+                                    <i class="fas fa-info-circle tooltip-icon" aria-hidden="true"></i>
+                                    <span class="tooltip-text">{{ company_description }}</span>
+                                </span>
+                                {% endif %}
+                            </label>
                         </div>
                         {% endfor %}
                     </div>
