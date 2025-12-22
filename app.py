@@ -18625,6 +18625,131 @@ def unread_notifications_count():
     return jsonify({'count': count})
 
 
+@app.route('/api/calendar/pending_count')
+@login_required
+@role_required('Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'IT Department Manager')
+def calendar_pending_count():
+    """Get count of pending (unpaid) payment requests scheduled for TODAY only"""
+    try:
+        from datetime import date, timedelta
+        today = date.today()
+        pending_count = 0
+        
+        # Count recurring payment requests with unpaid installments scheduled for TODAY
+        recurring_query = PaymentRequest.query.filter(
+            PaymentRequest.recurring == 'Recurring',
+            PaymentRequest.recurring_interval.isnot(None),
+            PaymentRequest.recurring_interval != '',
+            PaymentRequest.status.in_([
+                'Pending Finance Approval',
+                'Proof Pending',
+                'Proof Sent',
+                'Proof Rejected',
+                'Completed',
+                'Recurring'
+            ]),
+            PaymentRequest.is_archived == False
+        )
+        
+        # Project users can only see their department's requests
+        if current_user.role == 'Project Staff':
+            recurring_query = recurring_query.filter(PaymentRequest.department == current_user.department)
+        
+        recurring_requests = recurring_query.all()
+        
+        for req in recurring_requests:
+            schedules = RecurringPaymentSchedule.query.filter_by(request_id=req.request_id).all()
+            
+            if schedules:
+                # For variable payments, check each installment
+                for installment in schedules:
+                    # Only count unpaid installments scheduled for TODAY
+                    if not installment.is_paid and installment.payment_date == today:
+                        pending_count += 1
+            else:
+                # For regular recurring payments, generate due dates and check if today is included
+                end_date = today + timedelta(days=1)  # Only check up to today
+                due_dates = generate_future_due_dates(req, today, end_date)
+                
+                for due_date, amount in due_dates:
+                    # Only count if the due date is TODAY
+                    if due_date == today:
+                        # Check if this payment is already marked as paid
+                        paid_notification = PaidNotification.query.filter_by(
+                            request_id=req.request_id,
+                            paid_date=due_date
+                        ).first()
+                        
+                        # Only count unpaid payments
+                        if not paid_notification:
+                            pending_count += 1
+        
+        # Count one-time scheduled payments that are unpaid and scheduled for TODAY
+        one_time_query = PaymentRequest.query.filter(
+            ((PaymentRequest.recurring.is_(None)) | (PaymentRequest.recurring != 'Recurring')),
+            PaymentRequest.payment_date.isnot(None),
+            PaymentRequest.payment_date == today,  # Only TODAY
+            PaymentRequest.status.in_([
+                'Pending Finance Approval',
+                'Proof Pending',
+                'Proof Sent',
+                'Proof Rejected',
+                'Completed',
+                'Recurring'
+            ]),
+            PaymentRequest.is_archived == False
+        )
+        
+        # Project Staff can only see their department's one-time requests
+        if current_user.role == 'Project Staff':
+            one_time_query = one_time_query.filter(PaymentRequest.department == current_user.department)
+        
+        one_time_requests = one_time_query.all()
+        
+        # Check authorization for one-time requests (same logic as calendar events)
+        def is_authorized_for_one_time(req, user):
+            if req.user_id == user.user_id:
+                return True
+            if getattr(req, 'temporary_manager_id', None) == user.user_id:
+                return True
+            if user.role in ['GM', 'Operation Manager']:
+                return True
+            if user.department == 'IT' and user.role in ['IT Staff', 'Department Manager']:
+                return True
+            if getattr(req.user, 'manager_id', None) == user.user_id:
+                return True
+            if user.role == 'Department Manager' and user.department == req.department:
+                return True
+            if user.role == 'Finance Admin':
+                if req.status == 'Pending Finance Approval':
+                    if user.name == 'Abdalaziz Al-Brashdi':
+                        return req.user_id == user.user_id or getattr(req.user, 'manager_id', None) == user.user_id
+                    else:
+                        return req.user_id == user.user_id
+            return False
+        
+        for req in one_time_requests:
+            if not is_authorized_for_one_time(req, current_user):
+                continue
+            
+            # Check if request is completed or has paid notification
+            is_completed = req.status == 'Completed'
+            paid_notification = PaidNotification.query.filter_by(
+                request_id=req.request_id,
+                paid_date=req.payment_date
+            ).first()
+            
+            # Only count unpaid requests
+            if not is_completed and not paid_notification:
+                pending_count += 1
+        
+        return jsonify({'count': pending_count})
+        
+    except Exception as e:
+        print(f"Error getting calendar pending count: {e}")
+        return jsonify({'count': 0})
+
+
 @app.route('/api/overdue-requests/count')
 @login_required
 @role_required('Finance Admin', 'Finance Staff')
@@ -19188,6 +19313,9 @@ def api_admin_recurring_events():
             paid_count = sum(1 for event in day_events if event.get('color') == '#2e7d32')
             late_count = sum(1 for event in day_events if event.get('color') == '#d32f2f')
             
+            # Calculate pending count: unpaid events (purple or red, not green)
+            pending_count = count - paid_count
+            
             if paid_count == count:
                 # All payments are paid - green
                 date_color = '#2e7d32'
@@ -19212,6 +19340,7 @@ def api_admin_recurring_events():
                     'status': status_text,
                     'paidCount': paid_count,
                     'lateCount': late_count,
+                    'pendingCount': pending_count,  # Count of unpaid (pending) payment requests
                     'events': day_events  # Store all events for this date
                 }
             })

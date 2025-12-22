@@ -148,7 +148,12 @@
                 {% endif %}
                 
                 {% if current_user.role in ['Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'IT Department Manager'] %}
-                <li><a href="{{ url_for('admin_calendar') }}" class="nav-link"><i class="fas fa-calendar-alt"></i> Calendar</a></li>
+                <li class="calendar-link-container">
+                    <a href="{{ url_for('admin_calendar') }}" class="nav-link calendar-link">
+                        <i class="fas fa-calendar-alt"></i> Calendar
+                        <span class="notification-badge" id="nav-calendar-badge" style="display: none;">0</span>
+                    </a>
+                </li>
                 {% endif %}
                 
                 
@@ -806,10 +811,36 @@
         }
     });
     
+    function updateCalendarBadge() {
+        fetch('/api/calendar/pending_count')
+            .then(response => response.json())
+            .then(data => {
+                const badge = document.getElementById('nav-calendar-badge');
+                if (badge) {
+                    if (data.count > 0) {
+                        badge.textContent = data.count;
+                        badge.style.display = 'flex';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error updating calendar badge:', error);
+            });
+    }
+    
+    window.updateCalendarBadge = updateCalendarBadge;
+    
     document.addEventListener('DOMContentLoaded', function() {
         updateNotificationBadge();
+        updateCalendarBadge();
         setInterval(updateNotificationBadge, 5000);
-        window.addEventListener('focus', function() { updateNotificationBadge(); });
+        setInterval(updateCalendarBadge, 5000);
+        window.addEventListener('focus', function() {
+            updateNotificationBadge();
+            updateCalendarBadge();
+        });
     });
     </script>
     

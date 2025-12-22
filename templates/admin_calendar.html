@@ -115,10 +115,29 @@ document.addEventListener('DOMContentLoaded', function() {
     eventOrder: 'title',
     events: '/api/admin/recurring-events',
     dayCellContent: function(arg) {
-      // Just return the day number for now, dots will be added after events load
+      // Just return the day number for now, dots and pending badges will be added after events load
       return {
         html: `<div class="fc-daygrid-day-number">${arg.dayNumberText}</div>`
       };
+    },
+    dayDidMount: function(info) {
+      // Add pending payment request badge if there are pending requests for this day
+      const dateStr = info.dateStr;
+      const events = calendar.getEvents();
+      const dateEvent = events.find(event => event.startStr === dateStr);
+      
+      if (dateEvent && dateEvent.extendedProps && dateEvent.extendedProps.pendingCount > 0) {
+        const pendingCount = dateEvent.extendedProps.pendingCount;
+        const dayNumberEl = info.el.querySelector('.fc-daygrid-day-number');
+        
+        if (dayNumberEl && !dayNumberEl.querySelector('.pending-badge')) {
+          const badge = document.createElement('span');
+          badge.className = 'pending-badge';
+          badge.textContent = pendingCount;
+          badge.title = `${pendingCount} pending payment request${pendingCount !== 1 ? 's' : ''} on this date`;
+          dayNumberEl.appendChild(badge);
+        }
+      }
     },
      eventContent: function(arg) {
        // Show count and status for the day
@@ -649,10 +668,54 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
-  // Add dots after events are loaded
+  // Add dots and pending badges after events are loaded
   calendar.on('eventsSet', function() {
-    setTimeout(addPaidDots, 100); // Small delay to ensure DOM is updated
+    setTimeout(function() {
+      addPaidDots();
+      addPendingBadges();
+    }, 100); // Small delay to ensure DOM is updated
   });
+  
+  // Function to add pending payment request badges to calendar cells
+  function addPendingBadges() {
+    const events = calendar.getEvents();
+    
+    // Clear existing badges first to avoid duplicates
+    document.querySelectorAll('.pending-badge').forEach(badge => badge.remove());
+    
+    // Group events by date and get pending count
+    const pendingByDate = {};
+    events.forEach(event => {
+      const dateStr = event.startStr;
+      if (event.extendedProps && event.extendedProps.pendingCount > 0) {
+        pendingByDate[dateStr] = event.extendedProps.pendingCount;
+      }
+    });
+    
+    // Add badges to each date that has pending requests
+    Object.keys(pendingByDate).forEach(dateStr => {
+      const pendingCount = pendingByDate[dateStr];
+      
+      if (pendingCount > 0) {
+        // Find the day cell for this date
+        // FullCalendar 6.x uses data-date attribute on fc-daygrid-day elements
+        const dayCell = document.querySelector(`.fc-daygrid-day[data-date="${dateStr}"]`);
+        
+        if (dayCell) {
+          const dayNumberEl = dayCell.querySelector('.fc-daygrid-day-number');
+          
+          if (dayNumberEl) {
+            // Create and add badge
+            const badge = document.createElement('span');
+            badge.className = 'pending-badge';
+            badge.textContent = pendingCount;
+            badge.title = `${pendingCount} pending payment request${pendingCount !== 1 ? 's' : ''} on this date`;
+            dayNumberEl.appendChild(badge);
+          }
+        }
+      }
+    });
+  }
   
   // Update event content on window resize for responsive display
   let resizeTimeout;
@@ -911,10 +974,31 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 
-/* Adjust day number positioning to make room for dots */
+/* Adjust day number positioning to make room for dots and badges */
 .fc-daygrid-day-number {
   position: relative;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Pending payment request badge styling */
+.pending-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  background-color: #dc3545;
+  color: white;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 1;
+  padding: 0 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
 }
 
 /* Sidebar Content Styles */

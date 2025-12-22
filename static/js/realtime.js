@@ -528,6 +528,11 @@ function updateNotificationCount() {
                 console.error('Error updating notification count:', error);
             });
     }
+    
+    // Also update calendar badge if function is available
+    if (window.updateCalendarBadge) {
+        window.updateCalendarBadge();
+    }
 }
 
 /**

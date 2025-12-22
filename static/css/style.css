@@ -1163,6 +1163,35 @@ body {
     right: 0.2rem;
 }
 
+/* Calendar badge styling - similar to notification badge */
+.calendar-link {
+    position: relative;
+}
+
+.calendar-link .notification-badge {
+    position: absolute;
+    top: 0.2rem;
+    right: 0.2rem;
+}
+
+.calendar-badge {
+    position: absolute;
+    top: 0.2rem;
+    right: 0.2rem;
+}
+
+.desktop-sidebar-item.calendar-link {
+    position: relative;
+}
+
+.desktop-sidebar-item .calendar-badge {
+    position: absolute;
+    top: 50%;
+    right: 1rem;
+    transform: translateY(-50%);
+    margin-top: -0.5rem;
+}
+
 .notification-dropdown {
     position: absolute;
     top: 100%;
