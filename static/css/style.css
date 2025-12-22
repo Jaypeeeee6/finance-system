@@ -1171,13 +1171,27 @@ body {
 .calendar-link .notification-badge {
     position: absolute;
     top: 0.2rem;
-    right: 0.2rem;
+    left: -0.4rem; /* moved slightly left, allowed to overflow button */
+    right: auto; /* ensure the badge doesn't stretch by unsetting the global right anchor */
+    width: auto;
+    min-width: 1.2rem;
+    height: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .calendar-badge {
     position: absolute;
     top: 0.2rem;
-    right: 0.2rem;
+    left: -0.4rem; /* moved slightly left, allowed to overflow button */
+    right: auto;
+    width: auto;
+    min-width: 1.2rem;
+    height: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .desktop-sidebar-item.calendar-link {
