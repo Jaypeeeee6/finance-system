@@ -386,8 +386,8 @@ def maintenance_gate():
         if request.path in ['/login', '/logout', '/validate_credentials', '/verify_pin']:
             return None
 
-        # Allow IT department users to proceed
-        if current_user.is_authenticated and (getattr(current_user, 'department', None) == 'IT'):
+        # Allow IT department users or the user named "Super Admin" to proceed
+        if current_user.is_authenticated and (getattr(current_user, 'department', None) == 'IT' or getattr(current_user, 'name', None) == 'Super Admin'):
             return None
 
         # For everyone else, show maintenance page
@@ -403,8 +403,9 @@ def it_department_required(f):
     def wrapper(*args, **kwargs):
         if not current_user.is_authenticated:
             return redirect(url_for('login'))
-        if getattr(current_user, 'department', None) != 'IT':
-            flash('Only IT department can perform this action.', 'danger')
+        # Allow actions by IT department users or the user named "Super Admin"
+        if not (getattr(current_user, 'department', None) == 'IT' or getattr(current_user, 'name', None) == 'Super Admin'):
+            flash('Only IT department or Super Admin can perform this action.', 'danger')
             return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return wrapper

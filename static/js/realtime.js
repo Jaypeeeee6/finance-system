@@ -87,7 +87,8 @@ function initRealTimeUpdates() {
             wsMaintenanceState = state.enabled;
             
             const dept = document.body.getAttribute('data-user-department');
-            const isIT = dept === 'IT';
+            const userName = document.body.getAttribute('data-user-name');
+            const isIT = dept === 'IT' || userName === 'Super Admin';
             const onMaintPage = !!document.getElementById('maintenance-page');
             
             if (state.enabled) {
@@ -202,7 +203,8 @@ function initRealTimeUpdates() {
                     previousMaintenanceState = s.enabled;
                     
                     const dept = document.body.getAttribute('data-user-department');
-                    const isIT = dept === 'IT';
+                    const userName = document.body.getAttribute('data-user-name');
+                    const isIT = dept === 'IT' || userName === 'Super Admin';
                     const onMaintPage = !!document.getElementById('maintenance-page');
                     
                     if (s.enabled) {
