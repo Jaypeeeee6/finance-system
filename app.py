@@ -10909,6 +10909,17 @@ def draft_to_dict(draft):
     """Helper function to convert draft PaymentRequest object to dictionary for JSON serialization"""
     if not draft:
         return None
+    import json
+    # Parse receipt paths if they exist
+    receipt_paths = []
+    if draft.requestor_receipt_path:
+        try:
+            receipt_paths = json.loads(draft.requestor_receipt_path)
+            if not isinstance(receipt_paths, list):
+                receipt_paths = [draft.requestor_receipt_path] if draft.requestor_receipt_path else []
+        except:
+            receipt_paths = [draft.requestor_receipt_path] if draft.requestor_receipt_path else []
+    
     return {
         'request_id': draft.request_id,
         'request_type': draft.request_type,
@@ -10922,7 +10933,8 @@ def draft_to_dict(draft):
         'amount': float(draft.amount) if draft.amount else None,
         'recurring': draft.recurring,
         'recurring_interval': draft.recurring_interval,
-        'person_company': draft.person_company
+        'person_company': draft.person_company,
+        'requestor_receipt_path': receipt_paths
     }
 
 def get_available_request_types():
@@ -11451,24 +11463,48 @@ def edit_draft(draft_id):
         
         draft.person_company = final_person_company if final_person_company else None  # Store regardless of type
         
-        # Handle file uploads - always check for new files and preserve existing ones
+        # Handle file deletions first
         import uuid
         import json
         import os
         
+        delete_files = request.form.getlist('delete_files')
+        existing_receipts = []
+        if draft.requestor_receipt_path:
+            try:
+                existing_receipts = json.loads(draft.requestor_receipt_path)
+                if not isinstance(existing_receipts, list):
+                    existing_receipts = [draft.requestor_receipt_path] if draft.requestor_receipt_path else []
+            except (json.JSONDecodeError, TypeError):
+                existing_receipts = [draft.requestor_receipt_path] if draft.requestor_receipt_path else []
+        
+        # Remove deleted files and delete physical files
+        if delete_files:
+            upload_folder = os.path.join(app.root_path, 'uploads', 'receipts')
+            deleted_file_names = []
+            for filename_to_delete in delete_files:
+                if filename_to_delete in existing_receipts:
+                    existing_receipts.remove(filename_to_delete)
+                    # Delete the physical file
+                    filepath = os.path.join(upload_folder, filename_to_delete)
+                    if os.path.exists(filepath):
+                        try:
+                            os.remove(filepath)
+                            deleted_file_names.append(filename_to_delete)
+                        except Exception as e:
+                            print(f"Error deleting file {filename_to_delete}: {e}")
+            
+            if deleted_file_names:
+                log_action(f"Deleted {len(deleted_file_names)} receipt file(s) from draft #{draft_id}")
+        
+        # Handle file uploads - add new files to existing ones (after deletions)
         receipt_files = request.files.getlist('receipt_files')
+        receipt_paths = existing_receipts.copy()  # Start with existing receipts (minus deleted ones)
+        
         if receipt_files and any(f.filename for f in receipt_files):
             upload_folder = os.path.join(app.root_path, 'uploads', 'receipts')
             os.makedirs(upload_folder, exist_ok=True)
             allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
-            receipt_paths = []
-            
-            # Parse existing receipts if any
-            if draft.requestor_receipt_path:
-                try:
-                    receipt_paths = json.loads(draft.requestor_receipt_path)
-                except:
-                    receipt_paths = []
             
             for receipt_file in receipt_files:
                 if receipt_file and receipt_file.filename:
@@ -11490,11 +11526,12 @@ def edit_draft(draft_id):
                         full_path = os.path.join(upload_folder, filename)
                         receipt_file.save(full_path)
                         receipt_paths.append(filename)
-            
-            # Update receipt path if new files were added
-            if receipt_paths:
-                draft.requestor_receipt_path = json.dumps(receipt_paths)
-        # If no new files uploaded, keep existing receipts (don't overwrite)
+        
+        # Update receipt path (includes existing minus deleted plus new)
+        if receipt_paths:
+            draft.requestor_receipt_path = json.dumps(receipt_paths)
+        else:
+            draft.requestor_receipt_path = None
         
         draft.updated_at = datetime.utcnow()
         
