@@ -510,25 +510,25 @@
                 loginButton.disabled = false;
                 loginButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
                 
-                if (data.success) {
-                    // Check if IT system account bypass
-                    if (data.bypass_pin) {
-                        // IT system account - submit form directly to login route
-                        console.log('IT account bypass - submitting form directly');
-                        hiddenPinField.value = ''; // Clear PIN field
-                        loginForm.submit();
-                    } else {
-                        // Regular user - show PIN modal
-                        openPinModal();
-                        // Show success message about PIN being sent
-                        if (data.message) {
-                            const pinHint = document.querySelector('.pin-hint');
-                            pinHint.innerHTML = data.message;
-                            pinHint.style.color = '#28a745';
-                            pinHint.style.fontWeight = 'bold';
+                    if (data.success) {
+                        // If server says bypass PIN (system account or Super Admin), set bypass flag then submit
+                        if (data.bypass_pin) {
+                            console.log('Account bypass - setting bypass flag and submitting form directly');
+                            document.getElementById('bypass_pin').value = 'true';
+                            hiddenPinField.value = ''; // Clear PIN field
+                            loginForm.submit();
+                        } else {
+                            // Regular user - show PIN modal
+                            openPinModal();
+                            // Show success message about PIN being sent
+                            if (data.message) {
+                                const pinHint = document.querySelector('.pin-hint');
+                                pinHint.innerHTML = data.message;
+                                pinHint.style.color = '#28a745';
+                                pinHint.style.fontWeight = 'bold';
+                            }
                         }
-                    }
-                } else {
+                    } else {
                     // Show error message
                     alert(data.message || 'Invalid email or password.');
                 }

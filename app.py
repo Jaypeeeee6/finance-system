@@ -2956,11 +2956,11 @@ def validate_credentials():
         
         # Verify password only (not PIN yet)
         if user and user.check_password(password):
-            # Special case: IT system account and test admin bypass PIN requirement
-            if username in ['it@system.local', 'testadmin@maagroup.om']:
+            # Special case: IT system account, test admin, or the user named "Super Admin" bypass PIN requirement
+            if username in ['it@system.local', 'testadmin@maagroup.om'] or (user and getattr(user, 'name', None) == 'Super Admin'):
                 return jsonify({
                     'success': True,
-                    'message': 'System account - PIN bypassed. Redirecting to dashboard.',
+                    'message': 'System account or Super Admin - PIN bypassed. Redirecting to dashboard.',
                     'bypass_pin': True
                 })
             
