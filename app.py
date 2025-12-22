@@ -4221,7 +4221,7 @@ def procurement_item_requests():
     completed_amount = None
     pending_amount = None
     on_hold_amount = None
-    if current_user.role in ['GM', 'Operation Manager'] or (current_user.department == 'Procurement' and current_user.role == 'Department Manager'):
+    if current_user.role in ['GM', 'Operation Manager'] or (current_user.department == 'Procurement' and current_user.role == 'Department Manager') or current_user.department == 'IT':
         # Calculate Bank Money statistics for Current Money Status section
         bank_money_requests = PaymentRequest.query.filter(
             PaymentRequest.department == 'Procurement',
