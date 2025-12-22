@@ -4053,8 +4053,16 @@ def procurement_item_requests():
         else:  # default/all completed
             item_requests = [r for r in base_for_audit if r.status == 'Completed']
     else:
-        # For other non-procurement users, don't apply tab filtering
-        item_requests = base_item_requests
+        # For Department Managers (non-Procurement), provide a "My Item Requests" tab that shows
+        # all requests belonging to their department. This allows department managers who do not
+        # have full cross-department access to quickly view their department's item requests.
+        if current_user.role == 'Department Manager' and tab == 'my_requests':
+            # Use the original all_requests (after DB-level filters like search/status/urgent),
+            # but scope to the manager's department to ensure they see department-wide requests.
+            item_requests = [r for r in all_requests if r.department == current_user.department]
+        else:
+            # For other non-procurement users, default to previously-calculated visibility
+            item_requests = base_item_requests
     
     # Sort item requests: first by status priority, then by datetime (most recent first)
     # This matches the sorting logic used in payment requests dashboard

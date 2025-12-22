@@ -90,8 +90,8 @@
     </div>
     {% endif %}
 
-    <!-- Tab Navigation (for Procurement, IT, Auditing users, and GM/CEO/Operation Manager) -->
-    {% if user.department in ['Procurement', 'IT', 'Auditing'] or user.role in ['GM', 'CEO', 'Operation Manager'] %}
+    <!-- Tab Navigation (for Procurement, IT, Auditing users, GM/CEO/Operation Manager, and Department Managers) -->
+    {% if user.department in ['Procurement', 'IT', 'Auditing'] or user.role in ['GM', 'CEO', 'Operation Manager', 'Department Manager'] %}
     <div class="tab-navigation">
         {% if user.department != 'Auditing' %}
         <button class="tab-button {% if active_tab == 'all' %}active{% endif %}" onclick="switchTab('all')" id="tab-all">
@@ -103,7 +103,7 @@
         <button class="tab-button {% if active_tab == 'assigned_to_self' %}active{% endif %}" onclick="switchTab('assigned_to_self')" id="tab-assigned_to_self">
             <i class="fas fa-user"></i> Assigned to Self
         </button>
-        {% elif user.department == 'IT' or user.role in ['GM', 'CEO', 'Operation Manager'] %}
+        {% elif user.department == 'IT' or user.role in ['GM', 'CEO', 'Operation Manager', 'Department Manager'] %}
         <button class="tab-button {% if active_tab == 'my_requests' %}active{% endif %}" onclick="switchTab('my_requests')" id="tab-my_requests">
             <i class="fas fa-user"></i> My Item Requests
         </button>
