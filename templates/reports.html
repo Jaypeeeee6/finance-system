@@ -1569,6 +1569,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
+    
+    
     // Sync checkboxes between side panel and inline filters when changed
     function syncCheckboxes(changedCheckbox) {
         const name = changedCheckbox.name;
@@ -2421,6 +2423,17 @@ document.addEventListener('DOMContentLoaded', function() {
         {% endfor %}
     ];
     const selectedRequestTypes = {{ request.args.getlist('request_type') | tojson }};
+    // Helper to decode HTML entities (e.g. "&amp;" -> "&") in option values/texts
+    function decodeHtmlEntities(str) {
+        const txt = document.createElement('textarea');
+        txt.innerHTML = String(str || '');
+        return txt.value;
+    }
+    // Decode any HTML entities that may have been HTML-escaped when rendered server-side
+    for (let i = 0; i < requestTypes.length; i++) {
+        requestTypes[i].value = decodeHtmlEntities(requestTypes[i].value);
+        requestTypes[i].text = decodeHtmlEntities(requestTypes[i].text);
+    }
     initializeFilterDropdown({
         searchInputId: 'inline_request_type_search',
         dropdownId: 'inline_request_type_dropdown',
@@ -2434,6 +2447,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const companies = {{ companies | tojson }};
     const selectedCompanies = {{ request.args.getlist('company') | tojson }};
+    // Ensure company option fields are not HTML-escaped strings
+    if (Array.isArray(companies)) {
+        for (let i = 0; i < companies.length; i++) {
+            companies[i].value = decodeHtmlEntities(companies[i].value);
+            companies[i].text = decodeHtmlEntities(companies[i].text);
+            if (companies[i].description) companies[i].description = decodeHtmlEntities(companies[i].description);
+        }
+    }
     initializeFilterDropdown({
         searchInputId: 'inline_company_search',
         dropdownId: 'inline_company_dropdown',
@@ -2451,6 +2472,11 @@ document.addEventListener('DOMContentLoaded', function() {
         {% endfor %}
     ];
     const selectedBranches = {{ request.args.getlist('branch') | tojson }};
+    // Decode branch names in case they were escaped in the template
+    for (let i = 0; i < branches.length; i++) {
+        branches[i].value = decodeHtmlEntities(branches[i].value);
+        branches[i].text = decodeHtmlEntities(branches[i].text);
+    }
     initializeFilterDropdown({
         searchInputId: 'inline_branch_search',
         dropdownId: 'inline_branch_dropdown',
