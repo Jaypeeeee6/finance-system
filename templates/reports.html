@@ -2532,7 +2532,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const paymentMethods = [
         { value: 'Card', text: 'Card' },
-        { value: 'Cheque', text: 'Cheque' }
+        { value: 'Cheque', text: 'Cheque' },
+        { value: 'Cash', text: 'Cash' }
     ];
     const selectedPaymentMethods = {{ request.args.getlist('payment_method') | tojson }};
     initializeFilterDropdown({
