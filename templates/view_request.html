@@ -577,7 +577,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
             {% if can_manager_approve %}
             <div class="verification-required-notice">
                 <strong><i class="fas fa-exclamation-triangle"></i> Verification Required</strong>
-                <div>Please verify all fields below by checking the boxes before approving this request. You can reject without verifying all fields.</div>
+                <div>Please verify the required fields below by checking the boxes before approving this request. You can reject without verifying all fields.</div>
             </div>
             {% endif %}
 
@@ -586,7 +586,6 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 <div class="form-row">
                     <div class="form-group">
                         <label for="request_type">
-                            {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="request_type" required>{% endif %}
                             Request Type {% if 'request_type' in edited_fields %}<span class="edited-badge" data-field="request_type" role="button" tabindex="0">Edited</span>{% endif %}
                         </label>
                         {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') or (user and user.role == 'Finance Admin' and request.status == 'Pending Finance Approval') %}
@@ -644,7 +643,6 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 
                 <div class="form-group">
                     <label for="branch_name">
-                        {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="branch_name" required>{% endif %}
                         Branch Name {% if 'branch_name' in edited_fields %}<span class="edited-badge" data-field="branch_name" role="button" tabindex="0">Edited</span>{% endif %}
                     </label>
                     <input type="text" id="branch_name" value="{{ request.branch_name|replace(',', ', ') }}" readonly style="background: #f5f5f5; cursor: not-allowed;">
@@ -675,7 +673,6 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 <div class="form-row">
                     <div class="form-group">
                         <label for="department">
-                            {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="department" required>{% endif %}
                             Department {% if 'department' in edited_fields %}<span class="edited-badge" data-field="department" role="button" tabindex="0">Edited</span>{% endif %}
                         </label>
                         {% if can_edit_department_only and request.status == 'Pending Manager Approval' %}
@@ -707,7 +704,6 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 
                 <div class="form-group">
                     <label for="payment_method">
-                        {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="payment_method" required>{% endif %}
                         Payment Method {% if 'payment_method' in edited_fields %}<span class="edited-badge" data-field="payment_method" role="button" tabindex="0">Edited</span>{% endif %}
                     </label>
                     {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') %}
@@ -723,7 +719,6 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 
                 <div class="form-group" id="bank_name_group">
                     <label for="bank_name">
-                        {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="bank_name" required>{% endif %}
                         Bank Name {% if 'bank_name' in edited_fields %}<span class="edited-badge" data-field="bank_name" role="button" tabindex="0">Edited</span>{% endif %}
                     </label>
                     {% if (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') %}
@@ -792,7 +787,6 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 <div class="form-row">
                     <div class="form-group">
                         <label for="account_name">
-                            {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="account_name" required>{% endif %}
                             Account Name {% if 'account_name' in edited_fields %}<span class="edited-badge" data-field="account_name" role="button" tabindex="0">Edited</span>{% endif %}
                         </label>
                         {% set is_editable = (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status in ['Pending Manager Approval', 'Returned to Manager']) or (can_edit_request and request.status == 'Returned to Manager') %}
@@ -807,7 +801,6 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     {% if request.payment_method != 'Cheque' and request.payment_method != 'Cash' %}
                     <div class="form-group" id="account_number_group">
                         <label for="account_number">
-                            {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="account_number" required>{% endif %}
                             Account Number {% if 'account_number' in edited_fields %}<span class="edited-badge" data-field="account_number" role="button" tabindex="0">Edited</span>{% endif %}
                         </label>
                         {% if is_editable %}
@@ -852,7 +845,6 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 {% if request.recurring or request.payment_date %}
                 <div class="form-group">
                     <label for="payment_type">
-                        {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="payment_type" required>{% endif %}
                         Payment Type
                     </label>
                     {% if request.recurring == 'Recurring' %}
