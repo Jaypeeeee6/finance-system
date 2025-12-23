@@ -657,6 +657,14 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     </label>
                     <!-- Base text input (always rendered and always holds the actual value saved to the backend) -->
                     <input type="text" id="person_company" name="person_company" value="{{ request.person_company or '' }}" readonly style="background: #f5f5f5; display: block;">
+
+                    <!-- Person/Company description block (shown under the field in Submit Request tab) -->
+                    <div id="personCompanyDescription" class="person-company-desc" style="margin-top: 8px; display: none; align-items: center; gap: 8px; color: #495057;">
+                        <span class="tooltip-wrapper" style="display: inline-flex; align-items: center;">
+                            <i class="fas fa-info-circle tooltip-icon" aria-hidden="true" style="color: #6c757d; margin-left: 8px; cursor: help; font-size: 0.9em; vertical-align: middle;"></i>
+                        </span>
+                        <div id="personCompanyDescriptionText" style="font-size: 0.95rem;">{% if request.person_company_description %}{{ request.person_company_description }}{% endif %}</div>
+                    </div>
                     
                     <!-- Simple dropdown used only when the chosen department + request type have options -->
                     <select id="person_company_select_edit" class="form-control" style="display: none; margin-top: 8px;">
@@ -5154,6 +5162,80 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         // If no referrer or return_url, the button will use the default dashboard URL
+    }
+});
+</script>
+
+<script>
+// Person/Company description loader and updater
+document.addEventListener('DOMContentLoaded', function() {
+    const descContainer = document.getElementById('personCompanyDescription');
+    const descText = document.getElementById('personCompanyDescriptionText');
+    const selectEl = document.getElementById('person_company_select_edit');
+    const inputEl = document.getElementById('person_company');
+
+    // Helper to show/hide description
+    function showDescription(text) {
+        if (!descContainer || !descText) return;
+        if (text && text.trim()) {
+            descText.textContent = text;
+            descContainer.style.display = 'flex';
+        } else {
+            descText.textContent = '';
+            descContainer.style.display = 'none';
+        }
+    }
+
+    // If server provided a pre-filled description on the request object, show it immediately
+    try {
+        const serverDesc = `{% if request.person_company_description %}{{ request.person_company_description|e('js') }}{% else %}{% endif %}`;
+        if (serverDesc) {
+            showDescription(serverDesc);
+            return;
+        }
+    } catch (e) { /* ignore */ }
+
+    // Fetch options from the API and look up description for current value
+    async function fetchAndShowDescription(value) {
+        if (!value) {
+            showDescription('');
+            return;
+        }
+
+        try {
+            const dept = encodeURIComponent(`{{ request.department }}`);
+            const rtype = encodeURIComponent(`{{ request.request_type }}`);
+            const res = await fetch(`/api/person-company-options?department=${dept}&request_type=${rtype}`);
+            if (!res.ok) {
+                showDescription('');
+                return;
+            }
+            const data = await res.json();
+            const options = data.options || [];
+            const match = options.find(opt => {
+                const name = typeof opt === 'string' ? opt : (opt.name || '');
+                return name === value;
+            });
+            if (match) {
+                const description = typeof match === 'string' ? '' : (match.description || match.note || '');
+                showDescription(description || '');
+            } else {
+                showDescription('');
+            }
+        } catch (err) {
+            console.error('Error fetching person/company options:', err);
+            showDescription('');
+        }
+    }
+
+    // Initialize from select or input
+    const initialVal = (selectEl && selectEl.value) || (inputEl && inputEl.value) || '';
+    if (initialVal) fetchAndShowDescription(initialVal);
+
+    if (selectEl) {
+        selectEl.addEventListener('change', function() {
+            fetchAndShowDescription(this.value);
+        });
     }
 });
 </script>
