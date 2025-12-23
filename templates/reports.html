@@ -877,6 +877,16 @@
                     <label>Status</label>
                     <div id="status_chips_container" class="filter-chips-container"></div>
                     <div class="checkbox-group" id="status-group">
+                        {% if current_user.role == 'Auditing Staff' %}
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_recurring" value="Recurring" {% if 'Recurring' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_recurring">Recurring</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_completed" value="Completed" {% if 'Completed' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_completed">Completed</label>
+                        </div>
+                        {% else %}
                         <div class="checkbox-option">
                             <input type="checkbox" name="status" id="status_allpending" value="All Pending" {% if 'All Pending' in request.args.getlist('status') %}checked{% endif %}>
                             <label for="status_allpending">All Pending</label>
@@ -917,6 +927,7 @@
                             <input type="checkbox" name="status" id="status_completed" value="Completed" {% if 'Completed' in request.args.getlist('status') %}checked{% endif %}>
                             <label for="status_completed">Completed</label>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -2488,6 +2499,12 @@ document.addEventListener('DOMContentLoaded', function() {
         placeholder: 'Search branches...'
     });
     
+    {% if current_user.role == 'Auditing Staff' %}
+    const statuses = [
+        { value: 'Recurring', text: 'Recurring' },
+        { value: 'Completed', text: 'Completed' }
+    ];
+    {% else %}
     const statuses = [
         { value: 'All Pending', text: 'All Pending' },
         { value: 'Pending Manager Approval', text: 'Pending Manager Approval' },
@@ -2501,6 +2518,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { value: 'Recurring', text: 'Recurring' },
         { value: 'Completed', text: 'Completed' }
     ];
+    {% endif %}
     const selectedStatuses = {{ request.args.getlist('status') | tojson }};
     initializeFilterDropdown({
         searchInputId: 'inline_status_search',

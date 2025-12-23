@@ -127,8 +127,8 @@
                 <li class="nav-menu-desktop-hidden"><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="fas fa-home"></i> Dashboard</a></li>
                 
                 {# Determine who can see each report separately. Payment reports keep existing roles; Item reports limited to GM, CEO, Operation Manager, IT department users, and Procurement Department Manager #}
-                {% set can_view_payment_reports = current_user.role in ['Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager'] %}
-                {% set can_view_item_reports = (current_user.role in ['GM', 'CEO', 'Operation Manager']) or (current_user.department == 'IT') or (current_user.role == 'Department Manager' and current_user.department == 'Procurement') %}
+                {% set can_view_payment_reports = current_user.role in ['Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager', 'Auditing Staff'] %}
+                {% set can_view_item_reports = (current_user.role in ['GM', 'CEO', 'Operation Manager', 'Auditing Staff']) or (current_user.department == 'IT') or (current_user.role == 'Department Manager' and current_user.department == 'Procurement') %}
 
                 {# If item reports are available, show a dropdown containing available report links.
                    If item reports are NOT available but payment reports are, show a direct Reports link that

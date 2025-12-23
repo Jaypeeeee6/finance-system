@@ -15972,7 +15972,7 @@ def get_installment_edit_history(schedule_id):
 
 @app.route('/reports')
 @login_required
-@role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager')
+@role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager', 'Auditing Staff')
 def reports():
     """View reports page"""
     # Get filter parameters (support multiple values)
@@ -15994,6 +15994,10 @@ def reports():
     
     # Build query - show ALL statuses by default, but exclude archived requests
     query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
+    
+    # Auditing Staff: restrict to Completed and Recurring in reports
+    if current_user.role == 'Auditing Staff':
+        query = query.filter(PaymentRequest.status.in_(['Completed', 'Recurring']))
     
     # Filter for Department Managers based on their department
     if current_user.role == 'Department Manager':
@@ -16240,7 +16244,7 @@ def reports():
 
 @app.route('/procurement/item-requests/reports')
 @login_required
-@role_required('Procurement Manager', 'Procurement Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager')
+@role_required('Procurement Manager', 'Procurement Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager', 'Auditing Staff')
 def item_request_reports():
     """View item request reports page"""
     # Get filter parameters (support multiple values)
@@ -16259,6 +16263,10 @@ def item_request_reports():
     
     # Build query
     query = ProcurementItemRequest.query.filter(ProcurementItemRequest.is_draft == False)
+    
+    # Auditing Staff: only Completed item requests in reports
+    if current_user.role == 'Auditing Staff':
+        query = query.filter(ProcurementItemRequest.status == 'Completed')
     
     # GM, CEO, IT Staff, and Operation Manager can see ALL requests from all statuses
     # Only filter for Department Managers
