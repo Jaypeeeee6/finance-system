@@ -436,6 +436,7 @@
                                             <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
                                         {% endif %}
                                     </td>
+                                    <td>{{ req.payment_method or 'Card' }}</td>
                                     <td>{{ req.requestor_name }}</td>
                                     <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
                                     <td>
@@ -466,6 +467,56 @@
                         <i class="fas fa-inbox"></i>
                         <p>No payment requests found.</p>
                     </div>
+                {% endif %}
+                
+                <!-- Pagination for Completed Tab -->
+                {% if active_tab == 'completed' and completed_pagination %}
+                <div class="pagination-container" style="margin-top: 20px;">
+                    <div class="pagination-left">
+                        <div class="pagination-info">
+                            Showing {{ completed_pagination.per_page * (completed_pagination.page - 1) + 1 }} to 
+                            {{ completed_pagination.per_page * (completed_pagination.page - 1) + completed_pagination.items|length }} 
+                            of {{ completed_pagination.total }} requests
+                        </div>
+                        <div class="items-per-page">
+                            <label for="per_page_completed">Show:</label>
+                            <select id="per_page_completed" onchange="changeItemsPerPage(this.value)">
+                                <option value="10" {% if completed_pagination.per_page == 10 %}selected{% endif %}>10</option>
+                                <option value="20" {% if completed_pagination.per_page == 20 %}selected{% endif %}>20</option>
+                                <option value="50" {% if completed_pagination.per_page == 50 %}selected{% endif %}>50</option>
+                                <option value="100" {% if completed_pagination.per_page == 100 %}selected{% endif %}>100</option>
+                            </select>
+                            <span>per page</span>
+                        </div>
+                    </div>
+                    {% if completed_pagination.pages > 1 %}
+                    <div class="pagination">
+                        {% if completed_pagination.has_prev %}
+                            <a href="{{ url_for('department_dashboard', page=completed_pagination.prev_num, per_page=completed_pagination.per_page, tab=active_tab, status=status_filter, department=department_filter, urgent=urgent_filter, search=search_query) }}" class="btn btn-sm btn-secondary">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        {% endif %}
+                        
+                        {% for page_num in completed_pagination.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != completed_pagination.page %}
+                                    <a href="{{ url_for('department_dashboard', page=page_num, per_page=completed_pagination.per_page, tab=active_tab, status=status_filter, department=department_filter, urgent=urgent_filter, search=search_query) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
+                                {% else %}
+                                    <span class="btn btn-sm btn-primary">{{ page_num }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="pagination-ellipsis">...</span>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if completed_pagination.has_next %}
+                            <a href="{{ url_for('department_dashboard', page=completed_pagination.next_num, per_page=completed_pagination.per_page, tab=active_tab, status=status_filter, department=department_filter, urgent=urgent_filter, search=search_query) }}" class="btn btn-sm btn-secondary">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
                 {% endif %}
             </div>
             
@@ -572,6 +623,7 @@
                                             <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
                                         {% endif %}
                                     </td>
+                                    <td>{{ req.payment_method or 'Card' }}</td>
                                     <td>{{ req.requestor_name }}</td>
                                     <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
                                     <td>OMR {{ "%.3f"|format(req.amount) }}</td>

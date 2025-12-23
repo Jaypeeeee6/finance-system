@@ -3164,8 +3164,9 @@ def department_dashboard():
     search_query = request.args.get('search', None)
     status_filter = request.args.get('status', None)
     tab = request.args.get('tab', 'all')
-    if current_user.department == 'Auditing' and tab not in ['completed', 'my_requests']:
-        tab = 'completed'
+    # For Auditing Staff, allow access to all relevant tabs; 'all' is filtered to Completed/Recurring
+    if current_user.department == 'Auditing' and current_user.role == 'Auditing Staff' and tab not in ['all', 'completed', 'my_requests', 'rejected', 'recurring']:
+        tab = 'all'
     # Enforce visibility: only Auditing department users can access 'my_requests' tab
     if tab == 'my_requests' and (not current_user.department or current_user.department != 'Auditing'):
         tab = 'all'
@@ -3348,9 +3349,18 @@ def department_dashboard():
         query = base_query.filter(PaymentRequest.user_id == current_user.user_id)
     elif tab == 'all':
         # 'all' tab - show ALL requests, but apply status filter if provided
-        query = base_query
-        if status_filter:
-            query = query.filter(PaymentRequest.status == status_filter)
+        # For Auditing Staff, only show Completed and Recurring requests
+        if current_user.department == 'Auditing' and current_user.role == 'Auditing Staff':
+            query = base_query.filter(
+                db.or_(
+                    PaymentRequest.status == 'Completed',
+                    PaymentRequest.recurring == 'Recurring'
+                )
+            )
+        else:
+            query = base_query
+            if status_filter:
+                query = query.filter(PaymentRequest.status == status_filter)
     else:  # default - show ALL requests
         query = base_query
         if status_filter:
@@ -3478,7 +3488,16 @@ def department_dashboard():
             )
     
     # Get data for each tab
-    completed_requests = completed_query.order_by(get_completed_datetime_order()).all()
+    # For completed tab, paginate it instead of getting all records
+    completed_pagination = None
+    if tab == 'completed':
+        completed_pagination = completed_query.order_by(get_completed_datetime_order()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        completed_requests = completed_pagination.items
+    else:
+        completed_requests = completed_query.order_by(get_completed_datetime_order()).all()
+    
     rejected_requests = rejected_query.order_by(get_rejected_datetime_order()).all()
     recurring_requests = recurring_query.order_by(PaymentRequest.created_at.desc()).all()
     
@@ -3492,10 +3511,8 @@ def department_dashboard():
             page=page, per_page=per_page, error_out=False
         )
     elif tab == 'completed':
-        # Completed tab sorted by approval_date (most recent first)
-        requests_pagination = query.order_by(get_completed_datetime_order()).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
+        # Completed tab sorted by approval_date (most recent first) - use completed_pagination
+        requests_pagination = completed_pagination
     else:
         requests_pagination = query.order_by(PaymentRequest.created_at.desc()).paginate(
             page=page, per_page=per_page, error_out=False
@@ -3527,6 +3544,7 @@ def department_dashboard():
                          requests=requests_pagination.items, 
                          pagination=requests_pagination,
                          my_pagination=my_requests_pagination,
+                         completed_pagination=completed_pagination if tab == 'completed' else None,
                          user=current_user,
                          notifications=notifications,
                          unread_count=unread_count,
