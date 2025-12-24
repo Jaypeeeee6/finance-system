@@ -1400,6 +1400,13 @@ def create_recurring_payment_schedule(request_id, total_amount, payment_schedule
         print(f"Error creating payment schedule: {e}")
         return False
 
+def redirect_with_return_url(endpoint, **kwargs):
+    """Helper function to redirect to an endpoint while preserving return_url parameter"""
+    return_url = request.form.get('return_url') or request.args.get('return_url')
+    if return_url:
+        kwargs['return_url'] = return_url
+    return redirect(url_for(endpoint, **kwargs))
+
 def get_payment_schedule(request_id):
     """Get the payment schedule for a specific request"""
     schedules = RecurringPaymentSchedule.query.filter_by(request_id=request_id).order_by(RecurringPaymentSchedule.payment_order).all()
@@ -12942,12 +12949,12 @@ def edit_request(request_id):
     # OR when Finance Admin is editing Request Type for "Pending Finance Approval"
     if req.status not in ['Pending Manager Approval', 'Returned to Manager', 'Pending Finance Approval']:
         flash('This request cannot be edited in its current status.', 'error')
-        return redirect(url_for('view_request', request_id=request_id))
+        return redirect_with_return_url('view_request', request_id=request_id)
 
     # If status is "Pending Finance Approval" but user is not Finance Admin, deny access
     if req.status == 'Pending Finance Approval' and not is_finance_admin_edit:
         flash('This request cannot be edited in its current status.', 'error')
-        return redirect(url_for('view_request', request_id=request_id))
+        return redirect_with_return_url('view_request', request_id=request_id)
 
     # Authorization: 
     # - IT Staff and IT Department Manager can always edit when status is "Pending Manager Approval" or "Returned to Manager"
@@ -13403,7 +13410,12 @@ def edit_request(request_id):
         pass
 
     flash('Edits saved successfully.', 'success')
-    return redirect(url_for('view_request', request_id=request_id, tab='submit', edited='1', edited_fields=','.join(edited_fields)))
+    # Preserve return_url if it was provided
+    return_url = request.form.get('return_url') or request.args.get('return_url')
+    redirect_params = {'request_id': request_id, 'tab': 'submit', 'edited': '1', 'edited_fields': ','.join(edited_fields)}
+    if return_url:
+        redirect_params['return_url'] = return_url
+    return redirect(url_for('view_request', **redirect_params))
 
 
 @app.route('/request/<int:request_id>/manager-add-file', methods=['POST'])
@@ -13621,7 +13633,7 @@ def approve_request(request_id):
     # Check if request is in correct status for Finance approval
     if req.status not in ['Pending Manager Approval', 'Pending Finance Approval', 'Proof Sent']:
         flash('This request is not ready for Finance approval.', 'error')
-        return redirect(url_for('view_request', request_id=request_id))
+        return redirect_with_return_url('view_request', request_id=request_id)
     
     # Get form data
     approval_status = request.form.get('approval_status')
@@ -13631,7 +13643,7 @@ def approve_request(request_id):
         return_reason = request.form.get('return_reason', '').strip()
         if not return_reason:
             flash('Please provide a reason for returning this request to the manager.', 'error')
-            return redirect(url_for('view_request', request_id=request_id))
+            return redirect_with_return_url('view_request', request_id=request_id)
         
         # Save current return reason to history if it exists (for multiple returns)
         # Check if there's already a return reason (could be from a previous return)
@@ -13751,7 +13763,7 @@ def approve_request(request_id):
         })
         
         flash(f'Payment request #{request_id} has been returned to the manager.', 'info')
-        return redirect(url_for('view_request', request_id=request_id))
+        return redirect_with_return_url('view_request', request_id=request_id)
     
     elif approval_status == 'approve':
         # Automatically assign the logged-in finance admin user as the approver
@@ -13763,28 +13775,28 @@ def approve_request(request_id):
         reference_number = request.form.get('reference_number', '').strip()
         if not reference_number:
             flash('Reference number is required for Finance Admin approval.', 'error')
-            return redirect(url_for('view_request', request_id=request_id))
+            return redirect_with_return_url('view_request', request_id=request_id)
         
         # Validate reference number is alphanumeric
         if not re.match(r'^[A-Za-z0-9]+$', reference_number):
             flash('Reference number must contain only letters and numbers.', 'error')
-            return redirect(url_for('view_request', request_id=request_id))
+            return redirect_with_return_url('view_request', request_id=request_id)
         
         # Require cash receiver for Cash payment method
         cash_receiver = request.form.get('cash_receiver', '').strip()
         if req.payment_method == 'Cash' and not cash_receiver:
             flash('Cash Receiver is required when payment method is Cash.', 'error')
-            return redirect(url_for('view_request', request_id=request_id))
+            return redirect_with_return_url('view_request', request_id=request_id)
         
         # Require receipt upload for Finance Admin approval
         if 'receipt_files' not in request.files:
             flash('Receipt upload is required for Finance Admin approval.', 'error')
-            return redirect(url_for('view_request', request_id=request_id))
+            return redirect_with_return_url('view_request', request_id=request_id)
         
         receipt_files = request.files.getlist('receipt_files')
         if not receipt_files or not any(f.filename for f in receipt_files):
             flash('Receipt upload is required for Finance Admin approval.', 'error')
-            return redirect(url_for('view_request', request_id=request_id))
+            return redirect_with_return_url('view_request', request_id=request_id)
         
         # Handle multiple receipt uploads
         uploaded_files = []
@@ -14207,7 +14219,7 @@ def approve_request(request_id):
         rejection_reason = request.form.get('rejection_reason', '').strip()
         if not rejection_reason:
             flash('Please provide a reason for rejection.', 'error')
-            return redirect(url_for('view_request', request_id=request_id))
+            return redirect_with_return_url('view_request', request_id=request_id)
         
         req.status = 'Proof Rejected'  # Set to Proof Rejected status
         req.rejection_reason = rejection_reason
@@ -14234,13 +14246,14 @@ def approve_request(request_id):
         })
         
         flash(f'Proof for payment request #{request_id} has been rejected.', 'success')
+        return redirect_with_return_url('view_request', request_id=request_id)
     
     elif approval_status == 'reject':
         # Finance admin rejects - request is rejected
         rejection_reason = request.form.get('rejection_reason', '').strip()
         if not rejection_reason:
             flash('Please provide a reason for rejection.', 'error')
-            return redirect(url_for('view_request', request_id=request_id))
+            return redirect_with_return_url('view_request', request_id=request_id)
         
         current_time = datetime.utcnow()
         
@@ -14280,10 +14293,10 @@ def approve_request(request_id):
     
     else:
         flash('Invalid approval status selected.', 'error')
-        return redirect(url_for('view_request', request_id=request_id))
+        return redirect_with_return_url('view_request', request_id=request_id)
     
     db.session.commit()
-    return redirect(url_for('view_request', request_id=request_id))
+    return redirect_with_return_url('view_request', request_id=request_id)
 
 
 @app.route('/request/<int:request_id>/upload_additional_files', methods=['POST'])
@@ -14957,7 +14970,7 @@ def manager_approve_request(request_id):
     # If status is "On Hold", verify it was put on hold by a manager (not finance)
     if req.status == 'On Hold' and not req.manager_on_hold_by_user_id:
         flash('This request is on hold but not by a manager. You cannot take action on it.', 'error')
-        return redirect(url_for('view_request', request_id=request_id))
+        return redirect_with_return_url('view_request', request_id=request_id)
     
     # Get form data
     approval_status = request.form.get('approval_status')
@@ -15076,7 +15089,7 @@ def manager_approve_request(request_id):
         }, room='operation_manager')
         
         flash(f'Payment request #{request_id} has been put on hold.', 'warning')
-        return redirect(url_for('view_request', request_id=request_id))
+        return redirect_with_return_url('view_request', request_id=request_id)
     
     elif approval_status == 'approve':
         # Manager approves - move to Finance for final approval
@@ -15152,14 +15165,14 @@ def manager_approve_request(request_id):
         })
         
         flash(f'Payment request #{request_id} has been approved by manager. Sent to Finance for final approval.', 'success')
-        
+        return redirect_with_return_url('view_request', request_id=request_id)
         
     elif approval_status == 'reject':
         # Manager rejects - request is rejected
         rejection_reason = request.form.get('rejection_reason', '').strip()
         if not rejection_reason:
             flash('Please provide a reason for rejection.', 'error')
-            return redirect(url_for('view_request', request_id=request_id))
+            return redirect_with_return_url('view_request', request_id=request_id)
         
         current_time = datetime.utcnow()
         
@@ -15214,12 +15227,11 @@ def manager_approve_request(request_id):
         }, room='operation_manager')
         
         flash(f'Payment request #{request_id} has been rejected by manager.', 'success')
+        return redirect_with_return_url('view_request', request_id=request_id)
     
     else:
         flash('Invalid approval status selected.', 'error')
-        return redirect(url_for('view_request', request_id=request_id))
-    
-    return redirect(url_for('view_request', request_id=request_id))
+        return redirect_with_return_url('view_request', request_id=request_id)
 
 
 @app.route('/request/<int:request_id>/manager_reject', methods=['POST'])
@@ -15297,6 +15309,9 @@ def manager_reject_request(request_id):
     })
     
     flash(f'Payment request #{request_id} has been rejected by manager.', 'success')
+    return_url = request.form.get('return_url') or request.args.get('return_url')
+    if return_url:
+        return redirect(return_url)
     return redirect(url_for('dashboard'))
 
 

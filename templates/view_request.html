@@ -2853,10 +2853,10 @@ document.addEventListener('DOMContentLoaded', function() {
             this.classList.add('active');
             document.getElementById(`step-${step}`).classList.add('active');
             
-            // Update URL to preserve tab state on refresh
+            // Update URL to preserve tab state on refresh (use replaceState to avoid history buildup)
             const url = new URL(window.location);
             url.searchParams.set('tab', step);
-            window.history.pushState({}, '', url);
+            window.history.replaceState({}, '', url);
             
             // Show/hide request details section based on active tab
             const requestDetailsSection = document.querySelector('.request-details-section');
@@ -3700,10 +3700,10 @@ function switchToFinanceTab() {
         financeTab.classList.add('active');
         financeContent.classList.add('active');
         
-        // Update URL to preserve tab state on refresh
+        // Update URL to preserve tab state on refresh (use replaceState to avoid history buildup)
         const url = new URL(window.location);
         url.searchParams.set('tab', 'finance');
-        window.history.pushState({}, '', url);
+        window.history.replaceState({}, '', url);
         
         // Hide request details section for non-submit tabs
         const requestDetailsSection = document.querySelector('.request-details-section');
@@ -5121,39 +5121,124 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleCashReceiverField();
 });
 
-// Go back to the previous page (reports, dashboard, etc.) with all parameters preserved
+// Store the original return URL when page loads (before any POST actions)
 document.addEventListener('DOMContentLoaded', function() {
+    const currentUrl = new URL(window.location.href);
+    const currentPathname = currentUrl.pathname; // e.g., '/request/561'
+    
+    // Store the current page URL as the return URL if we don't have one stored yet
+    // This helps track where we came from before POST actions
+    const urlParams = new URLSearchParams(window.location.search);
+    const returnUrl = urlParams.get('return_url');
+    
+    if (returnUrl) {
+        // Store the return_url in sessionStorage for use after POST redirects
+        try {
+            sessionStorage.setItem('view_request_return_url', decodeURIComponent(returnUrl));
+        } catch (e) {
+            console.log('Could not store return_url in sessionStorage');
+        }
+    } else if (document.referrer) {
+        // Store referrer if it's from the same origin and not the same page (even with different query params)
+        try {
+            const referrerUrl = new URL(document.referrer);
+            const referrerPathname = referrerUrl.pathname;
+            
+            // Only store if:
+            // 1. Same origin
+            // 2. Not a POST action endpoint
+            // 3. NOT the same page (compare pathnames, ignore query params)
+            if (referrerUrl.origin === currentUrl.origin && 
+                !referrerPathname.includes('/approve') && 
+                !referrerPathname.includes('/reject') &&
+                !referrerPathname.includes('/complete') &&
+                !referrerPathname.includes('/return') &&
+                !referrerPathname.includes('/edit') &&
+                referrerPathname !== currentPathname) { // Critical: exclude same page
+                sessionStorage.setItem('view_request_return_url', document.referrer);
+            }
+        } catch (e) {
+            console.log('Could not parse referrer URL');
+        }
+    }
+    
+    // Update back button href
     const backButton = document.getElementById('back-to-dashboard-btn');
     if (backButton) {
-        // Check if return_url parameter is in current URL (explicit return URL)
-        const urlParams = new URLSearchParams(window.location.search);
-        const returnUrl = urlParams.get('return_url');
+        // First check sessionStorage for stored return URL
+        let storedReturnUrl = sessionStorage.getItem('view_request_return_url');
         
-        if (returnUrl) {
-            // Use the explicit return_url parameter
+        // Validate stored URL - make sure it's not the same page
+        if (storedReturnUrl) {
+            try {
+                const storedUrl = new URL(storedReturnUrl);
+                if (storedUrl.pathname === currentPathname) {
+                    // Same page - clear it and don't use it
+                    sessionStorage.removeItem('view_request_return_url');
+                    storedReturnUrl = null;
+                }
+            } catch (e) {
+                // Invalid URL - clear it
+                sessionStorage.removeItem('view_request_return_url');
+                storedReturnUrl = null;
+            }
+        }
+        
+        if (storedReturnUrl) {
+            backButton.href = storedReturnUrl;
+        } else if (returnUrl) {
+            // Use return_url from URL parameter
             try {
                 const decodedUrl = decodeURIComponent(returnUrl);
-                backButton.href = decodedUrl;
+                const decodedUrlObj = new URL(decodedUrl, window.location.origin);
+                // Validate it's not the same page
+                if (decodedUrlObj.pathname !== currentPathname) {
+                    backButton.href = decodedUrl;
+                }
             } catch (e) {
                 console.log('Could not decode return_url');
             }
         } else if (document.referrer) {
-            // Use the referrer URL if it's from the same origin
+            // Use referrer as fallback
             try {
                 const referrerUrl = new URL(document.referrer);
-                const currentUrl = new URL(window.location.href);
                 
-                // Only use referrer if it's from the same origin (same domain)
-                if (referrerUrl.origin === currentUrl.origin) {
-                    // Use the full referrer URL with all its parameters preserved
+                if (referrerUrl.origin === currentUrl.origin &&
+                    !referrerUrl.pathname.includes('/approve') &&
+                    !referrerUrl.pathname.includes('/reject') &&
+                    !referrerUrl.pathname.includes('/complete') &&
+                    !referrerUrl.pathname.includes('/return') &&
+                    !referrerUrl.pathname.includes('/edit') &&
+                    referrerUrl.pathname !== currentPathname) { // Critical: exclude same page
                     backButton.href = document.referrer;
                 }
             } catch (e) {
-                // If referrer URL parsing fails, use default dashboard URL
                 console.log('Could not parse referrer URL');
             }
         }
-        // If no referrer or return_url, the button will use the default dashboard URL
+        // If no return URL found, the button will use the default dashboard URL from href attribute
+    }
+});
+
+// Intercept all form submissions to preserve return_url
+document.addEventListener('DOMContentLoaded', function() {
+    // Get current return_url from URL or sessionStorage
+    const urlParams = new URLSearchParams(window.location.search);
+    let returnUrl = urlParams.get('return_url') || sessionStorage.getItem('view_request_return_url');
+    
+    // If we have a return_url, add it to all forms as a hidden input
+    if (returnUrl) {
+        const forms = document.querySelectorAll('form[method="POST"]');
+        forms.forEach(form => {
+            // Check if form already has return_url input
+            if (!form.querySelector('input[name="return_url"]')) {
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'return_url';
+                hiddenInput.value = returnUrl;
+                form.appendChild(hiddenInput);
+            }
+        });
     }
 });
 </script>
