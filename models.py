@@ -168,6 +168,10 @@ class PaymentRequest(db.Model):
     manager_on_hold_reason = db.Column(db.Text, nullable=True)  # Reason for putting request on hold
     is_urgent = db.Column(db.Boolean, default=False)  # Whether request is marked as urgent
     manager_approval_reason = db.Column(db.Text)  # Manager's notes when approving
+    gm_return_date = db.Column(db.Date, nullable=True)  # Date when GM returned request to requestor
+    gm_returnor = db.Column(db.String(100), nullable=True)  # Name of the GM who returned the request
+    gm_returnor_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)  # ID of the GM who returned the request
+    gm_return_reason = db.Column(db.Text, nullable=True)  # Reason for GM returning request to requestor
     finance_admin_note = db.Column(db.Text)  # Finance admin's note when reviewing
     finance_admin_note_added_by = db.Column(db.String(100))  # Name of user who added the note
     finance_rejection_date = db.Column(db.Date)  # Date when finance rejected
