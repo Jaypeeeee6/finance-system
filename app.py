@@ -19162,15 +19162,25 @@ def request_entity_too_large(error):
 
 
 @app.route('/admin/calendar')
-@role_required('Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'IT Department Manager')
+@role_required('Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'IT Department Manager', 'Department Manager')
 def admin_calendar():
-    """Calendar view for recurring payments (Admin and Project roles)"""
+    """Calendar view for recurring payments (Admin and Project roles)
+
+    Department Managers are allowed only if their department is IT.
+    """
+    if current_user.role == 'Department Manager' and getattr(current_user, 'department', None) != 'IT':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
     return render_template('admin_calendar.html')
 
 @app.route('/api/admin/recurring-events')
-@role_required('Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'IT Department Manager')
+@role_required('Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'IT Department Manager', 'Department Manager')
 def api_admin_recurring_events():
     """API endpoint for calendar events (recurring + one-time scheduled)."""
+    # Restrict Department Manager to IT department only
+    if current_user.role == 'Department Manager' and getattr(current_user, 'department', None) != 'IT':
+        flash('You do not have permission to access this resource.', 'danger')
+        return redirect(url_for('dashboard'))
     try:
         # Build query for recurring payment requests (exclude archived)
         # Include requests with Payment Type "Recurring" and status in allowed list

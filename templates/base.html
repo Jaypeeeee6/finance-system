@@ -163,7 +163,7 @@
                 <li class="nav-menu-desktop-hidden"><a href="{{ url_for('procurement_item_requests') }}" class="nav-link"><i class="fas fa-shopping-cart"></i> Item Requests</a></li>
                 {% endif %}
                 
-                {% if current_user.role in ['Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'IT Department Manager'] %}
+                {% if current_user.role in ['Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff'] or (current_user.role == 'Department Manager' and current_user.department == 'IT') %}
                 <li class="calendar-link-container">
                     <a href="{{ url_for('admin_calendar') }}" class="nav-link calendar-link">
                         <i class="fas fa-calendar-alt"></i> Calendar
