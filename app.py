@@ -520,28 +520,30 @@ def get_status_priority_order():
     """
     Returns SQLAlchemy case expression for ordering payment requests by status priority.
     Priority order:
-    1. Returned to Manager
-    2. Pending Manager Approval
-    3. On Hold
-    4. Pending Finance Approval
-    5. Proof Pending
-    6. Proof Sent
-    7. Proof Rejected
-    8. Recurring
-    9. Completed
-    10. Rejected (Rejected by Manager, Rejected by Finance, Proof Rejected)
+    1. Returned to Requestor
+    2. Returned to Manager
+    3. Pending Manager Approval
+    4. On Hold
+    5. Pending Finance Approval
+    6. Proof Pending
+    7. Proof Sent
+    8. Proof Rejected
+    9. Recurring
+    10. Completed
+    11. Rejected (Rejected by Manager, Rejected by Finance, Proof Rejected)
     """
     return db.case(
-        (PaymentRequest.status == 'Returned to Manager', 1),
-        (PaymentRequest.status == 'Pending Manager Approval', 2),
-        (PaymentRequest.status == 'On Hold', 3),
-        (PaymentRequest.status == 'Pending Finance Approval', 4),
-        (PaymentRequest.status == 'Proof Pending', 5),
-        (PaymentRequest.status == 'Proof Sent', 6),
-        (PaymentRequest.status == 'Proof Rejected', 7),
-        (PaymentRequest.status == 'Recurring', 8),
-        (PaymentRequest.status == 'Completed', 9),
-        (PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']), 10),
+        (PaymentRequest.status == 'Returned to Requestor', 1),
+        (PaymentRequest.status == 'Returned to Manager', 2),
+        (PaymentRequest.status == 'Pending Manager Approval', 3),
+        (PaymentRequest.status == 'On Hold', 4),
+        (PaymentRequest.status == 'Pending Finance Approval', 5),
+        (PaymentRequest.status == 'Proof Pending', 6),
+        (PaymentRequest.status == 'Proof Sent', 7),
+        (PaymentRequest.status == 'Proof Rejected', 8),
+        (PaymentRequest.status == 'Recurring', 9),
+        (PaymentRequest.status == 'Completed', 10),
+        (PaymentRequest.status.in_(['Rejected by Manager', 'Rejected by Finance', 'Proof Rejected']), 11),
         else_=99  # Any other status goes to the end
     )
 
@@ -12728,7 +12730,7 @@ def view_request(request_id):
     # Fetch return reason history (for multiple returns)
     return_reason_history = ReturnReasonHistory.query.filter_by(request_id=req.request_id).order_by(ReturnReasonHistory.returned_at.desc()).all()
     
-    # Check if current user can edit this request (for "Returned to Manager" status)
+    # Check if current user can edit this request (for "Returned to Manager" or "Returned to Requestor" status)
     can_edit_request = False
     # Flag used in the template: when status is "Pending Manager Approval", certain approvers
     # (GM, Operation Manager, assigned managers, temporary manager) can only edit the Department field
@@ -12742,6 +12744,10 @@ def view_request(request_id):
             authorized_approvers = get_authorized_manager_approvers(req)
             if current_user in authorized_approvers:
                 can_edit_request = True
+    elif req.status == 'Returned to Requestor':
+        # Only the requestor can edit their returned request
+        if req.user_id == current_user.user_id:
+            can_edit_request = True
     elif req.status == 'Pending Manager Approval':
         # IT can always edit
         if current_user.department == 'IT' and current_user.role in ['IT Staff', 'Department Manager']:
@@ -12939,15 +12945,18 @@ def schedule_one_time_payment(request_id):
 @app.route('/request/<int:request_id>/edit', methods=['POST'])
 @login_required
 def edit_request(request_id):
-    """Save inline edits by IT users, assigned managers, GM, and Operation Manager when status is Pending Manager Approval or Returned to Manager. Also allows Finance Admin to edit Request Type only when status is Pending Finance Approval."""
+    """Save inline edits by IT users, assigned managers, GM, and Operation Manager when status is Pending Manager Approval or Returned to Manager. Also allows Finance Admin to edit Request Type only when status is Pending Finance Approval. Allows requestors to edit when status is Returned to Requestor."""
     req = PaymentRequest.query.get_or_404(request_id)
 
     # Check if Finance Admin is editing Request Type only for Pending Finance Approval status
     is_finance_admin_edit = (current_user.role == 'Finance Admin' and req.status == 'Pending Finance Approval')
     
-    # Status gate - allow editing when status is "Pending Manager Approval" or "Returned to Manager"
+    # Check if requestor is editing their own returned request
+    is_requestor_edit = (req.user_id == current_user.user_id and req.status == 'Returned to Requestor')
+    
+    # Status gate - allow editing when status is "Pending Manager Approval" or "Returned to Manager" or "Returned to Requestor"
     # OR when Finance Admin is editing Request Type for "Pending Finance Approval"
-    if req.status not in ['Pending Manager Approval', 'Returned to Manager', 'Pending Finance Approval']:
+    if req.status not in ['Pending Manager Approval', 'Returned to Manager', 'Pending Finance Approval', 'Returned to Requestor']:
         flash('This request cannot be edited in its current status.', 'error')
         return redirect_with_return_url('view_request', request_id=request_id)
 
@@ -12955,11 +12964,17 @@ def edit_request(request_id):
     if req.status == 'Pending Finance Approval' and not is_finance_admin_edit:
         flash('This request cannot be edited in its current status.', 'error')
         return redirect_with_return_url('view_request', request_id=request_id)
+    
+    # If status is "Returned to Requestor" but user is not the requestor, deny access
+    if req.status == 'Returned to Requestor' and not is_requestor_edit:
+        flash('Only the requestor can edit a request that has been returned to them.', 'error')
+        return redirect_with_return_url('view_request', request_id=request_id)
 
     # Authorization: 
     # - IT Staff and IT Department Manager can always edit when status is "Pending Manager Approval" or "Returned to Manager"
     # - Assigned managers, GM, and Operation Manager can edit when status is "Returned to Manager"
     # - Finance Admin can edit Request Type only when status is "Pending Finance Approval"
+    # - Requestor can edit when status is "Returned to Requestor"
     is_authorized = False
     # Flag for manager/GM/Operation Manager/temporary manager editing ONLY department while status is Pending Manager Approval
     is_manager_pending_edit = False
@@ -12985,6 +13000,9 @@ def edit_request(request_id):
             # IT already handled above with full-edit permissions; here we restrict only non-IT approvers
             if not (current_user.department == 'IT' and current_user.role in ['IT Staff', 'Department Manager']):
                 is_manager_pending_edit = True
+    # For "Returned to Requestor" status, allow the requestor to edit
+    elif is_requestor_edit:
+        is_authorized = True
     
     if not is_authorized:
         flash('You are not authorized to edit this request.', 'error')
@@ -13087,7 +13105,7 @@ def edit_request(request_id):
                 return val.strip() == ''
             return False
 
-        if req.status in ['Pending Manager Approval', 'Returned to Manager']:
+        if req.status in ['Pending Manager Approval', 'Returned to Manager', 'Returned to Requestor']:
             missing_fields = []
 
             # Helper: prefer submitted value if the field was part of this form post;
@@ -13142,10 +13160,10 @@ def edit_request(request_id):
                 flash(f'The following fields cannot be empty when saving edits: {friendly_list}.', 'error')
                 return redirect(url_for('view_request', request_id=request_id))
 
-    # Handle file management (only when status is "Returned to Manager" and not Finance Admin edit).
+    # Handle file management (only when status is "Returned to Manager" or "Returned to Requestor" and not Finance Admin edit).
     # Manager/GM/Operation Manager/temporary manager restricted to Department only while
     # status is "Pending Manager Approval" so file handling is unaffected.
-    if req.status == 'Returned to Manager' and not is_finance_admin_edit:
+    if req.status in ['Returned to Manager', 'Returned to Requestor'] and not is_finance_admin_edit:
         # Handle file deletions
         delete_files = request.form.getlist('delete_files')
         if delete_files:
@@ -13240,6 +13258,27 @@ def edit_request(request_id):
                     all_receipts = existing_receipts + uploaded_files
                     req.requestor_receipt_path = json.dumps(all_receipts)
                     log_action(f"Manager added {len(uploaded_files)} file(s) to request #{request_id}")
+
+    # If requestor is editing a "Returned to Requestor" request, change status back to "Pending Manager Approval"
+    if is_requestor_edit and req.status == 'Returned to Requestor':
+        req.status = 'Pending Manager Approval'
+        req.rejection_reason = None  # Clear the return reason
+        req.updated_at = datetime.utcnow()
+        # Start manager approval timing
+        req.manager_approval_start_time = datetime.utcnow()
+        log_action(f"Request #{request_id} resubmitted by requestor after editing - status changed to Pending Manager Approval")
+        
+        # Notify all authorized managers who can approve this request
+        authorized_approvers = get_authorized_manager_approvers(req)
+        dept_text = get_department_text_for_notification(req)
+        for approver in authorized_approvers:
+            create_notification(
+                user_id=approver.user_id,
+                title="Request Resubmitted After Editing",
+                message=f"Payment request #{request_id} {dept_text} department has been edited and resubmitted by {req.user.name} - requires your approval",
+                notification_type="new_submission",
+                request_id=request_id
+            )
 
     db.session.commit()
 
@@ -15313,6 +15352,69 @@ def manager_reject_request(request_id):
     if return_url:
         return redirect(return_url)
     return redirect(url_for('dashboard'))
+
+
+@app.route('/request/<int:request_id>/gm_return_to_requestor', methods=['POST'])
+@login_required
+@role_required('GM')
+def gm_return_to_requestor(request_id):
+    """GM returns a payment request to the requestor for editing"""
+    req = PaymentRequest.query.get_or_404(request_id)
+    
+    # Check if request is in correct status (must be awaiting approval)
+    if req.status not in ['Pending Manager Approval', 'Pending Finance Approval']:
+        flash('This request is not in a valid status for returning to requestor.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Get return reason
+    return_reason = request.form.get('return_reason', '').strip()
+    if not return_reason:
+        flash('Please provide a reason for returning this request to the requestor.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Save return reason to history
+    return_history = ReturnReasonHistory(
+        request_id=request_id,
+        return_reason=return_reason,
+        returned_by_user_id=current_user.user_id,
+        returned_by_name=current_user.name,
+        returned_at=datetime.utcnow()
+    )
+    db.session.add(return_history)
+    
+    # Update request status to allow requestor to edit
+    old_status = req.status
+    req.status = 'Returned to Requestor'
+    req.rejection_reason = return_reason  # Store the return reason
+    req.updated_at = datetime.utcnow()
+    
+    # Reset manager approval timing if it was started
+    if req.manager_approval_start_time:
+        req.manager_approval_end_time = None
+        req.manager_approval_duration_minutes = None
+    
+    db.session.commit()
+    
+    log_action(f"GM returned payment request #{request_id} to requestor - Reason: {return_reason}")
+    
+    # Notify the requestor
+    create_notification(
+        user_id=req.user_id,
+        title="Request Returned for Editing",
+        message=f"Your payment request #{request_id} has been returned by the GM for editing. Reason: {return_reason}",
+        notification_type="request_returned",
+        request_id=request_id
+    )
+    
+    # Emit real-time update
+    socketio.emit('request_updated', {
+        'request_id': request_id,
+        'status': 'Returned to Requestor',
+        'returned_to_requestor': True
+    })
+    
+    flash(f'Payment request #{request_id} has been returned to the requestor for editing.', 'success')
+    return redirect(url_for('view_request', request_id=request_id))
 
 
 @app.route('/request/<int:request_id>/reassign_manager', methods=['POST'])
