@@ -18931,12 +18931,10 @@ def calendar_pending_count():
                 return True
             if user.role == 'Department Manager' and user.department == req.department:
                 return True
-            if user.role == 'Finance Admin':
+            # Finance Admin and Finance Staff can see all one-time scheduled payments when status is "Pending Finance Approval"
+            if user.role in ['Finance Admin', 'Finance Staff']:
                 if req.status == 'Pending Finance Approval':
-                    if user.name == 'Abdalaziz Al-Brashdi':
-                        return req.user_id == user.user_id or getattr(req.user, 'manager_id', None) == user.user_id
-                    else:
-                        return req.user_id == user.user_id
+                    return True  # Finance users can see all pending finance approval requests
             return False
         
         for req in one_time_requests:
@@ -19455,13 +19453,10 @@ def api_admin_recurring_events():
             # Department Manager of same department
             if user.role == 'Department Manager' and user.department == req.department:
                 return True
-            # Finance Admin special rules
-            if user.role == 'Finance Admin':
+            # Finance Admin and Finance Staff can see all one-time scheduled payments when status is "Pending Finance Approval"
+            if user.role in ['Finance Admin', 'Finance Staff']:
                 if req.status == 'Pending Finance Approval':
-                    if user.name == 'Abdalaziz Al-Brashdi':
-                        return req.user_id == user.user_id or getattr(req.user, 'manager_id', None) == user.user_id
-                    else:
-                        return req.user_id == user.user_id
+                    return True  # Finance users can see all pending finance approval requests
             return False
 
         one_time_query = PaymentRequest.query.filter(

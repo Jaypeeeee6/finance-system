@@ -3626,6 +3626,25 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Form action:', this.action);
             console.log('Form method:', this.method);
             
+            // Remove required attribute from hidden fields to prevent HTML5 validation errors
+            // This fixes the issue where cash_receiver or other fields are hidden but still required
+            const allRequiredFields = document.querySelectorAll('[required]');
+            allRequiredFields.forEach(field => {
+                const fieldGroup = field.closest('.form-group');
+                if (fieldGroup && fieldGroup.style.display === 'none') {
+                    field.removeAttribute('required');
+                }
+            });
+            
+            // Specifically handle cash_receiver field if it exists and is hidden
+            const cashReceiverInput = document.getElementById('cash_receiver');
+            if (cashReceiverInput) {
+                const cashReceiverGroup = document.getElementById('cash_receiver_group');
+                if (cashReceiverGroup && cashReceiverGroup.style.display === 'none') {
+                    cashReceiverInput.removeAttribute('required');
+                }
+            }
+            
             // Check if required fields are filled
             const approvalStatus = document.getElementById('manager_approval_status')?.value || 
                                  document.getElementById('manager_approval_status_returned')?.value;
@@ -5166,6 +5185,18 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('DOMContentLoaded', function() {
     // Check if we're on the finance tab and initialize cash receiver field
     toggleCashReceiverField();
+    
+    // Also ensure any hidden required fields have their required attribute removed
+    // This prevents "An invalid form control with name='...' is not focusable" errors
+    const allRequiredFields = document.querySelectorAll('[required]');
+    allRequiredFields.forEach(field => {
+        const fieldGroup = field.closest('.form-group');
+        if (fieldGroup && (fieldGroup.style.display === 'none' || fieldGroup.offsetParent === null)) {
+            field.removeAttribute('required');
+        } else if (field.offsetParent === null || field.style.display === 'none') {
+            field.removeAttribute('required');
+        }
+    });
 });
 
 // Store the original return URL when page loads (before any POST actions)
@@ -5267,11 +5298,36 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Intercept all form submissions to preserve return_url
+// Intercept all form submissions to preserve return_url and fix hidden required fields
 document.addEventListener('DOMContentLoaded', function() {
     // Get current return_url from URL or sessionStorage
     const urlParams = new URLSearchParams(window.location.search);
     let returnUrl = urlParams.get('return_url') || sessionStorage.getItem('view_request_return_url');
+    
+    // Global handler to remove required attribute from hidden fields before form submission
+    // This prevents "An invalid form control with name='...' is not focusable" errors
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            // Remove required attribute from all hidden fields
+            const allRequiredFields = this.querySelectorAll('[required]');
+            allRequiredFields.forEach(field => {
+                // Check if field is hidden directly or its parent group is hidden
+                const isHidden = field.offsetParent === null || 
+                               field.style.display === 'none' || 
+                               field.type === 'hidden';
+                
+                if (isHidden) {
+                    field.removeAttribute('required');
+                } else {
+                    // Check if parent form-group is hidden
+                    const fieldGroup = field.closest('.form-group');
+                    if (fieldGroup && (fieldGroup.style.display === 'none' || fieldGroup.offsetParent === null)) {
+                        field.removeAttribute('required');
+                    }
+                }
+            });
+        });
+    });
     
     // If we have a return_url, add it to all forms as a hidden input
     if (returnUrl) {
