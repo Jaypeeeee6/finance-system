@@ -5363,19 +5363,7 @@ def item_request_manager_reject_handler(request_id, item_request):
             item_request_id=request_id
         )
     
-    # Notify Procurement Managers (they should know it was rejected)
-    procurement_managers = User.query.filter_by(
-        department='Procurement',
-        role='Department Manager'
-    ).all()
-    for pm in procurement_managers:
-        create_notification(
-            user_id=pm.user_id,
-            title="Item Request Rejected by Manager",
-            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {formatted_items} has been rejected by {current_user.name}. Reason: {rejection_reason}",
-            notification_type="request_rejected",
-            item_request_id=request_id
-        )
+    # Procurement managers are intentionally not notified when a manager rejects a request.
     
     # Notify other authorized managers (who could have approved but didn't) that the request was rejected
     authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
@@ -5507,18 +5495,7 @@ def item_request_manager_reject(request_id):
             item_request_id=request_id
         )
     
-    # Notify Procurement Managers (they should know it was rejected)
-    procurement_managers = User.query.filter_by(
-        department='Procurement',
-        role='Department Manager'
-    ).all()
-    for pm in procurement_managers:
-        create_notification(
-            user_id=pm.user_id,
-            title="Item Request Rejected by Manager",
-            message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {item_request.item_name} has been rejected by {current_user.name}. Reason: {rejection_reason}",
-            notification_type="request_rejected"
-        )
+    # Procurement managers are intentionally not notified when a manager rejects a request.
     
     # Notify other authorized managers (who could have approved but didn't) that the request was rejected
     authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
