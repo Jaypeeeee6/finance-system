@@ -19,6 +19,21 @@ from playwright.sync_api import sync_playwright
 from io import BytesIO
 import base64
 
+# Wrap Flask's flash to centralize permission-denied handling.
+# Any code that calls flash("You do not have permission...") will instead
+# store the message in session['permission_denied'] so we can render it once
+# in the UI and avoid duplicate/stale alerts.
+_original_flash = flash
+def flash(message, category='message'):
+    try:
+        if isinstance(message, str) and message.startswith('You do not have permission to access this page'):
+            session['permission_denied'] = message
+            # Do not call original flash for permission messages
+            return
+    except Exception:
+        pass
+    return _original_flash(message, category)
+
 # --- Maintenance mode storage (instance file) ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_INSTANCE_DIR = os.path.join(BASE_DIR, 'instance')
@@ -530,8 +545,9 @@ def role_required(*roles):
             if not current_user.is_authenticated:
                 return redirect(url_for('login'))
             if current_user.role not in roles:
-                flash('You do not have permission to access this page.', 'danger')
-                return redirect(url_for('dashboard'))
+                # Do not flash here to avoid duplicate/stale alerts.
+                # Abort with 403 so a single, central handler can present a clear message.
+                abort(403)
             return f(*args, **kwargs)
         return decorated_function
     return decorator
@@ -3684,7 +3700,7 @@ def procurement_dashboard():
     # Normalize department value (strip whitespace and handle case)
     dept = current_user.department.strip() if current_user.department else ''
     if dept.lower() != 'procurement':
-        flash('You do not have permission to access this page. This dashboard is only for Procurement department users.', 'danger')
+        session['permission_denied'] = 'You do not have permission to access this page. This dashboard is only for Procurement department users.'
         return redirect(url_for('dashboard'))
     
     page = request.args.get('page', 1, type=int)
@@ -8460,7 +8476,7 @@ def it_dashboard():
     
     # Restrict Department Managers to IT department only
     if current_user.role == 'Department Manager' and current_user.department != 'IT':
-        flash('You do not have permission to access this page.', 'danger')
+        session['permission_denied'] = 'You do not have permission to access this page.'
         return redirect(url_for('dashboard'))
     
     # Build query with optional department and search filters
@@ -8698,7 +8714,7 @@ def archives():
     """Archives page for IT department - shows archived requests"""
     # Restrict Department Managers to IT department only
     if current_user.role == 'Department Manager' and current_user.department != 'IT':
-        flash('You do not have permission to access this page.', 'danger')
+        session['permission_denied'] = 'You do not have permission to access this page.'
         return redirect(url_for('dashboard'))
     
     page = request.args.get('page', 1, type=int)
@@ -8769,7 +8785,7 @@ def restore_request(request_id):
     """Restore an archived payment request (IT only)"""
     # Restrict Department Managers to IT department only
     if current_user.role == 'Department Manager' and current_user.department != 'IT':
-        flash('You do not have permission to access this page.', 'danger')
+        session['permission_denied'] = 'You do not have permission to access this page.'
         return redirect(url_for('dashboard'))
     
     req = PaymentRequest.query.get_or_404(request_id)

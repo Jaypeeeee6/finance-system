@@ -357,6 +357,16 @@
             {% set messages = get_flashed_messages(with_categories=true) %}
         {% endif %}
 
+        {# Show permission_denied session message first (if any) and clear it #}
+        {% if session.get('permission_denied') %}
+            <div class="flash-messages">
+                <div class="alert alert-danger">
+                    <span>{{ session.pop('permission_denied') }}</span>
+                    <button class="close-alert" onclick="this.parentElement.remove()">&times;</button>
+                </div>
+            </div>
+        {% endif %}
+
         {% if messages %}
             {# Existing inline alerts remain for non-error categories #}
             <div class="flash-messages">
