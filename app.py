@@ -1196,6 +1196,19 @@ def get_authorized_manager_approvers_for_item_request(item_request):
         log_action(f"WARNING: User not found for item request #{item_request.id} with user_id {item_request.user_id}")
         return authorized_users
     
+    # Special rule: If a Branch Manager or Supervisor (in Branch department) submits an item request,
+    # include Branch Inventory Officer(s) among the authorized manager approvers.
+    # Do NOT short-circuit other approvers — GM and Operation Manager should still be included.
+    try:
+        if requestor.role in ['Branch Manager', 'Supervisor'] and (requestor.department or '').strip().lower() == 'branch':
+            branch_inventory_officers = User.query.filter_by(role='Branch Inventory Officer').all()
+            for bio in branch_inventory_officers:
+                if bio.user_id != requestor.user_id:
+                    authorized_users.append(bio)
+            # Intentionally do NOT return here; allow GM/Operation Manager and other fallbacks to be added below.
+    except Exception as e:
+        app.logger.warning(f"Error applying Branch Inventory Officer special case for item request approvers: {e}")
+    
     # Hard rule: Requests submitted by GM/CEO/Operation Manager can ONLY be approved by Abdalaziz
     if requestor.role in ['GM', 'CEO', 'Operation Manager']:
         abdalaziz = User.query.filter_by(name='Abdalaziz Al-Brashdi').first()
@@ -2298,6 +2311,28 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
             )
         ).order_by(Notification.created_at.desc())
 
+    elif user.role == 'Branch Inventory Officer':
+        # Branch Inventory Officer: should receive item request submissions and related updates (same visibility as Operation Manager for item requests)
+        query = Notification.query.filter(
+            db.and_(
+                Notification.user_id == user.user_id,
+                db.or_(
+                    Notification.notification_type == 'item_request_submission',
+                    Notification.notification_type == 'new_submission',
+                    Notification.notification_type.in_([
+                        'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
+                        'status_changed', 'proof_required', 'recurring_approved', 'request_completed',
+                        'installment_paid', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold', 'item_request_updated', 'item_request_assigned'
+                    ]),
+                    Notification.notification_type.in_([
+                        'system_maintenance', 'system_update', 'security_alert', 'system_error',
+                        'admin_announcement'
+                    ]),
+                    Notification.notification_type == 'temporary_manager_assignment'
+                )
+            )
+        ).order_by(Notification.created_at.desc())
+
     elif user.role == 'Department Manager' and user.department == 'IT':
         # IT Department Manager: New submissions from IT Staff only + updates on their own requests + system-wide + user management + temporary manager assignments
         query = Notification.query.filter(
@@ -2635,7 +2670,7 @@ def notify_finance_and_admin(title, message, notification_type, request_id=None)
                     'action': 'new_notification',
                     'type': notification_type
                 }, room='gm')
-            elif requestor_role == 'Operation Staff':
+            elif requestor_role in ['Operation Staff', 'Branch Inventory Officer']:
                 socketio.emit('notification_update', {
                     'action': 'new_notification',
                     'type': notification_type
@@ -3220,7 +3255,7 @@ def dashboard():
     elif role == 'Procurement Staff':
         return redirect(url_for('procurement_dashboard'))
     elif role in ['HR Staff', 'PR Staff', 'Auditing Staff', 
-                  'Customer Service Staff', 'Marketing Staff', 'Operation Staff', 
+                  'Customer Service Staff', 'Marketing Staff', 'Operation Staff', 'Branch Inventory Officer',
                   'Quality Control Staff', 'Research and Development Staff', 
                   'Office Staff', 'Maintenance Staff', 'Logistic Staff']:
         return redirect(url_for('department_dashboard'))
@@ -3249,7 +3284,7 @@ def dashboard():
 @role_required(
     # Department-specific Staff roles (excluding Finance Staff, Project Staff, IT Staff, and Procurement Staff who have their own dashboards)
     'HR Staff', 'PR Staff', 'Auditing Staff',
-    'Customer Service Staff', 'Marketing Staff', 'Operation Staff', 'Quality Control Staff',
+    'Customer Service Staff', 'Marketing Staff', 'Operation Staff', 'Branch Inventory Officer', 'Quality Control Staff',
     'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Logistic Staff',
     # Other roles that can access this dashboard
     'Department Manager', 'Operation Manager'
@@ -4691,20 +4726,36 @@ def view_item_request_page(request_id):
             if dept_manager:
                 manager_name = dept_manager.name
     else:
-        # If no manager_id is set, find the Department Manager for the requestor's department
-        dept_manager = User.query.filter_by(role='Department Manager', department=item_request.department).first()
-        if dept_manager:
-            manager_name = dept_manager.name
-        elif item_request.department in ['Operation', 'Project']:
-            # For Operation and Project, try Operation Manager as fallback
-            operation_manager = User.query.filter_by(role='Operation Manager').first()
-            if operation_manager:
-                manager_name = operation_manager.name
-        elif item_request.department == 'Office':
-            # For Office, fallback to the General Manager
-            gm_user_fallback = User.query.filter_by(role='GM').first()
-            if gm_user_fallback:
-                manager_name = gm_user_fallback.name
+        # Special display case: Branch Manager or Supervisor requests should show Branch Inventory Officer(s) as Assigned Manager
+        try:
+            if requestor_user and requestor_user.role in ['Branch Manager', 'Supervisor'] and (requestor_user.department or '').strip().lower() == 'branch':
+                bios = User.query.filter_by(role='Branch Inventory Officer').all()
+                if bios:
+                    # Join multiple names if more than one Branch Inventory Officer exists
+                    manager_name = ', '.join([b.name for b in bios])
+                else:
+                    # Fallback to Department Manager if no Branch Inventory Officer found
+                    dept_manager = User.query.filter_by(role='Department Manager', department=item_request.department).first()
+                    if dept_manager:
+                        manager_name = dept_manager.name
+                # Do not continue to other fallbacks for Branch Manager/Supervisor
+        except Exception as e:
+            app.logger.warning(f"Error resolving Branch Inventory Officer for display: {e}")
+        # If no manager_id is set or Branch Inventory Officer not found, find the Department Manager for the requestor's department
+        if not manager_name:
+            dept_manager = User.query.filter_by(role='Department Manager', department=item_request.department).first()
+            if dept_manager:
+                manager_name = dept_manager.name
+            elif item_request.department in ['Operation', 'Project']:
+                # For Operation and Project, try Operation Manager as fallback
+                operation_manager = User.query.filter_by(role='Operation Manager').first()
+                if operation_manager:
+                    manager_name = operation_manager.name
+            elif item_request.department == 'Office':
+                # For Office, fallback to the General Manager
+                gm_user_fallback = User.query.filter_by(role='GM').first()
+                if gm_user_fallback:
+                    manager_name = gm_user_fallback.name
     
     # Also resolve GM and Operation Manager names (used for Department Manager submissions)
     gm_user = User.query.filter_by(role='GM').first()
@@ -18875,7 +18926,7 @@ def debug_requests():
 
 @app.route('/notifications')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'Branch Inventory Officer', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def notifications():
     """View all notifications based on RBAC permissions with pagination"""
     page = request.args.get('page', 1, type=int)
@@ -18891,7 +18942,7 @@ def notifications():
 
 @app.route('/notifications/mark_read/<int:notification_id>')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'Branch Inventory Officer', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def mark_notification_read(notification_id):
     """Mark a notification as read"""
     notification = Notification.query.filter_by(notification_id=notification_id, user_id=current_user.user_id).first()
@@ -18904,7 +18955,7 @@ def mark_notification_read(notification_id):
 
 @app.route('/notifications/mark_all_read')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'Branch Inventory Officer', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def mark_all_notifications_read():
     """Mark all notifications as read for current user"""
     Notification.query.filter_by(user_id=current_user.user_id, is_read=False).update({'is_read': True})
@@ -18913,7 +18964,7 @@ def mark_all_notifications_read():
 
 @app.route('/notifications/mark_paid/<int:notification_id>')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'Branch Inventory Officer', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def mark_notification_paid(notification_id):
     """Mark a recurring payment notification as paid and delete it"""
     notification = Notification.query.filter_by(
@@ -18945,7 +18996,7 @@ def mark_notification_paid(notification_id):
 
 @app.route('/notifications/delete/<int:notification_id>')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'Branch Inventory Officer', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def delete_notification(notification_id):
     """Delete a specific notification"""
     notification = Notification.query.filter_by(notification_id=notification_id, user_id=current_user.user_id).first()
@@ -18957,7 +19008,7 @@ def delete_notification(notification_id):
 
 @app.route('/notifications/delete_all')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'Branch Inventory Officer', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def delete_all_notifications():
     """Delete all notifications for current user"""
     try:
@@ -18971,7 +19022,7 @@ def delete_all_notifications():
 
 @app.route('/api/notifications/unread_count')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'Branch Inventory Officer', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def unread_notifications_count():
     """Get count of unread notifications based on RBAC"""
     count = get_unread_count_for_user(current_user)
@@ -19112,7 +19163,7 @@ def overdue_requests_count():
 
 @app.route('/api/notifications/recent')
 @login_required
-@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
+@role_required('Finance Admin', 'Admin', 'Finance Staff', 'Project Staff', 'Operation Manager', 'IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Staff', 'Branch Inventory Officer', 'HR Staff', 'PR Staff', 'Auditing Staff', 'Customer Service Staff', 'Marketing Staff', 'Quality Control Staff', 'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Procurement Staff', 'Logistic Staff')
 def recent_notifications():
     """Get recent notifications for the user based on RBAC"""
     notifications = get_notifications_for_user(current_user)
