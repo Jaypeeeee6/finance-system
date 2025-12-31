@@ -840,6 +840,14 @@ body {
     margin-right: 0.5rem;
     font-size: 1.8rem;
 }
+/* Logo image inside nav-brand */
+.nav-brand-logo {
+    height: 36px;
+    width: auto;
+    margin-right: 1rem;
+    display: inline-block;
+    vertical-align: middle;
+}
 
 /* Hamburger Menu Button */
 .hamburger-menu {
@@ -853,10 +861,11 @@ body {
     z-index: 1001;
 }
 
-.hamburger-menu span {
+.hamburger-menu span,
+.hamburger-menu-desktop span {
     width: 25px;
     height: 3px;
-    background-color: var(--dark-color);
+    background-color: #D9BD7D;
     border-radius: 3px;
     transition: var(--transition);
 }
@@ -889,7 +898,7 @@ body {
 .hamburger-menu-desktop span {
     width: 25px;
     height: 3px;
-    background-color: var(--dark-color);
+    background-color: #D9BD7D;
     border-radius: 3px;
     transition: var(--transition);
 }
@@ -942,6 +951,20 @@ body {
     z-index: 1000;
 }
 
+.desktop-sidebar-footer {
+    margin-top: auto;
+    padding: 0;
+    border-top: none;
+}
+
+.desktop-sidebar-footer .desktop-sidebar-item {
+    width: 100%;
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+}
+
 .desktop-sidebar-close {
     position: absolute;
     top: 1rem;
@@ -982,11 +1005,39 @@ body {
 
 .desktop-sidebar-item:hover {
     background: var(--light-color);
-    border-left-color: var(--primary-color);
+    border-left-color: #D9BD7D;
+    color: #D9BD7D;
 }
 
 .desktop-sidebar-item i {
     font-size: 1.3rem;
+}
+
+/* Hover & active: make icon and text use the brand color */
+.desktop-sidebar-item:hover i,
+.desktop-sidebar-item:focus i {
+    color: #D9BD7D;
+}
+
+.desktop-sidebar-item.active {
+    color: #D9BD7D;
+    border-left-color: #D9BD7D;
+    background: var(--light-color);
+}
+.desktop-sidebar-item.active i {
+    color: #D9BD7D;
+}
+
+/* Dropdown toggle variants */
+.desktop-sidebar-dropdown-toggle:hover,
+.desktop-sidebar-dropdown-toggle:focus,
+.desktop-sidebar-dropdown-toggle.active {
+    color: #D9BD7D;
+    background: var(--light-color);
+}
+.desktop-sidebar-dropdown-toggle:hover .dropdown-chevron,
+.desktop-sidebar-dropdown-toggle.active .dropdown-chevron {
+    color: #D9BD7D;
 }
 
 /* Desktop Sidebar Dropdown */

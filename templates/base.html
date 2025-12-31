@@ -88,7 +88,7 @@
                     <span></span>
                     <span></span>
                 </button>
-                <i class="fas fa-file-invoice-dollar"></i>
+                <img src="{{ url_for('static', filename='css/images/Maa-logo-transparent.png') }}" alt="Maa logo" class="nav-brand-logo" />
                 <span>Payment System</span>
             </div>
             <button class="hamburger-menu" id="hamburger-menu" aria-label="Toggle menu">
@@ -227,7 +227,7 @@
                     </div>
                     {% endif %}
                 </li>
-                <li><a href="{{ url_for('logout') }}" class="nav-link logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                <li class="nav-menu-desktop-hidden"><a href="{{ url_for('logout') }}" class="nav-link logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
             </ul>
         </div>
     </nav>
@@ -241,48 +241,54 @@
             </button>
             <nav class="desktop-sidebar-nav">
                 {% if not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
-                <a href="{{ url_for('dashboard') }}" class="desktop-sidebar-item">
+                <a href="{{ url_for('dashboard') }}" class="desktop-sidebar-item {% if request.path.startswith(url_for('dashboard')) or request.path.startswith(url_for('admin_dashboard')) or request.path.startswith(url_for('finance_dashboard')) or request.path.startswith(url_for('project_dashboard')) or request.path.startswith(url_for('operation_dashboard')) or request.path.startswith(url_for('procurement_dashboard')) or request.path.startswith(url_for('department_dashboard')) or request.path.startswith(url_for('gm_dashboard')) or request.path.startswith(url_for('ceo_dashboard')) or request.path.startswith(url_for('it_dashboard')) %}active{% endif %}">
                     <i class="fas fa-home"></i>
                     <span>Dashboard</span>
                 </a>
                 {% endif %}
                 {% if can_view_item_reports and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
                 <div class="desktop-sidebar-dropdown">
-                    <button class="desktop-sidebar-item desktop-sidebar-dropdown-toggle" id="reports-dropdown-toggle">
+                    <button class="desktop-sidebar-item desktop-sidebar-dropdown-toggle {% if request.path.startswith(url_for('reports')) or request.path.startswith(url_for('item_request_reports')) %}active{% endif %}" id="reports-dropdown-toggle">
                         <i class="fas fa-chart-bar"></i>
                         <span>Reports</span>
                         <i class="fas fa-chevron-down dropdown-chevron"></i>
                     </button>
                     <div class="desktop-sidebar-submenu" id="reports-submenu">
                         {% if can_view_payment_reports %}
-                        <a href="{{ url_for('reports') }}" class="desktop-sidebar-submenu-item">
+                        <a href="{{ url_for('reports') }}" class="desktop-sidebar-submenu-item {% if request.path.startswith(url_for('reports')) %}active{% endif %}">
                             <span>Payment Request Reports</span>
                         </a>
                         {% endif %}
-                        <a href="{{ url_for('item_request_reports') }}" class="desktop-sidebar-submenu-item">
+                        <a href="{{ url_for('item_request_reports') }}" class="desktop-sidebar-submenu-item {% if request.path.startswith(url_for('item_request_reports')) %}active{% endif %}">
                             <span>Item Request Reports</span>
                         </a>
                     </div>
                 </div>
                 {% elif can_view_payment_reports %}
-                <a href="{{ url_for('reports') }}" class="desktop-sidebar-item">
+                <a href="{{ url_for('reports') }}" class="desktop-sidebar-item {% if request.path.startswith(url_for('reports')) %}active{% endif %}">
                     <i class="fas fa-chart-bar"></i>
                     <span>Reports</span>
                 </a>
                 {% endif %}
                 {% if show_item_requests_flag or (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
-                <a href="{{ url_for('procurement_item_requests') }}" class="desktop-sidebar-item">
+                <a href="{{ url_for('procurement_item_requests') }}" class="desktop-sidebar-item {% if request.path.startswith(url_for('procurement_item_requests')) %}active{% endif %}">
                     <i class="fas fa-shopping-cart"></i>
                     <span>Item Requests</span>
                 </a>
                 {% endif %}
                 {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT') or current_user.name == 'Super Admin') and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
-                <a href="{{ url_for('archives') }}" class="desktop-sidebar-item">
+                <a href="{{ url_for('archives') }}" class="desktop-sidebar-item {% if request.path.startswith(url_for('archives')) %}active{% endif %}">
                     <i class="fas fa-archive"></i>
                     <span>Archives</span>
                 </a>
                 {% endif %}
             </nav>
+            <div class="desktop-sidebar-footer">
+                <a href="{{ url_for('logout') }}" class="desktop-sidebar-item logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </a>
+            </div>
         </div>
     </div>
     {% endif %}
