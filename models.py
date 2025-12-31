@@ -683,6 +683,9 @@ class ProcurementItemRequest(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
     user = db.relationship('User', backref='procurement_item_requests', foreign_keys=[user_id])
     
+    # Files uploaded by the requestor when creating the item request (JSON list of filenames)
+    requestor_item_upload_path = db.Column(db.Text)
+    
     # Manager approval fields
     manager_approval_date = db.Column(db.Date, nullable=True)
     manager_approver = db.Column(db.String(100), nullable=True)

@@ -13,9 +13,11 @@
         <a href="{{ url_for('procurement_request_item') }}" class="btn btn-primary">
             <i class="fas fa-plus"></i> New Item Request
         </a>
+        {% if not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
         <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Back to Dashboard
         </a>
+        {% endif %}
     </div>
 
     <!-- Statistics Summary (only for Procurement users) -->

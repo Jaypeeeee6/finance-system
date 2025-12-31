@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, send_file, session, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, send_file, session, Response, abort
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_socketio import SocketIO, emit, join_room
 from flask_mail import Mail, Message
@@ -67,6 +67,39 @@ def write_feature_flags(**kwargs):
 # Initialize Flask app
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# Reduce noisy print output by routing stdout/stderr into Flask logger and raising default log level to INFO.
+import logging, sys
+class StreamToLogger(object):
+    """File-like object that redirects writes to a logger instance."""
+    def __init__(self, logger, level):
+        self.logger = logger
+        self.level = level
+        self._buffer = ''
+    def write(self, buf):
+        # Buffer and emit complete lines
+        self._buffer += str(buf)
+        while '\n' in self._buffer:
+            line, self._buffer = self._buffer.split('\n', 1)
+            line = line.rstrip()
+            if line:
+                try:
+                    self.logger.log(self.level, line)
+                except Exception:
+                    pass
+    def flush(self):
+        if self._buffer:
+            try:
+                self.logger.log(self.level, self._buffer)
+            except Exception:
+                pass
+            self._buffer = ''
+
+# Set default logger level to INFO so debug prints don't flood the console.
+app.logger.setLevel(logging.INFO)
+# Redirect STDOUT/STDERR to the logger (DEBUG/ERROR respectively)
+sys.stdout = StreamToLogger(app.logger, logging.DEBUG)
+sys.stderr = StreamToLogger(app.logger, logging.ERROR)
 
 # Initialize maintenance and feature flags paths now that app is created
 try:
@@ -2790,6 +2823,18 @@ def login():
                 app.logger.error(f"Error clearing stale session: {str(e)}", exc_info=True)
             flash('Your session has expired. Please log in again.', 'info')
         else:
+            # If already authenticated, Branch Manager / Supervisor should go to Item Requests
+            try:
+                if getattr(current_user, 'department', None) == 'Branch' and getattr(current_user, 'role', None) in ['Branch Manager', 'Supervisor']:
+                    try:
+                        session.pop('_flashes', None)
+                        session['suppress_flashes_once'] = True
+                        session.modified = True
+                    except Exception:
+                        pass
+                    return redirect(url_for('procurement_item_requests'))
+            except Exception:
+                pass
             return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
@@ -2835,6 +2880,17 @@ def login():
                 app.logger.warning(f"⚠️ User {username} logged in via DEVELOPMENT TESTING MODE (PIN bypassed)")
                 log_action(f"⚠️ DEVELOPMENT: User {username} logged in successfully (PIN bypassed via testing button)")
                 flash(f'⚠️ DEVELOPMENT MODE: Welcome back, {user.name}! (PIN bypassed)', 'warning')
+                try:
+                    if getattr(user, 'department', None) == 'Branch' and getattr(user, 'role', None) in ['Branch Manager', 'Supervisor']:
+                        try:
+                            session.pop('_flashes', None)
+                            session['suppress_flashes_once'] = True
+                            session.modified = True
+                        except Exception:
+                            pass
+                        return redirect(url_for('procurement_item_requests'))
+                except Exception:
+                    pass
                 return redirect(url_for('dashboard'))
             
             # Special case: IT system account and test admin bypass PIN requirement
@@ -2858,6 +2914,17 @@ def login():
                 app.logger.info(f"System user logged in successfully, redirecting to dashboard")
                 log_action(f"System account {username} logged in successfully (PIN bypassed)")
                 flash(f'Welcome back, {user.name}!', 'success')
+                try:
+                    if getattr(user, 'department', None) == 'Branch' and getattr(user, 'role', None) in ['Branch Manager', 'Supervisor']:
+                        try:
+                            session.pop('_flashes', None)
+                            session['suppress_flashes_once'] = True
+                            session.modified = True
+                        except Exception:
+                            pass
+                        return redirect(url_for('procurement_item_requests'))
+                except Exception:
+                    pass
                 return redirect(url_for('dashboard'))
             
             # Check if PIN exists in session
@@ -3148,6 +3215,15 @@ def dashboard():
         if dept.lower() == 'procurement':
             return redirect(url_for('procurement_dashboard'))
         # Fallback for any unrecognized roles
+        # For Branch Manager/Supervisor, redirect to Item Requests instead of flashing
+        try:
+            if getattr(current_user, 'department', None) == 'Branch' and getattr(current_user, 'role', None) in ['Branch Manager', 'Supervisor']:
+                session.pop('_flashes', None)
+                session['suppress_flashes_once'] = True
+                session.modified = True
+                return redirect(url_for('procurement_item_requests'))
+        except Exception:
+            pass
         flash('Your role is not properly configured. Please contact IT.', 'warning')
         return redirect(url_for('department_dashboard'))
 
@@ -3956,6 +4032,12 @@ def procurement_item_requests():
             conn.commit()
             print("✓ Added 'procurement_quantity_rejection_reason' column to procurement_item_requests table")
 
+        # Add requestor_item_upload_path for storing requestor-uploaded item files (JSON)
+        if 'requestor_item_upload_path' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN requestor_item_upload_path TEXT")
+            conn.commit()
+            print("✓ Added 'requestor_item_upload_path' column to procurement_item_requests table")
+
         conn.close()
     except Exception as e:
         print(f"Warning: Could not migrate columns: {e}")
@@ -4699,6 +4781,18 @@ def view_item_request_page(request_id):
         except (json.JSONDecodeError, TypeError):
             receipt_files = [item_request.receipt_path]
     
+    # Prepare requestor-uploaded item files (stored in requestor_item_upload_path)
+    requestor_item_uploads = []
+    if getattr(item_request, 'requestor_item_upload_path', None):
+        try:
+            data = json.loads(item_request.requestor_item_upload_path)
+            if isinstance(data, list):
+                requestor_item_uploads = data
+            else:
+                requestor_item_uploads = [item_request.requestor_item_upload_path]
+        except (json.JSONDecodeError, TypeError):
+            requestor_item_uploads = [item_request.requestor_item_upload_path]
+
     # Prepare invoice files list (supports legacy string list and new metadata objects)
     def _parse_invoice_entries(raw_value):
         entries = []
@@ -4790,6 +4884,7 @@ def view_item_request_page(request_id):
                          assigned_by_name=assigned_by_name,
                          completed_by_name=completed_by_name,
                          receipt_files=receipt_files,
+                         requestor_item_uploads=requestor_item_uploads,
                          invoice_files=invoice_files,
                          invoice_entries=invoice_entries,
                          manager_approver_name=manager_approver_name,
@@ -7413,6 +7508,36 @@ def procurement_request_item():
                 flash('Please fill in all required fields.', 'danger')
                 return redirect(url_for('procurement_request_item'))
         
+        # Handle requestor file uploads (both draft and submit)
+        upload_paths = None
+        uploaded_filenames = []
+        if 'upload_files' in request.files:
+            upload_files = request.files.getlist('upload_files')
+            if upload_files and any(f.filename for f in upload_files):
+                import uuid, json, os
+                # Save uploads into the configured receipts upload folder so they are served by uploaded_file()
+                upload_folder = app.config.get('UPLOAD_FOLDER') or os.path.join(app.root_path, 'uploads', 'receipts')
+                os.makedirs(upload_folder, exist_ok=True)
+                allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
+                max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+                for upfile in upload_files:
+                    if upfile and upfile.filename:
+                        # Validate size
+                        file_size = len(upfile.read())
+                        if file_size > max_file_size:
+                            flash(f'File "{upfile.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'danger')
+                            return redirect(url_for('procurement_request_item'))
+                        upfile.seek(0)
+                        # Validate extension
+                        file_extension = upfile.filename.rsplit('.', 1)[1].lower() if '.' in upfile.filename else ''
+                        if file_extension not in allowed_extensions:
+                            flash(f'Invalid file type for "{upfile.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'danger')
+                            return redirect(url_for('procurement_request_item'))
+                        filename = f"{uuid.uuid4()}_{secure_filename(upfile.filename)}"
+                        full_path = os.path.join(upload_folder, filename)
+                        upfile.save(full_path)
+                        uploaded_filenames.append(filename)
+                upload_paths = json.dumps(uploaded_filenames) if uploaded_filenames else None
         # Create procurement item request record
         current_time = datetime.utcnow()
         item_request = ProcurementItemRequest(
@@ -7429,6 +7554,7 @@ def procurement_request_item():
             is_draft=is_save_draft,  # Mark as draft if saving as draft
             status='Pending Manager Approval' if not is_save_draft else 'Draft',
             user_id=current_user.user_id if current_user else None,
+            requestor_item_upload_path=upload_paths,
             manager_approval_start_time=current_time if not is_save_draft else None
         )
         
@@ -19124,7 +19250,46 @@ def api_it_dashboard():
 @login_required
 def uploaded_file(filename):
     """Serve uploaded receipt files"""
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    # First try the configured UPLOAD_FOLDER (receipts)
+    try:
+        receipts_dir = app.config.get('UPLOAD_FOLDER') or os.path.join(app.root_path, 'uploads', 'receipts')
+        candidate_path = os.path.join(receipts_dir, filename)
+        if os.path.exists(candidate_path):
+            return send_from_directory(receipts_dir, filename)
+    except Exception:
+        # ignore and try fallback
+        pass
+
+    # Fallback: check item_request_files directory where some uploads may be stored
+    try:
+        item_files_dir = os.path.join(app.root_path, 'uploads', 'item_request_files')
+        candidate_path = os.path.join(item_files_dir, filename)
+        if os.path.exists(candidate_path):
+            return send_from_directory(item_files_dir, filename)
+    except Exception:
+        pass
+
+    # Not found
+    abort(404)
+
+
+@app.route('/debug/whoami')
+@login_required
+def debug_whoami():
+    """Temporary debug endpoint to inspect the currently authenticated user and session."""
+    try:
+        info = {
+            'user_id': getattr(current_user, 'user_id', None),
+            'username': getattr(current_user, 'username', None),
+            'name': getattr(current_user, 'name', None),
+            'role': getattr(current_user, 'role', None),
+            'department': getattr(current_user, 'department', None),
+            'session_keys': {k: (str(v)[:200] + '...' if isinstance(v, str) and len(v) > 200 else v) for k, v in dict(session).items()}
+        }
+        return jsonify({'success': True, 'whoami': info})
+    except Exception as e:
+        app.logger.error(f"Error in debug/whoami: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/uploads/cheque/<filename>')

@@ -124,7 +124,9 @@
                 </div>
             </div>
             <ul class="nav-menu" id="nav-menu">
+                {% if not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
                 <li class="nav-menu-desktop-hidden"><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="fas fa-home"></i> Dashboard</a></li>
+                {% endif %}
                 
                 {# Determine who can see each report separately. Payment reports keep existing roles; Item reports limited to GM, CEO, Operation Manager, IT department users, and Procurement Department Manager #}
                 {% set can_view_payment_reports = current_user.role in ['Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager', 'Auditing Staff'] %}
@@ -133,7 +135,7 @@
                 {# If item reports are available, show a dropdown containing available report links.
                    If item reports are NOT available but payment reports are, show a direct Reports link that
                    redirects immediately to Payment Request Reports. #}
-                {% if can_view_item_reports %}
+                {% if can_view_item_reports and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
                 <li class="reports-dropdown nav-menu-desktop-hidden">
                     <button type="button" class="nav-link reports-toggle">
                         <i class="fas fa-chart-bar"></i> Reports
@@ -159,11 +161,11 @@
                 </li>
                 {% endif %}
                 
-                {% if show_item_requests_flag %}
+                {% if show_item_requests_flag or (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
                 <li class="nav-menu-desktop-hidden"><a href="{{ url_for('procurement_item_requests') }}" class="nav-link"><i class="fas fa-shopping-cart"></i> Item Requests</a></li>
                 {% endif %}
                 
-                {% if current_user.role in ['Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff'] or (current_user.role == 'Department Manager' and current_user.department == 'IT') %}
+                {% if (current_user.role in ['Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff'] or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
                 <li class="calendar-link-container">
                     <a href="{{ url_for('admin_calendar') }}" class="nav-link calendar-link">
                         <i class="fas fa-calendar-alt"></i> Calendar
@@ -238,11 +240,13 @@
                 <i class="fas fa-times"></i>
             </button>
             <nav class="desktop-sidebar-nav">
+                {% if not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
                 <a href="{{ url_for('dashboard') }}" class="desktop-sidebar-item">
                     <i class="fas fa-home"></i>
                     <span>Dashboard</span>
                 </a>
-                {% if can_view_item_reports %}
+                {% endif %}
+                {% if can_view_item_reports and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
                 <div class="desktop-sidebar-dropdown">
                     <button class="desktop-sidebar-item desktop-sidebar-dropdown-toggle" id="reports-dropdown-toggle">
                         <i class="fas fa-chart-bar"></i>
@@ -266,13 +270,13 @@
                     <span>Reports</span>
                 </a>
                 {% endif %}
-                {% if show_item_requests_flag %}
+                {% if show_item_requests_flag or (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
                 <a href="{{ url_for('procurement_item_requests') }}" class="desktop-sidebar-item">
                     <i class="fas fa-shopping-cart"></i>
                     <span>Item Requests</span>
                 </a>
                 {% endif %}
-                {% if current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT') or current_user.name == 'Super Admin' %}
+                {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT') or current_user.name == 'Super Admin') and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
                 <a href="{{ url_for('archives') }}" class="desktop-sidebar-item">
                     <i class="fas fa-archive"></i>
                     <span>Archives</span>
@@ -343,48 +347,56 @@
         })();
         </script>
         {% endif %}
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {# Existing inline alerts remain for non-error categories #}
-                <div class="flash-messages">
-                    {% for category, message in messages %}
-                        {% if category != 'error' %}
-                        <div class="alert alert-{{ category }}">
-                            <span>{{ message }}</span>
-                            <button class="close-alert" onclick="this.parentElement.remove()">&times;</button>
-                        </div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
+        {# Optionally suppress one-time flashed messages for branch users right after login.
+           When app.py sets session['suppress_flashes_once']=True we skip rendering flashes once
+           and remove the flag so future flashes behave normally. #}
+        {% if session.get('suppress_flashes_once') %}
+            {% set _ = session.pop('suppress_flashes_once') %}
+            {% set messages = [] %}
+        {% else %}
+            {% set messages = get_flashed_messages(with_categories=true) %}
+        {% endif %}
 
-                {# Central modal-style error dialog with OK button for error messages #}
+        {% if messages %}
+            {# Existing inline alerts remain for non-error categories #}
+            <div class="flash-messages">
                 {% for category, message in messages %}
-                    {% if category == 'error' %}
-                    <div id="flash-error-modal" class="flash-error-modal" style="display:flex;">
-                        <div class="flash-error-backdrop"></div>
-                        <div class="flash-error-dialog">
-                            <h3 class="flash-error-title"><i class="fas fa-exclamation-circle"></i> Error</h3>
-                            <div class="flash-error-body">
-                                {{ message }}
-                            </div>
-                            <div class="flash-error-actions">
-                                <button type="button" class="flash-error-ok-btn" onclick="(function(){ var m=document.getElementById('flash-error-modal'); if(m){m.style.display='none'; document.body.classList.remove('flash-error-open');}})()">OK</button>
-                            </div>
-                        </div>
+                    {% if category != 'error' %}
+                    <div class="alert alert-{{ category }}">
+                        <span>{{ message }}</span>
+                        <button class="close-alert" onclick="this.parentElement.remove()">&times;</button>
                     </div>
-                    <script>
-                        // Ensure body is dimmed and scrolling is locked when error modal is shown
-                        document.addEventListener('DOMContentLoaded', function() {
-                            var m = document.getElementById('flash-error-modal');
-                            if (m) {
-                                document.body.classList.add('flash-error-open');
-                            }
-                        });
-                    </script>
                     {% endif %}
                 {% endfor %}
-            {% endif %}
-        {% endwith %}
+            </div>
+
+            {# Central modal-style error dialog with OK button for error messages #}
+            {% for category, message in messages %}
+                {% if category == 'error' %}
+                <div id="flash-error-modal" class="flash-error-modal" style="display:flex;">
+                    <div class="flash-error-backdrop"></div>
+                    <div class="flash-error-dialog">
+                        <h3 class="flash-error-title"><i class="fas fa-exclamation-circle"></i> Error</h3>
+                        <div class="flash-error-body">
+                            {{ message }}
+                        </div>
+                        <div class="flash-error-actions">
+                            <button type="button" class="flash-error-ok-btn" onclick="(function(){ var m=document.getElementById('flash-error-modal'); if(m){m.style.display='none'; document.body.classList.remove('flash-error-open');}})()">OK</button>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                    // Ensure body is dimmed and scrolling is locked when error modal is shown
+                    document.addEventListener('DOMContentLoaded', function() {
+                        var m = document.getElementById('flash-error-modal');
+                        if (m) {
+                            document.body.classList.add('flash-error-open');
+                        }
+                    });
+                </script>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
 
         {% block content %}{% endblock %}
     </main>

@@ -16,7 +16,7 @@
 
     <div class="card">
         <div class="card-body">
-            <form method="POST" action="{{ url_for('procurement_request_item') }}" id="itemRequestForm" novalidate>
+            <form method="POST" action="{{ url_for('procurement_request_item') }}" id="itemRequestForm" enctype="multipart/form-data" novalidate>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="requestor_name">Requestor Name <span class="required-star">*</span></label>
@@ -1840,6 +1840,116 @@ window.itemAllSelectedFiles = window.itemAllSelectedFiles || [];
     // Initialize preview if there are preloaded files
     updateItemFilePreview();
 })();
+</script>
+
+<script>
+// Ensure selected files are sent with the form via FormData (handles normal submit and save draft)
+const itemForm = document.getElementById('itemRequestForm');
+if (itemForm) {
+    itemForm.addEventListener('submit', function(e) {
+        // Determine action (submit or save_draft)
+        let action = 'submit';
+        if (typeof e.submitter !== 'undefined' && e.submitter) {
+            action = e.submitter.value || action;
+        } else if (itemForm.dataset && itemForm.dataset.clickedAction) {
+            action = itemForm.dataset.clickedAction;
+        } else if (document.activeElement && document.activeElement.name === 'action') {
+            action = document.activeElement.value;
+        }
+
+        // Build FormData including files collected in window.itemAllSelectedFiles
+        const formData = new FormData(itemForm);
+
+        // Remove any existing upload_files entries then append selected files
+        formData.delete('upload_files');
+        if (window.itemAllSelectedFiles && window.itemAllSelectedFiles.length > 0) {
+            window.itemAllSelectedFiles.forEach(file => {
+                formData.append('upload_files', file);
+            });
+        } else {
+            // Fallback: include files from the real input if present
+            const fileInput = document.getElementById('item_receipt_files');
+            if (fileInput && fileInput.files && fileInput.files.length > 0) {
+                for (let i = 0; i < fileInput.files.length; i++) {
+                    formData.append('upload_files', fileInput.files[i]);
+                }
+            }
+        }
+
+        // If saving as draft, include action flag
+        if (action === 'save_draft') {
+            formData.set('action', 'save_draft');
+        }
+
+        // Prevent default and submit via fetch so FormData is preserved
+        e.preventDefault();
+
+        (async function doUpload() {
+            try {
+                // Use getAttribute('action') to avoid shadowing by form controls named "action"
+                const actionUrl = itemForm.getAttribute('action') || itemForm.action;
+                console.log('Submitting item request via fetch to', actionUrl);
+                // Debug: list FormData keys
+                for (const pair of formData.entries()) {
+                    if (pair[1] instanceof File) {
+                        console.log('FormData file:', pair[0], pair[1].name, pair[1].size);
+                    } else {
+                        console.log('FormData field:', pair[0], pair[1]);
+                    }
+                }
+
+                const response = await fetch(actionUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.redirected) {
+                    window.location.href = response.url;
+                    return;
+                }
+
+                if (response.ok) {
+                    window.location.href = '/procurement/item-requests';
+                    return;
+                }
+
+                // Non-OK response: try to parse JSON, otherwise show text
+                let msg = 'Upload failed. Please try again.';
+                try {
+                    const data = await response.json();
+                    msg = data.message || data.error || msg;
+                } catch (e) {
+                    try {
+                        const txt = await response.text();
+                        if (txt) msg = txt;
+                    } catch (ee) {
+                        /* ignore */
+                    }
+                }
+                console.error('Upload failed response:', response.status, response.statusText);
+                alert(msg);
+            } catch (err) {
+                console.error('Upload error (exception)', err);
+                alert('Network error while submitting files. See console for details.');
+            } finally {
+                // Reset submit buttons so user can try again
+                try {
+                    const submitBtns = itemForm.querySelectorAll('button[name="action"]');
+                    submitBtns.forEach(b => {
+                        b.disabled = false;
+                        if (b.value === 'submit') {
+                            b.innerHTML = '<i class=\"fas fa-paper-plane\"></i> Submit Request';
+                        } else if (b.value === 'save_draft') {
+                            b.innerHTML = '<i class=\"fas fa-save\"></i> Save as Draft';
+                        }
+                    });
+                } catch (e) {
+                    // ignore
+                }
+            }
+        })();
+    });
+}
 </script>
 
 {% endblock %}
