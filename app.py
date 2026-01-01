@@ -192,6 +192,14 @@ def inject_feature_flags():
         'show_test_login_flag': bool(flags.get('show_test_login')),
     }
 
+
+@app.context_processor
+def inject_flask_request():
+    """Expose the Flask request proxy to templates under `flask_request` to avoid
+    shadowing when a view passes a variable named `request` into a template."""
+    from flask import request as _flask_request
+    return {'flask_request': _flask_request}
+
 def format_recurring_schedule(interval, payment_schedule=None):
     """Format recurring interval into human-readable text"""
     try:
