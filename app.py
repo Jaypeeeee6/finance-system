@@ -110,10 +110,33 @@ class StreamToLogger(object):
                 pass
             self._buffer = ''
 
+# Save original stdout/stderr BEFORE redirecting
+_original_stdout = sys.stdout
+_original_stderr = sys.stderr
+
+# Configure logging with console handler using ORIGINAL stdout
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(_original_stdout)  # Use original stdout, not redirected one
+    ],
+    force=True  # Override any existing configuration
+)
+
 # Set default logger level to INFO so debug prints don't flood the console.
 app.logger.setLevel(logging.INFO)
-# Redirect STDOUT/STDERR to the logger (DEBUG/ERROR respectively)
-sys.stdout = StreamToLogger(app.logger, logging.DEBUG)
+
+# Ensure Flask logger has a console handler using ORIGINAL stdout
+if not any(isinstance(h, logging.StreamHandler) for h in app.logger.handlers):
+    console_handler = logging.StreamHandler(_original_stdout)
+    console_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    app.logger.addHandler(console_handler)
+
+# NOW redirect STDOUT/STDERR to the logger (INFO/ERROR respectively)
+sys.stdout = StreamToLogger(app.logger, logging.INFO)
 sys.stderr = StreamToLogger(app.logger, logging.ERROR)
 
 # Initialize maintenance and feature flags paths now that app is created
