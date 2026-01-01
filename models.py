@@ -816,3 +816,57 @@ class ProcurementItem(db.Model):
     
     def __repr__(self):
         return f'<ProcurementItem {self.id} - {self.name} ({self.department})>'
+
+
+class CurrentMoneyEntry(db.Model):
+    """Persistent ledger/snapshot entries for Current Money Status (budget-sheet style)"""
+    __tablename__ = 'current_money_entries'
+
+    id = db.Column(db.Integer, primary_key=True)
+    entry_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    department = db.Column(db.String(100), nullable=True)  # e.g., Procurement
+    entry_kind = db.Column(db.String(50), nullable=False)  # snapshot, manual_adjustment, bank_sync
+
+    # Core numeric fields captured for the snapshot/entry
+    completed_amount = db.Column(db.Numeric(14, 3), nullable=True)
+    item_requests_assigned_amount = db.Column(db.Numeric(14, 3), nullable=True)
+    completed_item_requests_amount = db.Column(db.Numeric(14, 3), nullable=True)
+    money_spent = db.Column(db.Numeric(14, 3), nullable=True)
+    available_balance = db.Column(db.Numeric(14, 3), nullable=True)
+    # Manual adjustment amount (positive or negative). Used when entry_kind == 'manual_adjustment'
+    adjustment_amount = db.Column(db.Numeric(14, 3), nullable=True)
+    # Whether this entry should be included when calculating available balance/reports.
+    affects_reports = db.Column(db.Boolean, default=False)
+    # Whether this adjustment should be included in runtime available_balance calculations
+    include_in_balance = db.Column(db.Boolean, default=False)
+
+    # Metadata for reconciliation and auditing
+    source = db.Column(db.String(50), nullable=True)  # e.g., 'view', 'manual', 'bank_sync'
+    source_id = db.Column(db.Integer, nullable=True)  # optional related object id (e.g., request id)
+    note = db.Column(db.Text, nullable=True)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+
+    created_by_user = db.relationship('User', foreign_keys=[created_by], backref='money_entries')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'entry_date': self.entry_date.strftime('%Y-%m-%d %H:%M:%S') if self.entry_date else None,
+            'department': self.department,
+            'entry_kind': self.entry_kind,
+            'completed_amount': float(self.completed_amount) if self.completed_amount is not None else None,
+            'item_requests_assigned_amount': float(self.item_requests_assigned_amount) if self.item_requests_assigned_amount is not None else None,
+            'completed_item_requests_amount': float(self.completed_item_requests_amount) if self.completed_item_requests_amount is not None else None,
+            'money_spent': float(self.money_spent) if self.money_spent is not None else None,
+            'available_balance': float(self.available_balance) if self.available_balance is not None else None,
+            'adjustment_amount': float(self.adjustment_amount) if self.adjustment_amount is not None else None,
+            'affects_reports': bool(self.affects_reports),
+            'include_in_balance': bool(self.include_in_balance),
+            'source': self.source,
+            'source_id': self.source_id,
+            'note': self.note,
+            'created_by': self.created_by
+        }
+
+    def __repr__(self):
+        return f'<CurrentMoneyEntry {self.id} - {self.department} - {self.entry_kind} - {self.available_balance}>'

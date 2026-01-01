@@ -12,12 +12,13 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority
+from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry
 from config import Config
 import json
 from playwright.sync_api import sync_playwright
 from io import BytesIO
 import base64
+from sqlalchemy import func
 
 # Wrap Flask's flash to centralize permission-denied handling.
 # Any code that calls flash("You do not have permission...") will instead
@@ -4004,10 +4005,40 @@ def procurement_dashboard():
     money_spent = item_requests_amount + completed_item_requests_amount
     # Available Balance = Completed payment requests - Completed item requests only
     # (Only completed item requests reduce available balance, not assigned/pending items)
-    available_balance = completed_amount - completed_item_requests_amount
+    # Include reconciled/manual adjustments that have been marked to affect reports
+    try:
+        adjustments_sum = db.session.query(func.coalesce(func.sum(CurrentMoneyEntry.adjustment_amount), 0)).filter(
+            CurrentMoneyEntry.department == 'Procurement',
+            CurrentMoneyEntry.entry_kind == 'manual_adjustment',
+            CurrentMoneyEntry.include_in_balance == True
+        ).scalar() or 0
+        adjustments_sum = float(adjustments_sum)
+    except Exception:
+        adjustments_sum = 0.0
+
+    available_balance = completed_amount - completed_item_requests_amount + adjustments_sum
     
     # Check and notify if balance is low
     check_and_notify_low_balance(available_balance)
+
+    # Persist a snapshot entry for Current Money Status (budget-sheet history)
+    try:
+        entry = CurrentMoneyEntry(
+            department='Procurement',
+            entry_kind='snapshot',
+            completed_amount=completed_amount,
+            item_requests_assigned_amount=item_requests_amount,
+            completed_item_requests_amount=completed_item_requests_amount,
+            money_spent=money_spent,
+            available_balance=available_balance,
+            source='view',
+            created_by=current_user.user_id if current_user and hasattr(current_user, 'user_id') else None
+        )
+        db.session.add(entry)
+        db.session.commit()
+    except Exception:
+        # Fail silently to avoid breaking the dashboard if DB write fails
+        db.session.rollback()
     
     return render_template('procurement_dashboard.html', 
                          requests=requests_pagination.items, 
@@ -4450,10 +4481,56 @@ def procurement_item_requests():
         completed_amount = item_requests_amount + completed_item_requests_amount
         # Available Balance = Completed payment requests - Completed item requests only
         # (Only completed item requests reduce available balance, not assigned/pending items)
-        available_balance = completed_amount_bm - completed_item_requests_amount
+        try:
+            adjustments_sum = db.session.query(func.coalesce(func.sum(CurrentMoneyEntry.adjustment_amount), 0)).filter(
+                CurrentMoneyEntry.department == 'Procurement',
+                CurrentMoneyEntry.entry_kind == 'manual_adjustment',
+                CurrentMoneyEntry.include_in_balance == True
+            ).scalar() or 0
+            adjustments_sum = float(adjustments_sum)
+        except Exception:
+            adjustments_sum = 0.0
+
+        available_balance = completed_amount_bm - completed_item_requests_amount + adjustments_sum
         
         # Check and notify if balance is low
         check_and_notify_low_balance(available_balance)
+
+        # Persist a snapshot entry for Current Money Status (budget-sheet history)
+        try:
+            entry = CurrentMoneyEntry(
+                department='Procurement',
+                entry_kind='snapshot',
+                completed_amount=completed_amount_bm,
+                item_requests_assigned_amount=item_requests_amount,
+                completed_item_requests_amount=completed_item_requests_amount,
+                money_spent=None,
+                available_balance=available_balance,
+                source='balance_check',
+                created_by=current_user.user_id if current_user and hasattr(current_user, 'user_id') else None
+            )
+            db.session.add(entry)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+        # Persist a snapshot entry for Current Money Status (budget-sheet history)
+        try:
+            entry = CurrentMoneyEntry(
+                department='Procurement',
+                entry_kind='snapshot',
+                completed_amount=completed_amount_bm,
+                item_requests_assigned_amount=item_requests_amount,
+                completed_item_requests_amount=completed_item_requests_amount,
+                money_spent=completed_amount,
+                available_balance=available_balance,
+                source='view',
+                created_by=current_user.user_id if current_user and hasattr(current_user, 'user_id') else None
+            )
+            db.session.add(entry)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
     
     return render_template('procurement_item_requests.html',
                          user=current_user,
@@ -5615,7 +5692,17 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         # Calculate available balance
         # Available Balance = Completed payment requests - Completed item requests only
         # (Only completed item requests reduce available balance, not assigned/pending items)
-        available_balance = completed_amount_bm - completed_item_requests_amount
+        try:
+            adjustments_sum = db.session.query(func.coalesce(func.sum(CurrentMoneyEntry.adjustment_amount), 0)).filter(
+                CurrentMoneyEntry.department == 'Procurement',
+                CurrentMoneyEntry.entry_kind == 'manual_adjustment',
+                CurrentMoneyEntry.include_in_balance == True
+            ).scalar() or 0
+            adjustments_sum = float(adjustments_sum)
+        except Exception:
+            adjustments_sum = 0.0
+
+        available_balance = completed_amount_bm - completed_item_requests_amount + adjustments_sum
         
         # Check and notify if balance is low
         check_and_notify_low_balance(available_balance)
