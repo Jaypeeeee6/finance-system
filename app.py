@@ -7666,8 +7666,78 @@ def procurement_request_item():
         
         # Validation for submit (more strict) vs draft (more lenient)
         if not is_save_draft:
-            if not all([requestor_name, category, item_name, purpose, branch_name]):
+            # Build missing fields list similar to client-side
+            missing_fields = []
+            if not requestor_name:
+                missing_fields.append('requestor_name')
+            if not category:
+                missing_fields.append('category')
+            # item_name may contain multiple items joined by commas - check presence
+            if not item_name:
+                missing_fields.append('item_name')
+            if not purpose:
+                missing_fields.append('purpose')
+            if not branch_name:
+                missing_fields.append('branch_name')
+            # Check uploaded files presence (server-side fallback)
+            uploaded_files = request.files.getlist('upload_files') if 'upload_files' in request.files else []
+            has_file = any(f and getattr(f, 'filename', '') for f in uploaded_files)
+            if not has_file:
+                missing_fields.append('upload_files')
+
+            # Check quantities: parse item_quantities JSON (if provided) and ensure at least one positive numeric value
+            qty_problem = False
+            if item_quantities_json:
+                try:
+                    import json as _json
+                    parsed_quantities = _json.loads(item_quantities_json)
+                    # parsed_quantities should be a list of values corresponding to selected items
+                    if not parsed_quantities or (isinstance(parsed_quantities, list) and all((not q or str(q).strip() == '') for q in parsed_quantities)):
+                        qty_problem = True
+                    else:
+                        for q in parsed_quantities:
+                            try:
+                                if float(str(q).strip()) <= 0:
+                                    qty_problem = True
+                                    break
+                            except Exception:
+                                qty_problem = True
+                                break
+                except Exception:
+                    # If parsing fails, mark as problem so client will be required to supply quantities
+                    qty_problem = True
+            else:
+                # No quantities provided at all
+                qty_problem = True
+
+            if qty_problem:
+                missing_fields.append('item_quantity')
+
+            if missing_fields:
+                # If request came via AJAX/fetch, return JSON with missing fields so frontend can show the same modal
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in (request.headers.get('Accept') or ''):
+                    return jsonify({'missing_fields': missing_fields}), 400
+                # Fallback behavior for non-AJAX: flash and redirect
                 flash('Please fill in all required fields.', 'danger')
+                return redirect(url_for('procurement_request_item'))
+
+            # Require quantities for submission and ensure they are positive
+            valid_quantity = False
+            if quantity:
+                # quantity may be semicolon-separated for multiple items
+                qty_parts = [q.strip() for q in (quantity.split(';') if ';' in quantity else [quantity.strip()])]
+                for part in qty_parts:
+                    try:
+                        if float(part) > 0:
+                            valid_quantity = True
+                            break
+                    except Exception:
+                        # non-numeric part - skip
+                        continue
+            if not valid_quantity:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in (request.headers.get('Accept') or ''):
+                    return jsonify({'errors': ['Please provide a positive quantity for the requested item(s).']}), 400
+                flash('Please provide a positive quantity for the requested item(s).', 'danger')
                 return redirect(url_for('procurement_request_item'))
         
         # Handle requestor file uploads (both draft and submit)

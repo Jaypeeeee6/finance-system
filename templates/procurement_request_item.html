@@ -695,6 +695,7 @@ function getItemRequestFieldDisplayName(fieldKey) {
         item_name: 'Item Name/Description',
         purpose: 'Purpose/Description',
         branch_name: 'Branch Name'
+        , item_quantity: 'Quantity'
     };
     return map[fieldKey] || fieldKey;
 }
@@ -1900,7 +1901,11 @@ if (itemForm) {
 
                 const response = await fetch(actionUrl, {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
                 });
 
                 if (response.redirected) {
@@ -1913,21 +1918,42 @@ if (itemForm) {
                     return;
                 }
 
-                // Non-OK response: try to parse JSON, otherwise show text
-                let msg = 'Upload failed. Please try again.';
+                // Non-OK response: try to parse JSON and show modal with error(s) to avoid page refresh
                 try {
                     const data = await response.json();
-                    msg = data.message || data.error || msg;
+                    // If server returned a list of missing fields, map to display names and show modal
+                    if (data.missing_fields && Array.isArray(data.missing_fields) && typeof getItemRequestFieldDisplayName === 'function') {
+                        const displayFields = data.missing_fields.map(f => getItemRequestFieldDisplayName(f));
+                        showItemRequestErrorModal(displayFields);
+                        return;
+                    }
+                    // If server returned structured errors array, show them
+                    if (data.errors && Array.isArray(data.errors)) {
+                        showItemRequestErrorModal(data.errors);
+                        return;
+                    }
+                    const msg = data.message || data.error || 'Upload failed. Please try again.';
+                    // Show modal with single message
+                    if (typeof showItemRequestErrorModal === 'function') {
+                        showItemRequestErrorModal([msg]);
+                    } else {
+                        alert(msg);
+                    }
+                    return;
                 } catch (e) {
                     try {
                         const txt = await response.text();
-                        if (txt) msg = txt;
+                        const msg = txt || 'Upload failed. Please try again.';
+                        if (typeof showItemRequestErrorModal === 'function') {
+                            showItemRequestErrorModal([msg]);
+                        } else {
+                            alert(msg);
+                        }
                     } catch (ee) {
-                        /* ignore */
+                        console.error('Upload failed response:', response.status, response.statusText);
+                        alert('Upload failed. Please try again.');
                     }
                 }
-                console.error('Upload failed response:', response.status, response.statusText);
-                alert(msg);
             } catch (err) {
                 console.error('Upload error (exception)', err);
                 alert('Network error while submitting files. See console for details.');
