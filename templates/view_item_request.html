@@ -1153,7 +1153,7 @@ body.flash-success-open {
 
             <div class="form-group">
                 <label>Created At</label>
-                <input type="text" value="{{ item_request.created_at.strftime('%Y-%m-%d %H:%M:%S') if item_request.created_at else 'N/A' }}" readonly style="background: #f5f5f5;">
+                <input type="text" value="{{ utc_to_local(item_request.created_at).strftime('%Y-%m-%d %H:%M:%S') if item_request.created_at else 'N/A' }}" readonly style="background: #f5f5f5;">
             </div>
         </div>
 
