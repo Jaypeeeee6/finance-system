@@ -155,10 +155,10 @@
                 </div>
                 
                 <div class="form-group">
-                    <label>Upload Files <span class="required-star">*</span></label>
+                <label>Upload Item Sample / Reference <span class="required-star">*</span></label>
                     <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
                         <button type="button" id="item_add-files-btn" class="btn btn-primary" style="white-space: nowrap;">
-                            <i class="fas fa-plus"></i> Upload Files
+                            <i class="fas fa-plus"></i> Upload Item Sample / Reference
                         </button>
                     </div>
                     <small>Upload multiple files (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX - Max 50MB each)</small>
@@ -712,7 +712,7 @@ function getItemRequestFieldDisplayName(fieldKey) {
         purpose: 'Purpose/Description',
         branch_name: 'Branch Name'
         , item_quantity: 'Quantity'
-        , upload_files: 'Upload Files'
+        , upload_files: 'Upload Item / Sample / Reference'
         , evidence_files: 'Upload Evidence of Damage / Reason'
     };
     return map[fieldKey] || fieldKey;
@@ -1844,7 +1844,7 @@ window.itemAllSelectedFiles = window.itemAllSelectedFiles || [];
             preview.appendChild(fileList);
         } else {
             // Reset button when no files are selected
-            button.innerHTML = '<i class="fas fa-plus"></i> Upload Files';
+            button.innerHTML = '<i class="fas fa-plus"></i> Upload Item Sample / Reference';
             button.className = 'btn btn-primary';
         }
     }
