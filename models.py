@@ -685,6 +685,8 @@ class ProcurementItemRequest(db.Model):
     
     # Files uploaded by the requestor when creating the item request (JSON list of filenames)
     requestor_item_upload_path = db.Column(db.Text)
+    # Additional evidence files uploaded by the requestor (e.g., photos of damage / reasons)
+    requestor_evidence_upload_path = db.Column(db.Text)
     
     # Manager approval fields
     manager_approval_date = db.Column(db.Date, nullable=True)

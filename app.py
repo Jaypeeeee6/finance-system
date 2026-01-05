@@ -84,6 +84,35 @@ def write_feature_flags(**kwargs):
 app = Flask(__name__)
 app.config.from_object(Config)
 
+# Ensure new procurement item request columns exist before first request (SQLite only)
+def ensure_procurement_item_request_columns_exist():
+    try:
+        import sqlite3
+        db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '') or ''
+        # Only attempt SQLite migrations here
+        if db_uri.startswith('sqlite:///'):
+            db_path = db_uri.replace('sqlite:///', '')
+            if os.name == 'nt':
+                db_path = db_path.replace('/', '\\')
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(procurement_item_requests)")
+            existing_columns = [row[1] for row in cursor.fetchall()]
+            if 'requestor_evidence_upload_path' not in existing_columns:
+                cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN requestor_evidence_upload_path TEXT")
+                conn.commit()
+                print("✓ Added 'requestor_evidence_upload_path' column to procurement_item_requests table (startup)")
+            conn.close()
+    except Exception as e:
+        # Non-fatal - app can run and show a warning
+        print(f"Warning: Could not ensure procurement_item_requests new columns: {e}")
+
+# Run migration immediately at import time so running `python app.py` works on older Flask versions
+try:
+    ensure_procurement_item_request_columns_exist()
+except Exception as _err:
+    print(f"Warning: ensure_procurement_item_request_columns_exist failed at startup: {_err}")
+
 # Reduce noisy print output by routing stdout/stderr into Flask logger and raising default log level to INFO.
 import logging, sys
 class StreamToLogger(object):
@@ -4150,6 +4179,11 @@ def procurement_item_requests():
             cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN requestor_item_upload_path TEXT")
             conn.commit()
             print("✓ Added 'requestor_item_upload_path' column to procurement_item_requests table")
+        # Add requestor_evidence_upload_path for storing requestor-uploaded evidence files (JSON)
+        if 'requestor_evidence_upload_path' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN requestor_evidence_upload_path TEXT")
+            conn.commit()
+            print("✓ Added 'requestor_evidence_upload_path' column to procurement_item_requests table")
 
         conn.close()
     except Exception as e:
@@ -4967,6 +5001,17 @@ def view_item_request_page(request_id):
                 requestor_item_uploads = [item_request.requestor_item_upload_path]
         except (json.JSONDecodeError, TypeError):
             requestor_item_uploads = [item_request.requestor_item_upload_path]
+    # Prepare requestor-uploaded evidence files (stored in requestor_evidence_upload_path)
+    requestor_evidence_uploads = []
+    if getattr(item_request, 'requestor_evidence_upload_path', None):
+        try:
+            data = json.loads(item_request.requestor_evidence_upload_path)
+            if isinstance(data, list):
+                requestor_evidence_uploads = data
+            else:
+                requestor_evidence_uploads = [item_request.requestor_evidence_upload_path]
+        except (json.JSONDecodeError, TypeError):
+            requestor_evidence_uploads = [item_request.requestor_evidence_upload_path]
 
     # Prepare invoice files list (supports legacy string list and new metadata objects)
     def _parse_invoice_entries(raw_value):
@@ -5060,6 +5105,7 @@ def view_item_request_page(request_id):
                          completed_by_name=completed_by_name,
                          receipt_files=receipt_files,
                          requestor_item_uploads=requestor_item_uploads,
+                         requestor_evidence_uploads=requestor_evidence_uploads,
                          invoice_files=invoice_files,
                          invoice_entries=invoice_entries,
                          manager_approver_name=manager_approver_name,
@@ -7684,6 +7730,7 @@ def procurement_request_item():
             has_file = any(f and getattr(f, 'filename', '') for f in uploaded_files)
             if not has_file:
                 missing_fields.append('upload_files')
+            # evidence_files is optional; do not require it server-side
 
             # Check quantities: parse item_quantities JSON (if provided) and ensure at least one positive numeric value
             qty_problem = False
@@ -7770,6 +7817,33 @@ def procurement_request_item():
                         upfile.save(full_path)
                         uploaded_filenames.append(filename)
                 upload_paths = json.dumps(uploaded_filenames) if uploaded_filenames else None
+        # Handle additional evidence file uploads (e.g., photos of damage / reason)
+        evidence_paths = None
+        evidence_filenames = []
+        if 'evidence_files' in request.files:
+            evidence_files = request.files.getlist('evidence_files')
+            if evidence_files and any(f.filename for f in evidence_files):
+                import uuid as _uuid, json as _json, os as _os
+                evidence_upload_folder = app.config.get('UPLOAD_FOLDER') or os.path.join(app.root_path, 'uploads', 'receipts')
+                _os.makedirs(evidence_upload_folder, exist_ok=True)
+                allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
+                max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+                for upfile in evidence_files:
+                    if upfile and upfile.filename:
+                        file_size = len(upfile.read())
+                        if file_size > max_file_size:
+                            flash(f'File "{upfile.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'danger')
+                            return redirect(url_for('procurement_request_item'))
+                        upfile.seek(0)
+                        file_extension = upfile.filename.rsplit('.', 1)[1].lower() if '.' in upfile.filename else ''
+                        if file_extension not in allowed_extensions:
+                            flash(f'Invalid file type for "{upfile.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'danger')
+                            return redirect(url_for('procurement_request_item'))
+                        filename = f"{_uuid.uuid4()}_{secure_filename(upfile.filename)}"
+                        full_path = _os.path.join(evidence_upload_folder, filename)
+                        upfile.save(full_path)
+                        evidence_filenames.append(filename)
+                evidence_paths = _json.dumps(evidence_filenames) if evidence_filenames else None
         # Create procurement item request record
         current_time = datetime.utcnow()
         item_request = ProcurementItemRequest(
@@ -7787,6 +7861,7 @@ def procurement_request_item():
             status='Pending Manager Approval' if not is_save_draft else 'Draft',
             user_id=current_user.user_id if current_user else None,
             requestor_item_upload_path=upload_paths,
+            requestor_evidence_upload_path=evidence_paths,
             manager_approval_start_time=current_time if not is_save_draft else None
         )
         
