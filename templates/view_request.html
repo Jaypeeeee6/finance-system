@@ -1582,11 +1582,20 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 {% endif %}
                 {% endif %}
                 
-                <!-- GM Return to Requestor section (only for GM role) -->
-                {% if user.role == 'GM' and request.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
+                <!-- Return to Requestor section (for GM, Department Managers, and Operation Managers) -->
+                {% set can_return_to_requestor = False %}
+                {% if request.status == 'Pending Manager Approval' %}
+                    {% if (request.temporary_manager_id and user.user_id == request.temporary_manager_id) or (not request.temporary_manager_id and ((user.role == 'Department Manager' and user.department == request.user.department and user.user_id != request.user_id) or (user.role == 'Finance Admin' and request.user.department == 'Finance' and user.user_id != request.user_id) or ((user.role in ['GM', 'Operation Manager']) and user.user_id != request.user_id and request.user.role not in ['GM','CEO','Operation Manager']) or (user.name == 'Abdalaziz Al-Brashdi' and request.user.role in ['GM', 'CEO', 'Finance Staff', 'Operation Manager']))) %}
+                        {% set can_return_to_requestor = True %}
+                    {% endif %}
+                {% elif request.status == 'Pending Finance Approval' and user.role == 'GM' %}
+                    {% set can_return_to_requestor = True %}
+                {% endif %}
+                
+                {% if can_return_to_requestor %}
                     <div class="card" style="margin-top: 1.5rem; border-left: 4px solid #ff9800;">
                         <div class="card-header" style="background: #fff3e0; border-bottom: 1px solid #ffcc80;">
-                            <h4><i class="fas fa-undo"></i> Return to Requestor (GM Only)</h4>
+                            <h4><i class="fas fa-undo"></i> Return to Requestor</h4>
                             <p style="margin: 0; font-size: 0.9rem; color: #6c757d;">Return this request to the requestor for editing if there is a mistake.</p>
                         </div>
                         <div class="card-body">

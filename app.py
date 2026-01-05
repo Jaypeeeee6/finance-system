@@ -15714,14 +15714,68 @@ def manager_reject_request(request_id):
 
 @app.route('/request/<int:request_id>/gm_return_to_requestor', methods=['POST'])
 @login_required
-@role_required('GM')
+@role_required('GM', 'Department Manager', 'Operation Manager')
 def gm_return_to_requestor(request_id):
-    """GM returns a payment request to the requestor for editing"""
+    """GM, Department Managers, and Operation Managers can return a payment request to the requestor for editing"""
     req = PaymentRequest.query.get_or_404(request_id)
     
-    # Check if request is in correct status (must be awaiting approval)
-    if req.status not in ['Pending Manager Approval', 'Pending Finance Approval']:
+    # Never allow users to return their own requests
+    if req.user_id == current_user.user_id:
+        flash('You cannot return your own request.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Determine which statuses are allowed based on role
+    allowed_statuses = []
+    if current_user.role == 'GM':
+        # GM can return for both manager and finance approval stages
+        allowed_statuses = ['Pending Manager Approval', 'Pending Finance Approval']
+    elif current_user.role in ['Department Manager', 'Operation Manager']:
+        # Department Managers and Operation Managers can only return during manager approval stage
+        allowed_statuses = ['Pending Manager Approval']
+    else:
+        flash('You do not have permission to return this request.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Check if request is in correct status
+    if req.status not in allowed_statuses:
         flash('This request is not in a valid status for returning to requestor.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
+    
+    # Check authorization - user must be authorized to approve this request
+    is_authorized = False
+    
+    # Check temporary manager assignment first
+    if req.temporary_manager_id:
+        if req.temporary_manager_id == current_user.user_id:
+            is_authorized = True
+        else:
+            is_authorized = False
+    else:
+        # No temporary manager, use standard authorization checks
+        # Hard rule: Requests submitted by GM/CEO/Operation Manager can ONLY be returned by Abdalaziz
+        if req.user.role in ['GM', 'CEO', 'Operation Manager']:
+            if current_user.name == 'Abdalaziz Al-Brashdi':
+                is_authorized = True
+            else:
+                is_authorized = False
+        # General Manager and Operation Manager can return all other requests
+        elif current_user.role in ['GM', 'Operation Manager']:
+            is_authorized = True
+        # Department Manager can return requests from their department
+        elif current_user.role == 'Department Manager':
+            if req.user.department == current_user.department and req.user_id != current_user.user_id:
+                is_authorized = True
+            else:
+                is_authorized = False
+        # Check if current user is the manager of the request submitter
+        elif req.user.manager_id and req.user.manager_id == current_user.user_id:
+            is_authorized = True
+        # Special case: Finance Admin can return Finance department requests
+        elif current_user.role == 'Finance Admin' and req.user.department == 'Finance':
+            is_authorized = True
+    
+    if not is_authorized:
+        flash('You are not authorized to return this request to the requestor.', 'error')
         return redirect(url_for('view_request', request_id=request_id))
     
     # Get return reason
@@ -15753,13 +15807,21 @@ def gm_return_to_requestor(request_id):
     
     db.session.commit()
     
-    log_action(f"GM returned payment request #{request_id} to requestor - Reason: {return_reason}")
+    # Determine who returned it for logging and notification
+    if current_user.role == 'Department Manager':
+        returned_by_text = f"Department Manager ({current_user.name})"
+    elif current_user.role == 'Operation Manager':
+        returned_by_text = f"Operation Manager ({current_user.name})"
+    else:
+        returned_by_text = f"GM ({current_user.name})"
+    
+    log_action(f"{returned_by_text} returned payment request #{request_id} to requestor - Reason: {return_reason}")
     
     # Notify the requestor
     create_notification(
         user_id=req.user_id,
         title="Request Returned for Editing",
-        message=f"Your payment request #{request_id} has been returned by the GM for editing. Reason: {return_reason}",
+        message=f"Your payment request #{request_id} has been returned by {returned_by_text} for editing. Reason: {return_reason}",
         notification_type="request_returned",
         request_id=request_id
     )
