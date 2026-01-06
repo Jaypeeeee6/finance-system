@@ -19807,6 +19807,12 @@ def admin_calendar():
         return redirect(url_for('dashboard'))
     return render_template('admin_calendar.html')
 
+@app.route('/settings')
+@role_required('GM', 'Operation Manager')
+def settings():
+    """Settings page restricted to GM and Operation Manager"""
+    return render_template('settings.html')
+
 @app.route('/api/admin/recurring-events')
 @role_required('Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'IT Department Manager', 'Department Manager')
 def api_admin_recurring_events():

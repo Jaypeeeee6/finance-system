@@ -282,8 +282,16 @@
                     <span>Archives</span>
                 </a>
                 {% endif %}
+                {% if current_user.role in ['GM', 'Operation Manager'] %}
+                {% endif %}
             </nav>
             <div class="desktop-sidebar-footer">
+                {% if current_user.role in ['GM', 'Operation Manager'] %}
+                <a href="{{ url_for('settings') }}" class="desktop-sidebar-item {% if flask_request.path.startswith(url_for('settings')) %}active{% endif %}">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
+                </a>
+                {% endif %}
                 <a href="{{ url_for('logout') }}" class="desktop-sidebar-item logout">
                     <i class="fas fa-sign-out-alt"></i>
                     <span>Logout</span>
