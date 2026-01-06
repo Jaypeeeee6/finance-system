@@ -1,7 +1,381 @@
 {% extends "base.html" %}
 {% block title %}Settings{% endblock %}
 {% block content %}
-{# Empty settings page for now - content to be added later #}
+<div class="dashboard-container settings-page">
+    <div class="dashboard-header">
+        <h2 style="margin:0;"><i class="fas fa-cog"></i> Settings</h2>
+    </div>
+    <style>
+        /* Slightly smaller form controls for settings page */
+        .settings-page .form-group label {
+            font-size: 0.95rem;
+        }
+        .settings-page select,
+        .settings-page input {
+            font-size: 0.95rem;
+            padding: 6px 8px;
+            height: 34px;
+        }
+        .settings-page .btn {
+            padding: 6px 10px;
+            font-size: 0.95rem;
+        }
+        .settings-page .card-header h4 {
+            font-size: 1rem;
+        }
+        .settings-page .card-body {
+            overflow: visible;
+        }
+        .settings-page table {
+            font-size: 0.95rem;
+        }
+        .settings-page .intro-paragraph {
+            padding-bottom: 12px;
+        }
+        /* Header background color for cards - slightly lighter */
+        .dashboard-container.settings-page div.card > .card-header,
+        .dashboard-container.settings-page .card .card-header {
+            background: #EFE9C6 !important;
+            color: #1f1f1f !important;
+            padding: 10px 12px !important;
+        }
+        /* Make Save button green and force override of global .btn-save */
+        .settings-page .btn-save {
+            background: #198754 !important;
+            border-color: #198754 !important;
+            color: #ffffff !important;
+            background-image: none !important;
+        }
+        .settings-page .btn-save:hover {
+            background: #157347 !important;
+            border-color: #157347 !important;
+        }
+        /* Unassign button color to match brand */
+        .settings-page .btn-unassign {
+            background-color: #D9BD7D !important;
+            border-color: #D9BD7D !important;
+            color: #1f1f1f !important;
+        }
+        .settings-page .btn-unassign:hover {
+            background-color: #c8ac65 !important;
+            border-color: #c8ac65 !important;
+            color: #1f1f1f !important;
+        }
+        /* Replicate Branch Name dropdown styles from new_request.html with high specificity */
+        .settings-page .manager-select-container {
+            position: relative;
+        }
+        .settings-page .manager-chips-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 0;
+            min-height: 0;
+        }
+        .settings-page .manager-chips-container:not(:empty) {
+            margin-bottom: 8px;
+        }
+        .settings-page .branch-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: #000;
+            color: white;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .settings-page .branch-chip .remove-chip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 0;
+            transition: background 0.2s;
+            line-height: 1;
+        }
+        .settings-page .branch-chip .remove-chip:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .settings-page .branch-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #ffffff !important;
+            border: 1px solid #ced4da !important;
+            border-top: none !important;
+            border-radius: 0 0 0.375rem 0.375rem !important;
+            max-height: 200px;
+            overflow-y: auto;
+            /* lowered z-index so the sidebar can overlay the dropdown when it opens */
+            z-index: 1200 !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        }
+        .settings-page .branch-group {
+            background-color: #f8f9fa !important;
+            padding: 8px 12px !important;
+            font-weight: bold !important;
+            color: #495057 !important;
+            border-bottom: 1px solid #dee2e6 !important;
+            font-size: 12px !important;
+            text-transform: uppercase !important;
+        }
+        .settings-page .branch-option {
+            padding: 8px 20px !important;
+            cursor: pointer !important;
+            border-bottom: 1px solid #f1f3f4 !important;
+            transition: background-color 0.15s !important;
+            -webkit-tap-highlight-color: transparent !important;
+            touch-action: manipulation !important;
+            user-select: none !important;
+            background: transparent !important;
+            color: #212529 !important;
+        }
+        .settings-page .branch-option:hover {
+            background-color: #e9ecef !important;
+        }
+        .settings-page .branch-option.selected {
+            background-color: #007bff !important;
+            color: white !important;
+        }
+        .settings-page .branch-option.hidden {
+            display: none !important;
+        }
+        /* Ensure native select dropdowns are not clipped and appear below the field */
+        .dashboard-container.settings-page .card {
+            overflow: visible !important;
+        }
+        .dashboard-container.settings-page .card .card-body {
+            overflow: visible !important;
+        }
+        .settings-page select {
+            position: relative;
+            z-index: auto;
+        }
+        /* ensure manager search input doesn't float above the sidebar */
+        .settings-page #manager_search {
+            position: relative;
+            z-index: auto;
+        }
+        /* Table styling will reuse global dashboard .data-table styles for consistency */
+        /* Make table columns equal width */
+        .settings-page .data-table {
+            table-layout: fixed !important;
+        }
+        .settings-page .data-table th,
+        .settings-page .data-table td {
+            width: 20% !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+            text-align: left !important;
+            padding: 12px 16px !important;
+        }
+    </style>
+
+    <div class="card" style="margin-top: 1rem;">
+        <div class="card-header">
+            <h4>Department-level Temporary Manager</h4>
+        </div>
+        <div class="card-body">
+            <p class="intro-paragraph">This allows assigning a temporary manager responsible for approving all payment and item requests for a whole department.</p>
+            <form method="POST" action="{{ url_for('settings') }}">
+                <div class="form-row">
+                    <div class="form-group" style="min-width: 240px;">
+                        <label for="department">Department</label>
+                        <select name="department" id="department" required>
+                            <option value="">-- Select Department --</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept }}">{{ dept }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row" style="margin-top: 0.75rem;">
+                    <div class="form-group" style="min-width: 280px;">
+                        <label for="temporary_manager_id">Temporary Manager</label>
+                        <div class="branch-select-container manager-select-container">
+                            <div id="manager_chips_container" class="branch-chips-container"></div>
+                            <input type="text" id="manager_search" class="form-control" placeholder="Search users..." autocomplete="off">
+                            <select name="temporary_manager_id" id="temporary_manager_id" class="form-control" style="display: none;">
+                                <option value="">-- Select Temporary Manager --</option>
+                                {% set current_dept = None %}
+                                {% for u in managers %}
+                                    {% set dept = u.department or 'Unknown' %}
+                                    {# Skip users belonging to the 'Branch' department #}
+                                    {% if dept != 'Branch' %}
+                                        {% if dept != current_dept %}
+                                            {% if current_dept is not none %}
+                                                </optgroup>
+                                            {% endif %}
+                                            <optgroup label="{{ dept }}" data-department="{{ dept }}">
+                                            {% set current_dept = dept %}
+                                        {% endif %}
+                                        <option value="{{ u.user_id }}" data-department="{{ dept }}">{{ u.name }} ({{ u.role }})</option>
+                                    {% endif %}
+                                {% endfor %}
+                                {% if current_dept is not none %}
+                                    </optgroup>
+                                {% endif %}
+                            </select>
+                            <div id="manager_dropdown" class="branch-dropdown" style="display: none;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 12px;">
+                    <button type="submit" class="btn btn-save"><i class="fas fa-save"></i> Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top: 1rem;">
+        <div class="card-header">
+            <h4>Current Department Temporary Manager Assignments</h4>
+        </div>
+        <div class="card-body">
+            {% if assignments %}
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Department</th>
+                            <th>Temporary Manager</th>
+                            <th>Set By</th>
+                            <th>Set At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for dept, entry in assignments.items()|sort %}
+                        <tr>
+                            <td>{{ dept }}</td>
+                            <td>{{ entry.temporary_manager.name if entry.temporary_manager else entry.temporary_manager_id }}</td>
+                            <td>{{ entry.set_by_user.name if entry.set_by_user else '' }}</td>
+                            <td>{{ entry.set_at.strftime('%Y-%m-%d %H:%M:%S') if entry.set_at else '' }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('unassign_temp_manager') }}" style="display:inline;">
+                                    <input type="hidden" name="department" value="{{ dept }}">
+                                    <button type="submit" class="btn btn-sm btn-unassign" onclick="return confirm('Unassign temporary manager for {{ dept }}?')">
+                                        <i class="fas fa-user-slash"></i> Unassign
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p>No department-level temporary managers assigned.</p>
+            {% endif %}
+        </div>
+    </div>
+    <script>
+    // Initialize a grouped searchable dropdown for managers (single selection)
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('manager_search');
+        const hiddenSelect = document.getElementById('temporary_manager_id');
+        const dropdown = document.getElementById('manager_dropdown');
+
+        if (!searchInput || !hiddenSelect || !dropdown) return;
+
+        function buildDropdown() {
+            dropdown.innerHTML = '';
+            const options = hiddenSelect.querySelectorAll('option');
+            let currentGroup = null;
+            options.forEach(option => {
+                if (option.value === '') return;
+                const dept = option.getAttribute('data-department') || 'Other';
+                if (!currentGroup || currentGroup !== dept) {
+                    const groupDiv = document.createElement('div');
+                    groupDiv.className = 'branch-group';
+                    groupDiv.textContent = dept;
+                    groupDiv.setAttribute('data-department', dept);
+                    dropdown.appendChild(groupDiv);
+                    currentGroup = dept;
+                }
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'branch-option';
+                optionDiv.textContent = option.textContent;
+                optionDiv.setAttribute('data-value', option.value);
+                optionDiv.setAttribute('data-department', dept);
+                optionDiv.addEventListener('mousedown', function(e){
+                    e.preventDefault();
+                    selectManager(option.value, option.textContent);
+                }, { passive: false });
+                dropdown.appendChild(optionDiv);
+            });
+            // reset scroll to top whenever we rebuild the dropdown
+            dropdown.scrollTop = 0;
+        }
+
+        function filterManagers(term) {
+            const options = dropdown.querySelectorAll('.branch-option');
+            const groups = dropdown.querySelectorAll('.branch-group');
+            let hasVisible = false;
+            options.forEach(opt => {
+                const txt = opt.textContent.toLowerCase();
+                if (txt.includes(term.toLowerCase())) {
+                    opt.classList.remove('hidden');
+                    hasVisible = true;
+                } else {
+                    opt.classList.add('hidden');
+                }
+            });
+            groups.forEach(group => {
+                const dept = group.getAttribute('data-department');
+                const hasInGroup = Array.from(options).some(o => o.getAttribute('data-department') === dept && !o.classList.contains('hidden'));
+                group.style.display = hasInGroup ? 'block' : 'none';
+            });
+            dropdown.style.display = hasVisible ? 'block' : 'none';
+        }
+
+        function selectManager(value, text) {
+            hiddenSelect.value = value;
+            searchInput.value = text;
+            dropdown.style.display = 'none';
+        }
+
+        searchInput.addEventListener('input', function() {
+            const term = this.value.trim();
+            if (term.length === 0) {
+                dropdown.querySelectorAll('.branch-option').forEach(o=>o.classList.remove('hidden'));
+                dropdown.querySelectorAll('.branch-group').forEach(g=>g.style.display='block');
+                dropdown.style.display = 'block';
+                // reset scroll to top when reopening to default state
+                dropdown.scrollTop = 0;
+            } else {
+                filterManagers(term);
+            }
+        });
+
+        searchInput.addEventListener('focus', function() {
+            dropdown.style.display = 'block';
+            // always open at the top when focusing/opening
+            dropdown.scrollTop = 0;
+        });
+        searchInput.addEventListener('blur', function() {
+            setTimeout(()=> dropdown.style.display='none', 150);
+        });
+        buildDropdown();
+        // Pre-fill search input if there is current value
+        if (hiddenSelect.value) {
+            const sel = hiddenSelect.querySelector(`option[value="${hiddenSelect.value}"]`);
+            if (sel) searchInput.value = sel.textContent;
+        }
+    });
+    </script>
+</div>
 {% endblock %}
 
 

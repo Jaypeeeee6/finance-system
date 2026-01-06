@@ -12,7 +12,7 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry
+from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry, DepartmentTemporaryManager
 from config import Config
 import json
 from playwright.sync_api import sync_playwright
@@ -1142,13 +1142,24 @@ def get_authorized_manager_approvers(request):
     This mirrors the authorization logic in manager_approve_request."""
     authorized_users = []
     
-    # If temporary manager is assigned, only that user is authorized
+    # If per-request temporary manager is assigned (IT feature), only that user is authorized
     if request.temporary_manager_id:
         temp_manager = User.query.get(request.temporary_manager_id)
         if temp_manager:
             authorized_users.append(temp_manager)
-            print(f"DEBUG: Found temporary manager: {temp_manager.name} (ID: {temp_manager.user_id})")
+            print(f"DEBUG: Found per-request temporary manager: {temp_manager.name} (ID: {temp_manager.user_id})")
         return authorized_users
+
+    # If a department-level temporary manager is assigned, include that user among authorized approvers
+    try:
+        dept_temp = DepartmentTemporaryManager.query.filter_by(department=(request.department or '')).first()
+    except Exception:
+        dept_temp = None
+    if dept_temp:
+        temp_manager = User.query.get(dept_temp.temporary_manager_id)
+        if temp_manager:
+            authorized_users.append(temp_manager)
+            print(f"DEBUG: Added department-level temporary manager for {request.department}: {temp_manager.name} (ID: {temp_manager.user_id})")
     
     # No temporary manager, use standard authorization checks
     
@@ -1247,6 +1258,16 @@ def get_authorized_manager_approvers(request):
 def get_authorized_manager_approvers_for_item_request(item_request):
     """Get all users who are authorized to approve this item request at the manager stage."""
     authorized_users = []
+    
+    # If a department-level temporary manager is assigned for this item_request.department, include that user among authorized approvers
+    try:
+        dept_temp = DepartmentTemporaryManager.query.filter_by(department=(item_request.department or '')).first()
+    except Exception:
+        dept_temp = None
+    if dept_temp:
+        temp_manager = User.query.get(dept_temp.temporary_manager_id)
+        if temp_manager:
+            authorized_users.append(temp_manager)
     
     # Get the requestor user - explicitly load from database if needed
     if not item_request.user_id:
@@ -2680,11 +2701,12 @@ def get_unread_count_for_user(user):
     
     else:
         # Department Staff: Updates on their own requests only + recurring payment due for their own requests + item request assignments
+        # Also include temporary_manager_assignment so department users see when a temp manager is set/removed
         return Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
-                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold', 'request_pending_approval'])
+                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold', 'request_pending_approval', 'temporary_manager_assignment'])
             )
         ).count()
 
@@ -15363,11 +15385,21 @@ def manager_approve_request(request_id):
             is_authorized = True
             print("DEBUG: Authorized via temporary manager assignment")
         else:
-            # When a temporary manager is assigned, only they can approve this request
+            # When a temporary manager is assigned for this specific request, only they can approve it
             print("DEBUG: Approval blocked - temporary manager is assigned and current user is not the assignee")
             is_authorized = False
     else:
-        # No temporary manager assigned, use standard authorization checks
+        # No per-request temporary manager assigned - check for department-level temporary manager
+        try:
+            dept_temp = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+        except Exception:
+            dept_temp = None
+        if dept_temp and dept_temp.temporary_manager_id == current_user.user_id:
+            is_authorized = True
+            print("DEBUG: Authorized via department-level temporary manager assignment")
+
+        # Continue with standard authorization checks even when a department-level temporary manager exists.
+        # This ensures GM and Operation Manager remain authorized as before.
         # Hard rule: Requests submitted by GM/CEO/Operation Manager can ONLY be approved by Abdalaziz (Finance Admin)
         if req.user.role in ['GM', 'CEO', 'Operation Manager']:
             if current_user.name == 'Abdalaziz Al-Brashdi':
@@ -19807,11 +19839,207 @@ def admin_calendar():
         return redirect(url_for('dashboard'))
     return render_template('admin_calendar.html')
 
-@app.route('/settings')
+@app.route('/settings', methods=['GET', 'POST'])
 @role_required('GM', 'Operation Manager')
 def settings():
-    """Settings page restricted to GM and Operation Manager"""
-    return render_template('settings.html')
+    """Settings page restricted to GM and Operation Manager.
+    Allows assigning a department-level temporary manager who will be the sole
+    manager approver for all requests in that department while assigned.
+    """
+    # Temporary manager for whole department can be any registered user.
+    if request.method == 'POST':
+        department = (request.form.get('department') or '').strip()
+        new_manager_id = request.form.get('temporary_manager_id')
+
+        if not department:
+            flash('Please select a department.', 'error')
+            return redirect(url_for('settings'))
+
+        # Unset assignment if no manager selected
+        if not new_manager_id or new_manager_id == 'none':
+            existing = DepartmentTemporaryManager.query.filter_by(department=department).first()
+            if existing:
+                old_manager = existing.temporary_manager
+                db.session.delete(existing)
+                db.session.commit()
+                log_action(f"Removed department-level temporary manager for {department} by {current_user.name}")
+                if old_manager:
+                    create_notification(
+                        user_id=old_manager.user_id,
+                        title="Temporary Manager Assignment Removed",
+                        message=f"You are no longer the temporary manager for the {department} department.",
+                        notification_type="temporary_manager_unassigned"
+                    )
+                flash(f'Department-level temporary manager for {department} has been removed.', 'success')
+            else:
+                flash(f'No temporary manager was set for {department}.', 'info')
+            return redirect(url_for('settings'))
+
+        # Validate new manager (allow any registered user)
+        try:
+            new_manager = User.query.get(int(new_manager_id))
+        except Exception:
+            new_manager = None
+
+        if not new_manager:
+            flash('Selected user does not exist.', 'error')
+            return redirect(url_for('settings'))
+
+        existing = DepartmentTemporaryManager.query.filter_by(department=department).first()
+        if existing and existing.temporary_manager_id == int(new_manager_id):
+            flash('Selected manager is already assigned as the temporary manager for this department.', 'info')
+            return redirect(url_for('settings'))
+
+        old_manager = existing.temporary_manager if existing else None
+        if existing:
+            existing.temporary_manager_id = int(new_manager_id)
+            existing.set_by_user_id = current_user.user_id
+            existing.set_at = datetime.utcnow()
+        else:
+            new_entry = DepartmentTemporaryManager(
+                department=department,
+                temporary_manager_id=int(new_manager_id),
+                set_by_user_id=current_user.user_id
+            )
+            db.session.add(new_entry)
+
+        db.session.commit()
+
+        # Notifications
+        create_notification(
+            user_id=new_manager.user_id,
+            title="Temporary Manager Assignment",
+            message=f"You have been temporarily assigned as manager for the {department} department. You will be responsible for manager approvals for payment and item requests in that department.",
+            notification_type="temporary_manager_assignment"
+        )
+        if old_manager and old_manager.user_id != new_manager.user_id:
+            create_notification(
+                user_id=old_manager.user_id,
+                title="Temporary Manager Assignment Removed",
+                message=f"You are no longer the temporary manager for the {department} department.",
+                notification_type="temporary_manager_unassigned"
+            )
+
+        log_action(f"Assigned department-level temporary manager for {department} to {new_manager.name} by {current_user.name}")
+        flash(f'{new_manager.name} has been assigned as temporary manager for {department}.', 'success')
+        # Additional notifications per policy:
+        # - IT Department (IT Staff and Department Manager)
+        # - GM
+        # - Operation Manager
+        # - Original Assigned Manager (Department Manager of this department)
+        # - Temporary Manager (already notified above)
+        # - All users under the department where temp manager was set
+        notified_ids = set()
+        # already notified
+        if new_manager and new_manager.user_id:
+            notified_ids.add(new_manager.user_id)
+        if old_manager and getattr(old_manager, 'user_id', None):
+            notified_ids.add(old_manager.user_id)
+
+        recipients = []
+
+        # IT Dept: users in department 'IT' with roles IT Staff or Department Manager
+        try:
+            it_users = User.query.filter(
+                User.department == 'IT',
+                User.role.in_(['IT Staff', 'Department Manager'])
+            ).all()
+            recipients.extend(it_users)
+        except Exception:
+            pass
+
+        # GM
+        try:
+            gm_users = User.query.filter_by(role='GM').all()
+            recipients.extend(gm_users)
+        except Exception:
+            pass
+
+        # Operation Manager
+        try:
+            op_users = User.query.filter_by(role='Operation Manager').all()
+            recipients.extend(op_users)
+        except Exception:
+            pass
+
+        # Original Assigned Manager(s) for this department (Department Manager role)
+        try:
+            dept_managers = User.query.filter_by(role='Department Manager', department=department).all()
+            recipients.extend(dept_managers)
+        except Exception:
+            pass
+
+        # All users under the department
+        try:
+            dept_users = User.query.filter_by(department=department).all()
+            recipients.extend(dept_users)
+        except Exception:
+            pass
+
+        # Send notifications, avoid duplicates
+        for user in recipients:
+            if not user or not getattr(user, 'user_id', None):
+                continue
+            if user.user_id in notified_ids:
+                continue
+            create_notification(
+                user_id=user.user_id,
+                title="Temporary Manager Assigned",
+                message=f"The {department} department has a temporary manager: {new_manager.name}. Please take note of the temporary approval flow.",
+                notification_type="temporary_manager_assignment"
+            )
+            notified_ids.add(user.user_id)
+
+        return redirect(url_for('settings'))
+
+    # GET: prepare data for settings page
+    # Departments - gather distinct departments from Users and PaymentRequest entries
+    user_departments = [d[0] for d in db.session.query(User.department).distinct().all() if d[0]]
+    request_departments = [d[0] for d in db.session.query(PaymentRequest.department).distinct().all() if d[0]]
+    departments = sorted(set(user_departments + request_departments))
+
+    # Load all users and group them by department in the template
+    managers = User.query.order_by(User.department, User.name).all()
+    assignments = {a.department: a for a in DepartmentTemporaryManager.query.all()}
+    return render_template('settings.html', departments=departments, managers=managers, assignments=assignments)
+
+
+@app.route('/settings/unassign', methods=['POST'])
+@role_required('GM', 'Operation Manager')
+def unassign_temp_manager():
+    """Unassign department-level temporary manager (from settings table)"""
+    department = (request.form.get('department') or '').strip()
+    if not department:
+        flash('No department specified.', 'error')
+        return redirect(url_for('settings'))
+
+    existing = DepartmentTemporaryManager.query.filter_by(department=department).first()
+    if not existing:
+        flash(f'No temporary manager set for {department}.', 'info')
+        return redirect(url_for('settings'))
+
+    old_manager = existing.temporary_manager
+    try:
+        db.session.delete(existing)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Failed to unassign temporary manager for {department}: {e}")
+        flash('Failed to unassign temporary manager. Please try again.', 'danger')
+        return redirect(url_for('settings'))
+
+    log_action(f"Removed department-level temporary manager for {department} by {current_user.name}")
+
+    if old_manager:
+        create_notification(
+            user_id=old_manager.user_id,
+            title="Temporary Manager Assignment Removed",
+            message=f"You are no longer the temporary manager for the {department} department.",
+            notification_type="temporary_manager_unassigned"
+        )
+
+    flash(f'Temporary manager removed for {department}.', 'success')
+    return redirect(url_for('settings'))
 
 @app.route('/api/admin/recurring-events')
 @role_required('Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff', 'IT Department Manager', 'Department Manager')

@@ -296,6 +296,26 @@ class Notification(db.Model):
         return f'<Notification {self.notification_id} - {self.title}>'
 
 
+class DepartmentTemporaryManager(db.Model):
+    """Department-level temporary manager assignment.
+    When set, only the assigned temporary manager may perform manager approvals
+    for requests belonging to that department (mirrors per-request temporary manager logic).
+    """
+    __tablename__ = 'department_temporary_managers'
+
+    id = db.Column(db.Integer, primary_key=True)
+    department = db.Column(db.String(100), nullable=False, unique=True)
+    temporary_manager_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    set_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    set_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    temporary_manager = db.relationship('User', foreign_keys=[temporary_manager_id], backref='department_temporary_assignments')
+    set_by_user = db.relationship('User', foreign_keys=[set_by_user_id], backref='department_temporary_set_actions')
+
+    def __repr__(self):
+        return f"<DepartmentTemporaryManager dept={self.department} temp_manager={self.temporary_manager.name if self.temporary_manager else self.temporary_manager_id}>"
+
+
 class PaidNotification(db.Model):
     """Track when recurring payment notifications were marked as paid"""
     __tablename__ = 'paid_notifications'
