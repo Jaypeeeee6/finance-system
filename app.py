@@ -4840,7 +4840,7 @@ def view_item_request(request_id):
             'procurement_manager_approver': item_request.procurement_manager_approver,
             'assigned_to': assigned_to_name,
             'completed_by': completed_by_name,
-            'completion_date': item_request.completion_date.strftime('%Y-%m-%d %H:%M:%S') if item_request.completion_date else None,
+            'completion_date': utc_to_local(item_request.completion_date).strftime('%Y-%m-%d %H:%M:%S') if item_request.completion_date else None,
             'completion_notes': item_request.completion_notes,
             'receipt_files': receipt_files,
             'invoice_files': invoice_files
@@ -5882,7 +5882,8 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
     if item_request.status == 'Final Approval':
         # If status is 'Final Approval', set it to 'Completed'
         item_request.status = 'Completed'
-        item_request.completion_date = current_time.date()
+        # Store full datetime (UTC) so local time conversion shows the correct time
+        item_request.completion_date = current_time
         item_request.completed_by = current_user.name
         item_request.completed_by_user_id = current_user.user_id
     else:

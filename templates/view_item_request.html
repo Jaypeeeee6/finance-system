@@ -4112,7 +4112,7 @@ body.flash-success-open {
                         {% if item_request.completion_date %}
                         <div class="form-group">
                             <label>Completion Date</label>
-                            <input type="text" value="{{ item_request.completion_date.strftime('%Y-%m-%d %H:%M:%S') }}" readonly style="background: #f5f5f5;">
+                            <input type="text" value="{{ utc_to_local(item_request.completion_date).strftime('%Y-%m-%d %H:%M:%S') }}" readonly style="background: #f5f5f5;">
                         </div>
                         {% endif %}
                         {% if item_request.completion_notes %}
