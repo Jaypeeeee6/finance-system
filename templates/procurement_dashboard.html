@@ -79,9 +79,11 @@
         <button class="tab-button {% if active_tab == 'all' %}active{% endif %}" onclick="switchTab('all')" id="tab-all">
             <i class="fas fa-list"></i> All Requests
         </button>
+        {% if not (user.department == 'Procurement' and user.role != 'Department Manager') %}
         <button class="tab-button {% if active_tab == 'my_requests' %}active{% endif %}" onclick="switchTab('my_requests')" id="tab-my_requests">
             <i class="fas fa-user"></i> My Requests
         </button>
+        {% endif %}
         <button class="tab-button {% if active_tab == 'completed' %}active{% endif %}" onclick="switchTab('completed')" id="tab-completed">
             <i class="fas fa-check-circle"></i> Completed
         </button>

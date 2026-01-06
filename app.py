@@ -4269,11 +4269,51 @@ def procurement_item_requests():
     own_requests_unfiltered = []
     if current_user.department == 'Auditing' and tab == 'my_requests':
         own_requests_unfiltered = ProcurementItemRequest.query.filter_by(user_id=current_user.user_id).all()
+    # For Procurement "my_requests", fetch own requests unfiltered so users can see all their submissions
+    own_requests_unfiltered_procurement = []
+    if current_user.department == 'Procurement' and tab == 'my_requests':
+        own_requests_unfiltered_procurement = ProcurementItemRequest.query.filter_by(user_id=current_user.user_id).all()
     
     # Filter requests based on user role (after database-level filters)
     if current_user.department == 'Procurement':
-        # All Procurement staff (Manager and Staff) see all requests except "Pending Manager Approval" and "Rejected by Manager"
-        base_item_requests = [r for r in all_requests if r.status not in ['Pending Manager Approval', 'Rejected by Manager']]
+        # Procurement Department Manager should see:
+        # - All requests belonging to the Procurement department (any status)
+        # - Requests from other departments ONLY when they are at procurement-manager level
+        #   (e.g., 'Pending Procurement Manager Approval') or when the manager is an authorized approver
+        # Procurement staff (non-manager) keep previous behaviour but always see their own requests.
+        if current_user.role == 'Department Manager':
+            authorized_approvers_ids = set()
+            for req in all_requests:
+                approvers = get_authorized_manager_approvers_for_item_request(req)
+                approver_ids = [a.user_id for a in approvers]
+                if current_user.user_id in approver_ids:
+                    authorized_approvers_ids.add(req.id)
+
+            # External statuses that Procurement Manager should be able to see across departments
+            external_statuses = {
+                'Pending Procurement Manager Approval',
+                'Final Approval',
+                'Assigned to Procurement',
+                'Completed'
+            }
+
+            base_item_requests = [
+                r for r in all_requests
+                if r.department == 'Procurement'
+                or (r.department != 'Procurement' and r.status in external_statuses)
+                or r.id in authorized_approvers_ids
+                or r.user_id == current_user.user_id
+            ]
+        else:
+            # Procurement staff (non-managers) visibility rules:
+            # 1) Always include requests created by the current user (any status).
+            # 2) Include requests from all departments only when their status is one of:
+            #    'Assigned to Procurement', 'Final Approval', or 'Completed'.
+            allowed_external_statuses = {'Assigned to Procurement', 'Final Approval', 'Completed'}
+            base_item_requests = [
+                r for r in all_requests
+                if r.user_id == current_user.user_id or r.status in allowed_external_statuses
+            ]
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager see all requests (view-only, same as Procurement Manager)
         base_item_requests = all_requests
@@ -4297,11 +4337,52 @@ def procurement_item_requests():
         visible_request_ids = authorized_approvers_ids.union(my_requests)
         base_item_requests = [r for r in all_requests if r.id in visible_request_ids]
     
+    # Build status options visible to current user (based on base_item_requests).
+    # If user is viewing their 'My Requests' tab, compute from their own requests so all statuses appear.
+    try:
+        if current_user.department == 'Procurement' and tab == 'my_requests':
+            visible_statuses_set = {r.status for r in own_requests_unfiltered_procurement}
+        else:
+            visible_statuses_set = {r.status for r in base_item_requests}
+    except Exception:
+        visible_statuses_set = set()
+
+    # Ensure manager sees common external statuses in the filter even if none present yet
+    if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
+        visible_statuses_set.update({
+            'Pending Procurement Manager Approval',
+            'Final Approval',
+            'Assigned to Procurement',
+            'Completed'
+        })
+        # Allow manager to filter by 'Rejected by Manager' but only procurement-department ones are visible
+        visible_statuses_set.add('Rejected by Manager')
+
+    # Preferred display order for statuses (manager-focused first)
+    status_priority_order = [
+        'Pending Procurement Manager Approval',
+        'Final Approval',
+        'Assigned to Procurement',
+        'On Hold',
+        'Completed',
+        'Rejected by Procurement Manager',
+        'Pending Manager Approval',
+        'Rejected by Manager'
+    ]
+
+    status_options = [s for s in status_priority_order if s in visible_statuses_set]
+    # Append any remaining statuses found dynamically in alphabetical order
+    remaining_statuses = sorted([s for s in visible_statuses_set if s not in status_options])
+    status_options.extend(remaining_statuses)
+
     # Apply tab-based filtering
     if current_user.department == 'Procurement':
         if tab == 'assigned_to_self':
             # Show requests assigned to current user
             item_requests = [r for r in base_item_requests if r.status == 'Assigned to Procurement' and r.assigned_to_user_id == current_user.user_id]
+        elif tab == 'my_requests':
+            # Show all requests created by the current procurement user (any status)
+            item_requests = own_requests_unfiltered_procurement
         elif tab == 'completed':
             # Show completed requests
             item_requests = [r for r in base_item_requests if r.status == 'Completed']
@@ -4356,15 +4437,16 @@ def procurement_item_requests():
             # 4. On Hold
             # 5. Completed
             # 6. Rejected by Procurement Manager
+            # For the Procurement Department Manager, prioritize requests awaiting manager-level decisions first.
             procurement_manager_status_priority = {
-                'Pending Procurement Manager Approval': 1,
-                'Final Approval': 2,
-                'Assigned to Procurement': 3,
-                'On Hold': 4,
-                'Completed': 5,
-                'Rejected by Procurement Manager': 6,
-                'Pending Manager Approval': 7,
-                'Rejected by Manager': 7,
+                'Pending Manager Approval': 1,
+                'Pending Procurement Manager Approval': 2,
+                'Final Approval': 3,
+                'Assigned to Procurement': 4,
+                'On Hold': 5,
+                'Completed': 6,
+                'Rejected by Procurement Manager': 7,
+                'Rejected by Manager': 8,
             }
             status_priority = procurement_manager_status_priority.get(req.status, 99)
         # For other Procurement staff (not Department Manager), use different priority order
@@ -4601,6 +4683,7 @@ def procurement_item_requests():
                          active_tab=tab,
                          department_filter=department_filter,
                          status_filter=status_filter,
+                         status_options=status_options,
                          urgent_filter=urgent_filter,
                          search_query=search_query,
                          departments=departments,
@@ -4620,9 +4703,15 @@ def view_item_request(request_id):
     # Check access permissions
     can_view = False
     if current_user.department == 'Procurement':
-        # All Procurement staff (Manager and Staff) can view all requests except "Pending Manager Approval" and "Rejected by Manager"
-        if item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
-            can_view = True
+        # Procurement Department Managers (any role name containing 'Manager') can view all Procurement requests
+        if current_user.role and 'Manager' in current_user.role:
+            if item_request.department == 'Procurement':
+                can_view = True
+        else:
+            # Procurement staff (non-managers) can view their own requests (any status) and other requests except
+            # "Pending Manager Approval" and "Rejected by Manager".
+            if item_request.user_id == current_user.user_id or item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
+                can_view = True
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager can view all requests (view-only)
         can_view = True
@@ -4797,9 +4886,16 @@ def view_item_request_page(request_id):
     # Check access permissions
     can_view = False
     if current_user.department == 'Procurement':
-        # All Procurement staff (Manager and Staff) can view all requests except "Pending Manager Approval" and "Rejected by Manager"
-        if item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
-            can_view = True
+        # Procurement managers (role contains 'Manager') can view all Procurement requests (any status)
+        if current_user.role and 'Manager' in current_user.role:
+            if item_request.department == 'Procurement':
+                can_view = True
+        else:
+            # Procurement staff (non-managers) can view:
+            # - their own requests (any status), or
+            # - other requests except "Pending Manager Approval" and "Rejected by Manager"
+            if item_request.user_id == current_user.user_id or item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
+                can_view = True
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager can view all requests (view-only)
         can_view = True

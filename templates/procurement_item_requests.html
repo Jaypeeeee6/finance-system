@@ -110,6 +110,9 @@
         <button class="tab-button {% if active_tab == 'assigned_to_self' %}active{% endif %}" onclick="switchTab('assigned_to_self')" id="tab-assigned_to_self">
             <i class="fas fa-user"></i> Assigned to Self
         </button>
+        <button class="tab-button {% if active_tab == 'my_requests' %}active{% endif %}" onclick="switchTab('my_requests')" id="tab-my_requests">
+            <i class="fas fa-user"></i> My Item Requests
+        </button>
         {% elif user.department == 'IT' or user.role in ['GM', 'CEO', 'Operation Manager', 'Department Manager'] %}
         <button class="tab-button {% if active_tab == 'my_requests' %}active{% endif %}" onclick="switchTab('my_requests')" id="tab-my_requests">
             <i class="fas fa-user"></i> My Item Requests
@@ -155,14 +158,9 @@
                     {% if active_tab != 'completed' %}
                     <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
                         <option value="">All Statuses</option>
-                        <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
-                        <option value="Pending Procurement Manager Approval" {% if status_filter == 'Pending Procurement Manager Approval' %}selected{% endif %}>Pending Procurement Manager Approval</option>
-                        <option value="On Hold" {% if status_filter == 'On Hold' %}selected{% endif %}>On Hold</option>
-                        <option value="Assigned to Procurement" {% if status_filter == 'Assigned to Procurement' %}selected{% endif %}>Assigned to Procurement</option>
-                        <option value="Final Approval" {% if status_filter == 'Final Approval' %}selected{% endif %}>Final Approval</option>
-                        <option value="Completed" {% if status_filter == 'Completed' %}selected{% endif %}>Completed</option>
-                        <option value="Rejected by Manager" {% if status_filter == 'Rejected by Manager' %}selected{% endif %}>Rejected by Manager</option>
-                        <option value="Rejected by Procurement Manager" {% if status_filter == 'Rejected by Procurement Manager' %}selected{% endif %}>Rejected by Procurement Manager</option>
+                        {% for status in status_options %}
+                        <option value="{{ status }}" {% if status_filter == status %}selected{% endif %}>{{ status }}</option>
+                        {% endfor %}
                     </select>
                     {% endif %}
                     <select id="urgentFilter" onchange="applyUrgentFilter()" class="form-select">
@@ -606,18 +604,50 @@ let searchDebounceTimer = null;
 function switchTab(tab) {
     const url = new URL(window.location);
     url.searchParams.set('tab', tab);
-    
+
     // For My Item Requests tab, clear department filter so results are based only on the current user's items
     if (tab === 'my_requests') {
         url.searchParams.delete('department');
     }
-    
-    // Preserve other filters
+
+    // Preserve other filters (search, urgent)
     const searchInput = document.getElementById('tabSearchInput');
     if (searchInput && searchInput.value.trim()) {
         url.searchParams.set('search', searchInput.value.trim());
     }
-    window.location.href = url.toString();
+    const urgentFilter = document.getElementById('urgentFilter');
+    if (urgentFilter && urgentFilter.value) {
+        url.searchParams.set('urgent', urgentFilter.value);
+    } else {
+        url.searchParams.delete('urgent');
+    }
+    url.searchParams.set('page', '1');
+
+    // Fetch the updated card-body and swap it in (avoid full page reload so scroll is preserved)
+    fetch(url.toString(), { headers: { 'X-Requested-With': 'fetch' } })
+        .then(res => {
+            if (!res.ok) throw new Error('Network error');
+            return res.text();
+        })
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newBody = doc.querySelector('.card-body');
+            const curBody = document.querySelector('.card-body');
+            if (newBody && curBody) {
+                const scrollY = window.scrollY || window.pageYOffset;
+                curBody.innerHTML = newBody.innerHTML;
+                history.pushState({}, '', url.toString());
+                // restore scroll
+                window.scrollTo(0, scrollY);
+            } else {
+                // fallback to full navigation
+                window.location.href = url.toString();
+            }
+        })
+        .catch(() => {
+            window.location.href = url.toString();
+        });
 }
 
 function performSearch(commit) {
