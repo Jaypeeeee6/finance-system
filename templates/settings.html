@@ -291,7 +291,13 @@
                             <td>{{ dept }}</td>
                             <td>{{ entry.temporary_manager.name if entry.temporary_manager else entry.temporary_manager_id }}</td>
                             <td>{{ entry.set_by_user.name if entry.set_by_user else '' }}</td>
-                            <td>{{ entry.set_at.strftime('%Y-%m-%d %H:%M:%S') if entry.set_at else '' }}</td>
+                            <td>
+                                {% if entry.set_at %}
+                                    {{ utc_to_local(entry.set_at).strftime('%Y-%m-%d %H:%M:%S') }}
+                                {% else %}
+                                   
+                                {% endif %}
+                            </td>
                             <td>
                                 <form method="POST" action="{{ url_for('unassign_temp_manager') }}" style="display:inline;">
                                     <input type="hidden" name="department" value="{{ dept }}">
