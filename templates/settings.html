@@ -120,6 +120,30 @@
             z-index: 1200 !important;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
         }
+        /* Assignment search input rounded styling */
+        .settings-page .assign-search-field {
+            width: 100%;
+        }
+        .settings-page .assign-search-input {
+            border-radius: 999px !important;
+            border: 1px solid #ced4da !important;
+            transition: border-color 0.12s ease, box-shadow 0.12s ease;
+            height: 38px;
+        }
+        .settings-page .assign-search-input:focus {
+            outline: none !important;
+            border-color: #D9BD7D !important;
+            box-shadow: 0 0 0 0.18rem rgba(217,189,125,0.15) !important;
+        }
+        .settings-page .assign-search-icon {
+            width: 20px !important;
+            height: 20px !important;
+            background: #ffffff;
+            border-radius: 50%;
+            padding: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+            cursor: pointer;
+        }
         .settings-page .branch-group {
             background-color: #f8f9fa !important;
             padding: 8px 12px !important;
@@ -244,6 +268,12 @@
         </div>
         <div class="card-body">
             {% if assignments %}
+            <div style="margin-bottom:10px; width:100%;">
+                <div class="assign-search-field" style="position:relative; width:100%;">
+                    <img src="{{ url_for('static', filename='css/icons/search.svg') }}" class="assign-search-icon" alt="Search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%);" onclick="document.getElementById('assignment_search').focus();" >
+                    <input type="search" id="assignment_search" class="form-control assign-search-input" placeholder="Search by department or temporary manager name" aria-label="Search assignments" style="padding-left:44px; width:100%;">
+                </div>
+            </div>
             <div class="table-responsive">
                 <table class="data-table">
                     <thead>
@@ -280,6 +310,49 @@
             {% endif %}
         </div>
     </div>
+    <script>
+    // Client-side search for Current Department Temporary Manager Assignments
+    (function(){
+        function normalizeText(s){ return (s||'').toString().toLowerCase().trim(); }
+        document.addEventListener('DOMContentLoaded', function(){
+            var input = document.getElementById('assignment_search');
+            if(!input) return;
+            var table = input.closest('.card-body').querySelector('table.data-table');
+            if(!table) return;
+            var tbody = table.tBodies[0];
+            var rows = Array.from(tbody.querySelectorAll('tr'));
+            input.addEventListener('input', function(){
+                var q = normalizeText(this.value);
+                var anyVisible = false;
+                rows.forEach(function(r){
+                    var dept = normalizeText(r.cells[0] && r.cells[0].textContent);
+                    var mgr  = normalizeText(r.cells[1] && r.cells[1].textContent);
+                    if(!q || dept.indexOf(q) !== -1 || mgr.indexOf(q) !== -1){
+                        r.style.display = '';
+                        anyVisible = true;
+                    } else {
+                        r.style.display = 'none';
+                    }
+                });
+                // Optional: show "no results" message
+                var noMsgId = 'assignments_no_results';
+                var existing = document.getElementById(noMsgId);
+                if(!anyVisible && q){
+                    if(!existing){
+                        var p = document.createElement('div');
+                        p.id = noMsgId;
+                        p.style.marginTop = '8px';
+                        p.style.color = '#666';
+                        p.textContent = 'No matching assignments.';
+                        table.parentNode.appendChild(p);
+                    }
+                } else {
+                    if(existing) existing.parentNode.removeChild(existing);
+                }
+            });
+        });
+    })();
+    </script>
     <script>
     // Initialize a grouped searchable dropdown for managers (single selection)
     document.addEventListener('DOMContentLoaded', function() {
