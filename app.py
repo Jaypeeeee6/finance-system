@@ -1045,6 +1045,7 @@ def create_notification(user_id, title, message, notification_type, request_id=N
         'new_submission',           # Manager: new request submitted
         'request_returned',         # Manager: returned by Finance to manager
         'temporary_manager_assignment',  # Manager: assigned temporarily
+        'temporary_manager_unassigned',
         'request_rejected',         # Requestor: rejected by manager
         'proof_required',           # Requestor: proof needed
         'proof_rejected'            # Requestor: proof rejected
@@ -2366,7 +2367,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
                         'admin_announcement'
                     ]),
-                    Notification.notification_type == 'temporary_manager_assignment'
+                    Notification.notification_type.in_(['temporary_manager_assignment', 'temporary_manager_unassigned'])
                 )
             )
         ).order_by(Notification.created_at.desc())
@@ -2388,7 +2389,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
                         'admin_announcement'
                     ]),
-                    Notification.notification_type == 'temporary_manager_assignment'
+                    Notification.notification_type.in_(['temporary_manager_assignment', 'temporary_manager_unassigned'])
                 )
             )
         ).order_by(Notification.created_at.desc())
@@ -2410,7 +2411,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
                         'admin_announcement'
                     ]),
-                    Notification.notification_type == 'temporary_manager_assignment'
+                    Notification.notification_type.in_(['temporary_manager_assignment', 'temporary_manager_unassigned'])
                 )
             )
         ).order_by(Notification.created_at.desc())
@@ -2452,7 +2453,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
                         'admin_announcement'
                     ]),
-                    Notification.notification_type == 'temporary_manager_assignment'
+                    Notification.notification_type.in_(['temporary_manager_assignment', 'temporary_manager_unassigned'])
                 )
             )
         ).order_by(Notification.created_at.desc())
@@ -2475,7 +2476,8 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     Notification.notification_type.in_([
                         'system_maintenance', 'system_update', 'security_alert', 'system_error',
                         'admin_announcement'
-                    ])
+                    ]),
+                    Notification.notification_type.in_(['temporary_manager_assignment', 'temporary_manager_unassigned'])
                 )
             )
         ).order_by(Notification.created_at.desc())
@@ -2504,7 +2506,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                         'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold',
                         'request_pending_approval'
                     ]),
-                    Notification.notification_type == 'temporary_manager_assignment'
+                    Notification.notification_type.in_(['temporary_manager_assignment', 'temporary_manager_unassigned'])
                 )
             )
         ).order_by(Notification.created_at.desc())
@@ -2519,7 +2521,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     'status_changed', 'recurring_due', 'proof_required', 'recurring_approved',
                     'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled',
                         'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold',
-                    'request_pending_approval'
+                    'request_pending_approval', 'temporary_manager_assignment', 'temporary_manager_unassigned'
                 ])
             )
         ).order_by(Notification.created_at.desc())
@@ -2608,7 +2610,7 @@ def get_unread_count_for_user(user):
                     Notification.notification_type == 'new_submission',
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold', 'item_request_updated', 'item_request_assigned']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                    Notification.notification_type == 'temporary_manager_assignment'
+                    Notification.notification_type.in_(['temporary_manager_assignment', 'temporary_manager_unassigned'])
                 )
             )
         ).count()
@@ -2624,7 +2626,7 @@ def get_unread_count_for_user(user):
                     Notification.notification_type == 'new_submission',
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'request_returned', 'request_on_hold', 'item_request_updated', 'item_request_assigned']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                    Notification.notification_type == 'temporary_manager_assignment'
+                    Notification.notification_type.in_(['temporary_manager_assignment', 'temporary_manager_unassigned'])
                 )
             )
         ).count()
@@ -2658,7 +2660,7 @@ def get_unread_count_for_user(user):
                     ),
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold', 'item_request_updated']),
                     Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
-                    Notification.notification_type == 'temporary_manager_assignment'
+                    Notification.notification_type.in_(['temporary_manager_assignment', 'temporary_manager_unassigned'])
                 )
             )
         ).count()
@@ -2673,7 +2675,8 @@ def get_unread_count_for_user(user):
                     # Item request submissions (for procurement item requests)
                     Notification.notification_type == 'item_request_submission',
                     Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'status_changed', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'user_created', 'user_updated', 'user_deleted', 'finance_note_added', 'request_archived', 'request_restored', 'request_permanently_deleted', 'one_time_payment_scheduled', 'request_returned', 'request_on_hold', 'item_request_updated']),
-                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement'])
+                    Notification.notification_type.in_(['system_maintenance', 'system_update', 'security_alert', 'system_error', 'admin_announcement']),
+                    Notification.notification_type.in_(['temporary_manager_assignment', 'temporary_manager_unassigned'])
                 )
             )
         ).count()
@@ -2694,7 +2697,7 @@ def get_unread_count_for_user(user):
                         'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'item_request_updated',
                         'request_returned', 'request_on_hold', 'request_pending_approval'
                     ]),
-                    Notification.notification_type == 'temporary_manager_assignment'
+                    Notification.notification_type.in_(['temporary_manager_assignment', 'temporary_manager_unassigned'])
                 )
             )
         ).count()
@@ -4374,7 +4377,7 @@ def procurement_item_requests():
     # Append any remaining statuses found dynamically in alphabetical order
     remaining_statuses = sorted([s for s in visible_statuses_set if s not in status_options])
     status_options.extend(remaining_statuses)
-
+    
     # Apply tab-based filtering
     if current_user.department == 'Procurement':
         if tab == 'assigned_to_self':
@@ -4703,15 +4706,9 @@ def view_item_request(request_id):
     # Check access permissions
     can_view = False
     if current_user.department == 'Procurement':
-        # Procurement Department Managers (any role name containing 'Manager') can view all Procurement requests
-        if current_user.role and 'Manager' in current_user.role:
-            if item_request.department == 'Procurement':
-                can_view = True
-        else:
-            # Procurement staff (non-managers) can view their own requests (any status) and other requests except
-            # "Pending Manager Approval" and "Rejected by Manager".
-            if item_request.user_id == current_user.user_id or item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
-                can_view = True
+        # All Procurement staff (Manager and Staff) can view all requests except "Pending Manager Approval" and "Rejected by Manager"
+        if item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
+            can_view = True
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager can view all requests (view-only)
         can_view = True
@@ -4840,7 +4837,7 @@ def view_item_request(request_id):
             'procurement_manager_approver': item_request.procurement_manager_approver,
             'assigned_to': assigned_to_name,
             'completed_by': completed_by_name,
-            'completion_date': utc_to_local(item_request.completion_date).strftime('%Y-%m-%d %H:%M:%S') if item_request.completion_date else None,
+            'completion_date': item_request.completion_date.strftime('%Y-%m-%d %H:%M:%S') if item_request.completion_date else None,
             'completion_notes': item_request.completion_notes,
             'receipt_files': receipt_files,
             'invoice_files': invoice_files
@@ -4886,16 +4883,9 @@ def view_item_request_page(request_id):
     # Check access permissions
     can_view = False
     if current_user.department == 'Procurement':
-        # Procurement managers (role contains 'Manager') can view all Procurement requests (any status)
-        if current_user.role and 'Manager' in current_user.role:
-            if item_request.department == 'Procurement':
-                can_view = True
-        else:
-            # Procurement staff (non-managers) can view:
-            # - their own requests (any status), or
-            # - other requests except "Pending Manager Approval" and "Rejected by Manager"
-            if item_request.user_id == current_user.user_id or item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
-                can_view = True
+        # All Procurement staff (Manager and Staff) can view all requests except "Pending Manager Approval" and "Rejected by Manager"
+        if item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
+            can_view = True
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager can view all requests (view-only)
         can_view = True
@@ -5882,8 +5872,7 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
     if item_request.status == 'Final Approval':
         # If status is 'Final Approval', set it to 'Completed'
         item_request.status = 'Completed'
-        # Store full datetime (UTC) so local time conversion shows the correct time
-        item_request.completion_date = current_time
+        item_request.completion_date = current_time.date()
         item_request.completed_by = current_user.name
         item_request.completed_by_user_id = current_user.user_id
     else:
@@ -20035,12 +20024,9 @@ def settings():
 
         recipients = []
 
-        # IT Dept: users in department 'IT' with roles IT Staff or Department Manager
+        # IT Dept: notify ALL users in the IT department
         try:
-            it_users = User.query.filter(
-                User.department == 'IT',
-                User.role.in_(['IT Staff', 'Department Manager'])
-            ).all()
+            it_users = User.query.filter_by(department='IT').all()
             recipients.extend(it_users)
         except Exception:
             pass
@@ -20063,6 +20049,15 @@ def settings():
         try:
             dept_managers = User.query.filter_by(role='Department Manager', department=department).all()
             recipients.extend(dept_managers)
+        except Exception:
+            pass
+
+        # Also include any users who are listed as manager_id for users in this department
+        try:
+            manager_ids = {u.manager_id for u in User.query.filter_by(department=department).all() if getattr(u, 'manager_id', None)}
+            if manager_ids:
+                manager_users = User.query.filter(User.user_id.in_(list(manager_ids))).all()
+                recipients.extend(manager_users)
         except Exception:
             pass
 
@@ -20127,13 +20122,77 @@ def unassign_temp_manager():
 
     log_action(f"Removed department-level temporary manager for {department} by {current_user.name}")
 
-    if old_manager:
+    notified_ids = set()
+    # Notify the former temporary manager directly
+    if old_manager and getattr(old_manager, 'user_id', None):
         create_notification(
             user_id=old_manager.user_id,
             title="Temporary Manager Assignment Removed",
             message=f"You are no longer the temporary manager for the {department} department.",
             notification_type="temporary_manager_unassigned"
         )
+        notified_ids.add(old_manager.user_id)
+
+    # Also notify all other authorized parties (same recipients as assignment)
+    recipients = []
+
+    # IT Dept: notify ALL users in the IT department
+    try:
+        it_users = User.query.filter_by(department='IT').all()
+        recipients.extend(it_users)
+    except Exception:
+        pass
+
+    # GM
+    try:
+        gm_users = User.query.filter_by(role='GM').all()
+        recipients.extend(gm_users)
+    except Exception:
+        pass
+
+    # Operation Manager
+    try:
+        op_users = User.query.filter_by(role='Operation Manager').all()
+        recipients.extend(op_users)
+    except Exception:
+        pass
+
+    # Original Assigned Manager(s) for this department (Department Manager role)
+    try:
+        dept_managers = User.query.filter_by(role='Department Manager', department=department).all()
+        recipients.extend(dept_managers)
+    except Exception:
+        pass
+
+    # Also include any users who are listed as manager_id for users in this department
+    try:
+        manager_ids = {u.manager_id for u in User.query.filter_by(department=department).all() if getattr(u, 'manager_id', None)}
+        if manager_ids:
+            manager_users = User.query.filter(User.user_id.in_(list(manager_ids))).all()
+            recipients.extend(manager_users)
+    except Exception:
+        pass
+
+    # All users under the department
+    try:
+        dept_users = User.query.filter_by(department=department).all()
+        recipients.extend(dept_users)
+    except Exception:
+        pass
+
+    # Send notifications, avoid duplicates
+    for user in recipients:
+        if not user or not getattr(user, 'user_id', None):
+            continue
+        if user.user_id in notified_ids:
+            continue
+        create_notification(
+            user_id=user.user_id,
+            title="Temporary Manager Removed",
+            message=f"The temporary manager for the {department} department has been removed. Please take note of the updated approval flow.",
+            notification_type="temporary_manager_unassigned"
+        )
+        notified_ids.add(user.user_id)
 
     flash(f'Temporary manager removed for {department}.', 'success')
     return redirect(url_for('settings'))
