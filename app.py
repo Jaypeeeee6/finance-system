@@ -3394,6 +3394,11 @@ def department_dashboard():
         is_temp_manager_any = DepartmentTemporaryManager.query.filter_by(temporary_manager_id=current_user.user_id).first() is not None
     except Exception:
         is_temp_manager_any = False
+    # Compute list of departments the current user temporarily manages (for UI filters)
+    try:
+        temp_departments = [dt.department.strip() for dt in DepartmentTemporaryManager.query.filter_by(temporary_manager_id=current_user.user_id).all() if dt.department]
+    except Exception:
+        temp_departments = []
 
     if current_user.role not in allowed_roles and not is_temp_manager_any:
         # keep existing behavior of denying access to unauthorized roles
@@ -3833,6 +3838,9 @@ def department_dashboard():
                          notifications=notifications,
                          unread_count=unread_count,
                          status_filter=status_filter,
+                         department_filter=department_filter,
+                         is_temp_manager_any=is_temp_manager_any,
+                         temp_departments=temp_departments,
                          search_query=search_query,
                          completed_requests=completed_requests,
                          rejected_requests=rejected_requests,
@@ -13411,7 +13419,14 @@ def view_request(request_id):
         if current_user in authorized_approvers:
             can_edit_department_only = True
     
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, departments=departments, was_just_edited=was_just_edited, edited_fields=edited_fields_all, can_schedule_one_time=can_schedule_one_time, one_time_scheduled_by=one_time_scheduled_by, can_edit_request=can_edit_request, return_reason_history=return_reason_history, can_edit_department_only=can_edit_department_only)
+    # Determine if current user is the department-level temporary manager for this request's department
+    try:
+        _dt_for_req = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+    except Exception:
+        _dt_for_req = None
+    is_dept_temp_for_req = bool(_dt_for_req and getattr(_dt_for_req, 'temporary_manager_id', None) == current_user.user_id)
+
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, departments=departments, was_just_edited=was_just_edited, edited_fields=edited_fields_all, can_schedule_one_time=can_schedule_one_time, one_time_scheduled_by=one_time_scheduled_by, can_edit_request=can_edit_request, return_reason_history=return_reason_history, can_edit_department_only=can_edit_department_only, is_dept_temp_for_req=is_dept_temp_for_req)
 
 
 @app.route('/request/<int:request_id>/schedule_one_time_payment', methods=['POST'])

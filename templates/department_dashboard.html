@@ -77,6 +77,14 @@
                         <option value="Proof Sent" {% if status_filter == 'Proof Sent' %}selected{% endif %}>Proof Sent</option>
                         <option value="Proof Rejected" {% if status_filter == 'Proof Rejected' %}selected{% endif %}>Proof Rejected</option>
                     </select>
+                    {% if is_temp_manager_any and active_tab == 'all' %}
+                    <select id="departmentFilter" onchange="applyDepartmentFilter()" class="form-select" style="margin-left:8px;">
+                        <option value="">All Departments</option>
+                        {% for d in temp_departments %}
+                            <option value="{{ d }}" {% if department_filter == d %}selected{% endif %}>{{ d }}</option>
+                        {% endfor %}
+                    </select>
+                    {% endif %}
                     {% endif %}
                     <select id="urgentFilter" onchange="filterTable()" class="form-select">
                         <option value="">All Requests</option>
@@ -116,6 +124,7 @@
                                 <th>Payment Type</th>
                                 <th>Payment Method</th>
                                 <th>Requestor</th>
+                                <th>Department</th>
                                 <th>Submitted</th>
                                 <th>Completed</th>
                                 <th>Amount</th>
@@ -145,6 +154,7 @@
                                 </td>
                                 <td>{{ req.payment_method or 'Card' }}</td>
                                 <td>{{ req.requestor_name }}</td>
+                                <td>{{ req.department or '-' }}</td>
                                 <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
                                 <td>
                                     {% if req.status == 'Completed' and req.completion_date %}
@@ -697,6 +707,20 @@ function applyStatusFilter() {
         url.searchParams.delete('status');
     }
     url.searchParams.set('page', '1'); // Reset to page 1 when filtering
+    window.location.href = url.toString();
+}
+
+function applyDepartmentFilter() {
+    const deptFilter = document.getElementById('departmentFilter');
+    if (!deptFilter) return;
+    const deptValue = deptFilter.value;
+    const url = new URL(window.location);
+    if (deptValue) {
+        url.searchParams.set('department', deptValue);
+    } else {
+        url.searchParams.delete('department');
+    }
+    url.searchParams.set('page', '1');
     window.location.href = url.toString();
 }
 
