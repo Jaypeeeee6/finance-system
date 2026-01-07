@@ -1040,16 +1040,9 @@ def create_notification(user_id, title, message, notification_type, request_id=N
     
     print(f"DEBUG: Notification created successfully with ID: {notification.notification_id}")
     
-    # Send email for selected notification types (action-required only)
-    email_notification_types = {
-        'new_submission',           # Manager: new request submitted
-        'request_returned',         # Manager: returned by Finance to manager
-        'temporary_manager_assignment',  # Manager: assigned temporarily
-        'temporary_manager_unassigned',
-        'request_rejected',         # Requestor: rejected by manager
-        'proof_required',           # Requestor: proof needed
-        'proof_rejected'            # Requestor: proof rejected
-    }
+    # Email sending disabled globally except for PIN emails (handled separately).
+    # Keep the set here in case we re-enable specific types in the future.
+    email_notification_types = set()
     if notification_type in email_notification_types:
         user = User.query.get(user_id)
         if user and user.email:
@@ -1425,6 +1418,24 @@ def notify_users_by_role(request, notification_type, title, message, request_id=
         
         # Get all authorized manager approvers using the helper function
         authorized_approvers = get_authorized_manager_approvers(request)
+
+        # Ensure department-level temporary manager (if any) is included even if department casing differs
+        try:
+            req_dept = (requestor_department or '').strip()
+            if req_dept:
+                dept_temp = None
+                for dt in DepartmentTemporaryManager.query.all():
+                    if (dt.department or '').strip().lower() == req_dept.lower():
+                        dept_temp = dt
+                        break
+                if dept_temp:
+                    temp_user = User.query.get(dept_temp.temporary_manager_id)
+                    if temp_user and temp_user not in authorized_approvers:
+                        authorized_approvers.append(temp_user)
+                        print(f"DEBUG: Added department-level temporary manager for department '{req_dept}' to authorized_approvers: {temp_user.name} (ID: {temp_user.user_id})")
+        except Exception:
+            # Don't fail notification flow on lookup errors
+            pass
         
         # Notify all authorized manager approvers
         for approver in authorized_approvers:
@@ -2513,6 +2524,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
 
     else:
         # Department Staff: Updates on their own requests only + recurring payment due for their own requests + item request assignments
+        # Also allow 'new_submission' and 'item_request_submission' types for users who were explicitly targeted
         query = Notification.query.filter(
             db.and_(
                 Notification.user_id == user.user_id,
@@ -2521,7 +2533,8 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                     'status_changed', 'recurring_due', 'proof_required', 'recurring_approved',
                     'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled',
                         'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold',
-                    'request_pending_approval', 'temporary_manager_assignment', 'temporary_manager_unassigned'
+                    'request_pending_approval', 'temporary_manager_assignment', 'temporary_manager_unassigned',
+                    'new_submission', 'item_request_submission'
                 ])
             )
         ).order_by(Notification.created_at.desc())
@@ -2709,7 +2722,7 @@ def get_unread_count_for_user(user):
             db.and_(
                 Notification.user_id == user.user_id,
                 Notification.is_read == False,
-                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold', 'request_pending_approval', 'temporary_manager_assignment'])
+                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold', 'request_pending_approval', 'temporary_manager_assignment', 'temporary_manager_unassigned', 'new_submission', 'item_request_submission'])
             )
         ).count()
 
@@ -3367,15 +3380,24 @@ def dashboard():
 
 @app.route('/department/dashboard')
 @login_required
-@role_required(
-    # Department-specific Staff roles (excluding Finance Staff, Project Staff, IT Staff, and Procurement Staff who have their own dashboards)
-    'HR Staff', 'PR Staff', 'Auditing Staff',
-    'Customer Service Staff', 'Marketing Staff', 'Operation Staff', 'Branch Inventory Officer', 'Quality Control Staff',
-    'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Logistic Staff',
-    # Other roles that can access this dashboard
-    'Department Manager', 'Operation Manager'
-)
 def department_dashboard():
+    """Dashboard for department users, finance, and project users"""
+    # Access control: allow the same static roles as before OR any user who is currently
+    # assigned as a department-level temporary manager for at least one department.
+    allowed_roles = {
+        'HR Staff', 'PR Staff', 'Auditing Staff',
+        'Customer Service Staff', 'Marketing Staff', 'Operation Staff', 'Branch Inventory Officer', 'Quality Control Staff',
+        'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Logistic Staff',
+        'Department Manager', 'Operation Manager'
+    }
+    try:
+        is_temp_manager_any = DepartmentTemporaryManager.query.filter_by(temporary_manager_id=current_user.user_id).first() is not None
+    except Exception:
+        is_temp_manager_any = False
+
+    if current_user.role not in allowed_roles and not is_temp_manager_any:
+        # keep existing behavior of denying access to unauthorized roles
+        abort(403)
     """Dashboard for department users, finance, and project users"""
     # Redirect Procurement Department Managers to their dedicated dashboard
     dept = current_user.department.strip() if current_user.department else ''
@@ -3435,8 +3457,15 @@ def department_dashboard():
                 if req_dept.lower() == 'auditing' and requestor_dept.lower() == 'auditing':
                     visible_request_ids.add(req.request_id)
                 
-                # Temporary manager
+                # Temporary manager (per-request)
                 if req.temporary_manager_id == current_user.user_id:
+                    visible_request_ids.add(req.request_id)
+                # Department-level temporary manager (assignment in settings) - include requests from departments
+                try:
+                    dt = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+                except Exception:
+                    dt = None
+                if dt and getattr(dt, 'temporary_manager_id', None) == current_user.user_id:
                     visible_request_ids.add(req.request_id)
                 
                 # Completed/Recurring from other departments (view-only - this is fine as is)
@@ -3488,8 +3517,15 @@ def department_dashboard():
                 if req_dept.lower() == user_dept.lower() and requestor_dept.lower() == user_dept.lower():
                     department_match_ids.add(req.request_id)
                 
-                # Check temporary manager
+                # Check per-request temporary manager
                 if req.temporary_manager_id == current_user.user_id:
+                    temp_manager_ids.add(req.request_id)
+                # Check department-level temporary manager assignment for this request's department
+                try:
+                    dt = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+                except Exception:
+                    dt = None
+                if dt and getattr(dt, 'temporary_manager_id', None) == current_user.user_id:
                     temp_manager_ids.add(req.request_id)
                 
                 # Check if user is an authorized approver (based on requestor, not request department)
@@ -3530,11 +3566,37 @@ def department_dashboard():
         )
     else:
         # For regular users, show their own requests (exclude archived and drafts)
-        base_query = PaymentRequest.query.filter(
-            PaymentRequest.user_id == current_user.user_id,
-            PaymentRequest.is_archived == False,
-            PaymentRequest.is_draft == False
-        )
+        # If the user is currently assigned as a department-level temporary manager,
+        # include requests for the departments they temporarily manage (only when assignment exists).
+        if is_temp_manager_any:
+            try:
+                temp_departments = [dt.department.strip() for dt in DepartmentTemporaryManager.query.filter_by(temporary_manager_id=current_user.user_id).all() if dt.department]
+            except Exception:
+                temp_departments = []
+            if temp_departments:
+                base_query = PaymentRequest.query.outerjoin(User, PaymentRequest.user_id == User.user_id).filter(
+                    db.and_(
+                        db.or_(
+                            db.and_(PaymentRequest.department.in_(temp_departments), User.department.in_(temp_departments)),
+                            PaymentRequest.temporary_manager_id == current_user.user_id,
+                            PaymentRequest.user_id == current_user.user_id
+                        ),
+                        PaymentRequest.is_archived == False,
+                        PaymentRequest.is_draft == False
+                    )
+                )
+            else:
+                base_query = PaymentRequest.query.filter(
+                    PaymentRequest.user_id == current_user.user_id,
+                    PaymentRequest.is_archived == False,
+                    PaymentRequest.is_draft == False
+                )
+        else:
+            base_query = PaymentRequest.query.filter(
+                PaymentRequest.user_id == current_user.user_id,
+                PaymentRequest.is_archived == False,
+                PaymentRequest.is_draft == False
+            )
     
     # Exclude CEO-submitted requests for non-authorized roles (visibility hardening)
     if current_user.role not in ['Finance Admin', 'GM', 'Operation Manager']:
@@ -4963,6 +5025,18 @@ def view_item_request_page(request_id):
     #     temp_manager = User.query.get(item_request.temporary_manager_id)
     #     if temp_manager:
     #         temporary_manager_name = temp_manager.name
+    # Department-level temporary manager (settings assignment) - include as temporary manager display
+    try:
+        dt = DepartmentTemporaryManager.query.filter_by(department=(item_request.department or '')).first()
+    except Exception:
+        dt = None
+    if dt:
+        try:
+            temp_user = User.query.get(dt.temporary_manager_id)
+            if temp_user:
+                temporary_manager_name = temp_user.name
+        except Exception:
+            pass
     
     # Determine manager name for all statuses (pending and completed)
     if requestor_user and requestor_user.manager_id:
@@ -7286,6 +7360,23 @@ def update_item_request_quantities_manager(request_id):
             
             # Authorized approvers
             authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
+
+            # Ensure department-level temporary manager (if any) is included even if department casing differs
+            try:
+                req_dept = (item_request.department or '').strip()
+                if req_dept:
+                    dept_temp = None
+                    for dt in DepartmentTemporaryManager.query.all():
+                        if (dt.department or '').strip().lower() == req_dept.lower():
+                            dept_temp = dt
+                            break
+                    if dept_temp:
+                        temp_user = User.query.get(dept_temp.temporary_manager_id)
+                        if temp_user and temp_user not in authorized_approvers:
+                            authorized_approvers.append(temp_user)
+                            print(f"DEBUG: Added department-level temporary manager for item_request dept '{req_dept}' to authorized_approvers: {temp_user.name} (ID: {temp_user.user_id})")
+            except Exception:
+                pass
             for approver in authorized_approvers:
                 if approver.user_id != current_user.user_id:
                     recipient_ids.add(approver.user_id)
@@ -12888,8 +12979,16 @@ def view_request(request_id):
             return render_template('403.html'), 403
 
     # Check permissions
+    # Quick allow: if current user is the department-level temporary manager for this request's department,
+    # grant view access regardless of their role (this mirrors item-request behavior).
+    try:
+        _dept_temp = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+    except Exception:
+        _dept_temp = None
+    allowed_by_dept_temp = bool(_dept_temp and getattr(_dept_temp, 'temporary_manager_id', None) == current_user.user_id)
+
     # Allow Operation Manager, IT users, and IT Department Managers to view all requests (same as GM visibility)
-    if current_user.role not in ['Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Project Staff', 'Operation Manager']:
+    if not allowed_by_dept_temp and current_user.role not in ['Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Project Staff', 'Operation Manager']:
         # Auditing Department users (Staff and Department Manager) can view their own requests OR Completed/Recurring requests from other departments
         if current_user.department == 'Auditing' and (current_user.role == 'Auditing Staff' or current_user.role == 'Department Manager'):
             # Allow if:
@@ -13071,6 +13170,19 @@ def view_request(request_id):
         temp_manager = User.query.get(req.temporary_manager_id)
         if temp_manager:
             temporary_manager_name = temp_manager.name
+    else:
+        # If no per-request temporary manager, check department-level temporary manager (settings)
+        try:
+            dt = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+        except Exception:
+            dt = None
+        if dt:
+            try:
+                temp_user = User.query.get(dt.temporary_manager_id)
+                if temp_user:
+                    temporary_manager_name = temp_user.name
+            except Exception:
+                pass
     
     # Determine manager name for all statuses (pending and completed)
     if req.user.manager_id:
