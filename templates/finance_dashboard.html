@@ -237,15 +237,24 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {% for item in schedule %}
-                                                    <tr>
-                                                        <td>{{ item.date.strftime('%Y-%m-%d') if item.date is defined else item.date }}</td>
-                                                        <td>OMR {{ '%.3f'|format(item.amount) }}</td>
-                                                        <td>{{ item.status }}</td>
-                                                    </tr>
+                                                    {% set schedules = req.payment_schedules | sort(attribute='payment_order') %}
+                                                    {% if schedules %}
+                                                        {% for item in schedules %}
+                                                        <tr>
+                                                            <td>{{ item.payment_date.strftime('%Y-%m-%d') if item.payment_date else '-' }}</td>
+                                                            <td>OMR {{ '%.3f'|format(item.amount) }}</td>
+                                                            <td>
+                                                                {% if item.is_paid %}
+                                                                    <span class="status-chip status-chip--paid">Paid</span>
+                                                                {% else %}
+                                                                    <span class="status-chip status-chip--pending">Pending</span>
+                                                                {% endif %}
+                                                            </td>
+                                                        </tr>
+                                                        {% endfor %}
                                                     {% else %}
-                                                    <tr><td colspan="3" style="color:#666;">No schedule</td></tr>
-                                                    {% endfor %}
+                                                        <tr><td colspan="3" style="color:#666;">No schedule</td></tr>
+                                                    {% endif %}
                                                 </tbody>
                                             </table>
                                         </div>

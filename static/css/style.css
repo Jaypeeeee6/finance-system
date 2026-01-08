@@ -2447,16 +2447,26 @@ body.flash-error-open {
 
 /* Nested schedule row styles */
 .nested-container {
-    padding: 0.5rem 1rem;
+    padding: 0.75rem 1.5rem; /* increased horizontal padding to make inner table appear smaller */
     background: #fafafa;
+    border-left: 6px solid #e9ecef;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
 }
 .nested-inner {
     overflow-x: auto;
+    padding: 0.25rem 0 0.25rem 4rem; /* larger left inset so table moves further right */
 }
 .nested-schedule-table {
-    width: 100%;
+    width: 85% !important;
+    max-width: 1000px !important;
     border-collapse: collapse;
     margin: 0;
+    margin-left: 3.75rem !important; /* shift to the right but allow table to be wider */
+    background: #ffffff !important;
+    border: 1px solid #e6e6e6 !important;
+    border-radius: 6px !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.04) !important;
+    table-layout: fixed !important;
 }
 .nested-schedule-table th,
 .nested-schedule-table td {
@@ -2468,9 +2478,43 @@ body.flash-error-open {
 .nested-schedule-table thead {
     background: transparent;
 }
+.nested-schedule-table {
+    table-layout: fixed; /* enforce column widths */
+}
+
+/* Make Date column wider so there's more space before Amount */
+.nested-schedule-table th:first-child,
+.nested-schedule-table td:first-child {
+    min-width: 420px !important;
+    width: 420px !important;
+    padding-right: 1.5rem !important; /* extra gap before amount */
+}
+
 .nested-row td.nested-container {
     background: transparent;
     padding: 0;
+}
+
+/* Status chips for nested schedule rows */
+.status-chip {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 999px;
+    line-height: 1;
+    text-align: center;
+    min-width: 64px;
+}
+.status-chip--paid {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+.status-chip--pending {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffe8a1;
 }
 
 /* ==================== TABLE ACTIONS ==================== */
