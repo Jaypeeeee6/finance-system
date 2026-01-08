@@ -626,3 +626,28 @@ console.log('%c Payment Request Management System ', 'background: #2196F3; color
 console.log('%c Built with Flask & JavaScript ', 'background: #4CAF50; color: white; font-size: 14px; padding: 5px;');
 console.log('%c For support, contact your IT administrator ', 'font-size: 12px; color: #666;');
 
+// ==================== NESTED SCHEDULE TOGGLE (Recurring rows) ====================
+// Use delegated handler and computed style to toggle visibility reliably
+document.addEventListener('click', function (e) {
+    const target = e.target.closest && e.target.closest('.chevron-toggle');
+    if (!target) return;
+
+    const requestId = target.dataset.requestId;
+    if (!requestId) return;
+
+    const nestedRow = document.querySelector('.nested-row[data-parent="' + requestId + '"]');
+    if (!nestedRow) return;
+
+    const computed = window.getComputedStyle(nestedRow);
+    const isVisible = computed.display !== 'none';
+
+    if (!isVisible) {
+        // show as table-row so layout is correct
+        nestedRow.style.display = 'table-row';
+        target.src = target.src.replace('chevron-right.svg', 'chevron-down.svg');
+    } else {
+        nestedRow.style.display = 'none';
+        target.src = target.src.replace('chevron-down.svg', 'chevron-right.svg');
+    }
+});
+

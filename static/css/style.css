@@ -2422,6 +2422,57 @@ body.flash-error-open {
     transition: opacity 0.3s ease;
 }
 
+/* Expand/collapse column */
+.data-table th.expand-col,
+.data-table td.expand-col,
+.data-table td.expand-cell {
+    width: 36px;
+    max-width: 36px;
+    padding: 0.5rem;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.chevron-toggle {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    opacity: 0.85;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.chevron-toggle:hover {
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+/* Nested schedule row styles */
+.nested-container {
+    padding: 0.5rem 1rem;
+    background: #fafafa;
+}
+.nested-inner {
+    overflow-x: auto;
+}
+.nested-schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+}
+.nested-schedule-table th,
+.nested-schedule-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+    font-size: 0.92rem;
+}
+.nested-schedule-table thead {
+    background: transparent;
+}
+.nested-row td.nested-container {
+    background: transparent;
+    padding: 0;
+}
+
 /* ==================== TABLE ACTIONS ==================== */
 .data-table td:last-child {
     white-space: nowrap;
