@@ -1082,6 +1082,14 @@ document.addEventListener('keydown', function(event) {
 
 // Initialize tab search functionality when page loads
 document.addEventListener('DOMContentLoaded', function() {
+    // Store current URL for back button navigation
+    // This helps the view page know where to return to
+    try {
+        sessionStorage.setItem('procurement_item_requests_return_url', window.location.href);
+    } catch (e) {
+        // sessionStorage might not be available
+    }
+    
     // Set up tab search functionality with debouncing
     const tabSearchInput = document.getElementById('tabSearchInput');
     if (tabSearchInput) {

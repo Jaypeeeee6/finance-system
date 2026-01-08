@@ -6370,35 +6370,63 @@ function escapeHtml(s) {
 document.addEventListener('DOMContentLoaded', function() {
     const backButton = document.getElementById('back-to-item-requests-btn');
     if (backButton) {
-        // Check if return_url parameter is in current URL (explicit return URL)
         const urlParams = new URLSearchParams(window.location.search);
         const returnUrl = urlParams.get('return_url');
+        const currentUrl = new URL(window.location.href);
+        const currentPathname = currentUrl.pathname;
         
-        if (returnUrl) {
-            // Use the explicit return_url parameter
+        // First check sessionStorage for stored return URL
+        let storedReturnUrl = sessionStorage.getItem('procurement_item_requests_return_url');
+        
+        // Validate stored URL - make sure it's not the same page
+        if (storedReturnUrl) {
+            try {
+                const storedUrl = new URL(storedReturnUrl);
+                if (storedUrl.pathname === currentPathname) {
+                    // Same page - clear it and don't use it
+                    sessionStorage.removeItem('procurement_item_requests_return_url');
+                    storedReturnUrl = null;
+                }
+            } catch (e) {
+                // Invalid URL - clear it
+                sessionStorage.removeItem('procurement_item_requests_return_url');
+                storedReturnUrl = null;
+            }
+        }
+        
+        if (storedReturnUrl) {
+            backButton.href = storedReturnUrl;
+        } else if (returnUrl) {
+            // Use return_url from URL parameter
             try {
                 const decodedUrl = decodeURIComponent(returnUrl);
-                backButton.href = decodedUrl;
+                const decodedUrlObj = new URL(decodedUrl, window.location.origin);
+                // Validate it's not the same page
+                if (decodedUrlObj.pathname !== currentPathname) {
+                    backButton.href = decodedUrl;
+                }
             } catch (e) {
                 console.log('Could not decode return_url');
             }
         } else if (document.referrer) {
-            // Use the referrer URL if it's from the same origin
+            // Use referrer as fallback, but exclude action URLs
             try {
                 const referrerUrl = new URL(document.referrer);
-                const currentUrl = new URL(window.location.href);
                 
-                // Only use referrer if it's from the same origin (same domain)
-                if (referrerUrl.origin === currentUrl.origin) {
-                    // Use the full referrer URL with all its parameters preserved
+                if (referrerUrl.origin === currentUrl.origin &&
+                    !referrerUrl.pathname.includes('/approve') &&
+                    !referrerUrl.pathname.includes('/reject') &&
+                    !referrerUrl.pathname.includes('/complete') &&
+                    !referrerUrl.pathname.includes('/assign') &&
+                    !referrerUrl.pathname.includes('/edit') &&
+                    referrerUrl.pathname !== currentPathname) {
                     backButton.href = document.referrer;
                 }
             } catch (e) {
-                // If referrer URL parsing fails, use default item requests URL
                 console.log('Could not parse referrer URL');
             }
         }
-        // If no referrer or return_url, the button will use the default procurement_item_requests URL
+        // If no return URL found, the button will use the default procurement_item_requests URL
     }
 });
 
