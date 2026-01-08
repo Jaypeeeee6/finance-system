@@ -17446,10 +17446,16 @@ def export_item_request_reports_excel():
         if all_branch_conditions:
             query = query.filter(db.or_(*all_branch_conditions))
     
+    # Date filtering - when a date range is provided, filter by completion_date.
+    # Requests without a completion_date should NOT appear in date-scoped results.
     if date_from:
-        query = query.filter(ProcurementItemRequest.request_date >= datetime.strptime(date_from, '%Y-%m-%d').date())
+        query = query.filter(ProcurementItemRequest.completion_date.isnot(None)).filter(
+            ProcurementItemRequest.completion_date >= datetime.strptime(date_from, '%Y-%m-%d')
+        )
     if date_to:
-        query = query.filter(ProcurementItemRequest.request_date <= datetime.strptime(date_to, '%Y-%m-%d').date())
+        query = query.filter(ProcurementItemRequest.completion_date.isnot(None)).filter(
+            ProcurementItemRequest.completion_date <= datetime.strptime(date_to, '%Y-%m-%d')
+        )
     
     # Get all filtered requests
     all_requests = query.order_by(ProcurementItemRequest.created_at.desc()).all()
@@ -18337,10 +18343,16 @@ def export_reports_excel():
     if payment_method_filter:
         # Handle multiple payment method filters
         query = query.filter(PaymentRequest.payment_method.in_(payment_method_filter))
+    # Date filtering - when a date range is provided, filter by completion_date.
+    # Requests without a completion_date should NOT appear in date-scoped results.
     if date_from:
-        query = query.filter(PaymentRequest.date >= datetime.strptime(date_from, '%Y-%m-%d').date())
+        query = query.filter(PaymentRequest.completion_date.isnot(None)).filter(
+            PaymentRequest.completion_date >= datetime.strptime(date_from, '%Y-%m-%d').date()
+        )
     if date_to:
-        query = query.filter(PaymentRequest.date <= datetime.strptime(date_to, '%Y-%m-%d').date())
+        query = query.filter(PaymentRequest.completion_date.isnot(None)).filter(
+            PaymentRequest.completion_date <= datetime.strptime(date_to, '%Y-%m-%d').date()
+        )
 
     result_requests = query.order_by(PaymentRequest.date.desc()).all()
 
@@ -18794,11 +18806,16 @@ def export_reports_pdf():
     if payment_method_filter:
         query = query.filter(PaymentRequest.payment_method.in_(payment_method_filter))
 
-    # Date filtering - use submission date (date field) which exists for all requests
+    # Date filtering - when a date range is provided, filter by completion_date.
+    # Requests without a completion_date should NOT appear in date-scoped results.
     if date_from:
-        query = query.filter(PaymentRequest.date >= datetime.strptime(date_from, '%Y-%m-%d').date())
+        query = query.filter(PaymentRequest.completion_date.isnot(None)).filter(
+            PaymentRequest.completion_date >= datetime.strptime(date_from, '%Y-%m-%d').date()
+        )
     if date_to:
-        query = query.filter(PaymentRequest.date <= datetime.strptime(date_to, '%Y-%m-%d').date())
+        query = query.filter(PaymentRequest.completion_date.isnot(None)).filter(
+            PaymentRequest.completion_date <= datetime.strptime(date_to, '%Y-%m-%d').date()
+        )
     result_requests = query.order_by(PaymentRequest.date.desc()).all()
 
     # Helper function to convert to float
