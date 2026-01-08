@@ -4776,8 +4776,11 @@ def view_item_request(request_id):
     # Check access permissions
     can_view = False
     if current_user.department == 'Procurement':
+        # Procurement Department Manager can view all Procurement department requests regardless of status
+        if current_user.role == 'Department Manager' and item_request.department == 'Procurement':
+            can_view = True
         # All Procurement staff (Manager and Staff) can view all requests except "Pending Manager Approval" and "Rejected by Manager"
-        if item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
+        elif item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
             can_view = True
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager can view all requests (view-only)
@@ -4953,8 +4956,11 @@ def view_item_request_page(request_id):
     # Check access permissions
     can_view = False
     if current_user.department == 'Procurement':
+        # Procurement Department Manager can view all Procurement department requests regardless of status
+        if current_user.role == 'Department Manager' and item_request.department == 'Procurement':
+            can_view = True
         # All Procurement staff (Manager and Staff) can view all requests except "Pending Manager Approval" and "Rejected by Manager"
-        if item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
+        elif item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
             can_view = True
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager can view all requests (view-only)
