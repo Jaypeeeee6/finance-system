@@ -632,11 +632,44 @@ function switchTab(tab) {
         .then(html => {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
-            const newBody = doc.querySelector('.card-body');
-            const curBody = document.querySelector('.card-body');
+            // Prefer the card-body that contains the requests table (.table-responsive)
+            function findRequestsBody(root) {
+                const bodies = root.querySelectorAll('.card-body');
+                for (const b of bodies) {
+                    if (b.querySelector('.table-responsive')) return b;
+                }
+                // Fallback to first .card-body
+                return root.querySelector('.card-body');
+            }
+
+            const newBody = findRequestsBody(doc);
+            const curBody = findRequestsBody(document);
             if (newBody && curBody) {
                 const scrollY = window.scrollY || window.pageYOffset;
                 curBody.innerHTML = newBody.innerHTML;
+                // Update tab navigation active state to match the new tab
+                try {
+                    const tabButtons = document.querySelectorAll('.tab-button');
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    // Prefer matching by id (ids are usually 'tab-<tabName>')
+                    const targetById = document.getElementById('tab-' + tab);
+                    if (targetById) {
+                        targetById.classList.add('active');
+                    } else {
+                        // Fallback: match the onclick handler's switchTab(...) argument
+                        for (const btn of tabButtons) {
+                            const onclickAttr = btn.getAttribute('onclick') || '';
+                            const match = onclickAttr.match(/switchTab\('([^']+)'\)/);
+                            if (match && match[1] === tab) {
+                                btn.classList.add('active');
+                                break;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // Non-fatal: if tab navigation update fails, continue with content swap
+                    console.error('Failed to update tab active state', e);
+                }
                 history.pushState({}, '', url.toString());
                 // restore scroll
                 window.scrollTo(0, scrollY);
@@ -676,10 +709,18 @@ function performSearch(commit) {
         .then(html => {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
-            
+
+            function findRequestsBody(root) {
+                const bodies = root.querySelectorAll('.card-body');
+                for (const b of bodies) {
+                    if (b.querySelector('.table-responsive')) return b;
+                }
+                return root.querySelector('.card-body');
+            }
+
             // Update the entire card-body content (includes table and empty state)
-            const newBody = doc.querySelector('.card-body');
-            const curBody = document.querySelector('.card-body');
+            const newBody = findRequestsBody(doc);
+            const curBody = findRequestsBody(document);
             if (newBody && curBody) {
                 curBody.innerHTML = newBody.innerHTML;
             }
