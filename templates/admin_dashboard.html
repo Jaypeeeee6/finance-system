@@ -135,8 +135,9 @@
                     <div class="table-responsive">
                         <table class="data-table">
                             <thead>
-                                <tr>
+                            <tr>
                                     <th>ID</th>
+                                    <th class="expand-col"></th>
                                     <th>Type</th>
                                     <th>Payment Type</th>
                                     <th>Payment Method</th>
@@ -154,6 +155,14 @@
                                 <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
                                     <td>
                                         <span>#{{ req.request_id }}</span>
+                                    </td>
+                                    <td class="expand-cell">
+                                        {% if req.recurring == 'Recurring' %}
+                                            <img src="{{ url_for('static', filename='css/icons/chevron-right.svg') }}" class="chevron-toggle" data-request-id="{{ req.request_id }}" alt="expand" />
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        
                                         {% if req.is_urgent %}
                                             <br>
                                             <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
@@ -216,6 +225,47 @@
                                         </a>
                                     </td>
                                 </tr>
+                                {% if req.recurring == 'Recurring' %}
+                                {% set schedules = req.payment_schedules | sort(attribute='payment_order') %}
+                                <tr class="nested-row" data-parent="{{ req.request_id }}" style="display:none;">
+                                    <td colspan="20" class="nested-container">
+                                        <div class="nested-inner">
+                                            <table class="nested-schedule-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th class="col-schedule-id">Schedule ID</th>
+                                                        <th class="col-date">Date</th>
+                                                        <th class="col-amount">Amount</th>
+                                                        <th class="col-status">Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% set letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
+                                                    {% if schedules %}
+                                                        {% for item in schedules %}
+                                                        {% set letter = letters[loop.index0] if loop.index0 < letters|length else letters[loop.index0 % letters|length] %}
+                                                        <tr>
+                                                            <td class="col-schedule-id">#{{ req.request_id }}-{{ letter }}</td>
+                                                            <td class="col-date">{{ item.payment_date.strftime('%Y-%m-%d') if item.payment_date else '-' }}</td>
+                                                            <td class="col-amount">OMR {{ '%.3f'|format(item.amount) }}</td>
+                                                            <td class="col-status">
+                                                                {% if item.is_paid %}
+                                                                    <span class="status-chip status-chip--paid">Paid</span>
+                                                                {% else %}
+                                                                    <span class="status-chip status-chip--pending">Pending</span>
+                                                                {% endif %}
+                                                            </td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        <tr><td colspan="4" style="color:#666;">No schedule</td></tr>
+                                                    {% endif %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endif %}
                                 {% endfor %}
                             </tbody>
                         </table>
