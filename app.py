@@ -18410,8 +18410,8 @@ def export_reports_excel():
         ws['A5'] = f"Total Amount: OMR {total_amount:.3f}"
         ws['A5'].font = Font(size=12, bold=True)
 
-        # Add headers starting from row 7
-        headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment Type', 'Payment Method', 'Scheduled', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver', 'Manager Duration', 'Finance Duration']
+        # Add headers starting from row 7 (removed 'Scheduled' column)
+        headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment Type', 'Payment Method', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver', 'Manager Duration', 'Finance Duration']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=7, column=col, value=str(header))
             cell.font = Font(bold=True)
@@ -18496,6 +18496,7 @@ def export_reports_excel():
             if amount_value is None:
                 amount_value = 0.0
             
+            # Scheduled removed from export; Amount is now column G
             row_data = [
                 f"#{r.request_id}",
                 str(r.request_type or ''),
@@ -18503,12 +18504,11 @@ def export_reports_excel():
                 str(r.department or ''),
                 payment_type_display,
                 str(r.payment_method or 'Card'),
-                scheduled_date,
-                amount_value,  # Store numeric value for Amount column (column H = 8)
+                amount_value,  # Amount column (G = 7)
                 str(r.branch_name or '').replace(',', ', '),
                 str(company_display or ''),
-                submitted_date_str,  # Store as formatted string for Submitted column (column K = 11)
-                approved_date_str,  # Store as formatted string for Approved column (column L = 12)
+                submitted_date_str,  # Submitted column (J = 10)
+                approved_date_str,   # Approved column (K = 11)
                 str(r.approver or ''),
                 manager_duration,
                 finance_duration
@@ -18516,7 +18516,7 @@ def export_reports_excel():
             
             for col, data in enumerate(row_data, 1):
                 # For Amount column, explicitly set as float to ensure Excel treats it as number
-                if col == 8:
+                if col == 7:
                     # Ensure the value is a proper float, not string or None
                     numeric_value = float(amount_value) if amount_value is not None else 0.0
                     cell = ws.cell(row=row_idx, column=col, value=numeric_value)
@@ -18524,18 +18524,18 @@ def export_reports_excel():
                     # This ensures SUM, SUBTOTAL, and other formulas work correctly with filters
                     cell.number_format = '#,##0.000'
                     cell.alignment = Alignment(horizontal='right', vertical='top')
-                # For Submitted date column (column K = 11) - store as string for immediate rendering
-                elif col == 11:
+                # For Submitted date column (column J = 10) - store as string for immediate rendering
+                elif col == 10:
                     cell = ws.cell(row=row_idx, column=col, value=str(data) if data else '')
                     cell.alignment = Alignment(horizontal='left', vertical='top')
-                # For Approved date column (column L = 12) - store as string for immediate rendering
-                elif col == 12:
+                # For Approved date column (column K = 11) - store as string for immediate rendering
+                elif col == 11:
                     cell = ws.cell(row=row_idx, column=col, value=str(data) if data else '')
                     cell.alignment = Alignment(horizontal='left', vertical='top')
                 else:
                     cell = ws.cell(row=row_idx, column=col, value=str(data) if data is not None else '')
                     # Enable text wrapping for columns that may have long text
-                    if col in [7, 9, 10]:  # Scheduled Date, Branch Name, Company columns
+                    if col in [8, 9]:  # Branch Name, Company columns
                         cell.alignment = Alignment(wrap_text=True, vertical='top')
                     else:
                         cell.alignment = Alignment(vertical='top', horizontal='left')
@@ -18561,18 +18561,20 @@ def export_reports_excel():
                 except:
                     pass
             
-            # Special handling for specific columns
+            # Special handling for specific columns (adjusted after removing Scheduled)
             if column_letter == 'A':  # ID column - make it narrower
                 adjusted_width = min(max_length + 2, 12)  # Cap ID column at 12 characters
             elif column_letter == 'D':  # Department column - make it wider
                 adjusted_width = min(max_length + 2, 25)  # Cap Department column at 25 characters
-            elif column_letter == 'G':  # Scheduled Date column - make it wider
-                adjusted_width = min(max_length + 2, 60)  # Cap Scheduled Date column at 60 characters
-            elif column_letter == 'H':  # Amount column - make it wider to accommodate "OMR #,##0.000" format
+            elif column_letter == 'G':  # Amount column - make it wider to accommodate "OMR #,##0.000" format
                 adjusted_width = max(max_length + 2, 20)  # Minimum 20 characters, can grow if needed
-            elif column_letter == 'M':  # Approver column - make it wider
+            elif column_letter == 'H':  # Branch column
+                adjusted_width = min(max_length + 2, 30)
+            elif column_letter == 'I':  # Company column
+                adjusted_width = min(max_length + 2, 30)
+            elif column_letter == 'L':  # Approver column - make it wider
                 adjusted_width = min(max_length + 2, 35)  # Cap Approver column at 35 characters
-            elif column_letter in ['N', 'O']:  # Duration columns - make them narrower
+            elif column_letter in ['M', 'N']:  # Duration columns - make them narrower
                 adjusted_width = min(max_length + 2, 15)  # Cap duration columns at 15 characters
             else:
                 adjusted_width = min(max_length + 2, 50)  # Cap other columns at 50 characters
@@ -18608,10 +18610,11 @@ def export_reports_excel():
         # Instead, ensure dates are written correctly from the start
         
         # Ensure date columns have proper width to display dates fully
+        # Adjust Submitted/Approved columns after removing Scheduled (now J and K)
+        j_width = ws.column_dimensions.get('J').width if 'J' in ws.column_dimensions else None
         k_width = ws.column_dimensions.get('K').width if 'K' in ws.column_dimensions else None
-        l_width = ws.column_dimensions.get('L').width if 'L' in ws.column_dimensions else None
-        ws.column_dimensions['K'].width = max(k_width or 10, 12)  # Submitted column
-        ws.column_dimensions['L'].width = max(l_width or 10, 12)  # Approved column
+        ws.column_dimensions['J'].width = max(j_width or 10, 12)  # Submitted column (J)
+        ws.column_dimensions['K'].width = max(k_width or 10, 12)  # Approved column (K)
         
         # Set workbook to use automatic calculation (helps with rendering)
         try:
@@ -19030,10 +19033,11 @@ def export_reports_pdf():
         
         # Table header
         c.setFont(body_font if arabic_font_name else 'Helvetica-Bold', 9)
-        headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment', 'Scheduled', 'Amount', 'Branch', 'Company', 'Approver']
-        # Column widths optimized for landscape A4 with proper spacing
-        # [ID, Type, Requestor, Department, Payment, Scheduled, Amount, Branch, Company, Approver]
-        col_widths = [14*mm, 30*mm, 22*mm, 18*mm, 16*mm, 40*mm, 18*mm, 26*mm, 26*mm, 28*mm]
+        # Removed 'Scheduled' column from PDF export (frontend-only removal mirrored in generated report)
+        headers = ['ID', 'Type', 'Requestor', 'Department', 'Payment', 'Amount', 'Branch', 'Company', 'Approver']
+        # Column widths optimized for landscape A4 with proper spacing (matching new headers)
+        # [ID, Type, Requestor, Department, Payment, Amount, Branch, Company, Approver]
+        col_widths = [14*mm, 30*mm, 22*mm, 18*mm, 16*mm, 18*mm, 30*mm, 30*mm, 28*mm]
         # Calculate column positions based on widths to prevent overlapping
         column_gap = 4 * mm  # slightly larger inter-column gap
         col_x = [left]
@@ -19057,23 +19061,13 @@ def export_reports_pdf():
             # For Person/Company column, show person_company field only
             company_display = r.person_company
 
-            scheduled_date = ''
-            if r.recurring == 'Recurring':
-                # Get scheduled dates for recurring payments
-                scheduled_date = get_recurring_scheduled_dates(r)
-            elif (not getattr(r, 'recurring', None) or getattr(r, 'recurring', None) != 'Recurring') and getattr(r, 'payment_date', None):
-                try:
-                    scheduled_date = r.payment_date.strftime('%Y-%m-%d')
-                except Exception:
-                    scheduled_date = str(r.payment_date)
-
+            # Scheduled date removed from exported PDF (useful only in frontend view)
             row_data = [
                 f"#{r.request_id}",
                 str(r.request_type or ''),
                 str(r.requestor_name or ''),
                 str(r.department or ''),
                 str(r.recurring or 'One-Time'),
-                scheduled_date,
                 f"OMR {to_float(r.amount):.3f}",
                 str(r.branch_name or '').replace(',', ', '),
                 str(company_display or ''),

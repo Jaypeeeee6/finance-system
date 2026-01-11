@@ -22,16 +22,15 @@
         font-size: 14px;
     }
 
-    /* Make status column chips and text slightly smaller (item requests) */
-    .data-table th:nth-child(9),
-    .data-table td:nth-child(9) {
+    /* Status column chips and text (use .status-col for stable targeting) */
+    .status-col {
         font-size: 13px;
     }
-    .data-table td:nth-child(9) .badge,
-    .data-table td:nth-child(9) .status-chip,
-    .data-table td:nth-child(9) .badge-warning,
-    .data-table td:nth-child(9) .badge-success,
-    .data-table td:nth-child(9) .badge-info {
+    .status-col .badge,
+    .status-col .status-chip,
+    .status-col .badge-warning,
+    .status-col .badge-success,
+    .status-col .badge-info {
         font-size: 12px !important;
         padding: 8px 14px !important;
         line-height: 1.3 !important;
@@ -993,7 +992,7 @@
                                     {% endif %}
                                 </td>
                                 <td>{{ req.request_date.strftime('%Y-%m-%d') if req.request_date else '-' }}</td>
-                                <td>
+                                <td class="status-col">
                                     {% if req.status == 'Completed' %}
                                         <span class="badge" style="background: #28a745; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">✓ {{ req.status }}</span>
                                     {% elif req.status == 'On Hold' %}
