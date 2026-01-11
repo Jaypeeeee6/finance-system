@@ -617,11 +617,20 @@
         margin: 0;
     }
 
+    /* Page-specific header adjustments to match Payment Reports page */
+    .dashboard-header {
+        padding-left: 16px;
+    }
+    .dashboard-header .dashboard-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
 </style>
 <div class="dashboard-container">
     <div class="dashboard-header">
-        <h1><i class="fas fa-chart-bar"></i> Item Request Reports</h1>
-        <p>Filter and analyze item requests</p>
+        <h2 class="dashboard-title" style="margin:0;"><i class="fas fa-chart-bar"></i> Item Request Reports</h2>
     </div>
 
     <!-- Active Filters -->

@@ -17569,8 +17569,8 @@ def export_item_request_reports_excel():
         ws['A5'] = f"Total Amount: OMR {total_amount:.3f}"
         ws['A5'].font = Font(size=12, bold=True)
         
-        # Add headers starting from row 7
-        headers = ['ID', 'Category', 'Item Name', 'Quantity', 'Requestor', 'Department', 'Branch', 'Request Date', 'Status', 'Amount (OMR)', 'Assigned To']
+        # Add headers starting from row 7 (include Completion Date)
+        headers = ['ID', 'Category', 'Item Name', 'Quantity', 'Requestor', 'Department', 'Branch', 'Request Date', 'Completion Date', 'Status', 'Amount (OMR)', 'Assigned To']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=7, column=col, value=str(header))
             cell.font = Font(bold=True)
@@ -17581,6 +17581,7 @@ def export_item_request_reports_excel():
         # Add data rows
         for row_idx, req in enumerate(all_requests, 8):
             request_date_str = req.request_date.strftime('%Y-%m-%d') if req.request_date else '-'
+            completion_date_str = req.completion_date.strftime('%Y-%m-%d') if getattr(req, 'completion_date', None) else '-'
             amount_value = to_float(req.receipt_amount)
             # Get quantity from assigned procurement staff (preferred), then manager, then original
             quantity_source = req.assigned_procurement_quantities or req.procurement_manager_quantities or req.procurement_quantities or req.quantity or ''
@@ -17630,14 +17631,15 @@ def export_item_request_reports_excel():
                 str(req.department or ''),
                 branch_display or '',
                 request_date_str,
+                completion_date_str,
                 str(req.status or ''),
                 amount_value,
                 str(req.assigned_to_user.name if req.assigned_to_user else '')
             ]
             
             for col, data in enumerate(row_data, 1):
-                # For Amount column (column 10), explicitly set as float
-                if col == 10:
+                # For Amount column (now column 11), explicitly set as float
+                if col == 11:
                     numeric_value = float(amount_value) if amount_value is not None else 0.0
                     cell = ws.cell(row=row_idx, column=col, value=numeric_value)
                     cell.number_format = '#,##0.000'
@@ -17873,11 +17875,11 @@ def export_item_request_reports_pdf():
         c.drawString(left, y, f"Total Amount: OMR {total_amount:.3f}")
         y -= 18
         
-        # Table header
+        # Table header (include Completion Date)
         c.setFont('Helvetica-Bold', 9)
-        headers = ['ID', 'Category', 'Item Name', 'Quantity', 'Requestor', 'Department', 'Branch', 'Request Date', 'Status', 'Amount', 'Assigned To']
-        # Column widths optimized for landscape A4
-        col_widths = [12*mm, 16*mm, 26*mm, 14*mm, 18*mm, 16*mm, 20*mm, 18*mm, 17*mm, 14*mm, 18*mm]
+        headers = ['ID', 'Category', 'Item Name', 'Quantity', 'Requestor', 'Department', 'Branch', 'Request Date', 'Completion Date', 'Status', 'Amount', 'Assigned To']
+        # Column widths optimized for landscape A4 (adjusted for new column)
+        col_widths = [12*mm, 16*mm, 26*mm, 14*mm, 18*mm, 16*mm, 20*mm, 18*mm, 18*mm, 17*mm, 14*mm, 18*mm]
         column_gap = 4 * mm
         col_x = [left]
         for i in range(1, len(col_widths)):
@@ -17979,6 +17981,7 @@ def export_item_request_reports_pdf():
                 str(r.department or ''),
                 branch_display or '',
                 r.request_date.strftime('%Y-%m-%d') if r.request_date else '-',
+                r.completion_date.strftime('%Y-%m-%d') if getattr(r, 'completion_date', None) else '-',
                 str(r.status or ''),
                 f"OMR {to_float(r.receipt_amount):.3f}",
                 str(r.assigned_to_user.name if r.assigned_to_user else '')
