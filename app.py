@@ -4779,6 +4779,9 @@ def view_item_request(request_id):
         # Procurement Department Manager can view all Procurement department requests regardless of status
         if current_user.role == 'Department Manager' and item_request.department == 'Procurement':
             can_view = True
+        # Allow procurement users to view requests they created at any status
+        elif item_request.user_id == current_user.user_id:
+            can_view = True
         # All Procurement staff (Manager and Staff) can view all requests except "Pending Manager Approval" and "Rejected by Manager"
         elif item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
             can_view = True
@@ -4958,6 +4961,9 @@ def view_item_request_page(request_id):
     if current_user.department == 'Procurement':
         # Procurement Department Manager can view all Procurement department requests regardless of status
         if current_user.role == 'Department Manager' and item_request.department == 'Procurement':
+            can_view = True
+        # Allow procurement users to view requests they created at any status
+        elif item_request.user_id == current_user.user_id:
             can_view = True
         # All Procurement staff (Manager and Staff) can view all requests except "Pending Manager Approval" and "Rejected by Manager"
         elif item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
