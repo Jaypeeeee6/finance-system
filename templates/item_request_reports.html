@@ -931,6 +931,7 @@
                                 <th>Department</th>
                                 <th>Branch</th>
                                 <th>Request Date</th>
+                                <th>Completion Date</th>
                                 <th>Status</th>
                                 <th>Amount</th>
                                 <th>Assigned To</th>
@@ -992,6 +993,7 @@
                                     {% endif %}
                                 </td>
                                 <td>{{ req.request_date.strftime('%Y-%m-%d') if req.request_date else '-' }}</td>
+                                <td>{{ req.completion_date.strftime('%Y-%m-%d') if req.completion_date else '-' }}</td>
                                 <td class="status-col">
                                     {% if req.status == 'Completed' %}
                                         <span class="badge" style="background: #28a745; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">✓ {{ req.status }}</span>

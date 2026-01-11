@@ -17797,10 +17797,15 @@ def export_item_request_reports_pdf():
         if all_branch_conditions:
             query = query.filter(db.or_(*all_branch_conditions))
     
+    # Date filtering - use completion_date for item request reports (exclude those without completion_date)
     if date_from:
-        query = query.filter(ProcurementItemRequest.request_date >= datetime.strptime(date_from, '%Y-%m-%d').date())
+        query = query.filter(ProcurementItemRequest.completion_date.isnot(None)).filter(
+            ProcurementItemRequest.completion_date >= datetime.strptime(date_from, '%Y-%m-%d')
+        )
     if date_to:
-        query = query.filter(ProcurementItemRequest.request_date <= datetime.strptime(date_to, '%Y-%m-%d').date())
+        query = query.filter(ProcurementItemRequest.completion_date.isnot(None)).filter(
+            ProcurementItemRequest.completion_date <= datetime.strptime(date_to, '%Y-%m-%d')
+        )
     
     # Get all filtered requests
     result_requests = query.order_by(ProcurementItemRequest.created_at.desc()).all()
