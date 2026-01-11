@@ -2454,19 +2454,19 @@ body.flash-error-open {
 }
 .nested-inner {
     overflow-x: auto;
-    padding: 0.25rem 0 0.25rem 4rem; /* larger left inset so table moves further right */
+    padding: 0.25rem 0 0.25rem 4rem; /* increased inset so inner content shifts right */
 }
 .nested-schedule-table {
-    width: 85% !important;
+    width: 92% !important;
     max-width: 1000px !important;
     border-collapse: collapse;
     margin: 0;
-    margin-left: 3.75rem !important; /* shift to the right but allow table to be wider */
+    margin-left: 5rem !important; /* moved further right */
     background: #ffffff !important;
     border: 1px solid #e6e6e6 !important;
     border-radius: 6px !important;
     box-shadow: 0 6px 18px rgba(0,0,0,0.04) !important;
-    table-layout: fixed !important;
+    table-layout: auto !important;
 }
 .nested-schedule-table th,
 .nested-schedule-table td {
@@ -2479,15 +2479,16 @@ body.flash-error-open {
     background: transparent;
 }
 .nested-schedule-table {
-    table-layout: fixed; /* enforce column widths */
+    /* prefer fixed layout so column widths below are enforced */
+    table-layout: fixed !important;
 }
 
-/* Make Date column wider so there's more space before Amount */
+/* Explicit column widths (enforced by fixed table layout) */
 .nested-schedule-table th:first-child,
 .nested-schedule-table td:first-child {
-    min-width: 420px !important;
-    width: 420px !important;
-    padding-right: 1.5rem !important; /* extra gap before amount */
+    /* Equal column widths: use 25% for each column */
+    width: 25% !important;
+    padding-right: 0.5rem !important;
 }
 
 .nested-row td.nested-container {
@@ -2515,6 +2516,30 @@ body.flash-error-open {
     background: #fff3cd;
     color: #856404;
     border: 1px solid #ffe8a1;
+}
+
+/* Column-specific widths for nested schedule table */
+.nested-schedule-table th.col-schedule-id,
+.nested-schedule-table td.col-schedule-id {
+    width: 25% !important;
+    padding-right: 0.75rem !important;
+}
+.nested-schedule-table th.col-date,
+.nested-schedule-table td.col-date {
+    width: 25% !important;
+    padding-right: 0.4rem !important;
+}
+}
+.nested-schedule-table th.col-amount,
+.nested-schedule-table td.col-amount {
+    width: 25% !important;
+    text-align: left !important;
+    white-space: normal !important;
+}
+.nested-schedule-table th.col-status,
+.nested-schedule-table td.col-status {
+    width: 25% !important;
+    text-align: left;
 }
 
 /* ==================== TABLE ACTIONS ==================== */

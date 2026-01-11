@@ -231,29 +231,33 @@
                                             <table class="nested-schedule-table">
                                                 <thead>
                                                     <tr>
-                                                        <th>Date</th>
-                                                        <th>Amount</th>
-                                                        <th>Status</th>
+                                                        <th class="col-schedule-id">Schedule ID</th>
+                                                        <th class="col-date">Date</th>
+                                                        <th class="col-amount">Amount</th>
+                                                        <th class="col-status">Status</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {% set schedules = req.payment_schedules | sort(attribute='payment_order') %}
+                                                    {% set letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
                                                     {% if schedules %}
                                                         {% for item in schedules %}
+                                                        {% set letter = letters[loop.index0] if loop.index0 < letters|length else letters[loop.index0 % letters|length] %}
                                                         <tr>
-                                                            <td>{{ item.payment_date.strftime('%Y-%m-%d') if item.payment_date else '-' }}</td>
-                                                            <td>OMR {{ '%.3f'|format(item.amount) }}</td>
-                                                            <td>
+                                                            <td class="col-schedule-id">#{{ req.request_id }}-{{ letter }}</td>
+                                                            <td class="col-date">{{ item.payment_date.strftime('%Y-%m-%d') if item.payment_date else '-' }}</td>
+                                                            <td class="col-amount">OMR {{ '%.3f'|format(item.amount) }}</td>
+                                                            <td class="col-status">
                                                                 {% if item.is_paid %}
                                                                     <span class="status-chip status-chip--paid">Paid</span>
                                                                 {% else %}
                                                                     <span class="status-chip status-chip--pending">Pending</span>
                                                                 {% endif %}
-                                                            </td>
-                                                        </tr>
+                                    </td>
+                                </tr>
                                                         {% endfor %}
                                                     {% else %}
-                                                        <tr><td colspan="3" style="color:#666;">No schedule</td></tr>
+                                                        <tr><td colspan="4" style="color:#666;">No schedule</td></tr>
                                                     {% endif %}
                                                 </tbody>
                                             </table>
