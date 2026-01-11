@@ -16989,14 +16989,39 @@ def reports():
         query = query.filter(PaymentRequest.payment_method.in_(payment_method_filter))
     
     # Date filtering - when a date range is provided, filter by completion_date.
-    # Requests without a completion_date should NOT appear in date-scoped results.
-    if date_from:
-        query = query.filter(PaymentRequest.completion_date.isnot(None)).filter(
-            PaymentRequest.completion_date >= datetime.strptime(date_from, '%Y-%m-%d').date()
+    # Additionally, for recurring requests, include requests if any schedule payment
+    # (RecurringPaymentSchedule) falls within the date range and is paid.
+    # Requests without a completion_date should NOT appear in date-scoped results,
+    # except recurring requests that match a paid schedule within the range.
+    if date_from or date_to:
+        date_from_dt = datetime.strptime(date_from, '%Y-%m-%d').date() if date_from else None
+        date_to_dt = datetime.strptime(date_to, '%Y-%m-%d').date() if date_to else None
+
+        # Build completion_date condition(s)
+        completion_conditions = [PaymentRequest.completion_date.isnot(None)]
+        if date_from_dt:
+            completion_conditions.append(PaymentRequest.completion_date >= date_from_dt)
+        if date_to_dt:
+            completion_conditions.append(PaymentRequest.completion_date <= date_to_dt)
+        completion_filter = db.and_(*completion_conditions)
+
+        # Build recurring schedule existence condition
+        schedule_q = db.session.query(RecurringPaymentSchedule.schedule_id).filter(
+            RecurringPaymentSchedule.request_id == PaymentRequest.request_id,
+            RecurringPaymentSchedule.is_paid == True
         )
-    if date_to:
-        query = query.filter(PaymentRequest.completion_date.isnot(None)).filter(
-            PaymentRequest.completion_date <= datetime.strptime(date_to, '%Y-%m-%d').date()
+        if date_from_dt:
+            schedule_q = schedule_q.filter(RecurringPaymentSchedule.payment_date >= date_from_dt)
+        if date_to_dt:
+            schedule_q = schedule_q.filter(RecurringPaymentSchedule.payment_date <= date_to_dt)
+        schedule_exists = schedule_q.exists()
+
+        # Final filter: either completion_date matches OR (recurring request AND schedule exists)
+        query = query.filter(
+            db.or_(
+                completion_filter,
+                db.and_(PaymentRequest.recurring == 'Recurring', schedule_exists)
+            )
         )
     # Sort by status priority then by date (Completed by completion_date, others by created_at)
     # Get all filtered requests for stats calculation (before pagination)
@@ -17012,7 +17037,34 @@ def reports():
     on_hold_count = len([r for r in all_filtered_requests if r.status == 'On Hold'])
     
     # Calculate total amount
-    total_amount = sum(float(r.amount) for r in all_filtered_requests)
+    # If a date range is applied, for recurring requests only sum matching paid schedules
+    total_amount = 0.0
+    if date_from or date_to:
+        # Pre-parse date bounds
+        date_from_dt = datetime.strptime(date_from, '%Y-%m-%d').date() if date_from else None
+        date_to_dt = datetime.strptime(date_to, '%Y-%m-%d').date() if date_to else None
+
+        for r in all_filtered_requests:
+            try:
+                if getattr(r, 'recurring', None) == 'Recurring':
+                    # Sum only schedule amounts that fall within the date range and are paid
+                    sched_q = RecurringPaymentSchedule.query.filter(RecurringPaymentSchedule.request_id == r.request_id, RecurringPaymentSchedule.is_paid == True)
+                    if date_from_dt:
+                        sched_q = sched_q.filter(RecurringPaymentSchedule.payment_date >= date_from_dt)
+                    if date_to_dt:
+                        sched_q = sched_q.filter(RecurringPaymentSchedule.payment_date <= date_to_dt)
+                    schedules = sched_q.all()
+                    total_amount += sum(float(s.amount) for s in schedules)
+                else:
+                    total_amount += float(r.amount)
+            except Exception:
+                # Fallback - include request amount if anything goes wrong
+                try:
+                    total_amount += float(r.amount)
+                except Exception:
+                    pass
+    else:
+        total_amount = sum(float(r.amount) for r in all_filtered_requests)
     it_amount = None
     
     # Paginate the query for display with the same ordering
