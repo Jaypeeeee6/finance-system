@@ -756,6 +756,8 @@ class ProcurementItemRequest(db.Model):
     receipt_path = db.Column(db.String(255), nullable=True)  # Receipt file path for completed item requests
     invoice_path = db.Column(db.String(255), nullable=True)  # Invoice file path for completed item requests
     receipt_reference_number = db.Column(db.String(100), nullable=True)  # Reference number for the receipt/transfer
+    # Flag indicating item came from in-house store and therefore no receipt/invoice is expected
+    from_store_no_receipt = db.Column(db.Boolean, default=False)
     
     # Relationships
     manager_approver_user = db.relationship('User', foreign_keys=[manager_approver_user_id], backref='approved_item_requests_as_manager')

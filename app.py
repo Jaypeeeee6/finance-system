@@ -6306,6 +6306,8 @@ def item_request_save_uploads(request_id):
         return error_response('Receipt reference number must contain only letters and numbers (no spaces or symbols).')
 
     completion_notes = request.form.get('completion_notes', '').strip()
+    # Checkbox: item from store, no receipt/invoice expected
+    from_store_flag = bool(request.form.get('from_store_no_receipt'))
     # Items assigned to this request (for invoice-to-item validation)
     assigned_items = []
     if item_request.item_name:
@@ -6543,6 +6545,8 @@ def item_request_save_uploads(request_id):
         item_request.receipt_reference_number = receipt_reference_number
     if completion_notes:
         item_request.completion_notes = completion_notes
+    # Persist from-store flag
+    item_request.from_store_no_receipt = from_store_flag
 
     # Save quantities and amounts from the right column if provided
     quantities_list = request.form.getlist('quantities[]')
@@ -6634,6 +6638,8 @@ def item_request_complete(request_id):
         return redirect(url_for('view_item_request_page', request_id=request_id))
     
     completion_notes = request.form.get('completion_notes', '').strip()
+    # Checkbox: item from store, no receipt/invoice expected
+    from_store_flag = bool(request.form.get('from_store_no_receipt'))
     # Items assigned to this request (for invoice-to-item validation)
     assigned_items = []
     if item_request.item_name:
@@ -6651,27 +6657,26 @@ def item_request_complete(request_id):
             flash('Could not read the invoice-to-item selections. Please try again.', 'danger')
             return redirect(url_for('view_item_request_page', request_id=request_id))
     
-    # Receipt Amount (required)
+    # Receipt Amount and reference (required unless item is from store)
     receipt_amount_str = request.form.get('receipt_amount', '').strip()
-    if not receipt_amount_str:
-        flash('Receipt amount is required.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
-    try:
-        receipt_amount_value = float(receipt_amount_str)
-        if receipt_amount_value <= 0:
-            raise ValueError()
-    except Exception:
-        flash('Please enter a valid positive receipt amount in OMR.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
-    
-    # Receipt reference number (required, alphanumeric only)
     receipt_reference_number = request.form.get('receipt_reference_number', '').strip()
-    if not receipt_reference_number:
-        flash('Receipt reference number is required.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
-    if not re.match(r'^[A-Za-z0-9]+$', receipt_reference_number):
-        flash('Receipt reference number must contain only letters and numbers (no spaces or symbols).', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
+    if not from_store_flag:
+        if not receipt_amount_str:
+            flash('Receipt amount is required.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id))
+        try:
+            receipt_amount_value = float(receipt_amount_str)
+            if receipt_amount_value <= 0:
+                raise ValueError()
+        except Exception:
+            flash('Please enter a valid positive receipt amount in OMR.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id))
+        if not receipt_reference_number:
+            flash('Receipt reference number is required.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id))
+        if not re.match(r'^[A-Za-z0-9]+$', receipt_reference_number):
+            flash('Receipt reference number must contain only letters and numbers (no spaces or symbols).', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id))
     
     # Handle receipt file upload (allow reuse of existing saved receipts)
     existing_receipt_files = []
@@ -6683,9 +6688,10 @@ def item_request_complete(request_id):
 
     receipt_files = request.files.getlist('receipt_files')
     has_new_receipts = receipt_files and any(f.filename for f in receipt_files)
-    if not has_new_receipts and not existing_receipt_files:
-        flash('Upload Receipt file is required.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
+    if not from_store_flag:
+        if not has_new_receipts and not existing_receipt_files:
+            flash('Upload Receipt file is required.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id))
     
     # Handle invoice file upload (allow reuse of existing saved invoices)
     def _parse_invoice_entries(raw_value):
@@ -6728,12 +6734,20 @@ def item_request_complete(request_id):
 
     invoice_files = request.files.getlist('invoice_files')
     has_new_invoices = invoice_files and any(f.filename for f in invoice_files)
-    if not has_new_invoices and not existing_invoice_entries:
-        flash('Upload Invoice file is required.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
-    if has_new_invoices and not invoice_item_map:
-        flash('Please choose which item(s) apply to each invoice file you are uploading.', 'danger')
-        return redirect(url_for('view_item_request_page', request_id=request_id))
+    if not from_store_flag:
+        if not has_new_invoices and not existing_invoice_entries:
+            flash('Upload Invoice file is required.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id))
+        if has_new_invoices and not invoice_item_map:
+            flash('Please choose which item(s) apply to each invoice file you are uploading.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id))
+    if not from_store_flag:
+        if not has_new_invoices and not existing_invoice_entries:
+            flash('Upload Invoice file is required.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id))
+        if has_new_invoices and not invoice_item_map:
+            flash('Please choose which item(s) apply to each invoice file you are uploading.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id))
     
     allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
     max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
@@ -6844,10 +6858,16 @@ def item_request_complete(request_id):
     invoice_total = _invoice_total(final_invoices)
 
     item_request.status = 'Final Approval'
-    item_request.receipt_amount = receipt_amount_value
+    # Only set receipt amount/reference when not marked as from-store (no receipt expected)
+    if not from_store_flag:
+        item_request.receipt_amount = receipt_amount_value
+        item_request.receipt_reference_number = receipt_reference_number
+    else:
+        # Clear receipt fields when item is from store
+        item_request.receipt_amount = None
+        item_request.receipt_reference_number = None
     if invoice_total is not None:
         item_request.invoice_amount = invoice_total
-    item_request.receipt_reference_number = receipt_reference_number
     item_request.receipt_path = json.dumps(final_receipts)
     item_request.invoice_path = json.dumps(final_invoices)
     item_request.updated_at = current_time

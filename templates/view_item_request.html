@@ -862,6 +862,12 @@ body.flash-success-open {
                     {% if payment_date_scheduled_by %} by {{ payment_date_scheduled_by }}{% endif %}
                 </span>
             {% endif %}
+            {# Show 'from store' banner when assigned-to-procurement step is completed (Final Approval or Completed) #}
+            {% if item_request.from_store_no_receipt and item_request.status in ['Final Approval', 'Completed'] %}
+                <span style="margin-left: 12px; font-size: 0.9rem; background: #eef7ee; color: #198754; padding: 6px 10px; border-radius: 18px; font-weight: 600;">
+                    This item was procured from the store, there is no receipt or invoice.
+                </span>
+            {% endif %}
         </h1>
         <a href="{{ url_for('procurement_item_requests') }}" id="back-to-item-requests-btn" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Back
@@ -3223,6 +3229,12 @@ body.flash-success-open {
                                 <div style="padding-right: 15px;">
                                     <form method="POST" action="{{ url_for('item_request_complete', request_id=item_request.id) }}" enctype="multipart/form-data" id="item-request-complete-form">
                                         <div class="form-group">
+                                            <div style="margin-bottom: 12px;">
+                                                <label style="display: inline-flex; align-items: center; gap: 10px;">
+                                                    <input type="checkbox" id="from_store_no_receipt_checkbox" name="from_store_no_receipt" value="1" {% if item_request.from_store_no_receipt %}checked{% endif %} />
+                                                    <span>This item is from the store. There is no receipt and invoice</span>
+                                                </label>
+                                            </div>
                                             <div id="item-receipt-upload-container" 
                                                  data-multiple-file-upload
                                                  data-input-name="receipt_files"
@@ -4327,6 +4339,141 @@ document.addEventListener('DOMContentLoaded', function() {
         const invoiceItemMapInput = document.getElementById('invoice_item_map_input');
         const receiptUploadContainer = document.getElementById('item-receipt-upload-container');
         const invoiceUploadContainer = document.getElementById('item-invoice-upload-container');
+        // Checkbox to indicate item came from store (no receipt/invoice expected)
+        const fromStoreNoReceiptCheckbox = document.getElementById('from_store_no_receipt_checkbox');
+        // Flag used by validation to skip receipt/invoice requirements
+        let noReceiptFromStore = false;
+        if (fromStoreNoReceiptCheckbox) {
+            // Initialize based on existing value (in case of server-side pre-check)
+            noReceiptFromStore = !!fromStoreNoReceiptCheckbox.checked;
+            fromStoreNoReceiptCheckbox.addEventListener('change', function() {
+                noReceiptFromStore = !!this.checked;
+
+                // Toggle receipt upload component
+                if (receiptUploadContainer && receiptUploadContainer.uploadComponent) {
+                    const comp = receiptUploadContainer.uploadComponent;
+                    if (noReceiptFromStore) {
+                        comp.clearFiles();
+                        comp.required = false;
+                        const addBtn = document.getElementById('add-files-btn-' + receiptUploadContainer.id);
+                        if (addBtn) { addBtn.disabled = true; addBtn.style.opacity = '0.6'; addBtn.style.cursor = 'not-allowed'; }
+                    } else {
+                        comp.required = true;
+                        const addBtn = document.getElementById('add-files-btn-' + receiptUploadContainer.id);
+                        if (addBtn) { addBtn.disabled = false; addBtn.style.opacity = '1'; addBtn.style.cursor = 'pointer'; }
+                    }
+                    // Gray out the label when disabled
+                    try {
+                        const rLabel = receiptUploadContainer.querySelector('label');
+                        if (rLabel) {
+                            rLabel.style.color = noReceiptFromStore ? '#6b7280' : '';
+                            rLabel.style.opacity = noReceiptFromStore ? '0.85' : '';
+                        }
+                    } catch (err) {}
+                }
+
+                // Toggle invoice upload component and invoice mapping UI
+                if (invoiceUploadContainer && invoiceUploadContainer.uploadComponent) {
+                    const comp = invoiceUploadContainer.uploadComponent;
+                    if (noReceiptFromStore) {
+                        comp.clearFiles();
+                        comp.required = false;
+                        const addBtn = document.getElementById('add-files-btn-' + invoiceUploadContainer.id);
+                        if (addBtn) { addBtn.disabled = true; addBtn.style.opacity = '0.6'; addBtn.style.cursor = 'not-allowed'; }
+                        if (invoiceMappingWrapper) {
+                            invoiceMappingWrapper.style.display = 'none';
+                            invoiceItemMapInput.value = '';
+                            invoiceMappingList.innerHTML = '';
+                        }
+                    } else {
+                        comp.required = true;
+                        const addBtn = document.getElementById('add-files-btn-' + invoiceUploadContainer.id);
+                        if (addBtn) { addBtn.disabled = false; addBtn.style.opacity = '1'; addBtn.style.cursor = 'pointer'; }
+                        // Refresh mapping if there are files
+                        refreshInvoiceMapping();
+                    }
+                    // Gray out the label when disabled
+                    try {
+                        const iLabel = invoiceUploadContainer.querySelector('label');
+                        if (iLabel) {
+                            iLabel.style.color = noReceiptFromStore ? '#6b7280' : '';
+                            iLabel.style.opacity = noReceiptFromStore ? '0.85' : '';
+                        }
+                    } catch (err) {}
+                } else {
+                    // If fallback inputs are used, disable them visually when noReceiptFromStore
+                    const receiptFileInput = itemRequestCompleteForm.querySelector('input[name="receipt_files"]');
+                    const invoiceFileInput = itemRequestCompleteForm.querySelector('input[name="invoice_files"]');
+                    if (receiptFileInput) receiptFileInput.disabled = noReceiptFromStore;
+                    if (invoiceFileInput) invoiceFileInput.disabled = noReceiptFromStore;
+                    if (noReceiptFromStore && invoiceMappingWrapper) {
+                        invoiceMappingWrapper.style.display = 'none';
+                        invoiceItemMapInput.value = '';
+                        invoiceMappingList.innerHTML = '';
+                    } else if (invoiceMappingWrapper) {
+                        refreshInvoiceMapping();
+                    }
+                }
+
+                // Disable/enable other related inputs: receipt amount, receipt reference, and invoice mapping inputs
+                const receiptAmountInputEl = itemRequestCompleteForm.querySelector('#completion_receipt_amount');
+                const receiptRefEl = itemRequestCompleteForm.querySelector('#completion_receipt_reference_number');
+                if (receiptAmountInputEl) {
+                    receiptAmountInputEl.disabled = noReceiptFromStore;
+                    if (noReceiptFromStore) receiptAmountInputEl.removeAttribute('required');
+                    else receiptAmountInputEl.setAttribute('required', 'true');
+                }
+                if (receiptRefEl) {
+                    receiptRefEl.disabled = noReceiptFromStore;
+                    if (noReceiptFromStore) receiptRefEl.removeAttribute('required');
+                    else receiptRefEl.setAttribute('required', 'true');
+                }
+
+                if (invoiceMappingList) {
+                    // Disable/enable all checkboxes and invoice amount inputs inside mapping
+                    invoiceMappingList.querySelectorAll('input').forEach(inp => {
+                        try {
+                            if (inp.getAttribute && inp.getAttribute('data-invoice-amount') === 'true') {
+                                inp.disabled = noReceiptFromStore;
+                                if (noReceiptFromStore) inp.removeAttribute('required');
+                                else inp.setAttribute('required', 'true');
+                            } else if (inp.classList && inp.classList.contains('invoice-item-checkbox')) {
+                                if (inp.getAttribute('data-qty-zero') === 'true') {
+                                    inp.disabled = true;
+                                } else {
+                                    inp.disabled = noReceiptFromStore;
+                                }
+                            } else {
+                                inp.disabled = noReceiptFromStore;
+                            }
+                        } catch (err) {
+                            // ignore individual input errors
+                        }
+                    });
+                }
+            });
+            // Apply initial state based on current checkbox value (server-side pre-check)
+            // Wait for upload components to initialize before applying the state.
+            const applyInitialFromStoreState = () => {
+                const receiptReady = (!receiptUploadContainer) || (receiptUploadContainer && receiptUploadContainer.uploadComponent);
+                const invoiceReady = (!invoiceUploadContainer) || (invoiceUploadContainer && invoiceUploadContainer.uploadComponent);
+                if (receiptReady && invoiceReady) {
+                    fromStoreNoReceiptCheckbox.dispatchEvent(new Event('change'));
+                    return true;
+                }
+                return false;
+            };
+
+            if (!applyInitialFromStoreState()) {
+                let initAttempts = 0;
+                const initInterval = setInterval(() => {
+                    initAttempts++;
+                    if (applyInitialFromStoreState() || initAttempts > 30) {
+                        clearInterval(initInterval);
+                    }
+                }, 100);
+            }
+        }
 
         const sanitizeForId = (val) => String(val || '').replace(/[^a-zA-Z0-9_-]/g, '');
 
@@ -4394,6 +4541,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 title.style.fontWeight = '600';
                 title.style.marginBottom = '6px';
                 title.textContent = file.name;
+                if (noReceiptFromStore) {
+                    title.style.color = '#6b7280';
+                    title.style.opacity = '0.95';
+                }
                 fileRow.appendChild(title);
 
                 const optionsWrap = document.createElement('div');
@@ -4425,6 +4576,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         checkbox.disabled = true;
                         label.style.setProperty('opacity', '0.5', 'important');
                         label.title = 'This item has quantity 0 and cannot be selected.';
+                    } else if (noReceiptFromStore) {
+                        // Gray out selectable labels when overall disabled
+                        label.style.color = '#6b7280';
+                        label.style.opacity = '0.85';
                     }
 
                     label.appendChild(checkbox);
@@ -4446,6 +4601,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 amountInput.min = '0';
                 amountInput.step = '0.001';
                 amountInput.required = true;
+                if (noReceiptFromStore) {
+                    amountInput.disabled = true;
+                    amountInput.removeAttribute('required');
+                    amountLabel.style.color = '#6b7280';
+                    amountLabel.style.opacity = '0.9';
+                }
                 amountInput.setAttribute('data-invoice-amount', 'true');
                 amountInput.style.width = '160px';
                 amountInput.placeholder = '0.000';
@@ -4761,7 +4922,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Validate receipt files
             let receiptFilesMissing = false;
-            if (!hasExistingReceipts) {
+            if (!hasExistingReceipts && !noReceiptFromStore) {
                 if (receiptContainer && receiptContainer.uploadComponent) {
                     const receiptComponent = receiptContainer.uploadComponent;
                     if (receiptComponent.getFiles().length === 0) {
@@ -4782,7 +4943,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Validate invoice files
             let invoiceFilesMissing = false;
             let invoiceFileList = [];
-            if (!hasExistingInvoices) {
+            if (!hasExistingInvoices && !noReceiptFromStore) {
                 if (invoiceContainer && invoiceContainer.uploadComponent) {
                     const invoiceComponent = invoiceContainer.uploadComponent;
                     invoiceFileList = invoiceComponent.getFiles();
@@ -4806,7 +4967,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Validate that each uploaded invoice file has item mapping and amount
             const invoiceMap = syncInvoiceItemMapInput();
-            if (invoiceFileList && invoiceFileList.length > 0) {
+            if (!noReceiptFromStore && invoiceFileList && invoiceFileList.length > 0) {
                 const missingInvoiceMapping = invoiceFileList.filter(f => {
                     const entry = invoiceMap[f.name];
                     return !entry || !entry.items || entry.items.length === 0 || !entry.amount || entry.amount <= 0;
@@ -4833,7 +4994,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Validate receipt amount - must be > 0
             // Validate receipt amount - must be > 0 only if a new receipt is being uploaded
             const receiptAmountInput = this.querySelector('input[name="receipt_amount"]');
-            if (receiptAmountInput && !hasExistingReceipts) {
+            if (receiptAmountInput && !hasExistingReceipts && !noReceiptFromStore) {
                 const receiptAmount = parseFloat(receiptAmountInput.value);
                 if (isNaN(receiptAmount) || receiptAmount <= 0) {
                     resetButton();
@@ -4844,7 +5005,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Validate receipt reference number - must not be empty only if a new receipt is being uploaded
             const receiptRefInput = this.querySelector('input[name="receipt_reference_number"]');
-            if (receiptRefInput && !hasExistingReceipts) {
+            if (receiptRefInput && !hasExistingReceipts && !noReceiptFromStore) {
                 const receiptRef = receiptRefInput.value.trim();
                 if (!receiptRef || receiptRef === '') {
                     resetButton();
@@ -4912,7 +5073,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         window.location.reload();
                         return;
                     }
-                    throw new Error('complete-failed');
+                    // Try to extract server error message (JSON or text/HTML) and show it
+                    const contentType = response.headers.get('content-type') || '';
+                    if (contentType.includes('application/json')) {
+                        return response.json().then(data => {
+                            throw new Error(data.message || JSON.stringify(data));
+                        });
+                    }
+                    return response.text().then(txt => {
+                        // Strip HTML tags for readability if any
+                        const plain = txt ? txt.replace(/<[^>]*>/g, ' ').trim() : '';
+                        throw new Error(plain || 'Form submission failed. Please try again.');
+                    });
                 })
                 .catch(err => {
                     console.error('Error:', err);
@@ -4921,7 +5093,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (String(err.message || '').includes('save-assigned')) {
                         showMarkCompleteValidationErrorDialog('Could not save quantities/amounts before completing. Please try again.');
                     } else {
-                        showMarkCompleteValidationErrorDialog('Form submission failed. Please try again.');
+                        // Show server-provided message when available
+                        showMarkCompleteValidationErrorDialog(err.message || 'Form submission failed. Please try again.');
                     }
                 });
         });
