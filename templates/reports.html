@@ -1263,6 +1263,9 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
+                                {% if current_user.department == 'Auditing' or current_user.role == 'Auditing Staff' %}
+                                <th>Ref. No.</th>
+                                {% endif %}
                                 <th class="expand-col"></th>
                                 <th>Type</th>
                                 <th>Requestor</th>
@@ -1299,6 +1302,9 @@
                             {% endif %}
                             <tr>
                                 <td>#{{ req.request_id }}</td>
+                                {% if current_user.department == 'Auditing' or current_user.role == 'Auditing Staff' %}
+                                <td>{{ req.reference_number or '-' }}</td>
+                                {% endif %}
                                 <td class="expand-cell">
                                     {% if req.recurring == 'Recurring' %}
                                         <img src="{{ url_for('static', filename='css/icons/chevron-right.svg') }}" class="chevron-toggle" data-request-id="{{ req.request_id }}" alt="expand" />
