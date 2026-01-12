@@ -20217,12 +20217,16 @@ def admin_calendar():
     return render_template('admin_calendar.html')
 
 @app.route('/settings', methods=['GET', 'POST'])
-@role_required('GM', 'Operation Manager')
+@login_required
 def settings():
-    """Settings page restricted to GM and Operation Manager.
+    """Settings page. Accessible to General Manager, Operation Manager, and all users in the IT department.
     Allows assigning a department-level temporary manager who will be the sole
     manager approver for all requests in that department while assigned.
     """
+    # Authorization: allow GM, Operation Manager, or any user in the IT department
+    if not (current_user.role in ['GM', 'Operation Manager'] or getattr(current_user, 'department', None) == 'IT'):
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
     # Temporary manager for whole department can be any registered user.
     if request.method == 'POST':
         department = (request.form.get('department') or '').strip()
@@ -20388,9 +20392,13 @@ def settings():
 
 
 @app.route('/settings/unassign', methods=['POST'])
-@role_required('GM', 'Operation Manager')
+@login_required
 def unassign_temp_manager():
     """Unassign department-level temporary manager (from settings table)"""
+    # Authorization: allow GM, Operation Manager, or any user in the IT department
+    if not (current_user.role in ['GM', 'Operation Manager'] or getattr(current_user, 'department', None) == 'IT'):
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
     department = (request.form.get('department') or '').strip()
     if not department:
         flash('No department specified.', 'error')

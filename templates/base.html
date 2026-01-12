@@ -286,7 +286,8 @@
                 {% endif %}
             </nav>
             <div class="desktop-sidebar-footer">
-                {% if current_user.role in ['GM', 'Operation Manager'] %}
+                {# Show Settings to GM, Operation Manager, and all users in the IT department #}
+                {% if current_user.role in ['GM', 'Operation Manager'] or current_user.department == 'IT' %}
                 <a href="{{ url_for('settings') }}" class="desktop-sidebar-item {% if flask_request.path.startswith(url_for('settings')) %}active{% endif %}">
                     <i class="fas fa-cog"></i>
                     <span>Settings</span>
