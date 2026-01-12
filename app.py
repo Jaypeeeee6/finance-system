@@ -1040,6 +1040,38 @@ def create_notification(user_id, title, message, notification_type, request_id=N
     
     print(f"DEBUG: Notification created successfully with ID: {notification.notification_id}")
     
+    # Emit real-time socket events for the specific user (or all users if user_id is None)
+    try:
+        payload = {
+            'title': notification.title,
+            'message': notification.message,
+            'type': notification.notification_type,
+            'request_id': notification.request_id,
+            'item_request_id': notification.item_request_id,
+            'notification_id': notification.notification_id
+        }
+        if user_id:
+            # Emit to the specific user's room so their unread count updates immediately
+            socketio.emit('new_notification', payload, room=f'user_{user_id}')
+            socketio.emit('notification_update', {
+                'action': 'new_notification',
+                'type': notification.notification_type,
+                'user_id': user_id
+            }, room=f'user_{user_id}')
+        else:
+            # Broadcast to all users when there is no specific user target
+            socketio.emit('new_notification', payload, room='all_users')
+            socketio.emit('notification_update', {
+                'action': 'new_notification',
+                'type': notification.notification_type
+            }, room='all_users')
+    except Exception as e:
+        # Don't let socket errors break notification creation
+        try:
+            app.logger.error(f"Failed to emit WebSocket for notification {notification.notification_id}: {e}")
+        except:
+            pass
+    
     # Email sending disabled globally except for PIN emails (handled separately).
     # Keep the set here in case we re-enable specific types in the future.
     email_notification_types = set()
@@ -4485,16 +4517,6 @@ def procurement_item_requests():
             item_requests = [r for r in base_for_audit if r.user_id == current_user.user_id]
         else:  # default/all completed
             item_requests = [r for r in base_for_audit if r.status == 'Completed']
-    elif current_user.role in ['GM', 'CEO', 'Operation Manager']:
-        # GM, CEO, and Operation Manager can view all requests with tab filtering
-        if tab == 'my_requests':
-            # Show only item requests created by the current user
-            item_requests = [r for r in base_item_requests if r.user_id == current_user.user_id]
-        elif tab == 'completed':
-            # Show all completed item requests
-            item_requests = [r for r in base_item_requests if r.status == 'Completed']
-        else:  # tab == 'all' or any other value
-            item_requests = base_item_requests
     else:
         # For Department Managers (non-Procurement), provide a "My Item Requests" tab that shows
         # all requests belonging to their department. This allows department managers who do not
@@ -6051,6 +6073,18 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         for staff_member in procurement_staff:
             create_notification(
                 user_id=staff_member.user_id,
+                title="Item Request Completed",
+                message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {formatted_item_names} has been completed.",
+                notification_type="request_completed",
+                item_request_id=request_id
+            )
+        
+        # Notify all auditing department users as well
+        auditing_users = User.query.filter_by(department='Auditing').all()
+        for audit_user in auditing_users:
+            # Avoid duplicate notification if they are already covered above
+            create_notification(
+                user_id=audit_user.user_id,
                 title="Item Request Completed",
                 message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) for {formatted_item_names} has been completed.",
                 notification_type="request_completed",
@@ -7878,6 +7912,12 @@ def bulk_upload_item_files():
             for staff in procurement_staff:
                 if staff.user_id not in authorized_users:
                     authorized_users.append(staff.user_id)
+            
+            # Add all auditing department users
+            auditing_staff = User.query.filter_by(department='Auditing').all()
+            for audit_user in auditing_staff:
+                if audit_user.user_id not in authorized_users:
+                    authorized_users.append(audit_user.user_id)
             
             # Send notifications for completion
             for user_id in authorized_users:
