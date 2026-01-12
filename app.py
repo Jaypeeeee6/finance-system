@@ -4485,6 +4485,16 @@ def procurement_item_requests():
             item_requests = [r for r in base_for_audit if r.user_id == current_user.user_id]
         else:  # default/all completed
             item_requests = [r for r in base_for_audit if r.status == 'Completed']
+    elif current_user.role in ['GM', 'CEO', 'Operation Manager']:
+        # GM, CEO, and Operation Manager can view all requests with tab filtering
+        if tab == 'my_requests':
+            # Show only item requests created by the current user
+            item_requests = [r for r in base_item_requests if r.user_id == current_user.user_id]
+        elif tab == 'completed':
+            # Show all completed item requests
+            item_requests = [r for r in base_item_requests if r.status == 'Completed']
+        else:  # tab == 'all' or any other value
+            item_requests = base_item_requests
     else:
         # For Department Managers (non-Procurement), provide a "My Item Requests" tab that shows
         # all requests belonging to their department. This allows department managers who do not

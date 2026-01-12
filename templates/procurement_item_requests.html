@@ -640,19 +640,24 @@ function switchTab(tab) {
     });
 
     // Fetch and update content
+    console.log('Fetching tab content for:', tab, 'URL:', url.toString());
+    
     fetch(url.toString(), { 
         method: 'GET',
         headers: { 
             'X-Requested-With': 'fetch',
-            'Cache-Control': 'no-cache'
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
         },
         cache: 'no-store'
     })
         .then(res => {
-            if (!res.ok) throw new Error('Network error');
+            console.log('Response received, status:', res.status);
+            if (!res.ok) throw new Error('Network error: ' + res.status);
             return res.text();
         })
         .then(html => {
+            console.log('HTML received, length:', html.length);
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             
@@ -675,11 +680,21 @@ function switchTab(tab) {
                 }
             }
             
+            console.log('Cards found - new:', !!newCard, 'current:', !!currentCard);
+            
             if (newCard && currentCard) {
                 const scrollY = window.scrollY || window.pageYOffset;
+                
+                // Count rows to verify update
+                const oldRows = currentCard.querySelectorAll('tbody tr').length;
+                const newRows = newCard.querySelectorAll('tbody tr').length;
+                console.log('Updating content - Old rows:', oldRows, 'New rows:', newRows);
+                
                 currentCard.innerHTML = newCard.innerHTML;
                 history.pushState({}, '', url.toString());
                 window.scrollTo(0, scrollY);
+                
+                console.log('Content updated successfully for tab:', tab);
                 
                 // Re-attach event listeners
                 const departmentFilter = document.getElementById('departmentFilter');
@@ -709,10 +724,12 @@ function switchTab(tab) {
                     }
                 });
             } else {
+                console.warn('Card not found, doing full page reload');
                 window.location.href = url.toString();
             }
         })
-        .catch(() => {
+        .catch((error) => {
+            console.error('Error fetching tab content:', error);
             window.location.href = url.toString();
         });
 }
