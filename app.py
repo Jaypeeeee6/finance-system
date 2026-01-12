@@ -5966,7 +5966,7 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
     if item_request.status == 'Final Approval':
         # If status is 'Final Approval', set it to 'Completed'
         item_request.status = 'Completed'
-        item_request.completion_date = current_time.date()
+        item_request.completion_date = current_time
         item_request.completed_by = current_user.name
         item_request.completed_by_user_id = current_user.user_id
     else:
