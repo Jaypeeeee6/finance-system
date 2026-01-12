@@ -214,7 +214,7 @@
                     </thead>
                     <tbody>
                         {% for req in item_requests %}
-                        <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
+                        <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %} data-request-id="{{ req.id }}">
                             {% if user.department == 'Procurement' %}
                             <td>
                                 {# Do not allow selection for requests that are completed, on hold, pending procurement manager approval, or in final approval #}
@@ -1138,8 +1138,31 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+<script>
+// Make table rows behave like clicking the View button
+function attachRowClickHandlersForProcurement() {
+    const rows = document.querySelectorAll('.data-table tbody tr[data-request-id]');
+    rows.forEach(row => {
+        // Skip nested rows
+        if (row.classList.contains('nested-row')) return;
+        const requestId = row.getAttribute('data-request-id');
+        if (!requestId) return;
+        const href = `/procurement/item-request/${requestId}/view`;
+        row.classList.add('clickable-row');
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', function(e) {
+            // Ignore clicks on interactive elements and the expand chevron/expand cell
+            if (e.target.closest('a, button, input, select, textarea') || e.target.closest('.chevron-toggle') || e.target.closest('.expand-cell')) return;
+            window.location.href = href;
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', attachRowClickHandlersForProcurement);
+</script>
 
 <style>
+    .data-table tbody tr.clickable-row:hover { background: #f8f9fa; }
     .filter-pill {
         display: inline-flex;
         align-items: center;

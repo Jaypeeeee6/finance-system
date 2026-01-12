@@ -4,6 +4,7 @@
 
 {% block content %}
 <style>
+    .data-table tbody tr.clickable-row:hover { background: #f8f9fa; }
     /* Make table section scrollable */
     .table-responsive {
         width: 100%;
@@ -952,7 +953,7 @@
                         </thead>
                         <tbody>
                             {% for req in requests %}
-                            <tr>
+                            <tr data-href="{{ url_for('view_item_request_page', request_id=req.id) }}">
                                 <td>#{{ req.id }}</td>
                                 {% if current_user.department == 'Auditing' or current_user.role == 'Auditing Staff' %}
                                 <td>{{ req.receipt_reference_number or '-' }}</td>
@@ -1856,6 +1857,27 @@ document.addEventListener('click', function(event) {
         }
     }
 });
+</script>
+<script>
+// Make table rows behave like clicking the View button
+function attachRowClickHandlersForReports() {
+    const rows = document.querySelectorAll('.data-table tbody tr[data-href]');
+    rows.forEach(row => {
+        // Skip nested rows
+        if (row.classList.contains('nested-row')) return;
+        const href = row.getAttribute('data-href');
+        if (!href) return;
+        row.classList.add('clickable-row');
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', function(e) {
+            // Ignore clicks on interactive elements and the expand chevron/expand cell
+            if (e.target.closest('a, button, input, select, textarea') || e.target.closest('.chevron-toggle') || e.target.closest('.expand-cell')) return;
+            window.location.href = href;
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', attachRowClickHandlersForReports);
 </script>
 {% endblock %}
 

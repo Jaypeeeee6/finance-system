@@ -1300,7 +1300,7 @@
                                 {% set seconds = req.finance_approval_duration_minutes % 60 %}
                                 {% set finance_duration = hours ~ ':' ~ '%02d'|format(minutes) ~ ':' ~ '%02d'|format(seconds) %}
                             {% endif %}
-                            <tr>
+                            <tr data-href="{{ url_for('view_request', request_id=req.request_id) }}">
                                 <td>#{{ req.request_id }}</td>
                                 {% if current_user.department == 'Auditing' or current_user.role == 'Auditing Staff' %}
                                 <td>{{ req.reference_number or '-' }}</td>
@@ -2908,6 +2908,30 @@ function togglePaymentMethod(event, value) {
         clickedOption.classList.remove('selected');
     }
 }
+</script>
+<style>
+    .data-table tbody tr.clickable-row:hover { background: #f8f9fa; }
+</style>
+<script>
+// Make table rows behave like clicking the View button (payment reports)
+function attachRowClickHandlersForPaymentReports() {
+    const rows = document.querySelectorAll('.data-table tbody tr[data-href]');
+    rows.forEach(row => {
+        // Skip nested rows
+        if (row.classList.contains('nested-row')) return;
+        const href = row.getAttribute('data-href');
+        if (!href) return;
+        row.classList.add('clickable-row');
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', function(e) {
+            // Ignore clicks on interactive elements and the expand chevron/expand cell
+            if (e.target.closest('a, button, input, select, textarea') || e.target.closest('.chevron-toggle') || e.target.closest('.expand-cell')) return;
+            window.location.href = href;
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', attachRowClickHandlersForPaymentReports);
 </script>
 {% endblock %}
 
