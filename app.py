@@ -4690,12 +4690,12 @@ def procurement_item_requests():
         # GM and Operation Manager see statistics like Procurement Manager (view-only)
         is_procurement_user = True
     
-    # Calculate Bank Money statistics for Current Money Status section (for Procurement Manager, GM, and Operation Manager)
+    # Calculate Bank Money statistics for Current Money Status section (for Procurement Manager, GM, Operation Manager, IT, and Auditing)
     available_balance = None
     completed_amount = None
     pending_amount = None
     on_hold_amount = None
-    if current_user.role in ['GM', 'Operation Manager'] or (current_user.department == 'Procurement' and current_user.role == 'Department Manager') or current_user.department == 'IT':
+    if current_user.role in ['GM', 'Operation Manager'] or (current_user.department == 'Procurement' and current_user.role == 'Department Manager') or current_user.department in ['IT', 'Auditing']:
         # Calculate Bank Money statistics for Current Money Status section
         bank_money_requests = PaymentRequest.query.filter(
             PaymentRequest.department == 'Procurement',
