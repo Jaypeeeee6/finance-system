@@ -521,6 +521,71 @@
         border-radius: 4px;
         font-size: 14px;
     }
+    /* Auditing reports search (copied from reports page) */
+    .reports-auditing-search .assign-search-field {
+        width: 100%;
+    }
+    .reports-auditing-search .assign-search-input {
+        border-radius: 999px !important;
+        border: 1px solid #ced4da !important;
+        transition: border-color 0.12s ease, box-shadow 0.12s ease;
+        height: 38px;
+        padding-left: 44px;
+        padding-right: 48px;
+    }
+    .reports-auditing-search .assign-search-input:focus {
+        outline: none !important;
+        border-color: #D9BD7D !important;
+        box-shadow: 0 0 0 0.18rem rgba(217,189,125,0.15) !important;
+    }
+    .reports-auditing-search .assign-search-icon {
+        width: 20px !important;
+        height: 20px !important;
+        background: #ffffff;
+        border-radius: 50%;
+        padding: 4px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        cursor: pointer;
+    }
+    .reports-auditing-search .assign-search-clear {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 28px;
+        height: 28px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: #ffffff;
+        border: 1px solid #e9ecef;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        cursor: pointer;
+        font-size: 14px;
+        color: #333;
+        padding: 0;
+    }
+    .reports-auditing-search.has-value .assign-search-clear {
+        display: inline-flex;
+    }
+    /* Hide native browser clear icon */
+    .reports-auditing-search .assign-search-input::-webkit-search-decoration,
+    .reports-auditing-search .assign-search-input::-webkit-search-cancel-button,
+    .reports-auditing-search .assign-search-input::-webkit-clear-button {
+        display: none !important;
+        -webkit-appearance: none !important;
+    }
+    .reports-auditing-search .assign-search-input::-ms-clear,
+    .reports-auditing-search .assign-search-input::-ms-reveal {
+        display: none !important;
+        width: 0;
+        height: 0;
+    }
+    .reports-auditing-search .assign-search-input {
+        -webkit-appearance: none;
+        appearance: none;
+    }
 
     .filter-dropdown {
         position: absolute;
@@ -919,7 +984,7 @@
         </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="report-results-card">
         <div class="card-header">
             <h2><i class="fas fa-table"></i> Report Results</h2>
             {% if requests and requests|length > 0 %}
@@ -934,6 +999,101 @@
             {% endif %}
         </div>
         <div class="card-body">
+            {% if user.department == 'Auditing' %}
+            <div class="reports-auditing-search" style="margin-bottom:12px; width:100%; display:flex; gap:8px; align-items:center;">
+                <div class="assign-search-field" style="position:relative; width:100%;">
+                    <img src="{{ url_for('static', filename='css/icons/search.svg') }}" class="assign-search-icon" alt="Search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%);" onclick="document.getElementById('item-auditing-ref-search').focus();" >
+                    <input type="search" id="item-auditing-ref-search" class="form-control assign-search-input" placeholder="Search reference number..." aria-label="Search reference number" value="{{ request.args.get('reference_number','') }}" autocomplete="off" style="padding-left:44px; padding-right:48px; width:100%;">
+                    <button type="button" class="assign-search-clear" id="item-auditing-ref-clear" title="Clear search">×</button>
+                </div>
+            </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    function attachAuditingSearchHandlersItem() {
+                        const wrapper = document.querySelector('.reports-auditing-search');
+                        if (!wrapper) return;
+                        const input = wrapper.querySelector('#item-auditing-ref-search');
+                        const clearBtn = wrapper.querySelector('#item-auditing-ref-clear');
+                        if (!input) return;
+
+                        function refreshClearVisibility() {
+                            if (!wrapper) return;
+                            if (input.value && input.value.trim() !== '') {
+                                wrapper.classList.add('has-value');
+                            } else {
+                                wrapper.classList.remove('has-value');
+                            }
+                        }
+
+                        // remove duplicate listeners by replacing input node
+                        input.replaceWith(input.cloneNode(true));
+                        const inputEl = wrapper.querySelector('#item-auditing-ref-search');
+
+                        inputEl.addEventListener('input', refreshClearVisibility);
+                        inputEl.addEventListener('keydown', function(e) {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const val = inputEl.value.trim();
+                                updateQueryParamAndGoItem('reference_number', val);
+                            }
+                        });
+
+                        if (clearBtn) {
+                            clearBtn.addEventListener('click', function() {
+                                inputEl.value = '';
+                                refreshClearVisibility();
+                                updateQueryParamAndGoItem('reference_number', '');
+                            });
+                        }
+
+                        refreshClearVisibility();
+                    }
+
+                    async function reloadResultsViaAjaxItem(urlStr) {
+                        try {
+                            const scrollY = window.scrollY;
+                            const res = await fetch(urlStr, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                            if (!res.ok) {
+                                window.location.href = urlStr;
+                                return;
+                            }
+                            const text = await res.text();
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(text, 'text/html');
+                            const newCard = doc.getElementById('report-results-card');
+                            const currentCard = document.getElementById('report-results-card');
+                            if (newCard && currentCard) {
+                                currentCard.innerHTML = newCard.innerHTML;
+                                attachAuditingSearchHandlersItem();
+                                if (typeof attachRowClickHandlersForReports === 'function') {
+                                    try { attachRowClickHandlersForReports(); } catch (e) { console.warn(e); }
+                                }
+                                window.scrollTo(0, scrollY);
+                            } else {
+                                window.location.href = urlStr;
+                            }
+                        } catch (err) {
+                            console.error('AJAX reload failed, falling back to full reload', err);
+                            window.location.href = urlStr;
+                        }
+                    }
+
+                    function updateQueryParamAndGoItem(key, value) {
+                        const url = new URL(window.location.href);
+                        if (value) {
+                            url.searchParams.set(key, value);
+                        } else {
+                            url.searchParams.delete(key);
+                        }
+                        url.searchParams.delete('page');
+                        history.replaceState(null, '', url.toString());
+                        reloadResultsViaAjaxItem(url.toString());
+                    }
+
+                    attachAuditingSearchHandlersItem();
+                });
+            </script>
+            {% endif %}
             {% if requests %}
                 <div class="table-responsive">
                     <table class="data-table">

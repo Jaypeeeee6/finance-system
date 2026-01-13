@@ -16926,6 +16926,7 @@ def reports():
     status_filter = request.args.getlist('status')  # List of statuses
     payment_type_filter = request.args.getlist('payment_type')  # List of payment types
     payment_method_filter = request.args.getlist('payment_method')  # List of payment methods
+    reference_number = request.args.get('reference_number', '').strip()
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -17063,6 +17064,11 @@ def reports():
     # Payment method filter (handle multiple values)
     if payment_method_filter:
         query = query.filter(PaymentRequest.payment_method.in_(payment_method_filter))
+    
+    # Reference number search (Auditing-specific search uses this GET param)
+    # Use prefix matching to avoid unrelated substring matches (e.g., '100' matching 'A100B')
+    if reference_number:
+        query = query.filter(PaymentRequest.reference_number.ilike(f'{reference_number}%'))
     
     # Date filtering - when a date range is provided, filter by completion_date.
     # Additionally, for recurring requests, include requests if any schedule payment
@@ -17351,6 +17357,11 @@ def item_request_reports():
         query = query.filter(ProcurementItemRequest.completion_date.isnot(None)).filter(
             ProcurementItemRequest.completion_date <= datetime.strptime(date_to, '%Y-%m-%d')
         )
+    
+    # Reference number search for item requests - use receipt_reference_number with prefix matching
+    reference_number = request.args.get('reference_number', '').strip()
+    if reference_number:
+        query = query.filter(ProcurementItemRequest.receipt_reference_number.ilike(f'{reference_number}%'))
     
     # Get all filtered requests for stats calculation (before pagination)
     all_filtered_requests = query.order_by(ProcurementItemRequest.created_at.desc()).all()
