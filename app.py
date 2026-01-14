@@ -3505,8 +3505,10 @@ def department_dashboard():
                 if dt and getattr(dt, 'temporary_manager_id', None) == current_user.user_id:
                     visible_request_ids.add(req.request_id)
                 
-                # Completed/Recurring from other departments (view-only - this is fine as is)
-                if req_dept.lower() != 'auditing' and req.status in ['Completed', 'Recurring']:
+                # Completed/Recurring and proof-related statuses from other departments (view-only)
+                if req_dept.lower() != 'auditing' and req.status in [
+                    'Completed', 'Recurring', 'Proof Pending', 'Proof Sent', 'Proof Rejected'
+                ]:
                     visible_request_ids.add(req.request_id)
                 
                 # Authorized approver (handles cases where department was edited)
@@ -3595,7 +3597,7 @@ def department_dashboard():
                 PaymentRequest.user_id == current_user.user_id,
                 db.and_(
                     PaymentRequest.department != 'Auditing',
-                    PaymentRequest.status.in_(['Completed', 'Recurring'])
+                    PaymentRequest.status.in_(['Completed', 'Recurring', 'Proof Pending', 'Proof Sent', 'Proof Rejected'])
                 )
             ),
             PaymentRequest.is_archived == False,
@@ -3674,7 +3676,7 @@ def department_dashboard():
         if current_user.department == 'Auditing' and current_user.role == 'Auditing Staff':
             query = base_query.filter(
                 db.or_(
-                    PaymentRequest.status == 'Completed',
+                    PaymentRequest.status.in_(['Completed', 'Proof Pending', 'Proof Sent', 'Proof Rejected']),
                     PaymentRequest.recurring == 'Recurring'
                 )
             )
@@ -3702,7 +3704,7 @@ def department_dashboard():
                     PaymentRequest.department == 'Auditing',
                     db.and_(
                         PaymentRequest.department != 'Auditing',
-                        PaymentRequest.status == 'Completed'
+                        PaymentRequest.status.in_(['Completed', 'Proof Pending', 'Proof Sent', 'Proof Rejected'])
                     )
                 ),
                 PaymentRequest.is_archived == False
@@ -3739,7 +3741,7 @@ def department_dashboard():
                     PaymentRequest.user_id == current_user.user_id,
                     db.and_(
                         PaymentRequest.department != 'Auditing',
-                        PaymentRequest.status == 'Completed'
+                        PaymentRequest.status.in_(['Completed', 'Proof Pending', 'Proof Sent', 'Proof Rejected'])
                     )
                 ),
                 PaymentRequest.is_archived == False
@@ -13092,12 +13094,12 @@ def view_request(request_id):
                     # Department Manager can also view their department's requests
                     if req.department == 'Auditing' or getattr(req, 'temporary_manager_id', None) == current_user.user_id:
                         pass  # Allow access
-                    elif req.status not in ['Completed', 'Recurring']:
+                    elif req.status not in ['Completed', 'Recurring', 'Proof Pending', 'Proof Sent', 'Proof Rejected']:
                         flash('You do not have permission to view this request.', 'danger')
                         return redirect(url_for('dashboard'))
                 else:
                     # Auditing Staff - check if it's Completed/Recurring from another department
-                    if req.department == 'Auditing' or req.status not in ['Completed', 'Recurring']:
+                    if req.department == 'Auditing' or req.status not in ['Completed', 'Recurring', 'Proof Pending', 'Proof Sent', 'Proof Rejected']:
                         flash('You do not have permission to view this request.', 'danger')
                         return redirect(url_for('dashboard'))
         # Other Department Managers can view requests from their department
@@ -16935,9 +16937,11 @@ def reports():
     # Build query - show ALL statuses by default, but exclude archived requests
     query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
     
-    # Auditing Staff: restrict to Completed and Recurring in reports
+    # Auditing Staff: restrict to Completed, Recurring, and proof-related statuses in reports
     if current_user.role == 'Auditing Staff':
-        query = query.filter(PaymentRequest.status.in_(['Completed', 'Recurring']))
+        query = query.filter(PaymentRequest.status.in_([
+            'Completed', 'Recurring', 'Proof Pending', 'Proof Sent', 'Proof Rejected'
+        ]))
     
     # Filter for Department Managers based on their department
     if current_user.role == 'Department Manager':
