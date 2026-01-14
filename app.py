@@ -12,7 +12,7 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry, DepartmentTemporaryManager
+from models import db, User, UserPermission, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry, DepartmentTemporaryManager
 from config import Config
 import json
 from playwright.sync_api import sync_playwright
@@ -19311,6 +19311,79 @@ def manage_users():
         return redirect(url_for('dashboard'))
     users = User.query.all()
     return render_template('manage_users.html', users=users, user=current_user)
+
+
+# ----------------- User permissions API -----------------
+@app.route('/api/users/<int:user_id>/permissions', methods=['GET', 'POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def api_user_permissions(user_id):
+    """Get or set per-user permissions, overrides and status scopes"""
+    import json
+    user = User.query.get_or_404(user_id)
+    if request.method == 'GET':
+        up = UserPermission.query.filter_by(user_id=user_id).first()
+        if not up:
+            return jsonify({'permissions': {}, 'overrides': {}, 'status_scopes': {}})
+        return jsonify(up.to_dict())
+
+    data = request.get_json(force=True, silent=True) or {}
+    permissions = data.get('permissions') or {}
+    overrides = data.get('overrides') or {}
+    status_scopes = data.get('status_scopes') or {}
+
+    up = UserPermission.query.filter_by(user_id=user_id).first()
+    if not up:
+        up = UserPermission(user_id=user_id)
+        db.session.add(up)
+
+    try:
+        up.permissions = json.dumps(permissions)
+        up.overrides = json.dumps(overrides)
+        up.status_scopes = json.dumps(status_scopes)
+        db.session.commit()
+        log_action(f"Updated permissions for user {user.username} (id={user.user_id})")
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.exception("Failed to save user permissions")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/users/apply_permissions', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def api_apply_permissions():
+    """Copy permissions from a source user to a list of target users"""
+    import json
+    data = request.get_json(force=True, silent=True) or {}
+    source_id = data.get('source_user_id') or data.get('sourceId') or data.get('source')
+    targets = data.get('target_user_ids') or data.get('targetUserIds') or data.get('targets') or []
+    if not source_id or not isinstance(targets, list) or len(targets) == 0:
+        return jsonify({'success': False, 'error': 'Invalid payload'}), 400
+
+    src = UserPermission.query.filter_by(user_id=source_id).first()
+    if not src:
+        return jsonify({'success': False, 'error': 'Source has no custom permissions'}), 404
+
+    try:
+        for tid in targets:
+            if int(tid) == int(source_id):
+                continue
+            up = UserPermission.query.filter_by(user_id=tid).first()
+            if not up:
+                up = UserPermission(user_id=tid)
+                db.session.add(up)
+            up.permissions = src.permissions
+            up.overrides = src.overrides
+            up.status_scopes = src.status_scopes
+        db.session.commit()
+        log_action(f"Applied permissions from user {source_id} to {len(targets)} users by {current_user.username}")
+        return jsonify({'success': True, 'applied_to': len(targets)})
+    except Exception as e:
+        app.logger.exception("Failed to apply permissions")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/users/new', methods=['GET', 'POST'])

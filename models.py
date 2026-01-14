@@ -121,6 +121,44 @@ class User(UserMixin, db.Model):
         return f'<User {self.username} ({self.role})>'
 
 
+class UserPermission(db.Model):
+    """Per-user permissions, overrides and status scopes"""
+    __tablename__ = 'user_permissions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False, unique=True)
+    permissions = db.Column(db.Text, nullable=True)     # JSON string: { perm_key: boolean, ... }
+    overrides = db.Column(db.Text, nullable=True)       # JSON string: { override_key: { enabled: bool, value: number|null }, ... }
+    status_scopes = db.Column(db.Text, nullable=True)   # JSON string: { action_key: { use_role_defaults: bool, statuses: [...] }, ... }
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('user_permission', uselist=False))
+
+    def to_dict(self):
+        import json
+        try:
+            perms = json.loads(self.permissions) if self.permissions else {}
+        except Exception:
+            perms = {}
+        try:
+            ovs = json.loads(self.overrides) if self.overrides else {}
+        except Exception:
+            ovs = {}
+        try:
+            scopes = json.loads(self.status_scopes) if self.status_scopes else {}
+        except Exception:
+            scopes = {}
+        return {
+            'user_id': self.user_id,
+            'permissions': perms,
+            'overrides': ovs,
+            'status_scopes': scopes,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None,
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else None
+        }
+
+
 class PaymentRequest(db.Model):
     """Payment request model"""
     __tablename__ = 'payment_requests'

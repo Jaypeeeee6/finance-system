@@ -491,6 +491,112 @@
     })();
     </script>
     <script>
+    // Edit Permissions side panel frontend behavior (no backend yet)
+    (function(){
+        function closeAllDeptPanels() {
+            document.querySelectorAll('.perm-dept-panel').forEach(p => p.style.display = 'none');
+            document.querySelectorAll('.perm-dept-toggle').forEach(t => t.setAttribute('aria-expanded','false'));
+        }
+
+        document.addEventListener('click', function(e){
+            // noop
+        });
+
+        window.openEditPermissions = function(userId) {
+            // Optionally populate header with user info if desired
+            var userNameElem = document.getElementById('permPanelUserName');
+            var userEmailElem = document.getElementById('permPanelUserEmail');
+            if (userNameElem && userEmailElem) {
+                // Try to find the user row in the table for display
+                var row = document.querySelector('.user-checkbox[value="' + userId + '"]');
+                if (row) {
+                    var tr = row.closest('tr');
+                    var nameCell = tr && tr.querySelectorAll('td')[2];
+                    var deptCell = tr && tr.querySelectorAll('td')[3];
+                    var emailCell = tr && tr.querySelectorAll('td')[5];
+                    if (nameCell) userNameElem.textContent = nameCell.textContent.trim();
+                    var deptText = deptCell ? deptCell.textContent.trim() : '';
+                    var emailText = emailCell ? (emailCell.textContent || '').trim() : '';
+                    userEmailElem.textContent = deptText + (deptText && emailText ? ' | ' + emailText : (emailText ? emailText : ''));
+                } else {
+                    userNameElem.textContent = 'User #' + userId;
+                    userEmailElem.textContent = '';
+                }
+            }
+
+            var backdrop = document.getElementById('permissionsBackdrop');
+            var panel = document.getElementById('permissionsPanel');
+            if (backdrop) backdrop.style.display = 'block';
+            if (panel) panel.style.transform = 'translateX(0)';
+            // close dept panels initially
+            closeAllDeptPanels();
+            // also close any open action dropdowns so they don't overlap the panel
+            try {
+                document.querySelectorAll('.action-dropdown').forEach(function(d){
+                    d.style.display = 'none';
+                    d.setAttribute('aria-hidden','true');
+                });
+                document.querySelectorAll('.action-ellipsis-btn').forEach(function(b){
+                    b.setAttribute('aria-expanded','false');
+                });
+            } catch(e){}
+            // prevent background scrolling while panel is open
+            try {
+                window.__prevBodyOverflow = document.body.style.overflow;
+                document.body.style.overflow = 'hidden';
+                // Prevent touchmove on iOS
+                window.__permissionsTouchHandler = function(ev){ ev.preventDefault(); };
+                document.addEventListener('touchmove', window.__permissionsTouchHandler, { passive: false });
+            } catch (e) {}
+        };
+
+        window.closeEditPermissions = function() {
+            var backdrop = document.getElementById('permissionsBackdrop');
+            var panel = document.getElementById('permissionsPanel');
+            if (backdrop) backdrop.style.display = 'none';
+            if (panel) panel.style.transform = 'translateX(calc(100% + 32px))';
+            // restore background scrolling
+            try {
+                if (window.__prevBodyOverflow !== undefined) {
+                    document.body.style.overflow = window.__prevBodyOverflow;
+                    delete window.__prevBodyOverflow;
+                } else {
+                    document.body.style.overflow = '';
+                }
+                if (window.__permissionsTouchHandler) {
+                    document.removeEventListener('touchmove', window.__permissionsTouchHandler, { passive: false });
+                    delete window.__permissionsTouchHandler;
+                }
+            } catch (e) {}
+        };
+
+        document.addEventListener('DOMContentLoaded', function(){
+            // backdrop click closes
+            var backdrop = document.getElementById('permissionsBackdrop');
+            if (backdrop) backdrop.addEventListener('click', closeEditPermissions);
+
+            // dept toggles
+            document.querySelectorAll('.perm-dept-toggle').forEach(function(btn){
+                btn.addEventListener('click', function(){
+                    var idx = btn.getAttribute('data-dept');
+                    var panel = document.getElementById('perm-panel-' + idx);
+                    if (!panel) return;
+                    var expanded = btn.getAttribute('aria-expanded') === 'true';
+                    if (expanded) {
+                        panel.style.display = 'none';
+                        btn.setAttribute('aria-expanded','false');
+                        btn.querySelector('.perm-toggle-caret').style.transform = 'rotate(0deg)';
+                    } else {
+                        panel.style.display = 'block';
+                        btn.setAttribute('aria-expanded','true');
+                        btn.querySelector('.perm-toggle-caret').style.transform = 'rotate(180deg)';
+                    }
+                });
+            });
+        });
+    })();
+    </script>
+    <script>
     // Improved action dropdown behavior: portal dropdowns to body and position absolutely
     (function(){
         function closeAllActionDropdowns() {
@@ -759,7 +865,7 @@
                                                         {% else %}
                                                         <div class="dropdown-item" style="display:block; padding:10px 12px; color:#6c757d;">Current User</div>
                                                         {% endif %}
-                                                        <button type="button" class="dropdown-item" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
+                                                        <button type="button" class="dropdown-item" role="menuitem" onclick="openEditPermissions({{ u.user_id }})" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
                                                             <i class="fas fa-user-shield" style="margin-right:8px;"></i> Edit Permissions
                                                         </button>
                                                     </div>
@@ -826,6 +932,311 @@
                     </div>
                 </div>
 
+                <!-- Edit Permissions Side Panel (frontend only) -->
+                <div id="permissionsBackdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:1999;"></div>
+                <style>
+                    /* Permissions panel header button sizing and colors */
+                    #permissionsPanel .permissions-header .btn {
+                        padding: 6px 8px !important;
+                        font-size: 0.95rem !important;
+                        border-radius: 6px !important;
+                    }
+                    #permissionsPanel .permissions-header .btn-outline {
+                        background: none !important;
+                        border: 1px solid #e9ecef !important;
+                        color: #222 !important;
+                        padding: 6px 8px !important;
+                    }
+                    #permissionsPanel .permissions-header .btn-primary {
+                        background: #28a745 !important;
+                        border-color: #28a745 !important;
+                        color: #ffffff !important;
+                        padding: 6px 10px !important;
+                    }
+                    #permissionsPanel .permissions-header .btn-primary:hover {
+                        background: #218838 !important;
+                        border-color: #1e7e34 !important;
+                    }
+                </style>
+                <style>
+                    /* Reduce typography inside the permissions panel body (keep header intact) */
+                    #permissionsPanel .permissions-body,
+                    #permissionsPanel .permissions-body p,
+                    #permissionsPanel .permissions-list,
+                    #permissionsPanel .permissions-list .data-table,
+                    #permissionsPanel .permissions-list .data-table th,
+                    #permissionsPanel .permissions-list .data-table td,
+                    #permissionsPanel .permissions-list .data-table thead th {
+                        font-size: 0.92rem !important;
+                        color: #333 !important;
+                    }
+                    /* Slightly reduce padding for table cells to fit more lines */
+                    #permissionsPanel .permissions-list .data-table th,
+                    #permissionsPanel .permissions-list .data-table td {
+                        padding: 8px 10px !important;
+                    }
+                    /* Make radio inputs a bit smaller */
+                    #permissionsPanel input[type="radio"] {
+                        width: 16px !important;
+                        height: 16px !important;
+                    }
+                </style>
+                <style>
+                    /* Left-align the Scope column header and cells in the permissions table */
+                    #permissionsPanel .permissions-list .data-table th:first-child,
+                    #permissionsPanel .permissions-list .data-table td:first-child {
+                        text-align: left !important;
+                        padding-left: 14px !important;
+                    }
+                </style>
+                <div id="permissionsPanel" class="permissions-sidepanel" style="position:fixed; right:16px; top:16px; bottom:16px; width:720px; max-width:calc(100% - 32px); transform:translateX(calc(100% + 32px)); transition: transform 0.28s ease; background:#fff; z-index:2000; box-shadow: -8px 0 32px rgba(13,12,18,0.12); border-radius:12px; overflow:hidden;">
+                    <div class="permissions-header" style="display:flex; align-items:center; justify-content:space-between; padding:18px; border-bottom:1px solid #e9ecef;">
+                        <div style="display:flex; gap:12px; align-items:center;">
+                            <div>
+                                <div id="permPanelUserName" style="font-weight:700; color:#222;">User</div>
+                                <div id="permPanelUserEmail" style="color:#666; font-size:0.9rem;">Department | email@example.com</div>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <button type="button" class="btn btn-outline" onclick="closeEditPermissions()" style="background:none; border:1px solid #e9ecef; padding:8px 10px; border-radius:6px;">Close</button>
+                            <button type="button" class="btn btn-primary" onclick="closeEditPermissions()" style="background:#D9BD7D; border-color:#D9BD7D; color:#fff; padding:8px 12px; border-radius:6px;">Save</button>
+                        </div>
+                    </div>
+
+                    <div class="permissions-body" style="overflow:auto; height: calc(100% - 72px); padding: 16px 18px;">
+                        <p style="color:#666; margin-bottom:12px;">Set this user's permissions across the system. Choose the level for each permission.</p>
+
+                        {% set permission_groups = [
+                            {'group':'Requests & Approvals', 'perms':[
+                                'View Requests',
+                                'Create Requests',
+                                'Edit Own Requests',
+                                'Approve as Manager',
+                                'Approve as Procurement',
+                                'Approve as Finance',
+                                'Assign Temporary Manager'
+                            ]},
+                            {'group':'Payments & Finance', 'perms':[
+                                'Schedule Payment',
+                                'Mark Payment Completed',
+                                'Upload Payment Proof',
+                                'Issue Refunds',
+                                'Access Financial Reports'
+                            ]},
+                            {'group':'Procurement & Items', 'perms':[
+                                'Create Item Request',
+                                'Assign to Procurement',
+                                'Finalize Procurement',
+                                'Manage Supplier Records'
+                            ]},
+                            {'group':'Users, Roles & Access', 'perms':[
+                                'View Users',
+                                'Create Users',
+                                'Edit Users',
+                                'Delete Users',
+                                'Manage Roles',
+                                'Manage Department Assignments'
+                            ]},
+                            {'group':'Notifications & Communication', 'perms':[
+                                'View Notifications',
+                                'Manage Notification Settings',
+                                'Send System Announcements',
+                                'Subscribe to Alerts'
+                            ]},
+                            {'group':'Profiles & Account', 'perms':[
+                                'Edit Own Profile',
+                                'Edit Other Profiles',
+                                'Reset User Password',
+                                'Unlock User Account'
+                            ]},
+                            {'group':'Settings & System', 'perms':[
+                                'Manage System Settings',
+                                'Manage API Keys',
+                                'Manage Integrations',
+                                'Configure Email/SMTP'
+                            ]},
+                            {'group':'Reporting & Export', 'perms':[
+                                'View Reports',
+                                'Export Data (CSV/XLS)',
+                                'Access Audit Logs'
+                            ]}
+                        ] %}
+
+                        <div class="permissions-list" style="display:flex; flex-direction:column; gap:12px;">
+                            <div style="overflow:auto;">
+                                <table class="data-table" style="width:100%; border-collapse:collapse;">
+                                    <thead>
+                                <tr>
+                                    <th style="text-align:left; padding:10px 12px; min-width:220px;">Scope</th>
+                                    <th style="text-align:center; padding:10px 12px; width:140px;">Full Access</th>
+                                </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for group in permission_groups %}
+                                        <tr style="background:#f8f9fa;">
+                                            <td colspan="2" style="padding:10px 12px; font-weight:700; text-align:left !important;">
+                                                <span>{{ group.group }}</span>
+                                                <a href="#" class="select-all-group" data-group="{{ loop.index0 }}" style="float:right; font-weight:600; color:#6c757d; text-decoration:none;">Select all</a>
+                                            </td>
+                                        </tr>
+                                        {% set group_idx = loop.index0 %}
+                                        {% for perm in group.perms %}
+                                        <tr data-group="{{ group_idx }}">
+                                            <td style="padding:10px 12px;">{{ perm }}</td>
+                                            {% set key = perm|lower|replace(' ', '_') %}
+                                            <td style="text-align:center; padding:8px 12px;">
+                                                <label class="perm-toggle" style="display:inline-block; cursor:pointer;">
+                                                    <input type="checkbox" name="perm_full_{{ key }}" style="display:none;" aria-label="Full access">
+                                                    <span class="perm-switch" style="display:inline-block; width:44px; height:24px; background:#e9ecef; border-radius:999px; position:relative; vertical-align:middle;">
+                                                        <span class="perm-knob" style="position:absolute; top:3px; left:3px; width:18px; height:18px; background:white; border-radius:50%; box-shadow:0 1px 3px rgba(0,0,0,0.15); transition: left 0.18s;"></span>
+                                                    </span>
+                                                </label>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <!-- Role defaults and Overrides -->
+                        <div style="margin-top:18px; border-top:1px solid #eef0f2; padding-top:14px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                                <div style="font-weight:700;">Overrides</div>
+                                <label style="display:flex; align-items:center; gap:8px; font-weight:600; color:#6c757d;">
+                                    <input type="checkbox" id="inheritRoleCheckbox" checked>
+                                    Inherit role permissions
+                                </label>
+                            </div>
+
+                            {% set override_defs = [
+                                {'key':'approve_above_amount','label':'Can approve payment requests above amount','type':'amount','placeholder':'₱100,000'},
+                                {'key':'complete_above_amount','label':'Can complete payments above amount','type':'amount','placeholder':'₱500,000'},
+                                {'key':'return_after_finance','label':'Can return requests after finance review','type':'boolean'},
+                                {'key':'skip_second_level','label':'Can skip second-level approval','type':'boolean'},
+                                {'key':'upload_receipts_only','label':'Can upload receipts only','type':'boolean'},
+                                {'key':'edit_payment_amounts','label':'Can edit payment amounts','type':'boolean'},
+                                {'key':'return_only_not_reject','label':'Can return to requestor but not reject','type':'boolean'}
+                            ] %}
+
+                            <div style="display:flex; flex-direction:column; gap:10px;">
+                                {% for ov in override_defs %}
+                                <div class="override-row" data-override="{{ ov.key }}" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid #f1f3f5; border-radius:8px; background:#fff;">
+                                    <div style="flex:1;">
+                                        <div style="font-weight:600;">{{ ov.label }}</div>
+                                        {% if ov.type == 'amount' %}
+                                        <div style="color:#6c757d; font-size:0.9rem; margin-top:4px;">Specify minimum amount (leave empty to disable)</div>
+                                        {% endif %}
+                                    </div>
+                                    <div style="min-width:210px; display:flex; align-items:center; gap:8px; justify-content:flex-end;">
+                                        <label style="display:flex; align-items:center; gap:8px;">
+                                            <input type="checkbox" class="override-enable" data-ov-key="{{ ov.key }}">
+                                            <span style="color:#6c757d; font-size:0.95rem;">Enable</span>
+                                        </label>
+                                        {% if ov.type == 'amount' %}
+                                        <input type="text" class="override-amount form-control" data-ov-key="{{ ov.key }}" placeholder="{{ ov.placeholder }}" style="width:120px; padding:6px 8px; border:1px solid #e9ecef; border-radius:6px; text-align:right; display:none;">
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <!-- Status Scope (per-action allowed statuses) -->
+                        <div style="margin-top:18px; border-top:1px solid #eef0f2; padding-top:14px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                                <div style="font-weight:700;">Status Scope (per action)</div>
+                                <div style="color:#6c757d; font-size:0.95rem;">Use role defaults toggles turn off the custom scope</div>
+                            </div>
+
+                            {% set statuses = [
+                                {'key':'draft','label':'Draft'},
+                                {'key':'pending_manager_approval','label':'Submitted / Pending Manager Approval'},
+                                {'key':'returned_to_requestor','label':'Returned to Requestor'},
+                                {'key':'approved_by_manager','label':'Approved by Manager / Pending Finance'},
+                                {'key':'returned_by_finance','label':'Returned by Finance'},
+                                {'key':'completed','label':'Completed / Paid'},
+                                {'key':'rejected','label':'Rejected / Cancelled'}
+                            ] %}
+
+                            {% set actions = [
+                                {'key':'approve','label':'Approve'},
+                                {'key':'return','label':'Return to Requestor'},
+                                {'key':'reject','label':'Reject'},
+                                {'key':'complete','label':'Complete (Mark as Paid)'},
+                                {'key':'attach_receipt','label':'Attach Receipt'},
+                                {'key':'verify_docs','label':'Verify Documents'},
+                                {'key':'comment','label':'Comment/Note'}
+                            ] %}
+
+                            <div class="status-scope-list" style="display:flex; flex-direction:column; gap:12px;">
+                                {% for action in actions %}
+                                <div class="action-row" data-action="{{ action.key }}" style="border:1px solid #f1f3f5; border-radius:8px; overflow:hidden;">
+                                    <button type="button" class="action-header" style="width:100%; text-align:left; padding:10px 12px; background:#fff; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                                        <div style="font-weight:600;">{{ action.label }}</div>
+                                        <div style="display:flex; align-items:center; gap:10px;">
+                                            <label style="display:flex; align-items:center; gap:8px; font-weight:600; color:#6c757d;">
+                                                <input type="checkbox" class="use-role-defaults" data-action="{{ action.key }}" checked> Use role defaults
+                                            </label>
+                                            <span class="action-caret">▾</span>
+                                        </div>
+                                    </button>
+                                    <div class="action-body" style="display:none; padding:10px 12px; background:#fafafa;">
+                                        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                                            {% for st in statuses %}
+                                            <label style="display:inline-flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; background:#fff; border:1px solid #eef0f2;">
+                                                <input type="checkbox" class="status-checkbox" data-action="{{ action.key }}" value="{{ st.key }}">
+                                                <span style="font-size:0.95rem;">{{ st.label }}</span>
+                                            </label>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <style>
+                    /* Toggle visuals for permission switches inside panel */
+                    #permissionsPanel .perm-switch {
+                        display: inline-block;
+                        width: 44px;
+                        height: 24px;
+                        background: #e9ecef;
+                        border-radius: 999px;
+                        position: relative;
+                        transition: background 0.18s ease;
+                    }
+                    #permissionsPanel .perm-switch .perm-knob {
+                        position: absolute;
+                        top: 3px;
+                        left: 3px;
+                        width: 18px;
+                        height: 18px;
+                        background: #ffffff;
+                        border-radius: 50%;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+                        transition: left 0.18s ease, background 0.18s ease;
+                    }
+                    #permissionsPanel input[type="checkbox"]:checked + .perm-switch {
+                        background: #28a745 !important;
+                    }
+                    #permissionsPanel input[type="checkbox"]:checked + .perm-switch .perm-knob {
+                        left: calc(100% - 3px - 18px) !important;
+                    }
+                </style>
+                <style>
+                    /* Ensure knob position toggles even when inline styles exist */
+                    #permissionsPanel label.perm-toggle input[type="checkbox"] + .perm-switch .perm-knob {
+                        left: 3px !important;
+                    }
+                    #permissionsPanel label.perm-toggle input[type="checkbox"]:checked + .perm-switch .perm-knob {
+                        left: calc(100% - 3px - 18px) !important;
+                    }
+                    #permissionsPanel label.perm-toggle input[type="checkbox"]:checked + .perm-switch {
+                        background: #28a745 !important;
+                    }
+                </style>
                 <script>
                 let currentUserId = null;
 
@@ -900,6 +1311,146 @@
                 function getSelectedUserIds() {
                     const checkedCheckboxes = document.querySelectorAll('.user-checkbox:checked');
                     return Array.from(checkedCheckboxes).map(checkbox => checkbox.value);
+                }
+
+                // Fetch current permissions for a user and populate the toggles
+                function fetchPermissionsForUser(userId) {
+                    if (!userId) return;
+                    fetch(`/api/users/${userId}/permissions`)
+                        .then(res => res.json())
+                        .then(data => {
+                            const perms = data.permissions || {};
+                            // Update each checkbox
+                            document.querySelectorAll('#permissionsPanel input[type="checkbox"][name^="perm_full_"]').forEach(function(cb){
+                                const name = cb.getAttribute('name').replace(/^perm_full_/, '');
+                                const checked = !!perms[name];
+                                cb.checked = checked;
+                                // ensure visual state by toggling checked (CSS handles appearance), but force knob position fallback
+                                const sw = cb.nextElementSibling;
+                                if (sw && sw.querySelector('.perm-knob')) {
+                                    if (checked) {
+                                        sw.style.background = '#28a745';
+                                        sw.querySelector('.perm-knob').style.left = 'calc(100% - 3px - 18px)';
+                                    } else {
+                                        sw.style.background = '#e9ecef';
+                                        sw.querySelector('.perm-knob').style.left = '3px';
+                                    }
+                                }
+                            });
+                            // populate status scopes if provided
+                            const statusScopes = data.status_scopes || data.statusScopes || {};
+                            document.querySelectorAll('.action-row').forEach(function(row){
+                                var action = row.getAttribute('data-action');
+                                var sc = statusScopes[action];
+                                var useDefaults = true;
+                                if (sc && typeof sc.use_role_defaults !== 'undefined') useDefaults = !!sc.use_role_defaults;
+                                var boxes = row.querySelectorAll('.status-checkbox');
+                                boxes.forEach(function(b){
+                                    if (sc && Array.isArray(sc.statuses)) {
+                                        b.checked = sc.statuses.indexOf(b.value) !== -1;
+                                    } else {
+                                        b.checked = false;
+                                    }
+                                    b.disabled = useDefaults;
+                                    b.style.opacity = useDefaults ? '0.5' : '1';
+                                });
+                                var useCb = row.querySelector('.use-role-defaults');
+                                if (useCb) useCb.checked = useDefaults;
+                            });
+                        }).catch(err => {
+                            console.error('Failed to load permissions', err);
+                        });
+                }
+
+                // Save permissions for the currently editing user
+                function savePermissions() {
+                    var userId = window.__editingUserId;
+                    if (!userId) {
+                        alert('No user selected.');
+                        return;
+                    }
+                    const inputs = document.querySelectorAll('#permissionsPanel input[type="checkbox"][name^="perm_full_"]');
+                    const perms = {};
+                    inputs.forEach(function(i){
+                        const name = i.getAttribute('name').replace(/^perm_full_/, '');
+                        perms[name] = !!i.checked;
+                    });
+                    // collect overrides
+                    const overrides = {};
+                    document.querySelectorAll('.override-row').forEach(function(row){
+                        var key = row.getAttribute('data-override');
+                        if (!key) return;
+                        var enableCb = row.querySelector('.override-enable');
+                        if (!enableCb) return;
+                        var enabled = !!enableCb.checked;
+                        var amountInput = row.querySelector('.override-amount');
+                        var value = null;
+                        if (amountInput) {
+                            var v = amountInput.value.trim().replace(/[^\d.-]/g,'');
+                            if (v !== '') value = parseFloat(v);
+                        }
+                        overrides[key] = { enabled: enabled, value: value };
+                    });
+                    // collect status scopes per action
+                    const status_scopes = {};
+                    document.querySelectorAll('.action-row').forEach(function(row){
+                        var action = row.getAttribute('data-action');
+                        if (!action) return;
+                        var useDefaultsEl = row.querySelector('.use-role-defaults');
+                        var useDefaults = true;
+                        if (useDefaultsEl) useDefaults = !!useDefaultsEl.checked;
+                        var checkedStatuses = [];
+                        row.querySelectorAll('.status-checkbox:checked').forEach(function(cb){
+                            checkedStatuses.push(cb.value);
+                        });
+                        status_scopes[action] = { use_role_defaults: useDefaults, statuses: checkedStatuses };
+                    });
+                    fetch(`/api/users/${userId}/permissions`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ permissions: perms, overrides: overrides, status_scopes: status_scopes })
+                    }).then(res => res.json())
+                    .then(data => {
+                        if (data && (data.success || data.status === 'ok')) {
+                            // small success feedback (could be flash) then close
+                            closeEditPermissions();
+                        } else {
+                            alert('Failed to save permissions.');
+                        }
+                    }).catch(err => {
+                        console.error(err);
+                        alert('Failed to save permissions.');
+                    });
+                }
+
+                // Apply current permissions to selected users in main users table
+                function applyPermissionsToSelectedUsers() {
+                    var sourceId = window.__editingUserId;
+                    if (!sourceId) {
+                        alert('No user open to copy from.');
+                        return;
+                    }
+                    var targetIds = getSelectedUserIds();
+                    if (!targetIds || targetIds.length === 0) {
+                        alert('No target users selected in the table.');
+                        return;
+                    }
+                    if (!confirm(`Apply these permissions to ${targetIds.length} selected user(s)?`)) return;
+                    fetch('/api/users/apply_permissions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ source_user_id: sourceId, target_user_ids: targetIds })
+                    }).then(res => res.json())
+                    .then(data => {
+                        if (data && (data.success || data.status === 'ok')) {
+                            alert('Permissions applied successfully.');
+                        } else {
+                            alert('Failed to apply permissions.');
+                        }
+                    }).catch(err => {
+                        console.error(err);
+                        alert('Failed to apply permissions.');
+                    });
                 }
 
                 // Search functionality
@@ -1002,6 +1553,96 @@
                             }
                         });
                     }
+
+                    // Select-all per group handler
+                    document.querySelectorAll('.select-all-group').forEach(function(a){
+                        a.addEventListener('click', function(ev){
+                            ev.preventDefault();
+                            var idx = a.getAttribute('data-group');
+                            if (idx === null || idx === undefined) return;
+                            var boxes = document.querySelectorAll('#permissionsPanel tbody tr[data-group="' + idx + '"] input[type="checkbox"]');
+                            if (!boxes || boxes.length === 0) return;
+                            var anyUnchecked = Array.from(boxes).some(b => !b.checked);
+                            boxes.forEach(function(b){
+                                b.checked = !!anyUnchecked;
+                                var sw = b.nextElementSibling;
+                                if (sw && sw.querySelector('.perm-knob')) {
+                                    if (anyUnchecked) {
+                                        sw.style.background = '#28a745';
+                                        sw.querySelector('.perm-knob').style.left = 'calc(100% - 3px - 18px)';
+                                    } else {
+                                        sw.style.background = '#e9ecef';
+                                        sw.querySelector('.perm-knob').style.left = '3px';
+                                    }
+                                }
+                            });
+                        });
+                    });
+
+                    // Toggle visual state when clicking the switch label
+                    document.querySelectorAll('label.perm-toggle input[type="checkbox"]').forEach(function(cb){
+                        cb.addEventListener('change', function(){
+                            var sw = cb.nextElementSibling;
+                            if (sw && sw.querySelector('.perm-knob')) {
+                                if (cb.checked) {
+                                    sw.style.background = '#28a745';
+                                    sw.querySelector('.perm-knob').style.left = 'calc(100% - 3px - 18px)';
+                                } else {
+                                    sw.style.background = '#e9ecef';
+                                    sw.querySelector('.perm-knob').style.left = '3px';
+                                }
+                            }
+                        });
+                    });
+
+                    // Overrides UI: show/hide amount inputs and collect values
+                    document.querySelectorAll('.override-enable').forEach(function(cb){
+                        cb.addEventListener('change', function(){
+                            var key = cb.getAttribute('data-ov-key');
+                            var amountInput = document.querySelector('.override-amount[data-ov-key="'+key+'"]');
+                            if (amountInput) {
+                                amountInput.style.display = cb.checked ? 'inline-block' : 'none';
+                            }
+                        });
+                    });
+
+                    // inherit role checkbox toggles enabling of overrides
+                    var inheritCb = document.getElementById('inheritRoleCheckbox');
+                    if (inheritCb) {
+                        inheritCb.addEventListener('change', function(){
+                            var disabled = inheritCb.checked;
+                            document.querySelectorAll('.override-enable, .override-amount').forEach(function(el){
+                                el.disabled = disabled;
+                                el.style.opacity = disabled ? '0.6' : '1';
+                            });
+                        });
+                    }
+
+                    // Status-scope accordion behavior
+                    document.querySelectorAll('.action-header').forEach(function(btn){
+                        btn.addEventListener('click', function(e){
+                            // ignore clicks on the use-role-defaults checkbox
+                            if (e.target && e.target.classList && e.target.classList.contains('use-role-defaults')) return;
+                            var parent = btn.parentElement;
+                            var body = parent.querySelector('.action-body');
+                            if (!body) return;
+                            var isOpen = body.style.display === 'block';
+                            // close all others
+                            document.querySelectorAll('.action-body').forEach(function(b){ b.style.display = 'none'; });
+                            if (!isOpen) body.style.display = 'block';
+                        });
+                    });
+
+                    // Use role defaults toggles status checkbox enabling
+                    document.querySelectorAll('.use-role-defaults').forEach(function(cb){
+                        cb.addEventListener('change', function(){
+                            var action = cb.getAttribute('data-action');
+                            var parent = cb.closest('.action-row');
+                            if (!parent) return;
+                            var boxes = parent.querySelectorAll('.status-checkbox');
+                            boxes.forEach(function(b){ b.disabled = cb.checked; b.style.opacity = cb.checked ? '0.5' : '1'; });
+                        });
+                    });
                 });
                 </script>
             </div>
