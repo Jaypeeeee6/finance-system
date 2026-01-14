@@ -5,6 +5,19 @@
     <div class="dashboard-header">
         <h2 style="margin:0;"><i class="fas fa-cog"></i> Settings</h2>
     </div>
+    <!-- Settings page tabs (Temporary Manager, Role Permissions) -->
+    <div class="settings-tabs" style="margin-top: 12px;">
+        <ul class="settings-nav-tabs" role="tablist" style="display:flex; gap:24px; list-style:none; padding:0; margin:0 0 16px 0; border-bottom:1px solid #e9ecef;">
+            <li class="settings-tab active" role="presentation" style="padding-bottom:12px;">
+                <a href="#temporary-manager" role="tab" aria-selected="true" style="text-decoration:none; color:#D9BD7D; font-weight:600; padding-bottom:6px; border-bottom:3px solid #D9BD7D; display:inline-block;">Temporary Manager</a>
+            </li>
+            <li class="settings-tab" role="presentation" style="padding-bottom:12px;">
+                <a href="#role-permissions" role="tab" aria-selected="false" style="text-decoration:none; color:#6c757d; display:inline-block;">Role Permissions</a>
+            </li>
+        </ul>
+    </div>
+    <div class="settings-tab-panels">
+        <div id="temporary-manager" role="tabpanel" aria-hidden="false">
     <style>
         /* Slightly smaller form controls for settings page */
         .settings-page .form-group label {
@@ -38,6 +51,9 @@
             background: #EFE9C6 !important;
             color: #1f1f1f !important;
             padding: 10px 12px !important;
+            /* Ensure both upper corners are rounded for header containers */
+            border-top-left-radius: 0.375rem !important;
+            border-top-right-radius: 0.375rem !important;
         }
         /* Make Save button green and force override of global .btn-save */
         .settings-page .btn-save {
@@ -177,6 +193,8 @@
         /* Ensure native select dropdowns are not clipped and appear below the field */
         .dashboard-container.settings-page .card {
             overflow: visible !important;
+            /* Round bottom-left corner for card containers on settings page */
+            border-bottom-left-radius: 0.375rem !important;
         }
         .dashboard-container.settings-page .card .card-body {
             overflow: visible !important;
@@ -453,6 +471,80 @@
             if (sel) searchInput.value = sel.textContent;
         }
     });
+    </script>
+        </div>
+        <div id="role-permissions" role="tabpanel" aria-hidden="true" style="display:none; margin-top: 1rem;">
+            <!-- Role Permissions content will be added later -->
+            <div class="card">
+                <div class="card-header">
+                    <h4>Role Permissions</h4>
+                </div>
+                <div class="card-body">
+                    <p class="intro-paragraph" style="color:#666;">No content yet. Role Permissions configuration will be added here.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Tab switching behavior for settings page
+    (function(){
+        function activateTabById(targetId) {
+            var tabs = document.querySelectorAll('.settings-nav-tabs .settings-tab');
+            tabs.forEach(function(li){
+                var a = li.querySelector('a');
+                if (!a) return;
+                var href = a.getAttribute('href') || '';
+                var id = href.replace('#','');
+                if (id === targetId) {
+                    li.classList.add('active');
+                    a.setAttribute('aria-selected','true');
+                    a.style.color = '#D9BD7D';
+                    a.style.borderBottom = '3px solid #D9BD7D';
+                } else {
+                    li.classList.remove('active');
+                    a.setAttribute('aria-selected','false');
+                    a.style.color = '#6c757d';
+                    a.style.borderBottom = 'none';
+                }
+            });
+
+            var panels = document.querySelectorAll('.settings-tab-panels [role="tabpanel"]');
+            panels.forEach(function(p){
+                if (p.id === targetId) {
+                    p.style.display = 'block';
+                    p.setAttribute('aria-hidden','false');
+                } else {
+                    p.style.display = 'none';
+                    p.setAttribute('aria-hidden','true');
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function(){
+            var anchors = Array.from(document.querySelectorAll('.settings-nav-tabs a[href^="#"]'));
+            anchors.forEach(function(a){
+                a.addEventListener('click', function(ev){
+                    ev.preventDefault();
+                    var targetId = (a.getAttribute('href') || '').replace('#','');
+                    if (!targetId) return;
+                    activateTabById(targetId);
+                    // update URL hash without scrolling
+                    if (history && history.replaceState) {
+                        history.replaceState(null, '', '#' + targetId);
+                    } else {
+                        location.hash = '#' + targetId;
+                    }
+                });
+            });
+
+            // On load: open tab from hash if present and valid, otherwise default to Temporary Manager
+            var initial = (location.hash || '').replace('#','') || 'temporary-manager';
+            var validPanel = document.getElementById(initial);
+            if (!validPanel) initial = 'temporary-manager';
+            activateTabById(initial);
+        });
+    })();
     </script>
 </div>
 {% endblock %}
