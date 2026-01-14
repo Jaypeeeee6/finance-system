@@ -12,7 +12,7 @@
                 <a href="#temporary-manager" role="tab" aria-selected="true" style="text-decoration:none; color:#D9BD7D; font-weight:600; padding-bottom:6px; border-bottom:3px solid #D9BD7D; display:inline-block;">Temporary Manager</a>
             </li>
             <li class="settings-tab" role="presentation" style="padding-bottom:12px;">
-                <a href="#role-permissions" role="tab" aria-selected="false" style="text-decoration:none; color:#6c757d; display:inline-block;">Role Permissions</a>
+                <a href="#users" role="tab" aria-selected="false" style="text-decoration:none; color:#6c757d; display:inline-block;">Users</a>
             </li>
         </ul>
     </div>
@@ -222,6 +222,119 @@
             text-align: left !important;
             padding: 12px 16px !important;
         }
+        /* Narrow checkbox column in Users table */
+        .user-management-settings .data-table th:first-child,
+        .user-management-settings .data-table td:first-child {
+            width: 40px !important;
+            padding: 8px !important;
+            text-align: center !important;
+        }
+        .user-management-settings .user-checkbox {
+            width: 18px !important;
+            height: 18px !important;
+        }
+        /* Narrow ID column (second column) */
+        .user-management-settings .data-table th:nth-child(2),
+        .user-management-settings .data-table td:nth-child(2) {
+            width: 60px !important;
+            padding: 8px !important;
+            text-align: center !important;
+        }
+    </style>
+    <style>
+        /* Normalize dropdown item font/icon sizing so Edit User matches others */
+        .user-management-settings .action-dropdown .dropdown-item {
+            font-size: 13px !important;
+            font-weight: 500 !important;
+            line-height: 1 !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            padding: 10px 12px !important;
+            color: #212529 !important;
+        }
+        .user-management-settings .action-dropdown .dropdown-item i {
+            font-size: 12px !important;
+            width: 16px !important;
+            text-align: center !important;
+        }
+        /* Dropdown item hover */
+        .user-management-settings .action-dropdown .dropdown-item:hover {
+            background: #f8f9fa;
+        }
+    </style>
+    <style>
+        /* Users panel: make container background white and style Add New User button */
+        .user-management-settings .card {
+            background: #ffffff !important;
+        }
+        .user-management-settings .card-header .card-header-actions .btn-primary {
+            background: #D9BD7D !important;
+            border-color: #D9BD7D !important;
+            color: #ffffff !important;
+        }
+        .user-management-settings .card-header .card-header-actions .btn-primary:hover {
+            background: #c8ac65 !important;
+            border-color: #c8ac65 !important;
+            color: #ffffff !important;
+        }
+        /* Make the card header (heading container) white.
+           Use a higher-specificity selector to override other settings-page rules. */
+        .dashboard-container.settings-page .user-management-settings div.card > .card-header {
+            background: #ffffff !important;
+            color: #333333 !important;
+            border-bottom: 1px solid #e9ecef !important;
+        }
+        .dashboard-container.settings-page .user-management-settings div.card > .card-header h2 {
+            color: #333333 !important;
+        }
+    </style>
+    <style>
+        /* Make action buttons in Users table more compact and match dashboard table style */
+        .user-management-settings .data-table .btn-sm {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 8px !important;
+            padding: 6px 8px !important;
+            font-size: 12px !important;
+            height: 32px !important;
+            line-height: 1 !important;
+            border-radius: 6px !important;
+            white-space: nowrap !important;
+        }
+        .user-management-settings .data-table .btn-sm i {
+            font-size: 12px !important;
+            margin: 0 6px 0 0 !important;
+        }
+        /* Make delete button icon-sized and outlined like dashboard */
+        .user-management-settings .data-table .btn-sm.btn-danger {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 32px !important;
+            height: 32px !important;
+            padding: 0 !important;
+            background: transparent !important;
+            border: 1px solid #dc3545 !important;
+            color: #dc3545 !important;
+            border-radius: 6px !important;
+            font-size: 12px !important;
+        }
+        .user-management-settings .data-table .btn-sm.btn-danger i {
+            margin: 0 !important;
+            font-size: 12px !important;
+        }
+    </style>
+    <style>
+        /* Ensure table wrapper doesn't clip dropdowns in Users panel */
+        .user-management-settings .table-responsive {
+            overflow: visible !important;
+        }
+        /* Slightly raise dropdown z-index to appear above other elements */
+        .user-management-settings .action-dropdown {
+            z-index: 1400 !important;
+        }
     </style>
 
     <div class="card" style="margin-top: 1rem;">
@@ -378,6 +491,86 @@
     })();
     </script>
     <script>
+    // Improved action dropdown behavior: portal dropdowns to body and position absolutely
+    (function(){
+        function closeAllActionDropdowns() {
+            document.querySelectorAll('.action-dropdown').forEach(function(d){
+                d.style.display = 'none';
+                d.setAttribute('aria-hidden','true');
+            });
+            document.querySelectorAll('.action-ellipsis-btn').forEach(function(b){
+                b.setAttribute('aria-expanded','false');
+            });
+        }
+
+        // Utility to portal a menu element to body and position it under the trigger button
+        function openPortalMenu(btn, menu) {
+            // Create placeholder if not already created
+            if (!menu.__placeholder) {
+                menu.__placeholder = document.createComment('action-dropdown-placeholder');
+                menu.__originalParent = menu.parentNode;
+                menu.__originalParent.insertBefore(menu.__placeholder, menu);
+                document.body.appendChild(menu);
+                menu.__ported = true;
+            } else if (menu.__originalParent && !menu.__originalParent.contains(menu)) {
+                document.body.appendChild(menu);
+            }
+
+            // Temporarily show to measure
+            menu.style.position = 'absolute';
+            menu.style.display = 'block';
+            menu.style.visibility = 'hidden';
+            menu.style.left = '0px';
+            menu.style.top = '0px';
+            menu.style.zIndex = 2000;
+
+            var rect = btn.getBoundingClientRect();
+            var mw = menu.offsetWidth;
+            var left = rect.right + window.scrollX - mw;
+            // prefer aligning right edge of menu with button, but avoid off-screen
+            if (left < 8) left = rect.left + window.scrollX;
+            var top = rect.bottom + window.scrollY + 6;
+
+            menu.style.left = left + 'px';
+            menu.style.top = top + 'px';
+            menu.style.visibility = 'visible';
+            menu.setAttribute('aria-hidden','false');
+            btn.setAttribute('aria-expanded','true');
+        }
+
+        document.addEventListener('click', function(ev){
+            // Close dropdown if click outside any action-menu-container or any portaled menu
+            if (!ev.target.closest('.action-menu-container') && !ev.target.closest('.action-dropdown')) {
+                closeAllActionDropdowns();
+            }
+        }, true);
+
+        document.addEventListener('keydown', function(ev){
+            if (ev.key === 'Escape') closeAllActionDropdowns();
+        });
+
+        document.addEventListener('DOMContentLoaded', function(){
+            document.querySelectorAll('.action-ellipsis-btn').forEach(function(btn){
+                btn.addEventListener('click', function(e){
+                    e.stopPropagation();
+                    var userId = btn.getAttribute('data-user-id');
+                    if (!userId) return;
+                    // find the menu by data-user-id (works even after portaling to body)
+                    var menu = document.querySelector('.action-dropdown[data-user-id="' + userId + '"]');
+                    if (!menu) return;
+                    var isOpen = menu.style.display === 'block' && menu.getAttribute('aria-hidden') === 'false';
+                    if (isOpen) {
+                        closeAllActionDropdowns();
+                        return;
+                    }
+                    closeAllActionDropdowns();
+                    openPortalMenu(btn, menu);
+                });
+            });
+        });
+    })();
+    </script>
+    <script>
     // Initialize a grouped searchable dropdown for managers (single selection)
     document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.getElementById('manager_search');
@@ -473,15 +666,344 @@
     });
     </script>
         </div>
-        <div id="role-permissions" role="tabpanel" aria-hidden="true" style="display:none; margin-top: 1rem;">
-            <!-- Role Permissions content will be added later -->
-            <div class="card">
-                <div class="card-header">
-                    <h4>Role Permissions</h4>
+        <div id="users" role="tabpanel" aria-hidden="true" style="display:none; margin-top: 1rem;">
+            {% set users_list = users if users is defined and users else managers if managers is defined else [] %}
+            <div class="user-management-settings">
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-list"></i> All Users</h2>
+                        <div class="card-header-actions">
+                            <a href="{{ url_for('new_user') }}" class="btn btn-primary">
+                                <i class="fas fa-user-plus"></i> Add New User
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Search Bar positioned below the header -->
+                    <div class="search-bar-container" style="margin: 12px 0;">
+                        <div class="search-form">
+                            <div class="search-input-container" style="position:relative; display:flex; align-items:center;">
+                                <i class="fas fa-search search-icon" style="position:absolute; left:12px; color:#6c757d;"></i>
+                                <input type="text" class="form-control" id="userSearch" placeholder="Search users by name, department, or role..." style="padding-left:38px;">
+                                <button type="button" class="clear-search-btn" id="clearSearch" style="display: none; margin-left:8px;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="search-results-info" id="searchResultsInfo" style="display: none; margin-top:8px; color:#666;">
+                            <i class="fas fa-info-circle"></i>
+                            <span id="searchResultsText" style="margin-left:6px;"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="card-body">
+                        {% if users_list %}
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th><input type="checkbox" id="selectAll" onchange="toggleAllCheckboxes()"></th>
+                                            <th>ID</th>
+                                            <th>Full Name</th>
+                                            <th>Department</th>
+                                            <th>Role</th>
+                                            <th>Email</th>
+                                            <th>Account Status</th>
+                                            <th>Created At</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for u in users_list %}
+                                        <tr {% if u.account_locked %}class="locked-account" style="background-color: #fff3cd;"{% endif %}>
+                                            <td><input type="checkbox" class="user-checkbox" value="{{ u.user_id }}" onchange="updateSelectAllState()" {% if u.user_id == current_user.user_id %}disabled{% endif %}></td>
+                                            <td>{{ u.user_id }}</td>
+                                            <td>{{ u.name }}</td>
+                                            <td>{{ u.department }}</td>
+                                            <td><span class="badge badge-primary">{{ u.role }}</span></td>
+                                            <td>{{ u.email or 'N/A' }}</td>
+                                            <td>
+                                                {% if u.account_locked %}
+                                                    <span class="badge badge-danger">
+                                                        <i class="fas fa-lock"></i> LOCKED
+                                                    </span>
+                                                    <small style="display: block; margin-top: 0.25rem;">
+                                                        Failed attempts: {{ u.failed_login_attempts or 0 }}
+                                                    </small>
+                                                {% else %}
+                                                    <span class="badge badge-success">
+                                                        <i class="fas fa-check-circle"></i> Active
+                                                    </span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ u.created_at.strftime('%Y-%m-%d') }}</td>
+                                            <td style="white-space: nowrap; position: relative;">
+                                                <div class="action-menu-container" style="position: relative; display: inline-block;">
+                                                    <button type="button" class="btn action-ellipsis-btn btn-view-outline" aria-haspopup="true" aria-expanded="false" data-user-id="{{ u.user_id }}" title="Actions">
+                                                        <i class="fas fa-ellipsis-h"></i>
+                                                    </button>
+
+                                                    <div class="action-dropdown" data-user-id="{{ u.user_id }}" role="menu" aria-hidden="true" style="display:none; position: absolute; right: 0; top: 38px; min-width: 180px; background: #fff; border: 1px solid #e9ecef; border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); z-index: 1200;">
+                                                        <a class="dropdown-item" role="menuitem" href="{{ url_for('edit_user', user_id=u.user_id) }}" style="display:block; padding:10px 12px; color:#212529; text-decoration:none;">
+                                                            <i class="fas fa-edit" style="margin-right:8px;"></i> Edit User
+                                                        </a>
+                                                        <button type="button" class="dropdown-item" role="menuitem" onclick="showResetPasswordModal({{ u.user_id }}, '{{ u.username }}', '{{ u.name }}')" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
+                                                            <i class="fas fa-key" style="margin-right:8px;"></i> Reset Password
+                                                        </button>
+                                                        {% if u.user_id != current_user.user_id %}
+                                                        <form method="POST" action="{{ url_for('delete_user', user_id=u.user_id) }}" class="dropdown-delete-form" onsubmit="return confirm('Are you sure you want to delete user {{ u.name }}?')" style="margin:0;">
+                                                            <button type="submit" class="dropdown-item" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#dc3545; cursor:pointer;">
+                                                                <i class="fas fa-trash" style="margin-right:8px;"></i> Delete User
+                                                            </button>
+                                                        </form>
+                                                        {% else %}
+                                                        <div class="dropdown-item" style="display:block; padding:10px 12px; color:#6c757d;">Current User</div>
+                                                        {% endif %}
+                                                        <button type="button" class="dropdown-item" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
+                                                            <i class="fas fa-user-shield" style="margin-right:8px;"></i> Edit Permissions
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="empty-state" style="color:#666; text-align:center; padding:18px;">
+                                <i class="fas fa-users" style="font-size:2rem;"></i>
+                                <p>No users found.</p>
+                            </div>
+                        {% endif %}
+                    </div>
                 </div>
-                <div class="card-body">
-                    <p class="intro-paragraph" style="color:#666;">No content yet. Role Permissions configuration will be added here.</p>
+
+                <!-- Password Reset Modal -->
+                <div id="resetPasswordModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);">
+                    <div style="background-color: #fefefe; margin: 6% auto; padding: 20px; border: 1px solid #888; width: 500px; border-radius: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h3 style="margin: 0;"><i class="fas fa-key"></i> Reset User Password</h3>
+                            <button onclick="closeResetPasswordModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888;">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <form method="POST" id="resetPasswordForm" onsubmit="return validatePasswordReset()">
+                            <div style="margin-bottom: 15px;">
+                                <p><strong>User:</strong> <span id="modalUserName"></span> (<span id="modalUserEmail"></span>)</p>
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <label for="newPassword" style="display: block; margin-bottom: 5px; font-weight: 600;">New Password:</label>
+                                <div class="password-input-container" style="position:relative;">
+                                    <input type="password" id="newPassword" name="new_password" class="form-control" required minlength="6" placeholder="Enter new password (min. 6 characters)" style="padding-right: 3rem;">
+                                    <button type="button" class="password-toggle-btn" id="newPassword-toggle" aria-label="Toggle password visibility" style="position:absolute; right:6px; top:6px; background:none; border:none;">
+                                        <i class="fas fa-eye" id="newPassword-toggle-icon"></i>
+                                    </button>
+                                </div>
+                                <small style="color: #666; display: block; margin-top: 5px;">Minimum 6 characters required</small>
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <label for="confirmPassword" style="display: block; margin-bottom: 5px; font-weight: 600;">Confirm Password:</label>
+                                <div class="password-input-container" style="position:relative;">
+                                    <input type="password" id="confirmPassword" class="form-control" required minlength="6" placeholder="Confirm new password" style="padding-right: 3rem;">
+                                    <button type="button" class="password-toggle-btn" id="confirmPassword-toggle" aria-label="Toggle password visibility" style="position:absolute; right:6px; top:6px; background:none; border:none;">
+                                        <i class="fas fa-eye" id="confirmPassword-toggle-icon"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 10px; margin-bottom: 15px;">
+                                <p style="margin: 0; font-size: 0.9rem;"><i class="fas fa-exclamation-triangle"></i> <strong>Note:</strong> This will reset the user's password and unlock their account if it's locked. The user will be notified.</p>
+                            </div>
+                            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                                <button type="button" onclick="closeResetPasswordModal()" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> Cancel
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-key"></i> Reset Password
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
+
+                <script>
+                let currentUserId = null;
+
+                function showResetPasswordModal(userId, userEmail, userName) {
+                    currentUserId = userId;
+                    document.getElementById('modalUserName').textContent = userName;
+                    document.getElementById('modalUserEmail').textContent = userEmail;
+                    document.getElementById('resetPasswordForm').action = `/users/${userId}/reset_password`;
+                    document.getElementById('resetPasswordModal').style.display = 'block';
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('confirmPassword').value = '';
+                    document.getElementById('newPassword').focus();
+                }
+
+                function closeResetPasswordModal() {
+                    document.getElementById('resetPasswordModal').style.display = 'none';
+                    currentUserId = null;
+                }
+
+                function validatePasswordReset() {
+                    const newPassword = document.getElementById('newPassword').value;
+                    const confirmPassword = document.getElementById('confirmPassword').value;
+                    
+                    if (newPassword.length < 6) {
+                        alert('Password must be at least 6 characters long.');
+                        return false;
+                    }
+                    
+                    if (newPassword !== confirmPassword) {
+                        alert('Passwords do not match. Please try again.');
+                        return false;
+                    }
+                    
+                    return confirm('Are you sure you want to reset this user\\'s password? They will be notified of the change.');
+                }
+
+                // Close modal when clicking outside of it
+                window.addEventListener('click', function(event) {
+                    const modal = document.getElementById('resetPasswordModal');
+                    if (event.target == modal) {
+                        closeResetPasswordModal();
+                    }
+                });
+
+                function toggleAllCheckboxes() {
+                    const selectAllCheckbox = document.getElementById('selectAll');
+                    const userCheckboxes = document.querySelectorAll('.user-checkbox:not(:disabled)');
+                    
+                    userCheckboxes.forEach(checkbox => {
+                        checkbox.checked = selectAllCheckbox.checked;
+                    });
+                }
+
+                function updateSelectAllState() {
+                    const selectAllCheckbox = document.getElementById('selectAll');
+                    const userCheckboxes = document.querySelectorAll('.user-checkbox:not(:disabled)');
+                    const checkedCheckboxes = document.querySelectorAll('.user-checkbox:checked');
+                    
+                    if (checkedCheckboxes.length === 0) {
+                        selectAllCheckbox.checked = false;
+                        selectAllCheckbox.indeterminate = false;
+                    } else if (checkedCheckboxes.length === userCheckboxes.length) {
+                        selectAllCheckbox.checked = true;
+                        selectAllCheckbox.indeterminate = false;
+                    } else {
+                        selectAllCheckbox.checked = false;
+                        selectAllCheckbox.indeterminate = true;
+                    }
+                }
+
+                // Get selected user IDs
+                function getSelectedUserIds() {
+                    const checkedCheckboxes = document.querySelectorAll('.user-checkbox:checked');
+                    return Array.from(checkedCheckboxes).map(checkbox => checkbox.value);
+                }
+
+                // Search functionality
+                document.addEventListener('DOMContentLoaded', function() {
+                    const searchInput = document.getElementById('userSearch');
+                    const clearSearchBtn = document.getElementById('clearSearch');
+                    const searchResultsInfo = document.getElementById('searchResultsInfo');
+                    const searchResultsText = document.getElementById('searchResultsText');
+                    const tableRows = document.querySelectorAll('.data-table tbody tr');
+
+                    const originalTableRows = Array.from(tableRows);
+
+                    function filterUsers() {
+                        const searchTerm = searchInput.value.toLowerCase().trim();
+                        let visibleCount = 0;
+                        
+                        if (searchTerm === '') {
+                            tableRows.forEach(row => {
+                                row.style.display = '';
+                                visibleCount++;
+                            });
+                            clearSearchBtn.style.display = 'none';
+                            searchResultsInfo.style.display = 'none';
+                        } else {
+                            tableRows.forEach(row => {
+                                const cells = row.querySelectorAll('td');
+                                let isVisible = false;
+                                
+                                for (let i = 1; i < cells.length - 1; i++) {
+                                    if (i === 5) continue;
+                                    const cellText = cells[i].textContent.toLowerCase();
+                                    if (cellText.includes(searchTerm)) {
+                                        isVisible = true;
+                                        break;
+                                    }
+                                }
+                                
+                                if (isVisible) {
+                                    row.style.display = '';
+                                    visibleCount++;
+                                } else {
+                                    row.style.display = 'none';
+                                }
+                            });
+                            
+                            clearSearchBtn.style.display = 'flex';
+                            searchResultsInfo.style.display = 'flex';
+                            searchResultsText.textContent = `Showing ${visibleCount} of ${originalTableRows.length} users`;
+                        }
+                        
+                        updateSelectAllState();
+                    }
+
+                    searchInput.addEventListener('input', filterUsers);
+
+                    clearSearchBtn.addEventListener('click', function() {
+                        searchInput.value = '';
+                        filterUsers();
+                        searchInput.focus();
+                    });
+
+                    filterUsers();
+
+                    // Password visibility toggles
+                    const newPasswordInput = document.getElementById('newPassword');
+                    const confirmPasswordInput = document.getElementById('confirmPassword');
+                    const newPasswordToggleBtn = document.getElementById('newPassword-toggle');
+                    const confirmPasswordToggleBtn = document.getElementById('confirmPassword-toggle');
+                    const newPasswordToggleIcon = document.getElementById('newPassword-toggle-icon');
+                    const confirmPasswordToggleIcon = document.getElementById('confirmPassword-toggle-icon');
+
+                    if (newPasswordToggleBtn && newPasswordInput) {
+                        newPasswordToggleBtn.addEventListener('click', function() {
+                            if (newPasswordInput.type === 'password') {
+                                newPasswordInput.type = 'text';
+                                newPasswordToggleIcon.classList.remove('fa-eye');
+                                newPasswordToggleIcon.classList.add('fa-eye-slash');
+                                newPasswordToggleBtn.setAttribute('aria-label', 'Hide password');
+                            } else {
+                                newPasswordInput.type = 'password';
+                                newPasswordToggleIcon.classList.remove('fa-eye-slash');
+                                newPasswordToggleIcon.classList.add('fa-eye');
+                                newPasswordToggleBtn.setAttribute('aria-label', 'Show password');
+                            }
+                        });
+                    }
+
+                    if (confirmPasswordToggleBtn && confirmPasswordInput) {
+                        confirmPasswordToggleBtn.addEventListener('click', function() {
+                            if (confirmPasswordInput.type === 'password') {
+                                confirmPasswordInput.type = 'text';
+                                confirmPasswordToggleIcon.classList.remove('fa-eye');
+                                confirmPasswordToggleIcon.classList.add('fa-eye-slash');
+                                confirmPasswordToggleBtn.setAttribute('aria-label', 'Hide password');
+                            } else {
+                                confirmPasswordInput.type = 'password';
+                                confirmPasswordToggleIcon.classList.remove('fa-eye-slash');
+                                confirmPasswordToggleIcon.classList.add('fa-eye');
+                                confirmPasswordToggleBtn.setAttribute('aria-label', 'Show password');
+                            }
+                        });
+                    }
+                });
+                </script>
             </div>
         </div>
     </div>
