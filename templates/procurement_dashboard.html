@@ -61,12 +61,24 @@
                 </div>
                 <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Money Spent</div>
-                    <div style="font-size: 24px; font-weight: bold; color: #f5576c;">OMR {{ completed_amount|format_currency }}</div>
-                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Assigned Items + Completed Items</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #f5576c;">
+                        OMR {{ completed_amount|format_currency }}
+                        <span class="info-tooltip" style="margin-left:8px;" tabindex="0" aria-hidden="true">
+                            <i class="fas fa-info-circle" style="font-size:14px; color:#999; cursor:help;"></i>
+                            <span class="tooltip-text">Based on the Receipt Amount of each completed item request</span>
+                        </span>
+                    </div>
+                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Completed Items</div>
                 </div>
                 <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Money Pending</div>
-                    <div style="font-size: 24px; font-weight: bold; color: #4facfe;">OMR {{ pending_amount|format_currency }}</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #4facfe;">
+                        OMR {{ pending_amount|format_currency }}
+                        <span class="info-tooltip" style="margin-left:8px;" tabindex="0" aria-hidden="true">
+                            <i class="fas fa-info-circle" style="font-size:14px; color:#999; cursor:help;"></i>
+                            <span class="tooltip-text">Pending 'Bank money' payment requests</span>
+                        </span>
+                    </div>
                     <div style="font-size: 12px; color: #999; margin-top: 5px;">Pending Approval</div>
                 </div>
             </div>

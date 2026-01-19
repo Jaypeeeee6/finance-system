@@ -4168,13 +4168,15 @@ def procurement_dashboard():
     assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
     item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
     
-    # Get completed item requests and their invoice amounts
+    # Get completed item requests and their invoice / receipt amounts
     completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
     completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
+    # For Money Spent we only count completed requests that have a receipt_amount (actual money spent)
+    completed_item_requests_receipt_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
     
     # Adjust calculations: deduct from available balance, add to money spent
-    # Money Spent = Assigned item requests + Completed item requests (only item requests, not payment requests)
-    money_spent = item_requests_amount + completed_item_requests_amount
+    # Money Spent should include only COMPLETED item requests that have a receipt_amount (actual spent money)
+    money_spent = completed_item_requests_receipt_amount
     # Available Balance = Completed payment requests - Completed item requests only
     # (Only completed item requests reduce available balance, not assigned/pending items)
     # Include reconciled/manual adjustments that have been marked to affect reports
@@ -4731,13 +4733,15 @@ def procurement_item_requests():
         assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
         item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
         
-        # Get completed item requests and their invoice amounts
+        # Get completed item requests and their invoice / receipt amounts
         completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
         completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
+        # For Money Spent we only count completed requests that have a receipt_amount (actual money spent)
+        completed_item_requests_receipt_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
         
         # Adjust calculations: deduct from available balance, add to money spent
-        # Money Spent = Assigned item requests + Completed item requests (only item requests, not payment requests)
-        completed_amount = item_requests_amount + completed_item_requests_amount
+        # Money Spent should include only COMPLETED item requests that have a receipt_amount (actual spent money)
+        completed_amount = completed_item_requests_receipt_amount
         # Available Balance = Completed payment requests - Completed item requests only
         # (Only completed item requests reduce available balance, not assigned/pending items)
         try:

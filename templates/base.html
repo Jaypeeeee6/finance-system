@@ -75,6 +75,44 @@
         body.tab-session-pending {
             visibility: hidden;
         }
+        /* Simple CSS tooltip for info icons */
+        .info-tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        .info-tooltip .tooltip-text {
+            visibility: hidden;
+            background: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-size: 12px;
+            position: absolute;
+            z-index: 1200;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            pointer-events: none;
+        }
+        .info-tooltip:hover .tooltip-text,
+        .info-tooltip:focus-within .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        .info-tooltip .tooltip-text::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
     </style>
     {% endif %}
 </head>
