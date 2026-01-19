@@ -1316,6 +1316,20 @@ def get_authorized_manager_approvers_for_item_request(item_request):
             # Intentionally do NOT return here; allow GM/Operation Manager and other fallbacks to be added below.
     except Exception as e:
         app.logger.warning(f"Error applying Branch Inventory Officer special case for item request approvers: {e}")
+
+    # New rule: For item requests created by users in the Operation department,
+    # include Branch Inventory Officer(s) among authorized manager approvers.
+    # This ensures Branch Inventory Officer becomes an authorized manager approver
+    # for Operation item requests while still retaining GM and Operation Manager authority.
+    try:
+        if (requestor.department or '').strip().lower() == 'operation':
+            branch_inventory_officers = User.query.filter_by(role='Branch Inventory Officer').all()
+            for bio in branch_inventory_officers:
+                if bio.user_id != requestor.user_id and bio not in authorized_users:
+                    authorized_users.append(bio)
+            # Do not return here; allow GM/Operation Manager and other fallbacks to be added below.
+    except Exception as e:
+        app.logger.warning(f"Error adding Branch Inventory Officer approvers for Operation department item requests: {e}")
     
     # Hard rule: Requests submitted by GM/CEO/Operation Manager can ONLY be approved by Abdalaziz
     if requestor.role in ['GM', 'CEO', 'Operation Manager']:
@@ -5093,7 +5107,17 @@ def view_item_request_page(request_id):
             pass
     
     # Determine manager name for all statuses (pending and completed)
-    if requestor_user and requestor_user.manager_id:
+    # Special-case: For Operation department requests, prefer Branch Inventory Officer(s) as Assigned Manager
+    if (item_request.department or '').strip().lower() == 'operation':
+        try:
+            bio_users = User.query.filter_by(role='Branch Inventory Officer').all()
+            if bio_users:
+                manager_name = ', '.join([b.name for b in bio_users])
+            # If no Branch Inventory Officer found, fall through to manager_id/department fallbacks below
+        except Exception as e:
+            app.logger.warning(f"Error resolving Branch Inventory Officer for Operation display override: {e}")
+
+    if not manager_name and requestor_user and requestor_user.manager_id:
         # Get the manager's name from the manager_id
         manager = User.query.get(requestor_user.manager_id)
         if manager:
@@ -5125,10 +5149,25 @@ def view_item_request_page(request_id):
             if dept_manager:
                 manager_name = dept_manager.name
             elif item_request.department in ['Operation', 'Project']:
-                # For Operation and Project, try Operation Manager as fallback
-                operation_manager = User.query.filter_by(role='Operation Manager').first()
-                if operation_manager:
-                    manager_name = operation_manager.name
+                # For Operation requests, prefer Branch Inventory Officer as the displayed assigned manager.
+                # If none exist, fall back to Operation Manager (and keep Project fallback to Operation Manager).
+                try:
+                    if item_request.department == 'Operation':
+                        bio_users = User.query.filter_by(role='Branch Inventory Officer').all()
+                        if bio_users:
+                            # Join multiple names if more than one Branch Inventory Officer exists
+                            manager_name = ', '.join([b.name for b in bio_users])
+                        else:
+                            operation_manager = User.query.filter_by(role='Operation Manager').first()
+                            if operation_manager:
+                                manager_name = operation_manager.name
+                    else:
+                        # For Project, fallback to Operation Manager as before
+                        operation_manager = User.query.filter_by(role='Operation Manager').first()
+                        if operation_manager:
+                            manager_name = operation_manager.name
+                except Exception as e:
+                    app.logger.warning(f"Error resolving Branch Inventory Officer fallback for display: {e}")
             elif item_request.department == 'Office':
                 # For Office, fallback to the General Manager
                 gm_user_fallback = User.query.filter_by(role='GM').first()
@@ -8184,6 +8223,18 @@ def procurement_request_item():
             
             authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
             
+            # Ensure Branch Inventory Officer(s) are included among notification recipients
+            # for Operation department item requests (defensive: even if the approver helper missed them).
+            try:
+                if (item_request.department or '').strip().lower() == 'operation':
+                    bios = User.query.filter_by(role='Branch Inventory Officer').all()
+                    for bio in bios:
+                        if bio.user_id != item_request.user_id and bio not in authorized_approvers:
+                            authorized_approvers.append(bio)
+            except Exception:
+                # Fail-safe: do not block submission on notification lookup errors
+                pass
+
             if not authorized_approvers:
                 # Log warning if no approvers found with more details
                 log_action(f"WARNING: No authorized approvers found for item request #{item_request.id} from {requestor_name} ({item_request.department}), user_id: {item_request.user_id}, role: {current_user.role if current_user else 'Unknown'}")
