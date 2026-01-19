@@ -5,7 +5,7 @@
 {% block content %}
 <div class="dashboard-container">
     <div class="dashboard-header">
-        <h1><i class="fas fa-user-tie"></i> CEO Dashboard</h1>
+        <h2 class="dashboard-title" style="margin:0; display:inline-flex; align-items:center; gap:8px; font-size:1.6rem; font-weight:700;"><i class="fas fa-user-tie"></i> CEO Dashboard</h2>
         <p>Overview of all financial activities</p>
     </div>
 
@@ -40,7 +40,7 @@
     </div>
 
     <!-- Status Tab Navigation -->
-    <div class="tab-navigation">
+    <div class="tab-navigation" style="border-bottom: 1px solid #e9ecef !important; position: relative; z-index: 2;">
         <button class="tab-button {% if active_tab == 'all' %}active{% endif %}" onclick="switchTab('all')" id="tab-all">
             <i class="fas fa-list"></i> All Requests
         </button>
@@ -56,56 +56,63 @@
         <button class="tab-button {% if active_tab == 'recurring' %}active{% endif %}" onclick="switchTab('recurring')" id="tab-recurring">
             <i class="fas fa-sync-alt"></i> Recurring
         </button>
-        <div class="tab-search">
-            <input type="text" id="tabSearchInput" placeholder="Search by request # or requestor name..." class="tab-search-input" value="{{ search_query or '' }}">
-            <button type="button" class="tab-search-btn" onclick="performSearch(true)">
-                <i class="fas fa-search"></i>
-            </button>
+    </div>
+
+    <!-- Filters placed immediately below the tabs -->
+    <div class="filters-container" style="margin: 0 0 8px 0;">
+        <div class="filters-left">
+            <div class="assign-search-field" style="position:relative; min-width:280px;">
+                <img src="{{ url_for('static', filename='css/icons/search.svg') }}" class="assign-search-icon" alt="Search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%);" onclick="document.getElementById('tabSearchInput').focus();" >
+                <input type="search" id="tabSearchInput" class="form-control assign-search-input" placeholder="Search by request # or requestor name" aria-label="Search requests" style="padding-left:44px; width:100%;" value="{{ search_query or '' }}">
+            </div>
+        </div>
+        <div class="filters-right" style="margin-left:auto;">
+            <div class="filter-controls">
+                {% if active_tab != 'my_requests' %}
+                <select id="departmentFilter" onchange="filterByDepartment()" class="form-select">
+                    <option value="">All Departments</option>
+                    <option value="HR" {% if department_filter == 'HR' %}selected{% endif %}>HR</option>
+                    <option value="Finance" {% if department_filter == 'Finance' %}selected{% endif %}>Finance</option>
+                    <option value="IT" {% if department_filter == 'IT' %}selected{% endif %}>IT</option>
+                    <option value="PR" {% if department_filter == 'PR' %}selected{% endif %}>PR</option>
+                    <option value="Auditing" {% if department_filter == 'Auditing' %}selected{% endif %}>Auditing</option>
+                    <option value="Customer Service" {% if department_filter == 'Customer Service' %}selected{% endif %}>Customer Service</option>
+                    <option value="Marketing" {% if department_filter == 'Marketing' %}selected{% endif %}>Marketing</option>
+                    <option value="Operation" {% if department_filter == 'Operation' %}selected{% endif %}>Operation</option>
+                    <option value="Procurement" {% if department_filter == 'Procurement' %}selected{% endif %}>Procurement</option>
+                    <option value="Logistic" {% if department_filter == 'Logistic' %}selected{% endif %}>Logistic</option>
+                    <option value="Quality Control" {% if department_filter == 'Quality Control' %}selected{% endif %}>Quality Control</option>
+                    <option value="Project" {% if department_filter == 'Project' %}selected{% endif %}>Project</option>
+                    <option value="Research and Development" {% if department_filter == 'Research and Development' %}selected{% endif %}>Research and Development</option>
+                    <option value="Office" {% if department_filter == 'Office' %}selected{% endif %}>Office</option>
+                    <option value="Maintenance" {% if department_filter == 'Maintenance' %}selected{% endif %}>Maintenance</option>
+                </select>
+                {% endif %}
+                {% if active_tab in ['all', 'my_requests'] %}
+                <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
+                    <option value="">All Statuses</option>
+                    <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
+                    <option value="On Hold" {% if status_filter == 'On Hold' %}selected{% endif %}>On Hold</option>
+                    <option value="Pending Finance Approval" {% if status_filter == 'Pending Finance Approval' %}selected{% endif %}>Pending Finance Approval</option>
+                    <option value="Returned to Manager" {% if status_filter == 'Returned to Manager' %}selected{% endif %}>Returned to Manager</option>
+                    <option value="Proof Pending" {% if status_filter == 'Proof Pending' %}selected{% endif %}>Proof Pending</option>
+                    <option value="Proof Sent" {% if status_filter == 'Proof Sent' %}selected{% endif %}>Proof Sent</option>
+                    <option value="Proof Rejected" {% if status_filter == 'Proof Rejected' %}selected{% endif %}>Proof Rejected</option>
+                </select>
+                {% endif %}
+                <select id="urgentFilter" onchange="filterByUrgent()" class="form-select">
+                    <option value="">All Requests</option>
+                    <option value="urgent" {% if urgent_filter == 'urgent' %}selected{% endif %}>🔴 Urgent Only</option>
+                    <option value="not_urgent" {% if urgent_filter == 'not_urgent' %}selected{% endif %}>⚪ Not Urgent</option>
+                </select>
+            </div>
         </div>
     </div>
 
     <div class="card">
         <div class="card-header">
             <div class="header-top">
-                <div class="filter-controls">
-                    {% if active_tab != 'my_requests' %}
-                    <select id="departmentFilter" onchange="filterByDepartment()" class="form-select">
-                        <option value="">All Departments</option>
-                        <option value="HR" {% if department_filter == 'HR' %}selected{% endif %}>HR</option>
-                        <option value="Finance" {% if department_filter == 'Finance' %}selected{% endif %}>Finance</option>
-                        <option value="IT" {% if department_filter == 'IT' %}selected{% endif %}>IT</option>
-                        <option value="PR" {% if department_filter == 'PR' %}selected{% endif %}>PR</option>
-                        <option value="Auditing" {% if department_filter == 'Auditing' %}selected{% endif %}>Auditing</option>
-                        <option value="Customer Service" {% if department_filter == 'Customer Service' %}selected{% endif %}>Customer Service</option>
-                        <option value="Marketing" {% if department_filter == 'Marketing' %}selected{% endif %}>Marketing</option>
-                        <option value="Operation" {% if department_filter == 'Operation' %}selected{% endif %}>Operation</option>
-                        <option value="Procurement" {% if department_filter == 'Procurement' %}selected{% endif %}>Procurement</option>
-                        <option value="Logistic" {% if department_filter == 'Logistic' %}selected{% endif %}>Logistic</option>
-                        <option value="Quality Control" {% if department_filter == 'Quality Control' %}selected{% endif %}>Quality Control</option>
-                        <option value="Project" {% if department_filter == 'Project' %}selected{% endif %}>Project</option>
-                        <option value="Research and Development" {% if department_filter == 'Research and Development' %}selected{% endif %}>Research and Development</option>
-                        <option value="Office" {% if department_filter == 'Office' %}selected{% endif %}>Office</option>
-                        <option value="Maintenance" {% if department_filter == 'Maintenance' %}selected{% endif %}>Maintenance</option>
-                    </select>
-                    {% endif %}
-                    {% if active_tab in ['all', 'my_requests'] %}
-                    <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
-                        <option value="">All Statuses</option>
-                        <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
-                        <option value="On Hold" {% if status_filter == 'On Hold' %}selected{% endif %}>On Hold</option>
-                        <option value="Pending Finance Approval" {% if status_filter == 'Pending Finance Approval' %}selected{% endif %}>Pending Finance Approval</option>
-                        <option value="Returned to Manager" {% if status_filter == 'Returned to Manager' %}selected{% endif %}>Returned to Manager</option>
-                        <option value="Proof Pending" {% if status_filter == 'Proof Pending' %}selected{% endif %}>Proof Pending</option>
-                        <option value="Proof Sent" {% if status_filter == 'Proof Sent' %}selected{% endif %}>Proof Sent</option>
-                        <option value="Proof Rejected" {% if status_filter == 'Proof Rejected' %}selected{% endif %}>Proof Rejected</option>
-                    </select>
-                    {% endif %}
-                    <select id="urgentFilter" onchange="filterByUrgent()" class="form-select">
-                        <option value="">All Requests</option>
-                        <option value="urgent" {% if urgent_filter == 'urgent' %}selected{% endif %}>🔴 Urgent Only</option>
-                        <option value="not_urgent" {% if urgent_filter == 'not_urgent' %}selected{% endif %}>⚪ Not Urgent</option>
-                    </select>
-                </div>
+                <!-- filters moved above into filters-container -->
             </div>
             <div class="card-header-actions">
                 {% if status_filter or department_filter or urgent_filter or search_query %}
@@ -216,7 +223,7 @@
                                 </td>
                                 <td>{{ req.approver or 'N/A' }}</td>
                                 <td>
-                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info" title="View">
+                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-view-outline" title="View">
                                         <i class="fas fa-eye"></i>
                                     </a>
                                 </td>
@@ -349,7 +356,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info" title="View">
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-view-outline" title="View">
                                             <i class="fas fa-eye"></i>
                                         </a>
                                     </td>
@@ -421,7 +428,7 @@
                                         <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info" title="View">
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-view-outline" title="View">
                                             <i class="fas fa-eye"></i>
                                         </a>
                                     </td>
@@ -478,7 +485,7 @@
                                         <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info" title="View">
+                                        <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-view-outline" title="View">
                                             <i class="fas fa-eye"></i>
                                         </a>
                                     </td>
@@ -565,8 +572,8 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-primary">
-                                        <i class="fas fa-eye"></i> View
+                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-view-outline">
+                                        <i class="fas fa-eye"></i>
                                     </a>
                                 </td>
                             </tr>
@@ -676,6 +683,270 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Dashboard container styling */
+.dashboard-container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+/* Reduce vertical spacing under dashboard header to match Admin */
+.dashboard-header {
+    margin-bottom: 4px !important;
+    padding-bottom: 2px !important;
+}
+
+/* Tabs */
+.tab-navigation {
+    border-bottom: 1px solid #e9ecef !important;
+    position: relative;
+    z-index: 2;
+    background: #ffffff !important;
+    box-shadow: none !important;
+}
+
+/* Filters container */
+.filters-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px 0 8px 0 !important;
+    flex-wrap: nowrap;
+}
+.filters-left { flex: 0 0 auto; }
+.filters-right { margin-left: auto; display:flex; gap:12px; align-items:center; }
+
+/* Search input styles (rounded pill) */
+.assign-search-field { position: relative; width: 300px; }
+.assign-search-input {
+    border-radius: 999px !important;
+    border: 1px solid #ced4da !important;
+    height: 38px;
+    padding-left: 44px !important;
+}
+.assign-search-input:focus {
+    outline: none !important;
+    border-color: #D9BD7D !important;
+    box-shadow: 0 0 0 0.18rem rgba(217,189,125,0.15) !important;
+}
+.assign-search-icon {
+    width: 20px !important;
+    height: 20px !important;
+    background: #ffffff;
+    border-radius: 50%;
+    padding: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    cursor: pointer;
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* Buttons */
+.dashboard-actions .new-request-toggle,
+.dashboard-actions .btn-secondary { background:#000 !important; border-color:#000 !important; color:#fff !important; }
+.dashboard-actions { margin-top: 16px !important; }
+/* Make Write Cheque use the same warning style as Overdue Requests */
+.dashboard-actions .btn-success {
+    background: #D9BD7D !important;
+    border-color: #D9BD7D !important;
+    color: #ffffff !important;
+}
+.dashboard-actions .btn-success:hover {
+    background: #c8ac65 !important;
+    border-color: #c8ac65 !important;
+    color: #ffffff !important;
+}
+
+/* Pagination styles */
+.pagination .btn.btn-sm.btn-primary,
+.pagination .btn.btn-sm.btn-primary[aria-current="page"] {
+    background: transparent !important;
+    border: 1px solid #D9BD7D !important;
+    color: #D9BD7D !important;
+}
+.pagination .btn.btn-sm.btn-secondary {
+    background: transparent !important;
+    border: 1px solid #D9BD7D !important;
+    color: #D9BD7D !important;
+}
+.pagination-container { background: transparent !important; box-shadow: none !important; border: none !important; padding: 0 !important; }
+/* Match Admin: filter/select styles in the filters container */
+.filters-container .form-select,
+.filters-container .filter-select,
+.filters-container select,
+.filters-container .tab-search-input {
+    background: #ffffff !important;
+    color: #212529 !important;
+    border: 1px solid #ced4da !important;
+    border-radius: 8px !important;
+    padding: 7px 12px !important; /* a little larger */
+    min-width: 180px !important; /* a little larger */
+    font-size: 13px !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    box-shadow: none !important;
+    background-position: right 8px center !important;
+    background-repeat: no-repeat !important;
+    background-size: 10px !important;
+    padding-right: 28px !important;
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M7%2010l5%205%205-5'%20fill='none'%20stroke='currentColor'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+    box-sizing: border-box !important;
+}
+.filters-container .form-select::-ms-expand,
+.filters-container select::-ms-expand {
+    display: none;
+}
+
+/* Focus styles matching Admin */
+.filters-container .form-select:focus,
+.filters-container .filter-select:focus,
+.filters-container select:focus,
+.filters-container .tab-search-input:focus {
+    outline: none !important;
+    border-color: #80bdff !important; /* Admin light-blue focus */
+    box-shadow: 0 0 0 0.18rem rgba(0,123,255,0.18) !important;
+}
+/* Ensure search field width and select chevron/background match Admin exactly */
+.filters-container .assign-search-field {
+    width: 300px !important;
+    box-sizing: border-box;
+}
+.filters-container .assign-search-input {
+    height: 38px !important;
+    box-sizing: border-box;
+}
+.filters-container .form-select,
+.filters-container .filter-select,
+.filters-container select {
+    background-position: right 6px center !important;
+    background-repeat: no-repeat !important;
+    background-size: 10px !important;
+    padding-right: 28px !important;
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M7%2010l5%205%205-5'%20fill='none'%20stroke='currentColor'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+}
+/* Make dashboard action buttons match Admin sizing (padding, font-size, border-radius) without changing colors */
+.dashboard-container .dashboard-actions .btn,
+.dashboard-container .dashboard-actions .new-request-toggle,
+.dashboard-container .dashboard-actions .btn-secondary,
+.dashboard-container .dashboard-actions .btn-success {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    border-radius: 6px !important;
+}
+/* Reduce spacing above the Payment Requests heading inside the card body */
+.dashboard-container .card .card-body .card-title.mb-4 {
+    margin-top: 4px !important;
+    margin-bottom: 8px !important;
+}
+/* Remove extra header space: tighten card-header and heading spacing */
+.dashboard-container .card > .card-header {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+    min-height: 0 !important;
+}
+.dashboard-container .card .card-body {
+    padding-top: 6px !important;
+}
+.dashboard-container .card .card-body .card-title.mb-4 {
+    margin-top: 0 !important;
+    margin-bottom: 8px !important;
+    padding-top: 0 !important;
+}
+/* Table text and action button styles: match Admin dashboard */
+.dashboard-container .card .data-table th,
+.dashboard-container .card .data-table td {
+    font-size: 14px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+.dashboard-container .card .data-table .badge,
+.dashboard-container .card .data-table .filter-pill,
+.dashboard-container .card .data-table .filter-chip {
+    display: inline-block !important;
+    margin: 0 auto !important;
+}
+.data-table .filter-pill,
+.data-table .filter-chip,
+.data-table .badge,
+.data-table .branch-chip,
+.data-table .item-chip,
+.data-table .status-col .badge {
+    font-size: 13px !important;
+    padding: 6px 10px !important;
+    line-height: 1.25 !important;
+}
+/* Action buttons inside tables: match Admin sizing */
+.data-table .btn-sm {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 32px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    border-radius: 6px !important;
+    background: transparent !important;
+}
+.data-table .btn-sm.btn-danger {
+    border: 1px solid #dc3545 !important;
+    color: #dc3545 !important;
+    width: 32px !important;
+    padding: 0 !important;
+}
+.data-table .btn-sm.btn-danger:hover {
+    background: #dc3545 !important;
+    color: #ffffff !important;
+}
+.btn-view-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent !important;
+    border: 1px solid #D9BD7D !important;
+    color: #D9BD7D !important;
+    border-radius: 6px;
+    font-size: 12px;
+}
+.btn-view-outline:hover {
+    background: #D9BD7D !important;
+    color: #ffffff !important;
+}
+/* Remove drop shadow from the requests card and make header transparent (no black bar) */
+.dashboard-container .card {
+    box-shadow: none !important;
+    background: #fff !important;
+    border: 1px solid #dee2e6 !important;
+}
+.dashboard-container .card-header,
+.dashboard-container .card-header .header-top,
+.dashboard-container .card-header-actions {
+    background: transparent !important;
+    box-shadow: none !important;
+    border-bottom: none !important;
+    color: inherit !important;
+}
+/* Stronger global overrides in case theme applies gradients */
+body .dashboard-container > .card > .card-header,
+body .dashboard-container .card-header {
+    background: transparent !important;
+    box-shadow: none !important;
+    border-bottom: none !important;
+}
+</style>
 {% endblock %}
 
 {% block extra_js %}
