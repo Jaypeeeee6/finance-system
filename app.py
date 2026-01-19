@@ -1178,7 +1178,7 @@ def get_authorized_manager_approvers(request):
 
     # If a department-level temporary manager is assigned, include that user among authorized approvers
     try:
-        dept_temp = DepartmentTemporaryManager.query.filter_by(department=(request.department or '')).first()
+        dept_temp = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((request.department or getattr(request.user, 'department', '')).strip().lower())).first()
     except Exception:
         dept_temp = None
     if dept_temp:
@@ -1287,7 +1287,7 @@ def get_authorized_manager_approvers_for_item_request(item_request):
     
     # If a department-level temporary manager is assigned for this item_request.department, include that user among authorized approvers
     try:
-        dept_temp = DepartmentTemporaryManager.query.filter_by(department=(item_request.department or '')).first()
+        dept_temp = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((item_request.department or '').strip().lower())).first()
     except Exception:
         dept_temp = None
     if dept_temp:
@@ -3513,7 +3513,7 @@ def department_dashboard():
                     visible_request_ids.add(req.request_id)
                 # Department-level temporary manager (assignment in settings) - include requests from departments
                 try:
-                    dt = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+                    dt = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((req.department or getattr(req.user, 'department', '')).strip().lower())).first()
                 except Exception:
                     dt = None
                 if dt and getattr(dt, 'temporary_manager_id', None) == current_user.user_id:
@@ -3575,7 +3575,7 @@ def department_dashboard():
                     temp_manager_ids.add(req.request_id)
                 # Check department-level temporary manager assignment for this request's department
                 try:
-                    dt = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+                    dt = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((req.department or getattr(req.user, 'department', '')).strip().lower())).first()
                 except Exception:
                     dt = None
                 if dt and getattr(dt, 'temporary_manager_id', None) == current_user.user_id:
@@ -5095,7 +5095,7 @@ def view_item_request_page(request_id):
     #         temporary_manager_name = temp_manager.name
     # Department-level temporary manager (settings assignment) - include as temporary manager display
     try:
-        dt = DepartmentTemporaryManager.query.filter_by(department=(item_request.department or '')).first()
+        dt = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((item_request.department or '').strip().lower())).first()
     except Exception:
         dt = None
     if dt:
@@ -13125,7 +13125,7 @@ def view_request(request_id):
     # Quick allow: if current user is the department-level temporary manager for this request's department,
     # grant view access regardless of their role (this mirrors item-request behavior).
     try:
-        _dept_temp = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+        _dept_temp = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((req.department or getattr(req.user, 'department', '')).strip().lower())).first()
     except Exception:
         _dept_temp = None
     allowed_by_dept_temp = bool(_dept_temp and getattr(_dept_temp, 'temporary_manager_id', None) == current_user.user_id)
@@ -13316,7 +13316,7 @@ def view_request(request_id):
     else:
         # If no per-request temporary manager, check department-level temporary manager (settings)
         try:
-            dt = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+            dt = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((req.department or getattr(req.user, 'department', '')).strip().lower())).first()
         except Exception:
             dt = None
         if dt:
@@ -13556,7 +13556,7 @@ def view_request(request_id):
     
     # Determine if current user is the department-level temporary manager for this request's department
     try:
-        _dt_for_req = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+        _dt_for_req = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((req.department or getattr(req.user, 'department', '')).strip().lower())).first()
     except Exception:
         _dt_for_req = None
     is_dept_temp_for_req = bool(_dt_for_req and getattr(_dt_for_req, 'temporary_manager_id', None) == current_user.user_id)
@@ -15739,12 +15739,19 @@ def manager_approve_request(request_id):
     else:
         # No per-request temporary manager assigned - check for department-level temporary manager
         try:
-            dept_temp = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+            dept_temp = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((req.department or getattr(req.user, 'department', '')).strip().lower())).first()
         except Exception:
             dept_temp = None
-        if dept_temp and dept_temp.temporary_manager_id == current_user.user_id:
-            is_authorized = True
-            print("DEBUG: Authorized via department-level temporary manager assignment")
+        if dept_temp:
+            # Extra debug: show the department temp record and comparison values
+            try:
+                print(f"DEBUG: Dept temp record found: department='{dept_temp.department}', temporary_manager_id={dept_temp.temporary_manager_id}")
+                print(f"DEBUG: Current user id: {current_user.user_id}")
+            except Exception:
+                pass
+            if dept_temp.temporary_manager_id == current_user.user_id:
+                is_authorized = True
+                print("DEBUG: Authorized via department-level temporary manager assignment")
 
         # Continue with standard authorization checks even when a department-level temporary manager exists.
         # This ensures GM and Operation Manager remain authorized as before.
@@ -15754,8 +15761,12 @@ def manager_approve_request(request_id):
                 is_authorized = True
                 print("DEBUG: Authorized via Abdalaziz-only rule for GM/CEO/Operation Manager submitter")
             else:
-                is_authorized = False
-                print("DEBUG: Blocked - only Abdalaziz can approve GM/CEO/Operation Manager submitter")
+                # Do not override a previous authorization (e.g., department-level temporary manager).
+                if not is_authorized:
+                    # Remains unauthorized unless another rule grants permission.
+                    print("DEBUG: Blocked - only Abdalaziz can approve GM/CEO/Operation Manager submitter")
+                else:
+                    print("DEBUG: Dept-level temporary manager present; overriding Abdalaziz-only restriction")
         # General rule for other requests
         elif current_user.role in ['GM', 'Operation Manager']:
             is_authorized = True
@@ -20404,7 +20415,7 @@ def settings():
 
         # Unset assignment if no manager selected
         if not new_manager_id or new_manager_id == 'none':
-            existing = DepartmentTemporaryManager.query.filter_by(department=department).first()
+            existing = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == (department or '').strip().lower()).first()
             if existing:
                 old_manager = existing.temporary_manager
                 db.session.delete(existing)
@@ -20432,7 +20443,7 @@ def settings():
             flash('Selected user does not exist.', 'error')
             return redirect(url_for('settings'))
 
-        existing = DepartmentTemporaryManager.query.filter_by(department=department).first()
+        existing = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == (department or '').strip().lower()).first()
         if existing and existing.temporary_manager_id == int(new_manager_id):
             flash('Selected manager is already assigned as the temporary manager for this department.', 'info')
             return redirect(url_for('settings'))
@@ -20570,7 +20581,7 @@ def unassign_temp_manager():
         flash('No department specified.', 'error')
         return redirect(url_for('settings'))
 
-    existing = DepartmentTemporaryManager.query.filter_by(department=department).first()
+    existing = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == (department or '').strip().lower()).first()
     if not existing:
         flash(f'No temporary manager set for {department}.', 'info')
         return redirect(url_for('settings'))
