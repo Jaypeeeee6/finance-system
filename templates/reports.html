@@ -1384,7 +1384,8 @@
                         refreshClearVisibility();
                     }
 
-                    async function reloadResultsViaAjax(urlStr) {
+                    // Make reloadResultsViaAjax globally accessible for pagination
+                    window.reloadResultsViaAjax = async function(urlStr, scrollToTop = false) {
                         try {
                             const scrollY = window.scrollY;
                             const res = await fetch(urlStr, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
@@ -1402,11 +1403,19 @@
                                 currentCard.innerHTML = newCard.innerHTML;
                                 // Re-attach handlers for the replaced content
                                 attachAuditingSearchHandlers();
+                                // Re-attach pagination handlers after AJAX reload
+                                if (typeof attachPaginationHandlers === 'function') {
+                                    try { attachPaginationHandlers(); } catch (e) { console.warn(e); }
+                                }
                                 if (typeof attachRowClickHandlersForPaymentReports === 'function') {
                                     try { attachRowClickHandlersForPaymentReports(); } catch (e) { console.warn(e); }
                                 }
-                                // Restore scroll position
-                                window.scrollTo(0, scrollY);
+                                // Scroll to top if requested (for pagination), otherwise restore scroll position
+                                if (scrollToTop) {
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                } else {
+                                    window.scrollTo(0, scrollY);
+                                }
                             } else {
                                 // If we couldn't find the fragment, do a full navigation
                                 window.location.href = urlStr;
@@ -1415,7 +1424,7 @@
                             console.error('AJAX reload failed, falling back to full reload', err);
                             window.location.href = urlStr;
                         }
-                    }
+                    };
 
                     function updateQueryParamAndGo(key, value) {
                         const url = new URL(window.location.href);
@@ -1429,7 +1438,7 @@
                         // Update the address bar without navigating
                         history.replaceState(null, '', url.toString());
                         // Reload only the results card via AJAX
-                        reloadResultsViaAjax(url.toString());
+                        window.reloadResultsViaAjax(url.toString());
                     }
 
                     // Initialize handlers
@@ -2112,39 +2121,41 @@ function changeItemsPerPage(perPage) {
 }
 
 // Handle pagination links - preserve all query parameters including multiple values
-document.addEventListener('DOMContentLoaded', function() {
+// Use AJAX reload if reference_number is present (for Auditing search), otherwise full page reload
+function attachPaginationHandlers() {
     document.querySelectorAll('.pagination-link').forEach(link => {
-        link.addEventListener('click', function(e) {
+        // Remove any existing listeners to avoid duplicates
+        const newLink = link.cloneNode(true);
+        link.parentNode.replaceChild(newLink, link);
+        
+        newLink.addEventListener('click', function(e) {
             e.preventDefault();
             const pageNum = this.getAttribute('data-page');
             
             // Build URL preserving all query parameters (including multiple values)
             const currentUrl = new URL(window.location);
-            const baseUrl = currentUrl.origin + currentUrl.pathname;
-            const paramParts = [];
             
-            // Add page number first
-            paramParts.push('page=' + encodeURIComponent(pageNum));
+            // Set the page number
+            currentUrl.searchParams.set('page', pageNum);
             
-            // Preserve all existing query parameters (including multiple values)
-            const originalSearch = window.location.search;
-            if (originalSearch) {
-                // Parse the original search string manually to preserve multiple values
-                const pairs = originalSearch.substring(1).split('&');
-                
-                pairs.forEach(pair => {
-                    const [key, value] = pair.split('=');
-                    if (key && key !== 'page') {
-                        // Preserve each parameter (including multiple values for same key)
-                        paramParts.push(key + '=' + (value || ''));
-                    }
-                });
+            // Check if reference_number is in URL - if so, use AJAX reload
+            const referenceNumber = currentUrl.searchParams.get('reference_number');
+            if (referenceNumber && typeof window.reloadResultsViaAjax === 'function') {
+                // Update URL in address bar
+                history.replaceState(null, '', currentUrl.toString());
+                // Reload via AJAX and scroll to top for pagination
+                window.reloadResultsViaAjax(currentUrl.toString(), true);
+            } else {
+                // Full page navigation for normal pagination
+                window.location.href = currentUrl.toString();
             }
-            
-            // Navigate to new URL
-            window.location.href = baseUrl + '?' + paramParts.join('&');
         });
     });
+}
+
+// Attach handlers on page load
+document.addEventListener('DOMContentLoaded', function() {
+    attachPaginationHandlers();
 });
 
 // Initialize filter dropdown with chips (reusable function)
