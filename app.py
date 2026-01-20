@@ -6959,6 +6959,8 @@ def item_request_complete(request_id):
         item_request.invoice_amount = invoice_total
     item_request.receipt_path = json.dumps(final_receipts)
     item_request.invoice_path = json.dumps(final_invoices)
+    # Persist from-store flag
+    item_request.from_store_no_receipt = from_store_flag
     item_request.updated_at = current_time
     
     db.session.commit()
