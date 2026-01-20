@@ -401,25 +401,28 @@
         let timeLeft = 120; // 2 minutes in seconds
 
         // Show PIN modal when login button is clicked
-        loginButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            // Validate email and password first
-            const email = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
-            if (!email || !password) {
-                alert('Please enter your email and password first.');
-                return;
-            }
-            
-            // Validate credentials with server first
-            validateCredentials(email, password);
-        });
+        if (loginButton) {
+            loginButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Validate email and password first
+                const email = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                
+                if (!email || !password) {
+                    alert('Please enter your email and password first.');
+                    return;
+                }
+                
+                // Validate credentials with server first
+                validateCredentials(email, password);
+            });
+        }
 
         // Handle test login button (bypasses PIN)
         const testLoginButton = document.getElementById('testLoginButton');
-        testLoginButton.addEventListener('click', function(e) {
+        if (testLoginButton) {
+            testLoginButton.addEventListener('click', function(e) {
             e.preventDefault();
             
             // Validate email and password first
@@ -433,10 +436,13 @@
             
             // Validate credentials and then submit with bypass flag
             validateCredentialsForTesting(email, password);
-        });
+            });
+        }
 
         // Show PIN modal when Enter key is pressed in email or password fields
-        document.getElementById('username').addEventListener('keypress', function(e) {
+        const usernameField = document.getElementById('username');
+        if (usernameField) {
+            usernameField.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 const email = document.getElementById('username').value;
@@ -455,9 +461,12 @@
                 // Validate credentials with server first
                 validateCredentials(email, password);
             }
-        });
+            });
+        }
 
-        document.getElementById('password').addEventListener('keypress', function(e) {
+        const passwordField = document.getElementById('password');
+        if (passwordField) {
+            passwordField.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 const email = document.getElementById('username').value;
@@ -471,13 +480,16 @@
                 // Validate credentials with server first
                 validateCredentials(email, password);
             }
-        });
+            });
+        }
 
         // Function to validate credentials for testing (bypasses PIN)
         async function validateCredentialsForTesting(email, password) {
             // Show loading state
-            testLoginButton.disabled = true;
-            testLoginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+            if (testLoginButton) {
+                testLoginButton.disabled = true;
+                testLoginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+            }
             
             try {
                 const response = await fetch('{{ url_for("validate_credentials") }}', {
@@ -500,14 +512,18 @@
                     loginForm.submit();
                 } else {
                     // Reset button
-                    testLoginButton.disabled = false;
-                    testLoginButton.innerHTML = 'Login for Testing (DEV ONLY - NO PIN REQUIRED)';
+                    if (testLoginButton) {
+                        testLoginButton.disabled = false;
+                        testLoginButton.innerHTML = 'Login for Testing (DEV ONLY - NO PIN REQUIRED)';
+                    }
                     alert(data.message || 'Invalid email or password.');
                 }
             } catch (error) {
                 // Reset button
-                testLoginButton.disabled = false;
-                testLoginButton.innerHTML = '<i class="fas fa-flask"></i> Login for Testing (DEV ONLY - NO PIN REQUIRED)';
+                if (testLoginButton) {
+                    testLoginButton.disabled = false;
+                    testLoginButton.innerHTML = '<i class="fas fa-flask"></i> Login for Testing (DEV ONLY - NO PIN REQUIRED)';
+                }
                 alert('An error occurred. Please try again.');
             }
         }
@@ -515,8 +531,10 @@
         // Function to validate credentials with server before showing PIN modal
         async function validateCredentials(email, password) {
             // Show loading state
-            loginButton.disabled = true;
-            loginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
+            if (loginButton) {
+                loginButton.disabled = true;
+                loginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
+            }
             
             try {
                 const response = await fetch('{{ url_for("validate_credentials") }}', {
@@ -533,8 +551,10 @@
                 const data = await response.json();
                 
                 // Reset button
-                loginButton.disabled = false;
-                loginButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+                if (loginButton) {
+                    loginButton.disabled = false;
+                    loginButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+                }
                 
                     if (data.success) {
                         // If server says bypass PIN (system account or Super Admin), set bypass flag then submit
@@ -560,16 +580,20 @@
                 }
             } catch (error) {
                 // Reset button
-                loginButton.disabled = false;
-                loginButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+                if (loginButton) {
+                    loginButton.disabled = false;
+                    loginButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+                }
                 alert('An error occurred. Please try again.');
             }
         }
 
         function openPinModal() {
+            if (!pinModal) return;
             pinModal.style.display = 'block';
             // Clear all PIN boxes
-            pinBoxes.forEach(box => {
+            if (pinBoxes && pinBoxes.length > 0) {
+                pinBoxes.forEach(box => {
                 box.value = '';
                 box.classList.remove('filled');
             });
@@ -583,7 +607,10 @@
             // Start the countdown timer
             startTimer();
             // Focus on first box
-            pinBoxes[0].focus();
+            if (pinBoxes && pinBoxes.length > 0) {
+                pinBoxes[0].focus();
+            }
+            }
         }
         
         function startTimer() {
@@ -632,26 +659,34 @@
         
         function timerExpired() {
             // Clear PIN boxes
-            pinBoxes.forEach(box => {
-                box.value = '';
-                box.classList.remove('filled');
-            });
+            if (pinBoxes && pinBoxes.length > 0) {
+                pinBoxes.forEach(box => {
+                    box.value = '';
+                    box.classList.remove('filled');
+                });
+            }
             
             // Show expired message
             const pinHint = document.querySelector('.pin-hint');
-            pinHint.innerHTML = '⏰ PIN has expired. Please request a new one by logging in again.';
-            pinHint.style.color = '#dc3545';
-            pinHint.style.fontWeight = 'bold';
+            if (pinHint) {
+                pinHint.innerHTML = '⏰ PIN has expired. Please request a new one by logging in again.';
+                pinHint.style.color = '#dc3545';
+                pinHint.style.fontWeight = 'bold';
+            }
             
             // Disable PIN input
-            pinBoxes.forEach(box => {
-                box.disabled = true;
-                box.style.opacity = '0.5';
-            });
+            if (pinBoxes && pinBoxes.length > 0) {
+                pinBoxes.forEach(box => {
+                    box.disabled = true;
+                    box.style.opacity = '0.5';
+                });
+            }
             
             // Disable submit button
-            submitPinButton.disabled = true;
-            submitPinButton.style.opacity = '0.5';
+            if (submitPinButton) {
+                submitPinButton.disabled = true;
+                submitPinButton.style.opacity = '0.5';
+            }
             
             // Update timer display
             document.getElementById('timerMinutes').textContent = '0';
@@ -671,19 +706,24 @@
         }
 
         function closePinModal() {
+            if (!pinModal) return;
             pinModal.style.display = 'none';
             // Stop the timer
             stopTimer();
             // Clear PIN boxes
-            pinBoxes.forEach(box => {
-                box.value = '';
-                box.classList.remove('filled');
-                box.disabled = false;
-                box.style.opacity = '1';
-            });
+            if (pinBoxes && pinBoxes.length > 0) {
+                pinBoxes.forEach(box => {
+                    box.value = '';
+                    box.classList.remove('filled');
+                    box.disabled = false;
+                    box.style.opacity = '1';
+                });
+            }
             // Reset submit button
-            submitPinButton.disabled = false;
-            submitPinButton.style.opacity = '1';
+            if (submitPinButton) {
+                submitPinButton.disabled = false;
+                submitPinButton.style.opacity = '1';
+            }
             // Reset timer display
             document.getElementById('timerMinutes').textContent = '2';
             document.getElementById('timerSeconds').textContent = '00';
@@ -695,7 +735,8 @@
         }
 
         // PIN box auto-focus and validation
-        pinBoxes.forEach((box, index) => {
+        if (pinBoxes && pinBoxes.length > 0) {
+            pinBoxes.forEach((box, index) => {
             box.addEventListener('input', function(e) {
                 // Only allow numbers
                 this.value = this.value.replace(/[^0-9]/g, '');
@@ -764,28 +805,36 @@
                     pinBoxes[nextIndex].focus();
                 }
             });
-        });
+            });
+        }
 
         // Submit PIN button
-        submitPinButton.addEventListener('click', submitPin);
+        if (submitPinButton) {
+            submitPinButton.addEventListener('click', submitPin);
+        }
 
         // Prevent Enter from submitting the underlying login form while PIN modal is open
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && pinModal.style.display === 'block') {
+            if (e.key === 'Enter' && pinModal && pinModal.style.display === 'block') {
                 e.preventDefault();
-                const pin = Array.from(pinBoxes).map(box => box.value).join('');
-                if (pin.length === 4) {
-                    submitPin();
+                if (pinBoxes && pinBoxes.length > 0) {
+                    const pin = Array.from(pinBoxes).map(box => box.value).join('');
+                    if (pin.length === 4) {
+                        submitPin();
+                    }
                 }
             }
         });
 
         function submitPin() {
+            if (!pinBoxes || pinBoxes.length === 0) return;
             const pin = Array.from(pinBoxes).map(box => box.value).join('');
             
             if (pin.length !== 4) {
                 showPinError('Please enter all 4 digits of your PIN.');
-                pinBoxes[0].focus();
+                if (pinBoxes[0]) {
+                    pinBoxes[0].focus();
+                }
                 return;
             }
             
@@ -796,8 +845,10 @@
             }
             
             // Show loading state
-            submitPinButton.disabled = true;
-            submitPinButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+            if (submitPinButton) {
+                submitPinButton.disabled = true;
+                submitPinButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+            }
             
             // Get username from form
             const username = document.getElementById('username').value;
@@ -816,8 +867,10 @@
             .then(response => response.json())
             .then(data => {
                 // Reset button
-                submitPinButton.disabled = false;
-                submitPinButton.innerHTML = '<i class="fas fa-check"></i> Submit';
+                if (submitPinButton) {
+                    submitPinButton.disabled = false;
+                    submitPinButton.innerHTML = '<i class="fas fa-check"></i> Submit';
+                }
                 
                 if (data.success) {
                     // PIN is correct - store tab session ID if provided
@@ -841,38 +894,48 @@
             })
             .catch(error => {
                 // Reset button
-                submitPinButton.disabled = false;
-                submitPinButton.innerHTML = '<i class="fas fa-check"></i> Submit';
+                if (submitPinButton) {
+                    submitPinButton.disabled = false;
+                    submitPinButton.innerHTML = '<i class="fas fa-check"></i> Submit';
+                }
                 showPinError('An error occurred. Please try again.');
             });
         }
         
         function showPinError(message) {
             // Clear PIN boxes
-            pinBoxes.forEach(box => {
-                box.value = '';
-                box.classList.remove('filled');
-            });
+            if (pinBoxes && pinBoxes.length > 0) {
+                pinBoxes.forEach(box => {
+                    box.value = '';
+                    box.classList.remove('filled');
+                });
+            }
             
             // Show error message
             const pinHint = document.querySelector('.pin-hint');
-            pinHint.innerHTML = `❌ ${message}`;
-            pinHint.style.color = '#dc3545';
-            pinHint.style.fontWeight = 'bold';
+            if (pinHint) {
+                pinHint.innerHTML = `❌ ${message}`;
+                pinHint.style.color = '#dc3545';
+                pinHint.style.fontWeight = 'bold';
+            }
             
             // Add shake animation
             const pinBoxesContainer = document.querySelector('.pin-boxes');
-            pinBoxesContainer.classList.add('shake');
-            setTimeout(() => {
-                pinBoxesContainer.classList.remove('shake');
-            }, 500);
+            if (pinBoxesContainer) {
+                pinBoxesContainer.classList.add('shake');
+                setTimeout(() => {
+                    pinBoxesContainer.classList.remove('shake');
+                }, 500);
+            }
             
             // Focus on first box
-            pinBoxes[0].focus();
+            if (pinBoxes && pinBoxes.length > 0 && pinBoxes[0]) {
+                pinBoxes[0].focus();
+            }
             
             // Reset error message after 3 seconds
             setTimeout(() => {
-                if (pinHint.innerHTML.includes('❌')) {
+                if (pinHint && pinHint.innerHTML.includes('❌')) {
                     pinHint.innerHTML = 'Enter the 4-digit PIN sent to your email';
                     pinHint.style.color = '#666';
                     pinHint.style.fontWeight = 'normal';
