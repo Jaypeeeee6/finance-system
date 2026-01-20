@@ -12,7 +12,7 @@
     <div class="login-container">
         <div class="login-box">
             <div class="login-header">
-                <i class="fas fa-file-invoice-dollar"></i>
+                <img src="{{ url_for('static', filename='css/images/MAA-logo-transparent.png') }}" alt="Maa logo" class="nav-brand-logo" />
                 <h1>Payment Request System</h1>
                 <p>Login to access your dashboard</p>
             </div>
@@ -57,12 +57,12 @@
                 <!-- Hidden field for development testing bypass -->
                 <input type="hidden" id="bypass_pin" name="bypass_pin" value="false">
 
-                <button type="button" class="btn btn-primary btn-block" id="loginButton">
+                <button type="button" class="btn btn-primary btn-block" id="loginButton" style="background-color: #D9BD7D; border-color: #D9BD7D; color: #000000;">
                     <i class="fas fa-sign-in-alt"></i> Login
                 </button>
                 
                 <!-- TEMPORARY: Development Testing Button - Bypasses PIN -->
-                <button type="button" class="btn btn-warning btn-block" id="testLoginButton" style="margin-top: 10px; background-color: #ffc107; border-color: #ffc107; color: #000; font-weight: bold; {% if not show_test_login_flag %}display: none;{% endif %}">
+                <button type="button" class="btn btn-warning btn-block" id="testLoginButton" style="margin-top: 10px; background-color: #ffc107; border-color: #ffc107; color: #000; font-weight: bold;" {% if not show_test_login_flag %}hidden{% endif %}>
                     Login for Testing (DEV ONLY - NO PIN REQUIRED)
                 </button>
             </form>
@@ -121,6 +121,30 @@
 
     <style>
         /* PIN Modal Styles */
+        /* Center and enlarge logo specifically for the login page so navbar styles are unaffected */
+        body.login-page .login-header {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        body.login-page .login-header .nav-brand-logo {
+            width: 70px;
+            height: auto;
+        }
+        /* Focused input border color for login inputs */
+        body.login-page .login-form input[type="email"]:focus,
+        body.login-page .login-form input[type="password"]:focus,
+        body.login-page .login-form input:focus,
+        body.login-page .login-form .password-input-container input:focus,
+        body.login-page .pin-box:focus {
+            outline: none;
+            border-color: #D9BD7D;
+            box-shadow: 0 0 0 3px rgba(217,189,125,0.15);
+        }
+        
         .pin-modal {
             display: none;
             position: fixed;
