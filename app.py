@@ -4168,10 +4168,12 @@ def procurement_dashboard():
     assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
     item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
     
-    # Get completed item requests and their invoice / receipt amounts
-    completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+    # Get completed (and final-approval) item requests and their invoice / receipt amounts
+    completed_item_requests = ProcurementItemRequest.query.filter(
+        ProcurementItemRequest.status.in_(['Completed', 'Final Approval'])
+    ).all()
     completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
-    # For Money Spent we only count completed requests that have a receipt_amount (actual money spent)
+    # For Money Spent we count completed and final-approval requests that have a receipt_amount (actual money spent)
     completed_item_requests_receipt_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
     
     # Adjust calculations: deduct from available balance, add to money spent
@@ -4190,7 +4192,8 @@ def procurement_dashboard():
     except Exception:
         adjustments_sum = 0.0
 
-    available_balance = completed_amount - completed_item_requests_amount + adjustments_sum
+    # Use actual money_spent (receipt-based) when computing available balance to avoid double-counting
+    available_balance = completed_amount - money_spent + adjustments_sum
     
     # Check and notify if balance is low
     check_and_notify_low_balance(available_balance)
@@ -4733,14 +4736,19 @@ def procurement_item_requests():
         assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
         item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
         
-        # Get completed item requests and their invoice / receipt amounts
-        completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+        # Get completed (and final-approval) item requests and their invoice / receipt amounts
+        completed_item_requests = ProcurementItemRequest.query.filter(
+            ProcurementItemRequest.status.in_(['Completed', 'Final Approval'])
+        ).all()
         completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
+        # For balance checks use the actual receipt amounts (money spent)
+        completed_item_requests_receipt_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
         # For Money Spent we only count completed requests that have a receipt_amount (actual money spent)
         completed_item_requests_receipt_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
         
         # Adjust calculations: deduct from available balance, add to money spent
         # Money Spent should include only COMPLETED item requests that have a receipt_amount (actual spent money)
+        money_spent = completed_item_requests_receipt_amount
         completed_amount = completed_item_requests_receipt_amount
         # Available Balance = Completed payment requests - Completed item requests only
         # (Only completed item requests reduce available balance, not assigned/pending items)
@@ -4754,7 +4762,8 @@ def procurement_item_requests():
         except Exception:
             adjustments_sum = 0.0
 
-        available_balance = completed_amount_bm - completed_item_requests_amount + adjustments_sum
+        # Compute available balance by subtracting actual money spent (receipts) to avoid invoice/receipt mismatch
+        available_balance = completed_amount_bm - money_spent + adjustments_sum
         
         # Check and notify if balance is low
         check_and_notify_low_balance(available_balance)
@@ -4767,7 +4776,7 @@ def procurement_item_requests():
                 completed_amount=completed_amount_bm,
                 item_requests_assigned_amount=item_requests_amount,
                 completed_item_requests_amount=completed_item_requests_amount,
-                money_spent=None,
+                money_spent=money_spent if 'money_spent' in locals() else None,
                 available_balance=available_balance,
                 source='balance_check',
                 created_by=current_user.user_id if current_user and hasattr(current_user, 'user_id') else None
@@ -4785,7 +4794,7 @@ def procurement_item_requests():
                 completed_amount=completed_amount_bm,
                 item_requests_assigned_amount=item_requests_amount,
                 completed_item_requests_amount=completed_item_requests_amount,
-                money_spent=completed_amount,
+                money_spent=money_spent if 'money_spent' in locals() else completed_amount,
                 available_balance=available_balance,
                 source='view',
                 created_by=current_user.user_id if current_user and hasattr(current_user, 'user_id') else None
@@ -6010,8 +6019,10 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         assigned_item_requests = [r for r in assigned_item_requests if r.id != request_id]
         item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
         
-        # Get completed item requests
-        completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+        # Get completed (and final-approval) item requests
+        completed_item_requests = ProcurementItemRequest.query.filter(
+            ProcurementItemRequest.status.in_(['Completed', 'Final Approval'])
+        ).all()
         completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
         
         # Calculate available balance
@@ -6027,7 +6038,8 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         except Exception:
             adjustments_sum = 0.0
 
-        available_balance = completed_amount_bm - completed_item_requests_amount + adjustments_sum
+        # Use receipt-based spent amount to compute available balance
+        available_balance = completed_amount_bm - completed_item_requests_receipt_amount + adjustments_sum
         
         # Check and notify if balance is low
         check_and_notify_low_balance(available_balance)
