@@ -4178,7 +4178,11 @@ def procurement_dashboard():
     
     # Adjust calculations: deduct from available balance, add to money spent
     # Money Spent should include only COMPLETED item requests that have a receipt_amount (actual spent money)
-    money_spent = completed_item_requests_receipt_amount
+    # Deduct completed payment requests from money spent (money received reduces net spending)
+    money_spent = completed_item_requests_receipt_amount - completed_amount
+    # Ensure money_spent doesn't go negative (can't have negative spending)
+    if money_spent < 0:
+        money_spent = 0.0
     # Available Balance = Completed payment requests - Completed item requests only
     # (Only completed item requests reduce available balance, not assigned/pending items)
     # Include reconciled/manual adjustments that have been marked to affect reports
@@ -4193,7 +4197,8 @@ def procurement_dashboard():
         adjustments_sum = 0.0
 
     # Use actual money_spent (receipt-based) when computing available balance to avoid double-counting
-    available_balance = completed_amount - money_spent + adjustments_sum
+    # Available balance = Completed payment requests - Completed item requests + adjustments
+    available_balance = completed_amount - completed_item_requests_receipt_amount + adjustments_sum
     
     # Check and notify if balance is low
     check_and_notify_low_balance(available_balance)
@@ -4742,14 +4747,17 @@ def procurement_item_requests():
         ).all()
         completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
         # For balance checks use the actual receipt amounts (money spent)
-        completed_item_requests_receipt_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
         # For Money Spent we only count completed requests that have a receipt_amount (actual money spent)
         completed_item_requests_receipt_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
         
         # Adjust calculations: deduct from available balance, add to money spent
         # Money Spent should include only COMPLETED item requests that have a receipt_amount (actual spent money)
-        money_spent = completed_item_requests_receipt_amount
-        completed_amount = completed_item_requests_receipt_amount
+        # Deduct completed payment requests from money spent (money received reduces net spending)
+        money_spent = completed_item_requests_receipt_amount - completed_amount_bm
+        # Ensure money_spent doesn't go negative (can't have negative spending)
+        if money_spent < 0:
+            money_spent = 0.0
+        completed_amount = money_spent
         # Available Balance = Completed payment requests - Completed item requests only
         # (Only completed item requests reduce available balance, not assigned/pending items)
         try:
@@ -4763,7 +4771,8 @@ def procurement_item_requests():
             adjustments_sum = 0.0
 
         # Compute available balance by subtracting actual money spent (receipts) to avoid invoice/receipt mismatch
-        available_balance = completed_amount_bm - money_spent + adjustments_sum
+        # Note: available_balance = completed payment requests - completed item requests
+        available_balance = completed_amount_bm - completed_item_requests_receipt_amount + adjustments_sum
         
         # Check and notify if balance is low
         check_and_notify_low_balance(available_balance)
@@ -18465,6 +18474,45 @@ def api_person_company_options():
     return jsonify({
         'options': options
     })
+
+
+@app.route('/api/procurement/money-spent')
+@login_required
+def api_procurement_money_spent():
+    """API endpoint to get current money spent value for Procurement Department Manager"""
+    # Only allow Procurement Department Manager to access this
+    if current_user.department != 'Procurement' or current_user.role != 'Department Manager':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        # Calculate Bank Money statistics for Current Money Status section
+        bank_money_requests = PaymentRequest.query.filter(
+            PaymentRequest.department == 'Procurement',
+            PaymentRequest.request_type == 'Bank money',
+            PaymentRequest.is_archived == False
+        ).all()
+        
+        # Get completed payment requests
+        completed_requests_bm = [r for r in bank_money_requests if r.status == 'Completed']
+        completed_amount_bm = sum(float(r.amount) for r in completed_requests_bm)
+        
+        # Get completed item requests and their receipt amounts
+        completed_item_requests = ProcurementItemRequest.query.filter(
+            ProcurementItemRequest.status.in_(['Completed', 'Final Approval'])
+        ).all()
+        completed_item_requests_receipt_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
+        
+        # Calculate money spent: completed item requests - completed payment requests
+        money_spent = completed_item_requests_receipt_amount - completed_amount_bm
+        # Ensure money_spent doesn't go negative
+        if money_spent < 0:
+            money_spent = 0.0
+        
+        return jsonify({
+            'money_spent': round(money_spent, 3)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/reports/export/excel')

@@ -454,6 +454,9 @@
                         <input type="text" name="amount" id="amount" required style="padding-left: 55px;" placeholder="0.000">
                     </div>
                     <small>Omani Rials (OMR) - Numbers only (automatically formatted with commas)</small>
+                    <small id="amount_auto_note" class="auto-populated-note" style="display: none; color: #28a745; font-style: italic; margin-top: 4px;">
+                        <i class="fas fa-info-circle"></i> Amount has been automatically populated based on the current "Money Spent (since last finance refund)" value
+                    </small>
                 </div>
 
                 <div class="form-group">
@@ -905,6 +908,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (accountNameNote) accountNameNote.style.display = 'none';
             }
         });
+    }
+    
+    // Add event listeners to amount field to clear auto-populated flag on manual edit
+    const amountInput = document.getElementById('amount');
+    if (amountInput) {
+        const amountNote = document.getElementById('amount_auto_note');
+        amountInput.addEventListener('input', function() {
+            // Clear auto-populated flag when user manually edits
+            // Only hide note if the value was actually changed (not just focused)
+            if (this.dataset.autoPopulated === 'true') {
+                this.dataset.autoPopulated = 'false';
+                // Hide note when manually edited
+                if (amountNote) amountNote.style.display = 'none';
+            }
+        });
+        // Note: We don't add a 'focus' event listener so the note stays visible when clicking
     }
     
     if (accountNumberInput) {
@@ -1452,6 +1471,42 @@ function handleRequestTypeChange() {
     
     // Always show Payment Type dropdown for all request types
     recurringFields.style.display = 'block';
+    
+    // Handle auto-population of amount for "Bank money" request type (Procurement Department Manager only)
+    const amountInput = document.getElementById('amount');
+    const amountNote = document.getElementById('amount_auto_note');
+    const userDepartment = department || '{{ user.department if user else "" }}';
+    const userRole = '{{ user.role if user else "" }}';
+    
+    if (requestType === 'Bank money' && userDepartment === 'Procurement' && userRole === 'Department Manager') {
+        // Fetch current money spent value and auto-populate amount
+        fetch('/api/procurement/money-spent')
+            .then(response => response.json())
+            .then(data => {
+                if (data.money_spent !== undefined && amountInput) {
+                    // Format the amount with commas (3 decimal places)
+                    const formattedAmount = parseFloat(data.money_spent).toFixed(3).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                    amountInput.value = formattedAmount;
+                    amountInput.dataset.autoPopulated = 'true';
+                    // Show the note
+                    if (amountNote) {
+                        amountNote.style.display = 'block';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching money spent:', error);
+            });
+    } else {
+        // Clear auto-populated flag and hide note if not "Bank money"
+        if (amountInput && amountInput.dataset.autoPopulated === 'true') {
+            amountInput.value = '';
+            amountInput.dataset.autoPopulated = 'false';
+        }
+        if (amountNote) {
+            amountNote.style.display = 'none';
+        }
+    }
     
     // If we have a department and a request type, try to fetch supplier/person options.
     // populateSupplierOptions now returns a Promise that resolves with the fetched options.
