@@ -320,7 +320,9 @@
                                     <span class="badge" style="background: #ffc107; color: #212529; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">⏸ On Hold</span>
                                 {% elif req.status == 'Final Approval' %}
                                     <span class="badge" style="background: #9c27b0; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">👤 Final Approval</span>
-                                {% elif req.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval'] %}
+                                {% elif req.status == 'Pending Procurement Manager Approval' %}
+                                    <span class="badge" style="background: #fd7e14; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">⏳ {{ req.status }}</span>
+                                {% elif req.status == 'Pending Manager Approval' %}
                                     <span class="badge" style="background: #6c757d; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">⏳ {{ req.status }}</span>
                                 {% elif req.status == 'Assigned to Procurement' %}
                                     <span class="badge" style="background: #2196F3; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">⏳ {{ req.status }}</span>
