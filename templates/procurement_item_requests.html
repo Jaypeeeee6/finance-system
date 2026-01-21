@@ -5,7 +5,7 @@
 {% block content %}
 <div class="dashboard-container">
     <div class="dashboard-header">
-        <h1><i class="fas fa-shopping-cart"></i> Item Requests</h1>
+        <h2 class="dashboard-title" style="margin:0;"><i class="fas fa-shopping-cart"></i> Item Requests</h2>
         <p>View and manage all item requests from requestors</p>
     </div>
 
@@ -111,7 +111,7 @@
 
     <!-- Tab Navigation (for Procurement, IT, Auditing users, GM/CEO/Operation Manager, and Department Managers) -->
     {% if user.department in ['Procurement', 'IT', 'Auditing'] or user.role in ['GM', 'CEO', 'Operation Manager', 'Department Manager'] %}
-    <div class="tab-navigation">
+    <div class="tab-navigation" style="border-bottom: 1px solid #e9ecef !important; position: relative; z-index: 2;">
         {% if user.department != 'Auditing' %}
         <button class="tab-button {% if active_tab == 'all' %}active{% endif %}" onclick="switchTab('all')" id="tab-all">
             <i class="fas fa-list"></i> All Item Requests
@@ -143,44 +143,52 @@
             <i class="fas fa-check-circle"></i> Completed
         </button>
         {% endif %}
-        <div class="tab-search">
-            <input type="text" id="tabSearchInput" placeholder="Search by request #, requestor, item, purpose..." class="tab-search-input" value="{{ search_query or '' }}">
-            <button type="button" class="tab-search-btn" onclick="performSearch()">
-                <i class="fas fa-search"></i>
-            </button>
+    </div>
+    {% endif %}
+
+    <!-- Filters placed immediately below the tabs (search moved into filters) -->
+    {% if user.department in ['Procurement', 'IT', 'Auditing'] or user.role in ['GM', 'CEO', 'Operation Manager', 'Department Manager'] %}
+    <div class="filters-container" style="margin: 0 0 8px 0;">
+        <div class="filters-left">
+            <div class="assign-search-field" style="position:relative; min-width:280px;">
+                <img src="{{ url_for('static', filename='css/icons/search.svg') }}" class="assign-search-icon" alt="Search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%);" onclick="document.getElementById('tabSearchInput').focus();" >
+                <input type="search" id="tabSearchInput" class="form-control assign-search-input" placeholder="Search by request #, requestor, item, purpose..." aria-label="Search requests" style="padding-left:44px; width:100%;" value="{{ search_query or '' }}">
+            </div>
+        </div>
+        <div class="filters-right" style="margin-left:auto;">
+            <div class="filter-controls">
+                {# Show department filter only to users who can view across departments (Procurement, IT, GM/CEO/Operation Manager).
+                   Hide for users who only see their own or their department's requests. Also hide on My Requests tab. #}
+                {% if (user.department in ['Procurement', 'IT'] or user.role in ['GM', 'CEO', 'Operation Manager']) and active_tab != 'my_requests' %}
+                <select id="departmentFilter" onchange="applyDepartmentFilter()" class="form-select">
+                    <option value="">All Departments</option>
+                    {% for dept in departments %}
+                    <option value="{{ dept }}" {% if department_filter == dept %}selected{% endif %}>{{ dept }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+                {% if active_tab != 'completed' %}
+                <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
+                    <option value="">All Statuses</option>
+                    {% for status in status_options %}
+                    <option value="{{ status }}" {% if status_filter == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+                <select id="urgentFilter" onchange="applyUrgentFilter()" class="form-select">
+                    <option value="">All Requests</option>
+                    <option value="urgent" {% if urgent_filter == 'urgent' %}selected{% endif %}>🔴 Urgent Only</option>
+                    <option value="not_urgent" {% if urgent_filter == 'not_urgent' %}selected{% endif %}>⚪ Not Urgent</option>
+                </select>
+            </div>
         </div>
     </div>
     {% endif %}
 
     <!-- Item Requests Table -->
-    <div class="card">
-        <div class="card-header">
+    <div class="card" style="border: 1px solid #dee2e6; border-radius: 8px; background: #fff; border-top-left-radius: 8px !important; border-top-right-radius: 8px !important;">
+        <div class="card-header" style="background: transparent !important; box-shadow: none !important; border-bottom: none !important;">
             <div class="header-top">
-                <div class="filter-controls">
-                    {# Show department filter only to users who can view across departments (Procurement, IT, GM/CEO/Operation Manager).
-                       Hide for users who only see their own or their department's requests. Also hide on My Requests tab. #}
-                    {% if (user.department in ['Procurement', 'IT'] or user.role in ['GM', 'CEO', 'Operation Manager']) and active_tab != 'my_requests' %}
-                    <select id="departmentFilter" onchange="applyDepartmentFilter()" class="form-select">
-                        <option value="">All Departments</option>
-                        {% for dept in departments %}
-                        <option value="{{ dept }}" {% if department_filter == dept %}selected{% endif %}>{{ dept }}</option>
-                        {% endfor %}
-                    </select>
-                    {% endif %}
-                    {% if active_tab != 'completed' %}
-                    <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
-                        <option value="">All Statuses</option>
-                        {% for status in status_options %}
-                        <option value="{{ status }}" {% if status_filter == status %}selected{% endif %}>{{ status }}</option>
-                        {% endfor %}
-                    </select>
-                    {% endif %}
-                    <select id="urgentFilter" onchange="applyUrgentFilter()" class="form-select">
-                        <option value="">All Requests</option>
-                        <option value="urgent" {% if urgent_filter == 'urgent' %}selected{% endif %}>🔴 Urgent Only</option>
-                        <option value="not_urgent" {% if urgent_filter == 'not_urgent' %}selected{% endif %}>⚪ Not Urgent</option>
-                    </select>
-                </div>
             </div>
             <div class="card-header-actions">
                 {% if department_filter or status_filter or urgent_filter or search_query %}
@@ -331,9 +339,9 @@
                             </td>
                             <td>{{ req.request_date.strftime('%Y-%m-%d') }}</td>
                             <td>
-                                <button type="button" class="btn btn-sm btn-info" onclick="viewRequest({{ req.id }})" title="View">
+                                <a href="/procurement/item-request/{{ req.id }}/view" class="btn btn-sm btn-view-outline" title="View">
                                     <i class="fas fa-eye"></i>
-                                </button>
+                                </a>
                             </td>
                         </tr>
                         {% endfor %}
@@ -1139,17 +1147,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
-    // Set up tab search button
-    const tabSearchBtn = document.querySelector('.tab-search-btn');
-    if (tabSearchBtn) {
-        tabSearchBtn.addEventListener('click', function() {
-            clearTimeout(searchDebounceTimer);
-            performSearch(true);
-        });
-    }
 });
 </script>
+{% endblock %}
+
+{% block extra_js %}
 <script>
 // Make table rows behave like clicking the View button
 function attachRowClickHandlersForProcurement() {
@@ -1172,53 +1174,139 @@ function attachRowClickHandlersForProcurement() {
 
 document.addEventListener('DOMContentLoaded', attachRowClickHandlersForProcurement);
 </script>
+{% endblock %}
 
+{% block extra_css %}
 <style>
-    .data-table tbody tr.clickable-row:hover { background: #f8f9fa; }
-    .filter-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 12px;
-        background: #000;
-        color: white;
-        border-radius: 20px;
-        font-size: 13px;
-        font-weight: 500;
-    }
-    
-    /* Branch name chips - separate styling with tighter padding, display in separate rows */
-    .branch-chip {
-        display: block;
-        width: fit-content;
-        padding: 6px 10px;
-        background: #000;
-        color: white;
-        border-radius: 20px;
-        font-size: 13px;
-        font-weight: 500;
-        white-space: nowrap;
-    }
-    
-    /* Item name chips - display in separate rows */
-    .filter-pill.item-chip {
-        display: block !important;
-        width: fit-content;
-    }
-    
-    /* Adjust column widths for Item Name and Quantity */
-    .data-table th:nth-child(4),
-    .data-table td:nth-child(4) {
-        width: 10%;
-        max-width: 10%;
-    }
-    
-    /* Reduce Department column width slightly */
-    .data-table th.department-column,
-    .data-table td.department-cell {
-        max-width: 120px;
-        width: 120px;
-    }
+/* Dashboard container styling */
+.dashboard-container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Tab button styling */
+.tab-btn {
+    cursor: pointer;
+    padding: 10px 20px;
+    border: 1px solid #ddd;
+    background: #f8f9fa;
+    border-radius: 5px 5px 0 0;
+    margin-right: 5px;
+    transition: all 0.3s ease;
+    display: inline-block;
+}
+
+.tab-btn:hover {
+    background: #e9ecef;
+}
+
+.tab-btn.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+/* Tab content styling - ensure it's contained within dashboard */
+.tab-content {
+    margin-top: 0;
+    border-top: 1px solid #ddd;
+    padding: 20px;
+    background: #fff;
+    border-radius: 0 0 8px 8px;
+    min-height: 400px;
+}
+
+/* Ensure tabs are visually connected */
+.dashboard-tabs {
+    margin-bottom: 0;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 0;
+    background: #fff;
+}
+
+/* Tab content should feel integrated */
+.tab-content .card {
+    margin-top: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    box-shadow: none;
+    border: 1px solid #ddd;
+}
+
+/* Tab content container */
+.tab-content-container {
+    background: #fff;
+    border-radius: 0 0 8px 8px;
+    overflow: hidden;
+}
+
+/* Ensure all content is within the dashboard container */
+.dashboard-container .tab-content {
+    position: relative;
+    z-index: 1;
+}
+
+/* Alert icon spacing */
+.alert-persistent i {
+    margin-right: 15px;
+}
+
+/* Header buttons styling */
+.header-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.data-table tbody tr.clickable-row:hover { background: #f8f9fa; }
+.filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #000;
+    color: white;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* Branch name chips - separate styling with tighter padding, display in separate rows */
+.branch-chip {
+    display: block;
+    width: fit-content;
+    padding: 6px 10px;
+    background: #000;
+    color: white;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Item name chips - display in separate rows */
+.filter-pill.item-chip {
+    display: block !important;
+    width: fit-content;
+}
+
+/* Adjust column widths for Item Name and Quantity */
+.data-table th:nth-child(4),
+.data-table td:nth-child(4) {
+    width: 10%;
+    max-width: 10%;
+}
+
+/* Reduce Department column width slightly */
+.data-table th.department-column,
+.data-table td.department-cell {
+    max-width: 120px;
+    width: 120px;
+}
 .modal {
     display: none;
     position: fixed;
@@ -1337,7 +1425,550 @@ document.addEventListener('DOMContentLoaded', attachRowClickHandlersForProcureme
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     transition: all 0.3s ease;
 }
-</style>
 
+.data-table th,
+.data-table td {
+    font-size: 14px;
+}
+/* Center-align all table headers, cells and inline chips inside dashboard cards */
+.dashboard-container .card .data-table th,
+.dashboard-container .card .data-table td {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+.dashboard-container .card .data-table .badge,
+.dashboard-container .card .data-table .filter-pill,
+.dashboard-container .card .data-table .filter-chip {
+    display: inline-block !important;
+    margin: 0 auto !important;
+}
+/* Make chips/badges inside the table match Reports page sizing */
+.data-table .filter-pill,
+.data-table .filter-pill.item-chip,
+.data-table .filter-chip,
+.data-table .badge,
+.data-table .branch-chip,
+.data-table .item-chip,
+.data-table .status-col .badge {
+    font-size: 13px;
+    padding: 6px 10px;
+    line-height: 1.25;
+}
+/* Dashboard action buttons: match Reports page action button style */
+.dashboard-container .header-actions .btn,
+.dashboard-container .dashboard-actions .btn,
+.dashboard-container .bulk-actions .btn,
+.dashboard-container .card-header .btn,
+.dashboard-container .card-header-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    border-radius: 6px;
+    background: #D9BD7D;
+    border: 1px solid #D9BD7D;
+    color: #ffffff;
+    text-decoration: none;
+}
+.dashboard-container .header-actions .btn:hover,
+.dashboard-container .dashboard-actions .btn:hover,
+.dashboard-container .bulk-actions .btn:hover,
+.dashboard-container .card-header .btn:hover,
+.dashboard-container .card-header-actions .btn:hover {
+    background: #c8ac65;
+    border-color: #c8ac65;
+    color: #ffffff;
+}
+/* Delete button: red outline with icon (override default D9BD7D styling) */
+.dashboard-container .btn-danger {
+    background: transparent !important;
+    border: 1px solid #dc3545 !important;
+    color: #dc3545 !important;
+    padding: 8px 14px !important;
+}
+.dashboard-container .btn-danger i {
+    color: inherit;
+}
+.dashboard-container .btn-danger:hover {
+    background: #dc3545 !important;
+    color: #ffffff !important;
+}
+/* Outline view button (icon-only) to match Reports page */
+.btn-view-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent !important;
+    border: 1px solid #D9BD7D !important;
+    color: #D9BD7D !important;
+    border-radius: 6px;
+    font-size: 12px;
+}
+.btn-view-outline i {
+    color: inherit;
+    font-size: 12px;
+}
+.btn-view-outline:hover {
+    background: #D9BD7D !important;
+    color: #ffffff !important;
+}
+/* Remove black bar / dark header above the filters and ensure selects are white */
+.filters-container,
+.filters-container .filter-controls,
+.dashboard-container .card-header,
+.dashboard-container .header-top,
+.dashboard-container .dashboard-tabs,
+.dashboard-container .tab-navigation,
+.dashboard-container .card-header-actions {
+    background: transparent !important;
+    box-shadow: none !important;
+    border-bottom: none !important;
+    color: inherit !important;
+}
+.filters-container .filter-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 0;
+}
+.filters-container .form-select,
+.filters-container .filter-select,
+.filters-container select,
+.filters-container .tab-search-input {
+    background: #ffffff !important;
+    color: #212529 !important;
+    border: 1px solid #ced4da !important;
+    border-radius: 8px !important;
+    padding: 8px 12px !important;
+}
+/* Stronger overrides to neutralize global dark/header styles */
+body .dashboard-container .dashboard-tabs,
+body .dashboard-container .tab-navigation,
+body .dashboard-container .card-header,
+body .dashboard-container .header-top,
+body .dashboard-container .card-header-actions,
+body .dashboard-container .card {
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border-bottom: none !important;
+}
+/* In case the global CSS uses gradients or var(--dark-color) on direct children */
+body .dashboard-container > .dashboard-tabs,
+body .dashboard-container > .card > .card-header,
+body .dashboard-container > .card > .card-header .header-top {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+/* Reduce excess vertical spacing above filters */
+.dashboard-header {
+    margin-bottom: 4px !important;
+    padding-bottom: 2px !important;
+}
+.dashboard-tabs,
+.tab-navigation {
+    margin-top: 0 !important;
+    margin-bottom: 4px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+.card {
+    margin-top: 0 !important;
+}
+.card-header {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+}
+.card-body {
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+}
+.filters-container {
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+}
+.filters-container .filter-controls {
+    gap: 10px;
+    align-items: center;
+}
+/* Make the dashboard tabs have a visible bottom border so they don't look floating */
+.dashboard-container .dashboard-tabs,
+.dashboard-container .tab-navigation {
+    border-bottom: 1px solid #e9ecef !important;
+    position: relative;
+    z-index: 2;
+}
+.dashboard-container > .dashboard-tabs {
+    border-bottom: none !important;
+}
+.dashboard-container .tab-btn {
+    position: relative;
+    z-index: 3;
+    background-clip: padding-box;
+}
+/* Also ensure inner request tab buttons sit above the separator and are visible */
+.dashboard-container .tab-button {
+    position: relative;
+    z-index: 3;
+    background-clip: padding-box;
+    background: none !important;
+    border: none !important;
+    border-bottom: 3px solid transparent !important;
+    border-right: 1px solid #dee2e6 !important;
+    padding: 15px 20px !important;
+    cursor: pointer;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: #6c757d !important;
+    transition: all 0.3s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    border-radius: 0 !important;
+    flex: 1 !important;
+    justify-content: center !important;
+}
+.dashboard-container .tab-button:first-child {
+    border-top-left-radius: 8px !important;
+    border-left: 1px solid #dee2e6 !important;
+}
+.dashboard-container .tab-button:last-child {
+    border-top-right-radius: 8px !important;
+    border-right: none !important;
+}
+.dashboard-container .tab-button:hover {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+    color: #000000 !important;
+}
+.dashboard-container .tab-button.active {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+    color: #000000 !important;
+    font-weight: 600 !important;
+    border-bottom-color: #000000 !important;
+}
+.dashboard-container .tab-button.active:hover {
+    background-color: rgba(0, 0, 0, 0.25) !important;
+    color: #000000 !important;
+}
+/* Individual tab colors when active - matching dashboard */
+#tab-completed.active {
+    background-color: #28a745 !important;
+    color: white !important;
+    border-bottom-color: #28a745 !important;
+}
+#tab-completed:hover {
+    background-color: rgba(40, 167, 69, 0.8) !important;
+    color: white !important;
+}
+#tab-completed.active:hover {
+    background-color: #218838 !important;
+    color: white !important;
+}
+/* Make the inner request tabs container have rounded bottom corners and visible background */
+.dashboard-container .tab-navigation {
+    border-bottom-left-radius: 8px !important;
+    border-bottom-right-radius: 8px !important;
+    background: #ffffff !important;
+    position: relative;
+    z-index: 3;
+    /* ensure it shows above adjacent elements */
+    box-shadow: none !important;
+}
+/* Prevent the card below from showing rounded top corners that conflict */
+.dashboard-container > .card {
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+}
+/* Make the outer dashboard tabs container fully rounded and style active tab */
+.dashboard-container .dashboard-tabs {
+    border-radius: 8px !important;
+    overflow: hidden;
+    background: #ffffff !important;
+    /* remove implicit border if any */
+    border: none !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.dashboard-container .dashboard-tabs .tab-btn {
+    background: transparent !important;
+    color: inherit !important;
+    border: none !important;
+}
+.dashboard-container .dashboard-tabs .tab-btn.active {
+    background: #D9BD7D !important;
+    border-color: #D9BD7D !important;
+    color: #ffffff !important;
+}
+/* Pagination: make active page use D9BD7D and Next button match Apply Filters style */
+.pagination .btn.btn-sm.btn-primary,
+.pagination .btn.btn-sm.btn-primary[aria-current="page"] {
+    background: transparent !important;
+    border: 1px solid #D9BD7D !important;
+    color: #D9BD7D !important;
+}
+.pagination .btn.btn-sm.btn-primary:hover {
+    background: transparent !important;
+    border-color: #c8ac65 !important;
+    color: #c8ac65 !important;
+}
+/* Style Next/Prev (secondary) as outlined gold */
+.pagination .btn.btn-sm.btn-secondary {
+    background: transparent !important;
+    border: 1px solid #D9BD7D !important;
+    color: #D9BD7D !important;
+}
+.pagination .btn.btn-sm.btn-secondary:hover {
+    background: transparent !important;
+    border-color: #c8ac65 !important;
+    color: #c8ac65 !important;
+}
+/* Remove gray background from pagination container */
+.pagination-container {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+}
+/* Reduce whitespace between table and pagination */
+.data-table {
+    margin-bottom: 0 !important;
+}
+.data-table + .pagination-container,
+.card-body > .pagination-container {
+    margin-top: 8px !important;
+    padding-top: 0 !important;
+}
+/* Make table delete icon buttons match the view button size/padding */
+.data-table .btn-sm.btn-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent !important;
+    border: 1px solid #dc3545 !important;
+    color: #dc3545 !important;
+    border-radius: 6px;
+    font-size: 12px;
+}
+.data-table .btn-sm.btn-danger i {
+    color: inherit;
+    font-size: 12px;
+}
+.data-table .btn-sm.btn-danger:hover {
+    background: #dc3545 !important;
+    color: #ffffff !important;
+}
+/* Search input styles copied from settings page (rounded pill) */
+.filters-container .assign-search-field {
+    position: relative;
+    width: 300px;
+}
+.filters-container .assign-search-input {
+    border-radius: 999px !important;
+    border: 1px solid #ced4da !important;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+    height: 38px;
+}
+.filters-container .assign-search-input:focus {
+    outline: none !important;
+    border-color: #D9BD7D !important;
+    box-shadow: 0 0 0 0.18rem rgba(217,189,125,0.15) !important;
+}
+.filters-container .assign-search-icon {
+    width: 20px !important;
+    height: 20px !important;
+    background: #ffffff;
+    border-radius: 50%;
+    padding: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    cursor: pointer;
+}
+/* Center-align headers and cells for all tables inside the Requests tab */
+#requests-tab .data-table th,
+#requests-tab .data-table td {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+/* Match reports page header title layout so refresh indicator positions identically */
+.dashboard-header .dashboard-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.6rem;
+}
+/* Ensure same weight as IT dashboard */
+.dashboard-header .dashboard-title {
+    font-weight: 700 !important;
+}
+/* Primary button: black */
+.dashboard-actions .btn-primary {
+    background: #000000 !important;
+    border-color: #000000 !important;
+    color: #ffffff !important;
+}
+.dashboard-actions .btn-primary:hover {
+    background: #000000 !important;
+    border-color: #000000 !important;
+    color: #ffffff !important;
+}
+/* Secondary buttons (Back to Dashboard, My Drafts): gold */
+.dashboard-actions .new-request-toggle,
+.dashboard-actions .btn-secondary {
+    background: #D9BD7D !important;
+    border-color: #D9BD7D !important;
+    color: #ffffff !important;
+}
+.dashboard-actions .new-request-toggle:hover,
+.dashboard-actions .btn-secondary:hover {
+    background: #c8ac65 !important;
+    border-color: #c8ac65 !important;
+    color: #ffffff !important;
+}
+/* Add external spacing above the action buttons container */
+.dashboard-actions {
+    margin-top: 16px !important;
+}
+/* Make dropdown chevrons match the select text color */
+.filters-container .form-select,
+.filters-container .filter-select,
+.filters-container select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-position: right 6px center;
+    background-repeat: no-repeat;
+    background-size: 10px;
+    padding-right: 12px !important;
+    color: inherit !important;
+    /* SVG chevron uses currentColor so it matches text */
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M7%2010l5%205%205-5'%20fill='none'%20stroke='currentColor'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+    background-color: #ffffff !important;
+    background-position: right 6px center !important;
+    background-repeat: no-repeat !important;
+    background-size: 10px !important;
+}
+/* Make department filter wider */
+#departmentFilter {
+    min-width: 220px !important;
+    width: 220px !important;
+}
+.filters-container .form-select::-ms-expand,
+.filters-container select::-ms-expand {
+    display: none;
+}
+/* Layout: keep search on left, filters on right */
+.filters-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.filters-left {
+    flex: 0 0 auto;
+}
+.filters-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+@media (max-width: 768px) {
+    .filters-container {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    .filters-right {
+        margin-left: 0;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+    .filters-left {
+        width: 100%;
+    }
+    .dashboard-actions {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    /* Request Statistics cards */
+    .request-statistics {
+        padding: 15px !important;
+    }
+    
+    .request-statistics > div[style*="grid-template-columns"] > div {
+        padding: 10px !important;
+    }
+    
+    .request-statistics > div[style*="grid-template-columns"] > div > div[style*="font-size: 24px"] {
+        font-size: 18px !important;
+    }
+    
+    .request-statistics > div[style*="grid-template-columns"] > div > div[style*="font-size: 14px"] {
+        font-size: 12px !important;
+        margin-bottom: 5px !important;
+    }
+    
+    .request-statistics > div[style*="grid-template-columns"] > div > div[style*="font-size: 12px"] {
+        font-size: 10px !important;
+        margin-top: 3px !important;
+    }
+    
+    .request-statistics h3 {
+        font-size: 18px !important;
+        margin-bottom: 10px !important;
+    }
+    
+    /* Current Money Status cards */
+    .current-money-status {
+        padding: 15px !important;
+    }
+    
+    .current-money-status > div[style*="grid-template-columns"] > div {
+        padding: 10px !important;
+    }
+    
+    .current-money-status > div[style*="grid-template-columns"] > div > div[style*="font-size: 24px"] {
+        font-size: 18px !important;
+    }
+    
+    .current-money-status > div[style*="grid-template-columns"] > div > div[style*="font-size: 14px"] {
+        font-size: 12px !important;
+        margin-bottom: 5px !important;
+    }
+    
+    .current-money-status > div[style*="grid-template-columns"] > div > div[style*="font-size: 12px"] {
+        font-size: 10px !important;
+        margin-top: 3px !important;
+    }
+    
+    .current-money-status h3 {
+        font-size: 18px !important;
+        margin-bottom: 10px !important;
+    }
+}
+/* Ensure tabs sit above the card border so the bottom edge isn't covered */
+.dashboard-container .tab-navigation {
+    position: relative !important;
+    z-index: 900 !important;
+    overflow: visible !important;
+}
+.dashboard-container .tab-button {
+    position: relative !important;
+    z-index: 901 !important;
+}
+.dashboard-container > .card {
+    position: relative !important;
+    z-index: 1 !important;
+    margin-top: 0 !important;
+}
+</style>
 {% endblock %}
 
