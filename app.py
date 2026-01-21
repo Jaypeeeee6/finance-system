@@ -17370,9 +17370,9 @@ def item_request_reports():
     # Build query
     query = ProcurementItemRequest.query.filter(ProcurementItemRequest.is_draft == False)
     
-    # Auditing Staff: only Completed item requests in reports
+    # Auditing Staff: can see Completed and Final Approval item requests in reports
     if current_user.role == 'Auditing Staff':
-        query = query.filter(ProcurementItemRequest.status == 'Completed')
+        query = query.filter(ProcurementItemRequest.status.in_(['Completed', 'Final Approval']))
     
     # GM, CEO, IT Staff, and Operation Manager can see ALL requests from all statuses
     # Only filter for Department Managers
@@ -17381,15 +17381,16 @@ def item_request_reports():
             # IT Department Manager can see ALL requests
             pass
         elif current_user.department == 'Procurement':
-            # Procurement Department Manager can only see: Assigned to Procurement, Completed, Pending Procurement Manager Approval
+            # Procurement Department Manager can see: Assigned to Procurement, Completed, Final Approval, Pending Procurement Manager Approval
             query = query.filter(ProcurementItemRequest.status.in_([
                 'Assigned to Procurement',
                 'Completed',
+                'Final Approval',
                 'Pending Procurement Manager Approval'
             ]))
         elif current_user.department == 'Auditing':
-            # Auditing Department Manager can see all completed requests
-            query = query.filter(ProcurementItemRequest.status == 'Completed')
+            # Auditing Department Manager can see completed and final approval requests
+            query = query.filter(ProcurementItemRequest.status.in_(['Completed', 'Final Approval']))
         else:
             # Other Department Managers can ONLY see their own department's requests
             query = query.filter(ProcurementItemRequest.department == current_user.department)
@@ -17554,9 +17555,9 @@ def item_request_reports():
                 ])
             )
         elif current_user.department == 'Auditing':
-            # Auditing Manager can only see categories with completed requests
+            # Auditing Manager can see categories with completed and final approval requests
             categories_query = categories_query.filter(
-                ProcurementItemRequest.status == 'Completed'
+                ProcurementItemRequest.status.in_(['Completed', 'Final Approval'])
             )
         elif current_user.department != 'IT':
             # Other Department Managers can only see their own department's categories
@@ -17630,6 +17631,10 @@ def export_item_request_reports_excel():
     # Build query (same logic as item_request_reports)
     query = ProcurementItemRequest.query.filter(ProcurementItemRequest.is_draft == False)
     
+    # Auditing Staff: can see Completed and Final Approval item requests in exports
+    if current_user.role == 'Auditing Staff':
+        query = query.filter(ProcurementItemRequest.status.in_(['Completed', 'Final Approval']))
+    
     if current_user.role == 'Department Manager':
         if current_user.department == 'IT':
             pass
@@ -17637,6 +17642,7 @@ def export_item_request_reports_excel():
             query = query.filter(ProcurementItemRequest.status.in_([
                 'Assigned to Procurement',
                 'Completed',
+                'Final Approval',
                 'Pending Procurement Manager Approval'
             ]))
         elif current_user.department == 'Auditing':
@@ -17925,6 +17931,10 @@ def export_item_request_reports_pdf():
     # Build query (same logic as item_request_reports)
     query = ProcurementItemRequest.query.filter(ProcurementItemRequest.is_draft == False)
     
+    # Auditing Staff: can see Completed and Final Approval item requests in exports
+    if current_user.role == 'Auditing Staff':
+        query = query.filter(ProcurementItemRequest.status.in_(['Completed', 'Final Approval']))
+    
     if current_user.role == 'Department Manager':
         if current_user.department == 'IT':
             pass
@@ -17932,6 +17942,7 @@ def export_item_request_reports_pdf():
             query = query.filter(ProcurementItemRequest.status.in_([
                 'Assigned to Procurement',
                 'Completed',
+                'Final Approval',
                 'Pending Procurement Manager Approval'
             ]))
         elif current_user.department == 'Auditing':
@@ -18458,7 +18469,7 @@ def api_person_company_options():
 
 @app.route('/reports/export/excel')
 @login_required
-@role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager')
+@role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager', 'Auditing Staff')
 def export_reports_excel():
     """Export filtered reports to an Excel file with frozen columns"""
     # Lazy imports to avoid hard dependency during app startup
@@ -18487,6 +18498,12 @@ def export_reports_excel():
 
     # Show ALL statuses by default (consistent with reports() view), but exclude archived requests
     query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
+    
+    # Auditing Staff: restrict to Completed, Recurring, and proof-related statuses in exports
+    if current_user.role == 'Auditing Staff':
+        query = query.filter(PaymentRequest.status.in_([
+            'Completed', 'Recurring', 'Proof Pending', 'Proof Sent', 'Proof Rejected'
+        ]))
     
     # Filter for Department Managers based on their department (same logic as reports() view)
     if current_user.role == 'Department Manager':
@@ -18607,6 +18624,13 @@ def export_reports_excel():
     if payment_method_filter:
         # Handle multiple payment method filters
         query = query.filter(PaymentRequest.payment_method.in_(payment_method_filter))
+    
+    # Reference number search (Auditing-specific search uses this GET param)
+    # Use prefix matching to avoid unrelated substring matches (e.g., '100' matching 'A100B')
+    reference_number = request.args.get('reference_number', '').strip()
+    if reference_number:
+        query = query.filter(PaymentRequest.reference_number.ilike(f'{reference_number}%'))
+    
     # Date filtering - when a date range is provided, filter by completion_date.
     # Requests without a completion_date should NOT appear in date-scoped results.
     if date_from:
@@ -18920,7 +18944,7 @@ def export_reports_excel():
 
 @app.route('/reports/export/pdf')
 @login_required
-@role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager')
+@role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager', 'Auditing Staff')
 def export_reports_pdf():
     """Export filtered reports to a PDF including total amount and full list"""
     # Lazy imports to avoid hard dependency during app startup
@@ -18963,6 +18987,12 @@ def export_reports_pdf():
 
     # Show ALL statuses by default (consistent with reports() view), but exclude archived requests
     query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
+    
+    # Auditing Staff: restrict to Completed, Recurring, and proof-related statuses in exports
+    if current_user.role == 'Auditing Staff':
+        query = query.filter(PaymentRequest.status.in_([
+            'Completed', 'Recurring', 'Proof Pending', 'Proof Sent', 'Proof Rejected'
+        ]))
     
     # Filter for Department Managers based on their department (same logic as reports() view)
     if current_user.role == 'Department Manager':
@@ -19085,6 +19115,12 @@ def export_reports_pdf():
     # Payment method filter (handle multiple values)
     if payment_method_filter:
         query = query.filter(PaymentRequest.payment_method.in_(payment_method_filter))
+    
+    # Reference number search (Auditing-specific search uses this GET param)
+    # Use prefix matching to avoid unrelated substring matches (e.g., '100' matching 'A100B')
+    reference_number = request.args.get('reference_number', '').strip()
+    if reference_number:
+        query = query.filter(PaymentRequest.reference_number.ilike(f'{reference_number}%'))
 
     # Date filtering - when a date range is provided, filter by completion_date.
     # Requests without a completion_date should NOT appear in date-scoped results.
