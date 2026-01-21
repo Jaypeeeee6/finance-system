@@ -15731,10 +15731,30 @@ def manager_approve_request(request_id):
     """Manager approves a payment request"""
     req = PaymentRequest.query.get_or_404(request_id)
     
-    # Never allow users to approve their own requests at the manager stage
+    # Check if user is trying to approve their own request
     if req.user_id == current_user.user_id:
-        flash('You cannot approve your own request at the manager stage.', 'error')
-        return redirect(url_for('view_request', request_id=request_id))
+        # Allow self-approval if user is a temporary manager (per-request or department-level)
+        is_temp_manager = False
+        
+        # Check if user is the per-request temporary manager
+        if req.temporary_manager_id == current_user.user_id:
+            is_temp_manager = True
+            print("DEBUG: Self-approval allowed - user is per-request temporary manager")
+        
+        # Check if user is a department-level temporary manager for this request's department
+        if not is_temp_manager:
+            try:
+                dept_temp = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((req.department or getattr(req.user, 'department', '')).strip().lower())).first()
+                if dept_temp and dept_temp.temporary_manager_id == current_user.user_id:
+                    is_temp_manager = True
+                    print("DEBUG: Self-approval allowed - user is department-level temporary manager")
+            except Exception:
+                pass
+        
+        # Block self-approval only if user is not a temporary manager
+        if not is_temp_manager:
+            flash('You cannot approve your own request at the manager stage.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
 
     # Debug information
     print(f"DEBUG: Current user: {current_user.name} (ID: {current_user.user_id}, Role: {current_user.role}, Department: {current_user.department})")
