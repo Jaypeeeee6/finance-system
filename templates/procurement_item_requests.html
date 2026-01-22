@@ -82,16 +82,16 @@
                     <div style="font-size: 24px; font-weight: bold; color: {% if available_balance <= 2500 %}#dc3545{% else %}#43e97b{% endif %};">OMR {{ available_balance|format_currency }}</div>
                     <div style="font-size: 12px; color: #999; margin-top: 5px;">(Completed Payment Requests - Completed Item Requests)</div>
                 </div>
-                <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <div id="money-spent-card" style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s ease;" onclick="openMoneySpentHistory()" onmouseover="this.style.boxShadow='0 4px 8px rgba(0,0,0,0.15)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)'; this.style.transform='translateY(0)';">
                     <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Money Spent (since last finance refund)</div>
                     <div style="font-size: 24px; font-weight: bold; color: #f5576c;">
                         OMR {{ completed_amount|format_currency }}
-                        <span class="info-tooltip" style="margin-left:8px;" tabindex="0" aria-hidden="true">
+                        <span class="info-tooltip" style="margin-left:8px;" tabindex="0" aria-hidden="true" onclick="event.stopPropagation();">
                             <i class="fas fa-info-circle" style="font-size:14px; color:#999; cursor:help;"></i>
                             <span class="tooltip-text">Based on the Receipt Amount of each completed item request</span>
                         </span>
                     </div>
-                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Completed Items</div>
+                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Completed Items <i class="fas fa-external-link-alt" style="font-size:10px; margin-left:4px;"></i></div>
                 </div>
                 <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <div style="font-size: 14px; color: #666; margin-bottom: 8px;">Money Pending</div>
@@ -1971,6 +1971,314 @@ body .dashboard-container > .card > .card-header .header-top {
     z-index: 1 !important;
     margin-top: 0 !important;
 }
+
+/* Money Spent History Side Panel */
+.money-spent-panel-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.money-spent-panel-overlay.show {
+    display: block;
+    opacity: 1;
+}
+
+.money-spent-side-panel {
+    position: fixed;
+    top: 80px;
+    right: -500px;
+    width: 500px;
+    max-width: calc(90vw - 40px);
+    height: calc(100vh - 100px);
+    background: white;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+    z-index: 1001;
+    transition: right 0.3s ease;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    border-radius: 8px;
+}
+
+.money-spent-side-panel.open {
+    right: 20px;
+}
+
+.money-spent-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    border-bottom: 1px solid #dee2e6;
+    background: #f8f9fa;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.money-spent-panel-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #212529;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.money-spent-panel-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.money-spent-panel-close:hover {
+    background: #e9ecef;
+    color: #212529;
+}
+
+.money-spent-panel-body {
+    padding: 20px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.money-spent-history-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.money-spent-history-table thead {
+    background: #f8f9fa;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+.money-spent-history-table th {
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 2px solid #dee2e6;
+    font-size: 14px;
+}
+
+.money-spent-history-table td {
+    padding: 12px;
+    border-bottom: 1px solid #e9ecef;
+    font-size: 14px;
+    color: #212529;
+}
+
+.money-spent-history-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.money-spent-history-table .amount-cell {
+    font-weight: 600;
+    color: #f5576c;
+    text-align: right;
+}
+
+.money-spent-history-table .date-cell {
+    color: #6c757d;
+    white-space: nowrap;
+}
+
+.money-spent-history-table .entry-kind-cell {
+    text-transform: capitalize;
+}
+
+.money-spent-loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+}
+
+.money-spent-loading i {
+    font-size: 32px;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.money-spent-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+}
+
+.money-spent-empty i {
+    font-size: 32px;
+    margin-bottom: 10px;
+    display: block;
+}
+
+@media (max-width: 768px) {
+    .money-spent-side-panel {
+        width: calc(100vw - 40px);
+        right: -100vw;
+        top: 80px;
+        height: calc(100vh - 100px);
+    }
+    
+    .money-spent-side-panel.open {
+        right: 20px;
+    }
+}
 </style>
+
+<!-- Money Spent History Side Panel -->
+<div class="money-spent-panel-overlay" id="money-spent-overlay" onclick="closeMoneySpentHistory()"></div>
+<div class="money-spent-side-panel" id="money-spent-panel">
+    <div class="money-spent-panel-header">
+        <h3><i class="fas fa-history"></i> Money Spent History</h3>
+        <button type="button" class="money-spent-panel-close" onclick="closeMoneySpentHistory()">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div class="money-spent-panel-body" id="money-spent-panel-body">
+        <div class="money-spent-loading">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Loading history...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+function openMoneySpentHistory() {
+    const panel = document.getElementById('money-spent-panel');
+    const overlay = document.getElementById('money-spent-overlay');
+    const body = document.getElementById('money-spent-panel-body');
+    
+    // Show panel and overlay
+    panel.classList.add('open');
+    overlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    
+    // Load history
+    loadMoneySpentHistory();
+}
+
+function closeMoneySpentHistory() {
+    const panel = document.getElementById('money-spent-panel');
+    const overlay = document.getElementById('money-spent-overlay');
+    
+    panel.classList.remove('open');
+    overlay.classList.remove('show');
+    document.body.style.overflow = '';
+}
+
+function loadMoneySpentHistory() {
+    const body = document.getElementById('money-spent-panel-body');
+    
+    // Show loading state
+    body.innerHTML = '<div class="money-spent-loading"><i class="fas fa-spinner fa-spin"></i><p>Loading history...</p></div>';
+    
+    fetch('/api/procurement/money-spent-history')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                body.innerHTML = '<div class="money-spent-empty"><i class="fas fa-exclamation-circle"></i><p>Error loading history: ' + data.error + '</p></div>';
+                return;
+            }
+            
+            if (!data.history || data.history.length === 0) {
+                body.innerHTML = '<div class="money-spent-empty"><i class="fas fa-inbox"></i><p>No history available</p></div>';
+                return;
+            }
+            
+            // Calculate total money spent
+            let totalMoneySpent = 0;
+            data.history.forEach(entry => {
+                if (entry.money_spent !== null && entry.money_spent !== undefined) {
+                    totalMoneySpent += parseFloat(entry.money_spent);
+                }
+            });
+            
+            // Format total with commas
+            const formattedTotal = totalMoneySpent.toFixed(3).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            
+            // Build table with total money spent above
+            let html = '<div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;">';
+            html += '<div style="font-size: 14px; color: #666; margin-bottom: 5px;">Total Money Spent</div>';
+            html += '<div style="font-size: 24px; font-weight: bold; color: #f5576c;">OMR ' + formattedTotal + '</div>';
+            html += '</div>';
+            html += '<table class="money-spent-history-table">';
+            html += '<thead><tr>';
+            html += '<th>Date & Time</th>';
+            html += '<th style="text-align: right;">Money Spent</th>';
+            html += '<th style="text-align: right;">Available Balance</th>';
+            html += '</tr></thead>';
+            html += '<tbody>';
+            
+            data.history.forEach(entry => {
+                // Parse UTC date and convert to GST (UTC+4)
+                const date = new Date(entry.entry_date);
+                // Add 4 hours for GST timezone
+                const gstDate = new Date(date.getTime() + (4 * 60 * 60 * 1000));
+                
+                // Format date similar to system format: "Jan 15, 2024 at 02:30 PM"
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const month = months[gstDate.getUTCMonth()];
+                const day = gstDate.getUTCDate();
+                const year = gstDate.getUTCFullYear();
+                const hours = gstDate.getUTCHours();
+                const minutes = gstDate.getUTCMinutes();
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                const displayHours = hours % 12 || 12;
+                const displayMinutes = minutes.toString().padStart(2, '0');
+                
+                const dateStr = month + ' ' + day + ', ' + year;
+                const timeStr = displayHours + ':' + displayMinutes + ' ' + ampm;
+                
+                const moneySpent = entry.money_spent !== null && entry.money_spent !== undefined ? parseFloat(entry.money_spent).toFixed(3) : 'N/A';
+                const availableBalance = entry.available_balance !== null && entry.available_balance !== undefined ? parseFloat(entry.available_balance).toFixed(3) : 'N/A';
+                
+                html += '<tr>';
+                html += '<td class="date-cell">' + dateStr + '<br><small style="color: #999;">' + timeStr + '</small></td>';
+                html += '<td class="amount-cell">OMR ' + moneySpent + '</td>';
+                html += '<td style="text-align: right; color: #495057;">OMR ' + availableBalance + '</td>';
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            body.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error loading money spent history:', error);
+            body.innerHTML = '<div class="money-spent-empty"><i class="fas fa-exclamation-circle"></i><p>Error loading history. Please try again.</p></div>';
+        });
+}
+
+// Close panel on Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const panel = document.getElementById('money-spent-panel');
+        if (panel && panel.classList.contains('open')) {
+            closeMoneySpentHistory();
+        }
+    }
+});
+</script>
 {% endblock %}
 

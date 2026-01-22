@@ -18515,6 +18515,35 @@ def api_procurement_money_spent():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/procurement/money-spent-history')
+@login_required
+def api_procurement_money_spent_history():
+    """API endpoint to get money spent history for users who can see Current Money Status section"""
+    # Allow access to: GM, Operation Manager, Procurement Department Manager, IT, and Auditing departments
+    can_access = (
+        current_user.role in ['GM', 'Operation Manager'] or
+        (current_user.department == 'Procurement' and current_user.role == 'Department Manager') or
+        current_user.department in ['IT', 'Auditing']
+    )
+    if not can_access:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        # Get history entries from CurrentMoneyEntry table for Procurement department
+        # Order by most recent first
+        entries = CurrentMoneyEntry.query.filter(
+            CurrentMoneyEntry.department == 'Procurement'
+        ).order_by(CurrentMoneyEntry.entry_date.desc()).limit(100).all()
+        
+        history = [entry.to_dict() for entry in entries]
+        
+        return jsonify({
+            'history': history
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/reports/export/excel')
 @login_required
 @role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager', 'Auditing Staff')
