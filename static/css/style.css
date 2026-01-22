@@ -402,7 +402,7 @@
     box-shadow: 0 12px 30px rgba(20, 20, 43, 0.2);
     padding: 8px 0;
     display: none;
-    z-index: 20;
+    z-index: 1000;
 }
 
 .new-request-dropdown.open .new-request-menu {
@@ -473,7 +473,7 @@
     box-shadow: 0 12px 30px rgba(20, 20, 43, 0.2);
     padding: 8px 0;
     display: none;
-    z-index: 20;
+    z-index: 1000;
 }
 
 .reports-dropdown.open .reports-menu {

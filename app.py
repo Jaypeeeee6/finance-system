@@ -8233,21 +8233,61 @@ def procurement_request_item():
         # Refresh the item_request to ensure relationships are loaded
         db.session.refresh(item_request)
         
-        # Notify the requestor
+        # Check if user qualifies for auto-approval
+        # Auto-approve if user role is "Department Manager", "General Manager" (or "GM"), "Operation Manager", or "CEO"
+        # OR user name starts with "Abdalaziz"
+        should_auto_approve = False
         if current_user:
-            create_notification(
-                user_id=current_user.user_id,
-                title="Item Request Submitted",
-                message=f"Your item request for {item_name} has been submitted successfully and is awaiting manager approval.",
-                notification_type="new_submission",
-                item_request_id=item_request.id
-            )
+            user_role = current_user.role or ''
+            user_name = current_user.name or ''
+            # Check role (case-insensitive)
+            role_matches = user_role.lower() in ['department manager', 'general manager', 'gm', 'operation manager', 'ceo']
+            # Check name starts with "Abdalaziz" (case-insensitive)
+            name_matches = user_name.lower().startswith('abdalaziz')
+            should_auto_approve = role_matches or name_matches
         
-        # Notify manager(s) - similar to payment requests
-        if current_user:
-            # Get manager approvers - ensure we reload the item_request with user relationship
-            item_request = ProcurementItemRequest.query.get(item_request.id)
+        # Auto-approve manager approval if conditions are met
+        if should_auto_approve:
+            # Update request to auto-approved status
+            item_request.status = 'Pending Procurement Manager Approval'
+            item_request.manager_approval_date = current_time.date()
+            item_request.manager_approver = current_user.name
+            item_request.manager_approver_user_id = current_user.user_id
+            item_request.manager_approval_end_time = current_time
+            item_request.updated_at = current_time
             
+            db.session.commit()
+            
+            # Log the auto-approval
+            log_action(f"Manager approval auto-approved for item request #{item_request.id} by {current_user.name} ({current_user.role})")
+            
+            # Notify the requestor about auto-approval
+            if current_user:
+                formatted_items = ', '.join([item.strip() for item in item_request.item_name.split(',') if item.strip()]) if item_request.item_name else 'Item'
+                create_notification(
+                    user_id=current_user.user_id,
+                    title="Item Request Approved by Manager",
+                    message=f"Your item request #{item_request.id} for {formatted_items} has been automatically approved and sent to Procurement Manager.",
+                    notification_type="request_approved",
+                    item_request_id=item_request.id
+                )
+            
+            # Notify Procurement Managers
+            procurement_managers = User.query.filter_by(
+                department='Procurement',
+                role='Department Manager'
+            ).all()
+            for pm in procurement_managers:
+                create_notification(
+                    user_id=pm.user_id,
+                    title="New Item Request for Approval",
+                    message=f"Item request #{item_request.id} from {item_request.requestor_name} ({item_request.department}) requires your approval.",
+                    notification_type="new_submission",
+                    item_request_id=item_request.id
+                )
+            
+            # Notify other authorized managers (who could have approved but didn't) that the request was auto-approved
+            item_request = ProcurementItemRequest.query.get(item_request.id)
             authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
             
             # Ensure Branch Inventory Officer(s) are included among notification recipients
@@ -8261,23 +8301,66 @@ def procurement_request_item():
             except Exception:
                 # Fail-safe: do not block submission on notification lookup errors
                 pass
-
-            if not authorized_approvers:
-                # Log warning if no approvers found with more details
-                log_action(f"WARNING: No authorized approvers found for item request #{item_request.id} from {requestor_name} ({item_request.department}), user_id: {item_request.user_id}, role: {current_user.role if current_user else 'Unknown'}")
             
             for approver in authorized_approvers:
+                if approver.user_id != current_user.user_id:  # Don't notify the approver themselves
+                    try:
+                        create_notification(
+                            user_id=approver.user_id,
+                            title="Item Request Auto-Approved by Manager",
+                            message=f"Item request #{item_request.id} from {item_request.requestor_name} ({item_request.department}) has been automatically approved by {current_user.name} and sent to Procurement Manager.",
+                            notification_type="request_approved",
+                            item_request_id=item_request.id
+                        )
+                    except Exception as e:
+                        # Silently handle notification errors - don't log to audit
+                        pass
+        else:
+            # Normal flow: Notify the requestor
+            if current_user:
+                create_notification(
+                    user_id=current_user.user_id,
+                    title="Item Request Submitted",
+                    message=f"Your item request for {item_name} has been submitted successfully and is awaiting manager approval.",
+                    notification_type="new_submission",
+                    item_request_id=item_request.id
+                )
+            
+            # Notify manager(s) - similar to payment requests
+            if current_user:
+                # Get manager approvers - ensure we reload the item_request with user relationship
+                item_request = ProcurementItemRequest.query.get(item_request.id)
+                
+                authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
+                
+                # Ensure Branch Inventory Officer(s) are included among notification recipients
+                # for Operation department item requests (defensive: even if the approver helper missed them).
                 try:
-                    create_notification(
-                        user_id=approver.user_id,
-                        title="New Item Request for Approval",
-                        message=f"New item request submitted by {requestor_name} from {item_request.department} department for {item_name} - requires your approval",
-                        notification_type="item_request_submission",
-                        item_request_id=item_request.id
-                    )
-                except Exception as e:
-                    # Silently handle notification errors - don't log to audit
+                    if (item_request.department or '').strip().lower() == 'operation':
+                        bios = User.query.filter_by(role='Branch Inventory Officer').all()
+                        for bio in bios:
+                            if bio.user_id != item_request.user_id and bio not in authorized_approvers:
+                                authorized_approvers.append(bio)
+                except Exception:
+                    # Fail-safe: do not block submission on notification lookup errors
                     pass
+
+                if not authorized_approvers:
+                    # Log warning if no approvers found with more details
+                    log_action(f"WARNING: No authorized approvers found for item request #{item_request.id} from {requestor_name} ({item_request.department}), user_id: {item_request.user_id}, role: {current_user.role if current_user else 'Unknown'}")
+                
+                for approver in authorized_approvers:
+                    try:
+                        create_notification(
+                            user_id=approver.user_id,
+                            title="New Item Request for Approval",
+                            message=f"New item request submitted by {requestor_name} from {item_request.department} department for {item_name} - requires your approval",
+                            notification_type="item_request_submission",
+                            item_request_id=item_request.id
+                        )
+                    except Exception as e:
+                        # Silently handle notification errors - don't log to audit
+                        pass
         
         # Notify IT department users about new item request (all IT Staff and IT Department Manager)
         it_users = User.query.filter(
