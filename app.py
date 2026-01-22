@@ -18532,13 +18532,41 @@ def api_procurement_money_spent_history():
         # Get history entries from CurrentMoneyEntry table for Procurement department
         # Order by most recent first
         entries = CurrentMoneyEntry.query.filter(
-            CurrentMoneyEntry.department == 'Procurement'
-        ).order_by(CurrentMoneyEntry.entry_date.desc()).limit(100).all()
+            CurrentMoneyEntry.department == 'Procurement',
+            CurrentMoneyEntry.money_spent.isnot(None)  # Only get entries with money_spent value
+        ).order_by(CurrentMoneyEntry.entry_date.desc()).limit(1000).all()
         
-        history = [entry.to_dict() for entry in entries]
+        # Filter to only show entries where money_spent changed
+        # We'll process from oldest to newest to track changes
+        entries_list = [entry.to_dict() for entry in entries]
+        entries_list.reverse()  # Reverse to process from oldest to newest
+        
+        filtered_history = []
+        previous_money_spent = None
+        
+        for entry in entries_list:
+            current_money_spent = entry.get('money_spent')
+            # Skip entries with None or invalid money_spent
+            if current_money_spent is None:
+                continue
+            
+            # Convert to float for comparison
+            try:
+                current_money_spent_float = float(current_money_spent)
+            except (ValueError, TypeError):
+                continue  # Skip invalid values
+            
+            # Only include if money_spent is different from previous entry
+            # Use a small epsilon for float comparison to handle floating point precision
+            if previous_money_spent is None or abs(current_money_spent_float - previous_money_spent) > 0.001:
+                filtered_history.append(entry)
+                previous_money_spent = current_money_spent_float
+        
+        # Reverse back to show most recent first
+        filtered_history.reverse()
         
         return jsonify({
-            'history': history
+            'history': filtered_history
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
