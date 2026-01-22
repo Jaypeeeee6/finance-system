@@ -109,8 +109,8 @@
     </div>
     {% endif %}
 
-    <!-- Tab Navigation (for Procurement, IT, Auditing users, GM/CEO/Operation Manager, and Department Managers) -->
-    {% if user.department in ['Procurement', 'IT', 'Auditing'] or user.role in ['GM', 'CEO', 'Operation Manager', 'Department Manager'] %}
+    <!-- Tab Navigation (for Procurement, IT, Auditing users, GM/CEO/Operation Manager, Finance Admin, and Department Managers) -->
+    {% if user.department in ['Procurement', 'IT', 'Auditing'] or user.role in ['GM', 'CEO', 'Operation Manager', 'Department Manager', 'Finance Admin'] %}
     <div class="tab-navigation" style="border-bottom: 1px solid #e9ecef !important; position: relative; z-index: 2;">
         {% if user.department != 'Auditing' %}
         <button class="tab-button {% if active_tab == 'all' %}active{% endif %}" onclick="switchTab('all')" id="tab-all">
@@ -125,7 +125,7 @@
         <button class="tab-button {% if active_tab == 'my_requests' %}active{% endif %}" onclick="switchTab('my_requests')" id="tab-my_requests">
             <i class="fas fa-user"></i> My Item Requests
         </button>
-        {% elif user.department == 'IT' or user.role in ['GM', 'CEO', 'Operation Manager', 'Department Manager'] %}
+        {% elif user.department == 'IT' or user.role in ['GM', 'CEO', 'Operation Manager', 'Department Manager', 'Finance Admin'] %}
         <button class="tab-button {% if active_tab == 'my_requests' %}active{% endif %}" onclick="switchTab('my_requests')" id="tab-my_requests">
             <i class="fas fa-user"></i> My Item Requests
         </button>
@@ -147,7 +147,7 @@
     {% endif %}
 
     <!-- Filters placed immediately below the tabs (search moved into filters) -->
-    {% if user.department in ['Procurement', 'IT', 'Auditing'] or user.role in ['GM', 'CEO', 'Operation Manager', 'Department Manager'] %}
+    {% if user.department in ['Procurement', 'IT', 'Auditing'] or user.role in ['GM', 'CEO', 'Operation Manager', 'Department Manager', 'Finance Admin'] %}
     <div class="filters-container" style="margin: 0 0 8px 0;">
         <div class="filters-left">
             <div class="assign-search-field" style="position:relative; min-width:280px;">
@@ -202,7 +202,7 @@
                         {% if search_query %}{{ filters.append('Search: ' + search_query) or '' }}{% endif %}
                         {{ filters|join(' | ') }}
                     </span>
-                    <a href="{{ url_for('procurement_item_requests', tab=active_tab if (user.department in ['Procurement','IT','Auditing']) else 'all') }}" class="btn btn-sm btn-outline">
+                    <a href="{{ url_for('procurement_item_requests', tab=active_tab if (user.department in ['Procurement','IT','Auditing'] or user.role == 'Finance Admin') else 'all') }}" class="btn btn-sm btn-outline">
                         <i class="fas fa-times"></i> Clear All
                     </a>
                 </div>

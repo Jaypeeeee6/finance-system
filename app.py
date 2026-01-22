@@ -4451,6 +4451,9 @@ def procurement_item_requests():
     elif current_user.department == 'IT':
         # IT department can see all item requests (view-only, similar to payment requests visibility)
         base_item_requests = all_requests
+    elif current_user.role == 'Finance Admin':
+        # Finance Admin can only see their own item requests
+        base_item_requests = [r for r in all_requests if r.user_id == current_user.user_id]
     elif current_user.department == 'Auditing':
         # Auditing department can see all completed item requests for auditing purposes
         base_item_requests = [r for r in all_requests if r.status == 'Completed']
@@ -4531,6 +4534,16 @@ def procurement_item_requests():
             # IT: show all completed item requests
             item_requests = [r for r in base_item_requests if r.status == 'Completed']
         else:  # tab == 'all' or any other value
+            item_requests = base_item_requests
+    elif current_user.role == 'Finance Admin':
+        if tab == 'my_requests':
+            # Finance Admin: show only item requests created by the current user
+            item_requests = [r for r in base_item_requests if r.user_id == current_user.user_id]
+        elif tab == 'completed':
+            # Finance Admin: show only their own completed item requests
+            item_requests = [r for r in base_item_requests if r.status == 'Completed']
+        else:  # tab == 'all' or any other value
+            # Finance Admin: show only their own requests
             item_requests = base_item_requests
     elif current_user.department == 'Auditing':
         # Auditing: show all completed; always include own requests (any status) even if filters were applied
@@ -4721,7 +4734,7 @@ def procurement_item_requests():
     completed_amount = None
     pending_amount = None
     on_hold_amount = None
-    if current_user.role in ['GM', 'Operation Manager'] or (current_user.department == 'Procurement' and current_user.role == 'Department Manager') or current_user.department in ['IT', 'Auditing']:
+    if current_user.role in ['GM', 'Operation Manager', 'Finance Admin'] or (current_user.department == 'Procurement' and current_user.role == 'Department Manager') or current_user.department in ['IT', 'Auditing']:
         # Calculate Bank Money statistics for Current Money Status section
         bank_money_requests = PaymentRequest.query.filter(
             PaymentRequest.department == 'Procurement',
@@ -18602,9 +18615,9 @@ def api_procurement_money_spent():
 @login_required
 def api_procurement_money_spent_history():
     """API endpoint to get money spent history for users who can see Current Money Status section"""
-    # Allow access to: GM, Operation Manager, Procurement Department Manager, IT, and Auditing departments
+    # Allow access to: GM, Operation Manager, Procurement Department Manager, IT, Auditing departments, and Finance Admin
     can_access = (
-        current_user.role in ['GM', 'Operation Manager'] or
+        current_user.role in ['GM', 'Operation Manager', 'Finance Admin'] or
         (current_user.department == 'Procurement' and current_user.role == 'Department Manager') or
         current_user.department in ['IT', 'Auditing']
     )
