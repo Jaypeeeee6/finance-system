@@ -503,6 +503,9 @@
         });
 
         window.openEditPermissions = function(userId) {
+            // Store the user ID being edited
+            window.__editingUserId = userId;
+            
             // Optionally populate header with user info if desired
             var userNameElem = document.getElementById('permPanelUserName');
             var userEmailElem = document.getElementById('permPanelUserEmail');
@@ -533,6 +536,14 @@
             // also close any open action dropdowns so they don't overlap the panel
             try {
                 document.querySelectorAll('.action-dropdown').forEach(function(d){
+                    // Blur any focused elements inside the dropdown before hiding
+                    var activeEl = document.activeElement;
+                    if (activeEl && d.contains(activeEl) && activeEl.blur) {
+                        activeEl.blur();
+                    }
+                    // Also check for any focusable elements that might have focus
+                    var focused = d.querySelector(':focus');
+                    if (focused && focused.blur) focused.blur();
                     d.style.display = 'none';
                     d.setAttribute('aria-hidden','true');
                 });
@@ -548,6 +559,11 @@
                 window.__permissionsTouchHandler = function(ev){ ev.preventDefault(); };
                 document.addEventListener('touchmove', window.__permissionsTouchHandler, { passive: false });
             } catch (e) {}
+            
+            // Fetch and populate permissions for this user
+            if (window.fetchPermissionsForUser) {
+                window.fetchPermissionsForUser(userId);
+            }
         };
 
         window.closeEditPermissions = function() {
@@ -568,6 +584,8 @@
                     delete window.__permissionsTouchHandler;
                 }
             } catch (e) {}
+            // Clear the editing user ID
+            window.__editingUserId = null;
         };
 
         document.addEventListener('DOMContentLoaded', function(){
@@ -601,6 +619,14 @@
     (function(){
         function closeAllActionDropdowns() {
             document.querySelectorAll('.action-dropdown').forEach(function(d){
+                // Blur any focused elements inside the dropdown before hiding
+                var activeEl = document.activeElement;
+                if (activeEl && d.contains(activeEl) && activeEl.blur) {
+                    activeEl.blur();
+                }
+                // Also check for any focusable elements that might have focus
+                var focused = d.querySelector(':focus');
+                if (focused && focused.blur) focused.blur();
                 d.style.display = 'none';
                 d.setAttribute('aria-hidden','true');
             });
@@ -999,22 +1025,12 @@
                         </div>
                         <div style="display:flex; gap:8px; align-items:center;">
                             <button type="button" class="btn btn-outline" onclick="closeEditPermissions()" style="background:none; border:1px solid #e9ecef; padding:8px 10px; border-radius:6px;">Close</button>
-                            <button type="button" class="btn btn-primary" onclick="closeEditPermissions()" style="background:#D9BD7D; border-color:#D9BD7D; color:#fff; padding:8px 12px; border-radius:6px;">Save</button>
+                            <button type="button" class="btn btn-primary" onclick="savePermissions()" style="background:#28a745; border-color:#28a745; color:#fff; padding:6px 10px; border-radius:6px;">Save</button>
                         </div>
                     </div>
 
                     <div class="permissions-body" style="overflow:auto; height: calc(100% - 72px); padding: 16px 18px;">
                         <p style="color:#666; margin-bottom:12px;">Set this user's permissions across the system. Choose the level for each permission.</p>
-
-                        {% set statuses = [
-                            {'key':'draft','label':'Draft'},
-                            {'key':'pending_manager_approval','label':'Submitted / Pending Manager Approval'},
-                            {'key':'returned_to_requestor','label':'Returned to Requestor'},
-                            {'key':'approved_by_manager','label':'Approved by Manager / Pending Finance'},
-                            {'key':'returned_by_finance','label':'Returned by Finance'},
-                            {'key':'completed','label':'Completed / Paid'},
-                            {'key':'rejected','label':'Rejected / Cancelled'}
-                        ] %}
 
                         {% set permission_groups = [
                             {'group':'Requests & Approvals', 'perms':[
@@ -1091,29 +1107,9 @@
                                         </tr>
                                         {% set group_idx = loop.index0 %}
                                         {% for perm in group.perms %}
-                                        {% set key = perm|lower|replace(' ', '_') %}
-                                        <tr data-group="{{ group_idx }}" data-perm="{{ key }}">
-                                            <td style="padding:10px 12px; position:relative;">
-                                                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-                                                    <div style="flex:1;">{{ perm }}</div>
-                                                    <div style="display:flex; align-items:center; gap:8px;">
-                                                        <button type="button" class="status-dropdown-toggle" data-perm="{{ key }}" aria-haspopup="true" style="background:#fff; border:1px solid #e9ecef; padding:6px 8px; border-radius:6px; font-size:0.9rem; cursor:pointer;">Status ▾</button>
-                                                        <span class="status-count-badge" data-perm="{{ key }}" style="font-size:0.85rem; color:#6c757d; font-weight:600; opacity:0.6;">None</span>
-                                                    </div>
-                                                </div>
-                                                <div class="status-dropdown" data-perm="{{ key }}" style="display:none; position:absolute; right:12px; top:44px; z-index:2500; background:#fff; border:1px solid #e9ecef; padding:8px; border-radius:6px; box-shadow:0 6px 18px rgba(0,0,0,0.08); min-width:220px;">
-                                                    <label style="display:flex; align-items:center; gap:8px; padding:6px 4px; border-bottom:1px solid #eef0f2; margin-bottom:6px;">
-                                                        <input type="checkbox" class="perm-select-all" data-perm="{{ key }}">
-                                                        <strong style="font-size:0.95rem;">Select all</strong>
-                                                    </label>
-                                                    {% for st in statuses %}
-                                                    <label style="display:flex; align-items:center; gap:8px; padding:6px 4px;">
-                                                        <input type="checkbox" class="perm-status-checkbox" data-perm="{{ key }}" value="{{ st.key }}">
-                                                        <span style="font-size:0.95rem;">{{ st.label }}</span>
-                                                    </label>
-                                                    {% endfor %}
-                                                </div>
-                                            </td>
+                                        <tr data-group="{{ group_idx }}">
+                                            <td style="padding:10px 12px;">{{ perm }}</td>
+                                            {% set key = perm|lower|replace(' ', '_') %}
                                             <td style="text-align:center; padding:8px 12px;">
                                                 <label class="perm-toggle" style="display:inline-block; cursor:pointer;">
                                                     <input type="checkbox" name="perm_full_{{ key }}" style="display:none;" aria-label="Full access">
@@ -1172,7 +1168,58 @@
                             </div>
                         </div>
                         <!-- Status Scope (per-action allowed statuses) -->
-                        <!-- Status per-scope dropdowns are rendered beside each Scope row -->
+                        <div style="margin-top:18px; border-top:1px solid #eef0f2; padding-top:14px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                                <div style="font-weight:700;">Status Scope (per action)</div>
+                                <div style="color:#6c757d; font-size:0.95rem;">Use role defaults toggles turn off the custom scope</div>
+                            </div>
+
+                            {% set statuses = [
+                                {'key':'draft','label':'Draft'},
+                                {'key':'pending_manager_approval','label':'Submitted / Pending Manager Approval'},
+                                {'key':'returned_to_requestor','label':'Returned to Requestor'},
+                                {'key':'approved_by_manager','label':'Approved by Manager / Pending Finance'},
+                                {'key':'returned_by_finance','label':'Returned by Finance'},
+                                {'key':'completed','label':'Completed / Paid'},
+                                {'key':'rejected','label':'Rejected / Cancelled'}
+                            ] %}
+
+                            {% set actions = [
+                                {'key':'approve','label':'Approve'},
+                                {'key':'return','label':'Return to Requestor'},
+                                {'key':'reject','label':'Reject'},
+                                {'key':'complete','label':'Complete (Mark as Paid)'},
+                                {'key':'attach_receipt','label':'Attach Receipt'},
+                                {'key':'verify_docs','label':'Verify Documents'},
+                                {'key':'comment','label':'Comment/Note'}
+                            ] %}
+
+                            <div class="status-scope-list" style="display:flex; flex-direction:column; gap:12px;">
+                                {% for action in actions %}
+                                <div class="action-row" data-action="{{ action.key }}" style="border:1px solid #f1f3f5; border-radius:8px; overflow:hidden;">
+                                    <button type="button" class="action-header" style="width:100%; text-align:left; padding:10px 12px; background:#fff; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                                        <div style="font-weight:600;">{{ action.label }}</div>
+                                        <div style="display:flex; align-items:center; gap:10px;">
+                                            <label style="display:flex; align-items:center; gap:8px; font-weight:600; color:#6c757d;">
+                                                <input type="checkbox" class="use-role-defaults" data-action="{{ action.key }}" checked> Use role defaults
+                                            </label>
+                                            <span class="action-caret">▾</span>
+                                        </div>
+                                    </button>
+                                    <div class="action-body" style="display:none; padding:10px 12px; background:#fafafa;">
+                                        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                                            {% for st in statuses %}
+                                            <label style="display:inline-flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; background:#fff; border:1px solid #eef0f2;">
+                                                <input type="checkbox" class="status-checkbox" data-action="{{ action.key }}" value="{{ st.key }}">
+                                                <span style="font-size:0.95rem;">{{ st.label }}</span>
+                                            </label>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <style>
@@ -1249,7 +1296,7 @@
                         return false;
                     }
                     
-                    return confirm('Are you sure you want to reset this user\\'s password? They will be notified of the change.');
+                    return confirm('Are you sure you want to reset this user\'s password? They will be notified of the change.');
                 }
 
                 // Close modal when clicking outside of it
@@ -1293,29 +1340,7 @@
                 }
 
                 // Fetch current permissions for a user and populate the toggles
-                // Helper: update status-count badge for a permission
-                function updateStatusCountBadge(permKey) {
-                    if (!permKey) return;
-                    var cnt = document.querySelectorAll('.perm-status-checkbox[data-perm="'+permKey+'"]:checked').length;
-                    var badge = document.querySelector('.status-count-badge[data-perm="'+permKey+'"]');
-                    if (!badge) return;
-                    if (cnt > 0) {
-                        badge.textContent = cnt + ' selected';
-                        badge.style.opacity = '1';
-                    } else {
-                        badge.textContent = 'None';
-                        badge.style.opacity = '0.6';
-                    }
-                }
-
-                function refreshAllStatusBadges() {
-                    document.querySelectorAll('tr[data-perm]').forEach(function(r){
-                        var p = r.getAttribute('data-perm');
-                        if (p) updateStatusCountBadge(p);
-                    });
-                }
-
-                function fetchPermissionsForUser(userId) {
+                window.fetchPermissionsForUser = function(userId) {
                     if (!userId) return;
                     fetch(`/api/users/${userId}/permissions`)
                         .then(res => res.json())
@@ -1338,33 +1363,41 @@
                                     }
                                 }
                             });
-                            // populate per-permission status selections if provided
+                            // populate overrides if provided
+                            const overrides = data.overrides || {};
+                            document.querySelectorAll('.override-row').forEach(function(row){
+                                var key = row.getAttribute('data-override');
+                                if (!key) return;
+                                var ov = overrides[key];
+                                if (ov) {
+                                    var enableCb = row.querySelector('.override-enable');
+                                    if (enableCb) enableCb.checked = !!ov.enabled;
+                                    var amountInput = row.querySelector('.override-amount');
+                                    if (amountInput && ov.value !== null && ov.value !== undefined) {
+                                        amountInput.value = ov.value;
+                                        amountInput.style.display = ov.enabled ? 'inline-block' : 'none';
+                                    }
+                                }
+                            });
+                            // populate status scopes if provided
                             const statusScopes = data.status_scopes || data.statusScopes || {};
-                            // reset all first
-                            document.querySelectorAll('.perm-status-checkbox').forEach(function(cb){
-                                cb.checked = false;
-                                cb.disabled = false;
-                                cb.style.opacity = '1';
-                            });
-                            // populate from returned object (keys are perm keys)
-                            Object.keys(statusScopes || {}).forEach(function(permKey){
-                                try {
-                                    var sc = statusScopes[permKey] || {};
-                                    var statusesArray = Array.isArray(sc.statuses) ? sc.statuses : [];
-                                    document.querySelectorAll('.perm-status-checkbox[data-perm="'+permKey+'"]').forEach(function(cb){
-                                        cb.checked = statusesArray.indexOf(cb.value) !== -1;
-                                    });
-                                } catch(e){}
-                            });
-                            // refresh select-all and badges
-                            document.querySelectorAll('tr[data-perm]').forEach(function(row){
-                                var perm = row.getAttribute('data-perm');
-                                if (!perm) return;
-                                var total = document.querySelectorAll('.perm-status-checkbox[data-perm="'+perm+'"]').length;
-                                var checked = document.querySelectorAll('.perm-status-checkbox[data-perm="'+perm+'"]:checked').length;
-                                var selAll = document.querySelector('.perm-select-all[data-perm="'+perm+'"]');
-                                if (selAll) selAll.checked = (total > 0 && total === checked);
-                                updateStatusCountBadge(perm);
+                            document.querySelectorAll('.action-row').forEach(function(row){
+                                var action = row.getAttribute('data-action');
+                                var sc = statusScopes[action];
+                                var useDefaults = true;
+                                if (sc && typeof sc.use_role_defaults !== 'undefined') useDefaults = !!sc.use_role_defaults;
+                                var boxes = row.querySelectorAll('.status-checkbox');
+                                boxes.forEach(function(b){
+                                    if (sc && Array.isArray(sc.statuses)) {
+                                        b.checked = sc.statuses.indexOf(b.value) !== -1;
+                                    } else {
+                                        b.checked = false;
+                                    }
+                                    b.disabled = useDefaults;
+                                    b.style.opacity = useDefaults ? '0.5' : '1';
+                                });
+                                var useCb = row.querySelector('.use-role-defaults');
+                                if (useCb) useCb.checked = useDefaults;
                             });
                         }).catch(err => {
                             console.error('Failed to load permissions', err);
@@ -1372,7 +1405,7 @@
                 }
 
                 // Save permissions for the currently editing user
-                function savePermissions() {
+                window.savePermissions = function() {
                     var userId = window.__editingUserId;
                     if (!userId) {
                         alert('No user selected.');
@@ -1400,16 +1433,19 @@
                         }
                         overrides[key] = { enabled: enabled, value: value };
                     });
-                    // collect status scopes per permission (scope key)
+                    // collect status scopes per action
                     const status_scopes = {};
-                    document.querySelectorAll('tr[data-perm]').forEach(function(row){
-                        var perm = row.getAttribute('data-perm');
-                        if (!perm) return;
+                    document.querySelectorAll('.action-row').forEach(function(row){
+                        var action = row.getAttribute('data-action');
+                        if (!action) return;
+                        var useDefaultsEl = row.querySelector('.use-role-defaults');
+                        var useDefaults = true;
+                        if (useDefaultsEl) useDefaults = !!useDefaultsEl.checked;
                         var checkedStatuses = [];
-                        row.querySelectorAll('.perm-status-checkbox:checked').forEach(function(cb){
+                        row.querySelectorAll('.status-checkbox:checked').forEach(function(cb){
                             checkedStatuses.push(cb.value);
                         });
-                        status_scopes[perm] = { use_role_defaults: false, statuses: checkedStatuses };
+                        status_scopes[action] = { use_role_defaults: useDefaults, statuses: checkedStatuses };
                     });
                     fetch(`/api/users/${userId}/permissions`, {
                         method: 'POST',
@@ -1564,6 +1600,7 @@
                     document.querySelectorAll('.select-all-group').forEach(function(a){
                         a.addEventListener('click', function(ev){
                             ev.preventDefault();
+                            ev.stopPropagation();
                             var idx = a.getAttribute('data-group');
                             if (idx === null || idx === undefined) return;
                             var boxes = document.querySelectorAll('#permissionsPanel tbody tr[data-group="' + idx + '"] input[type="checkbox"]');
@@ -1624,72 +1661,29 @@
                         });
                     }
 
-                    // Status dropdowns per permission: toggle dropdown and close on outside click
-                    document.querySelectorAll('.status-dropdown-toggle').forEach(function(btn){
+                    // Status-scope accordion behavior
+                    document.querySelectorAll('.action-header').forEach(function(btn){
                         btn.addEventListener('click', function(e){
-                            e.stopPropagation();
-                            try {
-                                console.log('[DEBUG] status-dropdown-toggle clicked', { button: btn, dataPerm: btn.getAttribute('data-perm') });
-                            } catch (ex) {}
-                            var perm = btn.getAttribute('data-perm');
-                            if (!perm) {
-                                try { console.log('[DEBUG] status-dropdown-toggle missing data-perm attribute'); } catch(e){}
-                                return;
-                            }
-                            // close other dropdowns and restore any ancestor overflow changes they made
-                            document.querySelectorAll('.status-dropdown').forEach(function(dd){
-                                if (dd.getAttribute('data-perm') !== perm) {
-                                    dd.style.display = 'none';
-                                    if (dd.__overflowPrev) {
-                                        dd.__overflowPrev.forEach(function(o){ if (o && o.el) o.el.style.overflow = o.prev || ''; });
-                                        delete dd.__overflowPrev;
-                                    }
-                                }
-                            });
-                            var menu = document.querySelector('.status-dropdown[data-perm="'+perm+'"]');
-                            if (!menu) {
-                                try { console.log('[DEBUG] status-dropdown menu not found for perm:', perm); } catch(e){}
-                                return;
-                            }
-                            var newDisplay = (menu.style.display === 'block') ? 'none' : 'block';
-                            try { console.log('[DEBUG] toggling status-dropdown for', perm, '->', newDisplay); } catch(e){}
-                            menu.style.display = newDisplay;
+                            // ignore clicks on the use-role-defaults checkbox
+                            if (e.target && e.target.classList && e.target.classList.contains('use-role-defaults')) return;
+                            var parent = btn.parentElement;
+                            var body = parent.querySelector('.action-body');
+                            if (!body) return;
+                            var isOpen = body.style.display === 'block';
+                            // close all others
+                            document.querySelectorAll('.action-body').forEach(function(b){ b.style.display = 'none'; });
+                            if (!isOpen) body.style.display = 'block';
                         });
                     });
-                    // close status dropdowns when clicking outside
-                    document.addEventListener('click', function(){
-                        try { console.debug('[DEBUG] document click - closing all status-dropdowns'); } catch(e){}
-                        document.querySelectorAll('.status-dropdown').forEach(function(dd){ dd.style.display = 'none'; });
-                    });
-                    // prevent clicks inside dropdown from closing it
-                    document.querySelectorAll('.status-dropdown').forEach(function(dd){
-                        dd.addEventListener('click', function(e){
-                            try { console.debug('[DEBUG] click inside status-dropdown - stopping propagation for perm:', dd.getAttribute('data-perm')); } catch(e){}
-                            e.stopPropagation();
-                        });
-                    });
-                    // perm-status checkbox change -> update badge and select-all state
-                    document.querySelectorAll('.perm-status-checkbox').forEach(function(cb){
+
+                    // Use role defaults toggles status checkbox enabling
+                    document.querySelectorAll('.use-role-defaults').forEach(function(cb){
                         cb.addEventListener('change', function(){
-                            var perm = cb.getAttribute('data-perm');
-                            if (!perm) return;
-                            var total = document.querySelectorAll('.perm-status-checkbox[data-perm="'+perm+'"]').length;
-                            var checked = document.querySelectorAll('.perm-status-checkbox[data-perm="'+perm+'"]:checked').length;
-                            var selAll = document.querySelector('.perm-select-all[data-perm="'+perm+'"]');
-                            if (selAll) selAll.checked = (total > 0 && total === checked);
-                            updateStatusCountBadge(perm);
-                        });
-                    });
-                    // perm-select-all behavior
-                    document.querySelectorAll('.perm-select-all').forEach(function(cb){
-                        cb.addEventListener('change', function(){
-                            var perm = cb.getAttribute('data-perm');
-                            if (!perm) return;
-                            var checked = !!cb.checked;
-                            document.querySelectorAll('.perm-status-checkbox[data-perm="'+perm+'"]').forEach(function(ch){
-                                ch.checked = checked;
-                            });
-                            updateStatusCountBadge(perm);
+                            var action = cb.getAttribute('data-action');
+                            var parent = cb.closest('.action-row');
+                            if (!parent) return;
+                            var boxes = parent.querySelectorAll('.status-checkbox');
+                            boxes.forEach(function(b){ b.disabled = cb.checked; b.style.opacity = cb.checked ? '0.5' : '1'; });
                         });
                     });
                 });
@@ -1699,131 +1693,6 @@
     </div>
 
     <script>
-    // Delegated listener: capture clicks on .status-dropdown-toggle even if direct handlers weren't attached
-    (function(){
-        document.addEventListener('click', function(e){
-            try {
-                var btn = e.target.closest && e.target.closest('.status-dropdown-toggle');
-                if (!btn) return;
-                var perm = btn.getAttribute('data-perm');
-                console.log('[DELEGATED DEBUG] status-dropdown-toggle clicked', { dataPerm: perm });
-
-                var menu = document.querySelector('.status-dropdown[data-perm="'+perm+'"]');
-                console.log('[DELEGATED DEBUG] found menu element', menu);
-                    if (menu) {
-                        var inlineDisplay = menu.style.display;
-                        var computedDisplay = window.getComputedStyle(menu).display;
-                        console.log('[DELEGATED DEBUG] menu displays -> inline:', inlineDisplay, 'computed:', computedDisplay);
-
-                        // Attempt to toggle using same logic as original handler, but portal the menu to body
-                        var shouldShow = !(inlineDisplay === 'block' || computedDisplay === 'block');
-
-                        // Ensure ancestor overflow doesn't clip the dropdown: temporarily set overflow:visible up the chain
-                        if (!menu.__overflowPrev) {
-                            try {
-                                menu.__overflowPrev = [];
-                                var anc = menu.parentElement;
-                                while (anc && anc !== document.body && anc !== document.documentElement) {
-                                    var aCs = window.getComputedStyle(anc);
-                                    if (aCs.overflow !== 'visible') {
-                                        menu.__overflowPrev.push({ el: anc, prev: anc.style.overflow });
-                                        anc.style.overflow = 'visible';
-                                    }
-                                    anc = anc.parentElement;
-                                }
-                                var bodyCs = window.getComputedStyle(document.body);
-                                if (bodyCs.overflow !== 'visible') {
-                                    menu.__overflowPrev.push({ el: document.body, prev: document.body.style.overflow });
-                                    document.body.style.overflow = 'visible';
-                                }
-                                console.log('[DELEGATED DEBUG] adjusted ancestor overflow for perm:', perm);
-                            } catch (e) {
-                                console.error('[DELEGATED DEBUG] failed to adjust ancestor overflow', e);
-                            }
-                        }
-
-                        if (shouldShow) {
-                            // Use fixed positioning so the dropdown is not affected by ancestor stacking contexts/transforms
-                            menu.style.position = 'fixed';
-                            menu.style.display = 'block';
-                            menu.style.visibility = 'hidden';
-                            menu.style.zIndex = 99999;
-
-                            var rectBtn = btn.getBoundingClientRect();
-                            var mw = menu.offsetWidth;
-                            // Align right edge of menu with button right edge where possible
-                            var left = rectBtn.right - mw;
-                            if (left < 8) left = rectBtn.left;
-                            var top = rectBtn.bottom + 6;
-                            // Ensure menu is not positioned off-screen at the bottom
-                            var vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-                            if (top + menu.offsetHeight > vh - 8) {
-                                // try showing above the button
-                                top = rectBtn.top - menu.offsetHeight - 6;
-                                if (top < 8) top = 8;
-                            }
-
-                            menu.style.left = Math.round(left) + 'px';
-                            menu.style.top = Math.round(top) + 'px';
-                            menu.style.visibility = 'visible';
-                        } else {
-                            menu.style.display = 'none';
-                            if (menu.__overflowPrev) {
-                                menu.__overflowPrev.forEach(function(o){ if (o && o.el) o.el.style.overflow = o.prev || ''; });
-                                delete menu.__overflowPrev;
-                            }
-                        }
-
-                        console.log('[DELEGATED DEBUG] after toggle computed display:', window.getComputedStyle(menu).display);
-
-                        try {
-                            var rect = menu.getBoundingClientRect();
-                            console.log('[DELEGATED DEBUG] menu bounding rect', rect);
-                            console.log('[DELEGATED DEBUG] menu offsetParent', menu.offsetParent);
-                            console.log('[DELEGATED DEBUG] menu size', menu.offsetWidth, menu.offsetHeight);
-                            var cs = window.getComputedStyle(menu);
-                            console.log('[DELEGATED DEBUG] menu computed styles', {
-                                visibility: cs.visibility,
-                                opacity: cs.opacity,
-                                zIndex: cs.zIndex,
-                                pointerEvents: cs.pointerEvents,
-                                transform: cs.transform
-                            });
-
-                            // What element sits on top at the menu center?
-                            var cx = rect.left + rect.width/2;
-                            var cy = rect.top + rect.height/2;
-                            var topEl = document.elementFromPoint(cx, cy);
-                            console.log('[DELEGATED DEBUG] top element at menu center', topEl);
-
-                            // Log ancestors' overflow/transform/z-index to detect clipping/staking contexts
-                            var anc = menu;
-                            var ancList = [];
-                            while (anc && anc !== document.body && anc !== document.documentElement) {
-                                var aCs = window.getComputedStyle(anc);
-                                ancList.push({
-                                    tag: anc.tagName,
-                                    id: anc.id || null,
-                                    classes: anc.className || null,
-                                    overflow: aCs.overflow,
-                                    zIndex: aCs.zIndex,
-                                    transform: aCs.transform
-                                });
-                                anc = anc.parentElement;
-                            }
-                            console.log('[DELEGATED DEBUG] ancestor styles', ancList);
-                        } catch(e) {
-                            console.error('[DELEGATED DEBUG] failed to collect bounding/stacking info', e);
-                        }
-                    } else {
-                        console.log('[DELEGATED DEBUG] no .status-dropdown element found for perm:', perm);
-                    }
-            } catch (ex) {
-                // swallow any errors to avoid breaking page scripts
-                console.error('[DELEGATED DEBUG] error in delegated status handler', ex);
-            }
-        }, true); // use capture to get events early
-    })();
     // Tab switching behavior for settings page
     (function(){
         function activateTabById(targetId) {

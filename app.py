@@ -1178,7 +1178,7 @@ def get_authorized_manager_approvers(request):
 
     # If a department-level temporary manager is assigned, include that user among authorized approvers
     try:
-        dept_temp = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((request.department or getattr(request.user, 'department', '')).strip().lower())).first()
+        dept_temp = DepartmentTemporaryManager.query.filter_by(department=(request.department or '')).first()
     except Exception:
         dept_temp = None
     if dept_temp:
@@ -1287,7 +1287,7 @@ def get_authorized_manager_approvers_for_item_request(item_request):
     
     # If a department-level temporary manager is assigned for this item_request.department, include that user among authorized approvers
     try:
-        dept_temp = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((item_request.department or '').strip().lower())).first()
+        dept_temp = DepartmentTemporaryManager.query.filter_by(department=(item_request.department or '')).first()
     except Exception:
         dept_temp = None
     if dept_temp:
@@ -1316,20 +1316,6 @@ def get_authorized_manager_approvers_for_item_request(item_request):
             # Intentionally do NOT return here; allow GM/Operation Manager and other fallbacks to be added below.
     except Exception as e:
         app.logger.warning(f"Error applying Branch Inventory Officer special case for item request approvers: {e}")
-
-    # New rule: For item requests created by users in the Operation department,
-    # include Branch Inventory Officer(s) among authorized manager approvers.
-    # This ensures Branch Inventory Officer becomes an authorized manager approver
-    # for Operation item requests while still retaining GM and Operation Manager authority.
-    try:
-        if (requestor.department or '').strip().lower() == 'operation':
-            branch_inventory_officers = User.query.filter_by(role='Branch Inventory Officer').all()
-            for bio in branch_inventory_officers:
-                if bio.user_id != requestor.user_id and bio not in authorized_users:
-                    authorized_users.append(bio)
-            # Do not return here; allow GM/Operation Manager and other fallbacks to be added below.
-    except Exception as e:
-        app.logger.warning(f"Error adding Branch Inventory Officer approvers for Operation department item requests: {e}")
     
     # Hard rule: Requests submitted by GM/CEO/Operation Manager can ONLY be approved by Abdalaziz
     if requestor.role in ['GM', 'CEO', 'Operation Manager']:
@@ -3513,7 +3499,7 @@ def department_dashboard():
                     visible_request_ids.add(req.request_id)
                 # Department-level temporary manager (assignment in settings) - include requests from departments
                 try:
-                    dt = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((req.department or getattr(req.user, 'department', '')).strip().lower())).first()
+                    dt = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
                 except Exception:
                     dt = None
                 if dt and getattr(dt, 'temporary_manager_id', None) == current_user.user_id:
@@ -3575,7 +3561,7 @@ def department_dashboard():
                     temp_manager_ids.add(req.request_id)
                 # Check department-level temporary manager assignment for this request's department
                 try:
-                    dt = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((req.department or getattr(req.user, 'department', '')).strip().lower())).first()
+                    dt = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
                 except Exception:
                     dt = None
                 if dt and getattr(dt, 'temporary_manager_id', None) == current_user.user_id:
@@ -4168,21 +4154,13 @@ def procurement_dashboard():
     assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
     item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
     
-    # Get completed (and final-approval) item requests and their invoice / receipt amounts
-    completed_item_requests = ProcurementItemRequest.query.filter(
-        ProcurementItemRequest.status.in_(['Completed', 'Final Approval'])
-    ).all()
+    # Get completed item requests and their invoice amounts
+    completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
     completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
-    # For Money Spent we count completed and final-approval requests that have a receipt_amount (actual money spent)
-    completed_item_requests_receipt_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
     
     # Adjust calculations: deduct from available balance, add to money spent
-    # Money Spent should include only COMPLETED item requests that have a receipt_amount (actual spent money)
-    # Deduct completed payment requests from money spent (money received reduces net spending)
-    money_spent = completed_item_requests_receipt_amount - completed_amount
-    # Ensure money_spent doesn't go negative (can't have negative spending)
-    if money_spent < 0:
-        money_spent = 0.0
+    # Money Spent = Assigned item requests + Completed item requests (only item requests, not payment requests)
+    money_spent = item_requests_amount + completed_item_requests_amount
     # Available Balance = Completed payment requests - Completed item requests only
     # (Only completed item requests reduce available balance, not assigned/pending items)
     # Include reconciled/manual adjustments that have been marked to affect reports
@@ -4196,9 +4174,7 @@ def procurement_dashboard():
     except Exception:
         adjustments_sum = 0.0
 
-    # Use actual money_spent (receipt-based) when computing available balance to avoid double-counting
-    # Available balance = Completed payment requests - Completed item requests + adjustments
-    available_balance = completed_amount - completed_item_requests_receipt_amount + adjustments_sum
+    available_balance = completed_amount - completed_item_requests_amount + adjustments_sum
     
     # Check and notify if balance is low
     check_and_notify_low_balance(available_balance)
@@ -4451,9 +4427,6 @@ def procurement_item_requests():
     elif current_user.department == 'IT':
         # IT department can see all item requests (view-only, similar to payment requests visibility)
         base_item_requests = all_requests
-    elif current_user.role == 'Finance Admin':
-        # Finance Admin can only see their own item requests
-        base_item_requests = [r for r in all_requests if r.user_id == current_user.user_id]
     elif current_user.department == 'Auditing':
         # Auditing department can see all completed item requests for auditing purposes
         base_item_requests = [r for r in all_requests if r.status == 'Completed']
@@ -4534,16 +4507,6 @@ def procurement_item_requests():
             # IT: show all completed item requests
             item_requests = [r for r in base_item_requests if r.status == 'Completed']
         else:  # tab == 'all' or any other value
-            item_requests = base_item_requests
-    elif current_user.role == 'Finance Admin':
-        if tab == 'my_requests':
-            # Finance Admin: show only item requests created by the current user
-            item_requests = [r for r in base_item_requests if r.user_id == current_user.user_id]
-        elif tab == 'completed':
-            # Finance Admin: show only their own completed item requests
-            item_requests = [r for r in base_item_requests if r.status == 'Completed']
-        else:  # tab == 'all' or any other value
-            # Finance Admin: show only their own requests
             item_requests = base_item_requests
     elif current_user.department == 'Auditing':
         # Auditing: show all completed; always include own requests (any status) even if filters were applied
@@ -4734,7 +4697,7 @@ def procurement_item_requests():
     completed_amount = None
     pending_amount = None
     on_hold_amount = None
-    if current_user.role in ['GM', 'Operation Manager', 'Finance Admin'] or (current_user.department == 'Procurement' and current_user.role == 'Department Manager') or current_user.department in ['IT', 'Auditing']:
+    if current_user.role in ['GM', 'Operation Manager'] or (current_user.department == 'Procurement' and current_user.role == 'Department Manager') or current_user.department in ['IT', 'Auditing']:
         # Calculate Bank Money statistics for Current Money Status section
         bank_money_requests = PaymentRequest.query.filter(
             PaymentRequest.department == 'Procurement',
@@ -4754,23 +4717,13 @@ def procurement_item_requests():
         assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
         item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
         
-        # Get completed (and final-approval) item requests and their invoice / receipt amounts
-        completed_item_requests = ProcurementItemRequest.query.filter(
-            ProcurementItemRequest.status.in_(['Completed', 'Final Approval'])
-        ).all()
+        # Get completed item requests and their invoice amounts
+        completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
         completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
-        # For balance checks use the actual receipt amounts (money spent)
-        # For Money Spent we only count completed requests that have a receipt_amount (actual money spent)
-        completed_item_requests_receipt_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
         
         # Adjust calculations: deduct from available balance, add to money spent
-        # Money Spent should include only COMPLETED item requests that have a receipt_amount (actual spent money)
-        # Deduct completed payment requests from money spent (money received reduces net spending)
-        money_spent = completed_item_requests_receipt_amount - completed_amount_bm
-        # Ensure money_spent doesn't go negative (can't have negative spending)
-        if money_spent < 0:
-            money_spent = 0.0
-        completed_amount = money_spent
+        # Money Spent = Assigned item requests + Completed item requests (only item requests, not payment requests)
+        completed_amount = item_requests_amount + completed_item_requests_amount
         # Available Balance = Completed payment requests - Completed item requests only
         # (Only completed item requests reduce available balance, not assigned/pending items)
         try:
@@ -4783,9 +4736,7 @@ def procurement_item_requests():
         except Exception:
             adjustments_sum = 0.0
 
-        # Compute available balance by subtracting actual money spent (receipts) to avoid invoice/receipt mismatch
-        # Note: available_balance = completed payment requests - completed item requests
-        available_balance = completed_amount_bm - completed_item_requests_receipt_amount + adjustments_sum
+        available_balance = completed_amount_bm - completed_item_requests_amount + adjustments_sum
         
         # Check and notify if balance is low
         check_and_notify_low_balance(available_balance)
@@ -4798,7 +4749,7 @@ def procurement_item_requests():
                 completed_amount=completed_amount_bm,
                 item_requests_assigned_amount=item_requests_amount,
                 completed_item_requests_amount=completed_item_requests_amount,
-                money_spent=money_spent if 'money_spent' in locals() else None,
+                money_spent=None,
                 available_balance=available_balance,
                 source='balance_check',
                 created_by=current_user.user_id if current_user and hasattr(current_user, 'user_id') else None
@@ -4816,7 +4767,7 @@ def procurement_item_requests():
                 completed_amount=completed_amount_bm,
                 item_requests_assigned_amount=item_requests_amount,
                 completed_item_requests_amount=completed_item_requests_amount,
-                money_spent=money_spent if 'money_spent' in locals() else completed_amount,
+                money_spent=completed_amount,
                 available_balance=available_balance,
                 source='view',
                 created_by=current_user.user_id if current_user and hasattr(current_user, 'user_id') else None
@@ -5130,7 +5081,7 @@ def view_item_request_page(request_id):
     #         temporary_manager_name = temp_manager.name
     # Department-level temporary manager (settings assignment) - include as temporary manager display
     try:
-        dt = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((item_request.department or '').strip().lower())).first()
+        dt = DepartmentTemporaryManager.query.filter_by(department=(item_request.department or '')).first()
     except Exception:
         dt = None
     if dt:
@@ -5142,17 +5093,7 @@ def view_item_request_page(request_id):
             pass
     
     # Determine manager name for all statuses (pending and completed)
-    # Special-case: For Operation department requests, prefer Branch Inventory Officer(s) as Assigned Manager
-    if (item_request.department or '').strip().lower() == 'operation':
-        try:
-            bio_users = User.query.filter_by(role='Branch Inventory Officer').all()
-            if bio_users:
-                manager_name = ', '.join([b.name for b in bio_users])
-            # If no Branch Inventory Officer found, fall through to manager_id/department fallbacks below
-        except Exception as e:
-            app.logger.warning(f"Error resolving Branch Inventory Officer for Operation display override: {e}")
-
-    if not manager_name and requestor_user and requestor_user.manager_id:
+    if requestor_user and requestor_user.manager_id:
         # Get the manager's name from the manager_id
         manager = User.query.get(requestor_user.manager_id)
         if manager:
@@ -5184,25 +5125,10 @@ def view_item_request_page(request_id):
             if dept_manager:
                 manager_name = dept_manager.name
             elif item_request.department in ['Operation', 'Project']:
-                # For Operation requests, prefer Branch Inventory Officer as the displayed assigned manager.
-                # If none exist, fall back to Operation Manager (and keep Project fallback to Operation Manager).
-                try:
-                    if item_request.department == 'Operation':
-                        bio_users = User.query.filter_by(role='Branch Inventory Officer').all()
-                        if bio_users:
-                            # Join multiple names if more than one Branch Inventory Officer exists
-                            manager_name = ', '.join([b.name for b in bio_users])
-                        else:
-                            operation_manager = User.query.filter_by(role='Operation Manager').first()
-                            if operation_manager:
-                                manager_name = operation_manager.name
-                    else:
-                        # For Project, fallback to Operation Manager as before
-                        operation_manager = User.query.filter_by(role='Operation Manager').first()
-                        if operation_manager:
-                            manager_name = operation_manager.name
-                except Exception as e:
-                    app.logger.warning(f"Error resolving Branch Inventory Officer fallback for display: {e}")
+                # For Operation and Project, try Operation Manager as fallback
+                operation_manager = User.query.filter_by(role='Operation Manager').first()
+                if operation_manager:
+                    manager_name = operation_manager.name
             elif item_request.department == 'Office':
                 # For Office, fallback to the General Manager
                 gm_user_fallback = User.query.filter_by(role='GM').first()
@@ -6041,10 +5967,8 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         assigned_item_requests = [r for r in assigned_item_requests if r.id != request_id]
         item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
         
-        # Get completed (and final-approval) item requests
-        completed_item_requests = ProcurementItemRequest.query.filter(
-            ProcurementItemRequest.status.in_(['Completed', 'Final Approval'])
-        ).all()
+        # Get completed item requests
+        completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
         completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
         
         # Calculate available balance
@@ -6060,8 +5984,7 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         except Exception:
             adjustments_sum = 0.0
 
-        # Use receipt-based spent amount to compute available balance
-        available_balance = completed_amount_bm - completed_item_requests_receipt_amount + adjustments_sum
+        available_balance = completed_amount_bm - completed_item_requests_amount + adjustments_sum
         
         # Check and notify if balance is low
         check_and_notify_low_balance(available_balance)
@@ -6993,8 +6916,6 @@ def item_request_complete(request_id):
         item_request.invoice_amount = invoice_total
     item_request.receipt_path = json.dumps(final_receipts)
     item_request.invoice_path = json.dumps(final_invoices)
-    # Persist from-store flag
-    item_request.from_store_no_receipt = from_store_flag
     item_request.updated_at = current_time
     
     db.session.commit()
@@ -8246,134 +8167,39 @@ def procurement_request_item():
         # Refresh the item_request to ensure relationships are loaded
         db.session.refresh(item_request)
         
-        # Check if user qualifies for auto-approval
-        # Auto-approve if user role is "Department Manager", "General Manager" (or "GM"), "Operation Manager", or "CEO"
-        # OR user name starts with "Abdalaziz"
-        should_auto_approve = False
+        # Notify the requestor
         if current_user:
-            user_role = current_user.role or ''
-            user_name = current_user.name or ''
-            # Check role (case-insensitive)
-            role_matches = user_role.lower() in ['department manager', 'general manager', 'gm', 'operation manager', 'ceo']
-            # Check name starts with "Abdalaziz" (case-insensitive)
-            name_matches = user_name.lower().startswith('abdalaziz')
-            should_auto_approve = role_matches or name_matches
+            create_notification(
+                user_id=current_user.user_id,
+                title="Item Request Submitted",
+                message=f"Your item request for {item_name} has been submitted successfully and is awaiting manager approval.",
+                notification_type="new_submission",
+                item_request_id=item_request.id
+            )
         
-        # Auto-approve manager approval if conditions are met
-        if should_auto_approve:
-            # Update request to auto-approved status
-            item_request.status = 'Pending Procurement Manager Approval'
-            item_request.manager_approval_date = current_time.date()
-            item_request.manager_approver = current_user.name
-            item_request.manager_approver_user_id = current_user.user_id
-            item_request.manager_approval_end_time = current_time
-            item_request.updated_at = current_time
-            
-            db.session.commit()
-            
-            # Log the auto-approval
-            log_action(f"Manager approval auto-approved for item request #{item_request.id} by {current_user.name} ({current_user.role})")
-            
-            # Notify the requestor about auto-approval
-            if current_user:
-                formatted_items = ', '.join([item.strip() for item in item_request.item_name.split(',') if item.strip()]) if item_request.item_name else 'Item'
-                create_notification(
-                    user_id=current_user.user_id,
-                    title="Item Request Approved by Manager",
-                    message=f"Your item request #{item_request.id} for {formatted_items} has been automatically approved and sent to Procurement Manager.",
-                    notification_type="request_approved",
-                    item_request_id=item_request.id
-                )
-            
-            # Notify Procurement Managers
-            procurement_managers = User.query.filter_by(
-                department='Procurement',
-                role='Department Manager'
-            ).all()
-            for pm in procurement_managers:
-                create_notification(
-                    user_id=pm.user_id,
-                    title="New Item Request for Approval",
-                    message=f"Item request #{item_request.id} from {item_request.requestor_name} ({item_request.department}) requires your approval.",
-                    notification_type="new_submission",
-                    item_request_id=item_request.id
-                )
-            
-            # Notify other authorized managers (who could have approved but didn't) that the request was auto-approved
+        # Notify manager(s) - similar to payment requests
+        if current_user:
+            # Get manager approvers - ensure we reload the item_request with user relationship
             item_request = ProcurementItemRequest.query.get(item_request.id)
+            
             authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
             
-            # Ensure Branch Inventory Officer(s) are included among notification recipients
-            # for Operation department item requests (defensive: even if the approver helper missed them).
-            try:
-                if (item_request.department or '').strip().lower() == 'operation':
-                    bios = User.query.filter_by(role='Branch Inventory Officer').all()
-                    for bio in bios:
-                        if bio.user_id != item_request.user_id and bio not in authorized_approvers:
-                            authorized_approvers.append(bio)
-            except Exception:
-                # Fail-safe: do not block submission on notification lookup errors
-                pass
+            if not authorized_approvers:
+                # Log warning if no approvers found with more details
+                log_action(f"WARNING: No authorized approvers found for item request #{item_request.id} from {requestor_name} ({item_request.department}), user_id: {item_request.user_id}, role: {current_user.role if current_user else 'Unknown'}")
             
             for approver in authorized_approvers:
-                if approver.user_id != current_user.user_id:  # Don't notify the approver themselves
-                    try:
-                        create_notification(
-                            user_id=approver.user_id,
-                            title="Item Request Auto-Approved by Manager",
-                            message=f"Item request #{item_request.id} from {item_request.requestor_name} ({item_request.department}) has been automatically approved by {current_user.name} and sent to Procurement Manager.",
-                            notification_type="request_approved",
-                            item_request_id=item_request.id
-                        )
-                    except Exception as e:
-                        # Silently handle notification errors - don't log to audit
-                        pass
-        else:
-            # Normal flow: Notify the requestor
-            if current_user:
-                create_notification(
-                    user_id=current_user.user_id,
-                    title="Item Request Submitted",
-                    message=f"Your item request for {item_name} has been submitted successfully and is awaiting manager approval.",
-                    notification_type="new_submission",
-                    item_request_id=item_request.id
-                )
-            
-            # Notify manager(s) - similar to payment requests
-            if current_user:
-                # Get manager approvers - ensure we reload the item_request with user relationship
-                item_request = ProcurementItemRequest.query.get(item_request.id)
-                
-                authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
-                
-                # Ensure Branch Inventory Officer(s) are included among notification recipients
-                # for Operation department item requests (defensive: even if the approver helper missed them).
                 try:
-                    if (item_request.department or '').strip().lower() == 'operation':
-                        bios = User.query.filter_by(role='Branch Inventory Officer').all()
-                        for bio in bios:
-                            if bio.user_id != item_request.user_id and bio not in authorized_approvers:
-                                authorized_approvers.append(bio)
-                except Exception:
-                    # Fail-safe: do not block submission on notification lookup errors
+                    create_notification(
+                        user_id=approver.user_id,
+                        title="New Item Request for Approval",
+                        message=f"New item request submitted by {requestor_name} from {item_request.department} department for {item_name} - requires your approval",
+                        notification_type="item_request_submission",
+                        item_request_id=item_request.id
+                    )
+                except Exception as e:
+                    # Silently handle notification errors - don't log to audit
                     pass
-
-                if not authorized_approvers:
-                    # Log warning if no approvers found with more details
-                    log_action(f"WARNING: No authorized approvers found for item request #{item_request.id} from {requestor_name} ({item_request.department}), user_id: {item_request.user_id}, role: {current_user.role if current_user else 'Unknown'}")
-                
-                for approver in authorized_approvers:
-                    try:
-                        create_notification(
-                            user_id=approver.user_id,
-                            title="New Item Request for Approval",
-                            message=f"New item request submitted by {requestor_name} from {item_request.department} department for {item_name} - requires your approval",
-                            notification_type="item_request_submission",
-                            item_request_id=item_request.id
-                        )
-                    except Exception as e:
-                        # Silently handle notification errors - don't log to audit
-                        pass
         
         # Notify IT department users about new item request (all IT Staff and IT Department Manager)
         it_users = User.query.filter(
@@ -13248,7 +13074,7 @@ def view_request(request_id):
     # Quick allow: if current user is the department-level temporary manager for this request's department,
     # grant view access regardless of their role (this mirrors item-request behavior).
     try:
-        _dept_temp = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((req.department or getattr(req.user, 'department', '')).strip().lower())).first()
+        _dept_temp = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
     except Exception:
         _dept_temp = None
     allowed_by_dept_temp = bool(_dept_temp and getattr(_dept_temp, 'temporary_manager_id', None) == current_user.user_id)
@@ -13439,7 +13265,7 @@ def view_request(request_id):
     else:
         # If no per-request temporary manager, check department-level temporary manager (settings)
         try:
-            dt = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((req.department or getattr(req.user, 'department', '')).strip().lower())).first()
+            dt = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
         except Exception:
             dt = None
         if dt:
@@ -13679,7 +13505,7 @@ def view_request(request_id):
     
     # Determine if current user is the department-level temporary manager for this request's department
     try:
-        _dt_for_req = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((req.department or getattr(req.user, 'department', '')).strip().lower())).first()
+        _dt_for_req = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
     except Exception:
         _dt_for_req = None
     is_dept_temp_for_req = bool(_dt_for_req and getattr(_dt_for_req, 'temporary_manager_id', None) == current_user.user_id)
@@ -15836,30 +15662,10 @@ def manager_approve_request(request_id):
     """Manager approves a payment request"""
     req = PaymentRequest.query.get_or_404(request_id)
     
-    # Check if user is trying to approve their own request
+    # Never allow users to approve their own requests at the manager stage
     if req.user_id == current_user.user_id:
-        # Allow self-approval if user is a temporary manager (per-request or department-level)
-        is_temp_manager = False
-        
-        # Check if user is the per-request temporary manager
-        if req.temporary_manager_id == current_user.user_id:
-            is_temp_manager = True
-            print("DEBUG: Self-approval allowed - user is per-request temporary manager")
-        
-        # Check if user is a department-level temporary manager for this request's department
-        if not is_temp_manager:
-            try:
-                dept_temp = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((req.department or getattr(req.user, 'department', '')).strip().lower())).first()
-                if dept_temp and dept_temp.temporary_manager_id == current_user.user_id:
-                    is_temp_manager = True
-                    print("DEBUG: Self-approval allowed - user is department-level temporary manager")
-            except Exception:
-                pass
-        
-        # Block self-approval only if user is not a temporary manager
-        if not is_temp_manager:
-            flash('You cannot approve your own request at the manager stage.', 'error')
-            return redirect(url_for('view_request', request_id=request_id))
+        flash('You cannot approve your own request at the manager stage.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
 
     # Debug information
     print(f"DEBUG: Current user: {current_user.name} (ID: {current_user.user_id}, Role: {current_user.role}, Department: {current_user.department})")
@@ -15882,19 +15688,12 @@ def manager_approve_request(request_id):
     else:
         # No per-request temporary manager assigned - check for department-level temporary manager
         try:
-            dept_temp = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == ((req.department or getattr(req.user, 'department', '')).strip().lower())).first()
+            dept_temp = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
         except Exception:
             dept_temp = None
-        if dept_temp:
-            # Extra debug: show the department temp record and comparison values
-            try:
-                print(f"DEBUG: Dept temp record found: department='{dept_temp.department}', temporary_manager_id={dept_temp.temporary_manager_id}")
-                print(f"DEBUG: Current user id: {current_user.user_id}")
-            except Exception:
-                pass
-            if dept_temp.temporary_manager_id == current_user.user_id:
-                is_authorized = True
-                print("DEBUG: Authorized via department-level temporary manager assignment")
+        if dept_temp and dept_temp.temporary_manager_id == current_user.user_id:
+            is_authorized = True
+            print("DEBUG: Authorized via department-level temporary manager assignment")
 
         # Continue with standard authorization checks even when a department-level temporary manager exists.
         # This ensures GM and Operation Manager remain authorized as before.
@@ -15904,12 +15703,8 @@ def manager_approve_request(request_id):
                 is_authorized = True
                 print("DEBUG: Authorized via Abdalaziz-only rule for GM/CEO/Operation Manager submitter")
             else:
-                # Do not override a previous authorization (e.g., department-level temporary manager).
-                if not is_authorized:
-                    # Remains unauthorized unless another rule grants permission.
-                    print("DEBUG: Blocked - only Abdalaziz can approve GM/CEO/Operation Manager submitter")
-                else:
-                    print("DEBUG: Dept-level temporary manager present; overriding Abdalaziz-only restriction")
+                is_authorized = False
+                print("DEBUG: Blocked - only Abdalaziz can approve GM/CEO/Operation Manager submitter")
         # General rule for other requests
         elif current_user.role in ['GM', 'Operation Manager']:
             is_authorized = True
@@ -17475,9 +17270,9 @@ def item_request_reports():
     # Build query
     query = ProcurementItemRequest.query.filter(ProcurementItemRequest.is_draft == False)
     
-    # Auditing Staff: can see Completed and Final Approval item requests in reports
+    # Auditing Staff: only Completed item requests in reports
     if current_user.role == 'Auditing Staff':
-        query = query.filter(ProcurementItemRequest.status.in_(['Completed', 'Final Approval']))
+        query = query.filter(ProcurementItemRequest.status == 'Completed')
     
     # GM, CEO, IT Staff, and Operation Manager can see ALL requests from all statuses
     # Only filter for Department Managers
@@ -17486,16 +17281,15 @@ def item_request_reports():
             # IT Department Manager can see ALL requests
             pass
         elif current_user.department == 'Procurement':
-            # Procurement Department Manager can see: Assigned to Procurement, Completed, Final Approval, Pending Procurement Manager Approval
+            # Procurement Department Manager can only see: Assigned to Procurement, Completed, Pending Procurement Manager Approval
             query = query.filter(ProcurementItemRequest.status.in_([
                 'Assigned to Procurement',
                 'Completed',
-                'Final Approval',
                 'Pending Procurement Manager Approval'
             ]))
         elif current_user.department == 'Auditing':
-            # Auditing Department Manager can see completed and final approval requests
-            query = query.filter(ProcurementItemRequest.status.in_(['Completed', 'Final Approval']))
+            # Auditing Department Manager can see all completed requests
+            query = query.filter(ProcurementItemRequest.status == 'Completed')
         else:
             # Other Department Managers can ONLY see their own department's requests
             query = query.filter(ProcurementItemRequest.department == current_user.department)
@@ -17660,9 +17454,9 @@ def item_request_reports():
                 ])
             )
         elif current_user.department == 'Auditing':
-            # Auditing Manager can see categories with completed and final approval requests
+            # Auditing Manager can only see categories with completed requests
             categories_query = categories_query.filter(
-                ProcurementItemRequest.status.in_(['Completed', 'Final Approval'])
+                ProcurementItemRequest.status == 'Completed'
             )
         elif current_user.department != 'IT':
             # Other Department Managers can only see their own department's categories
@@ -17736,10 +17530,6 @@ def export_item_request_reports_excel():
     # Build query (same logic as item_request_reports)
     query = ProcurementItemRequest.query.filter(ProcurementItemRequest.is_draft == False)
     
-    # Auditing Staff: can see Completed and Final Approval item requests in exports
-    if current_user.role == 'Auditing Staff':
-        query = query.filter(ProcurementItemRequest.status.in_(['Completed', 'Final Approval']))
-    
     if current_user.role == 'Department Manager':
         if current_user.department == 'IT':
             pass
@@ -17747,7 +17537,6 @@ def export_item_request_reports_excel():
             query = query.filter(ProcurementItemRequest.status.in_([
                 'Assigned to Procurement',
                 'Completed',
-                'Final Approval',
                 'Pending Procurement Manager Approval'
             ]))
         elif current_user.department == 'Auditing':
@@ -18036,10 +17825,6 @@ def export_item_request_reports_pdf():
     # Build query (same logic as item_request_reports)
     query = ProcurementItemRequest.query.filter(ProcurementItemRequest.is_draft == False)
     
-    # Auditing Staff: can see Completed and Final Approval item requests in exports
-    if current_user.role == 'Auditing Staff':
-        query = query.filter(ProcurementItemRequest.status.in_(['Completed', 'Final Approval']))
-    
     if current_user.role == 'Department Manager':
         if current_user.department == 'IT':
             pass
@@ -18047,7 +17832,6 @@ def export_item_request_reports_pdf():
             query = query.filter(ProcurementItemRequest.status.in_([
                 'Assigned to Procurement',
                 'Completed',
-                'Final Approval',
                 'Pending Procurement Manager Approval'
             ]))
         elif current_user.department == 'Auditing':
@@ -18572,105 +18356,9 @@ def api_person_company_options():
     })
 
 
-@app.route('/api/procurement/money-spent')
-@login_required
-def api_procurement_money_spent():
-    """API endpoint to get current money spent value for Procurement Department Manager"""
-    # Only allow Procurement Department Manager to access this
-    if current_user.department != 'Procurement' or current_user.role != 'Department Manager':
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    try:
-        # Calculate Bank Money statistics for Current Money Status section
-        bank_money_requests = PaymentRequest.query.filter(
-            PaymentRequest.department == 'Procurement',
-            PaymentRequest.request_type == 'Bank money',
-            PaymentRequest.is_archived == False
-        ).all()
-        
-        # Get completed payment requests
-        completed_requests_bm = [r for r in bank_money_requests if r.status == 'Completed']
-        completed_amount_bm = sum(float(r.amount) for r in completed_requests_bm)
-        
-        # Get completed item requests and their receipt amounts
-        completed_item_requests = ProcurementItemRequest.query.filter(
-            ProcurementItemRequest.status.in_(['Completed', 'Final Approval'])
-        ).all()
-        completed_item_requests_receipt_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
-        
-        # Calculate money spent: completed item requests - completed payment requests
-        money_spent = completed_item_requests_receipt_amount - completed_amount_bm
-        # Ensure money_spent doesn't go negative
-        if money_spent < 0:
-            money_spent = 0.0
-        
-        return jsonify({
-            'money_spent': round(money_spent, 3)
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/procurement/money-spent-history')
-@login_required
-def api_procurement_money_spent_history():
-    """API endpoint to get money spent history for users who can see Current Money Status section"""
-    # Allow access to: GM, Operation Manager, Procurement Department Manager, IT, Auditing departments, and Finance Admin
-    can_access = (
-        current_user.role in ['GM', 'Operation Manager', 'Finance Admin'] or
-        (current_user.department == 'Procurement' and current_user.role == 'Department Manager') or
-        current_user.department in ['IT', 'Auditing']
-    )
-    if not can_access:
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    try:
-        # Get history entries from CurrentMoneyEntry table for Procurement department
-        # Order by most recent first
-        entries = CurrentMoneyEntry.query.filter(
-            CurrentMoneyEntry.department == 'Procurement',
-            CurrentMoneyEntry.money_spent.isnot(None)  # Only get entries with money_spent value
-        ).order_by(CurrentMoneyEntry.entry_date.desc()).limit(1000).all()
-        
-        # Filter to only show entries where money_spent changed
-        # We'll process from oldest to newest to track changes
-        entries_list = [entry.to_dict() for entry in entries]
-        entries_list.reverse()  # Reverse to process from oldest to newest
-        
-        filtered_history = []
-        previous_money_spent = None
-        
-        for entry in entries_list:
-            current_money_spent = entry.get('money_spent')
-            # Skip entries with None or invalid money_spent
-            if current_money_spent is None:
-                continue
-            
-            # Convert to float for comparison
-            try:
-                current_money_spent_float = float(current_money_spent)
-            except (ValueError, TypeError):
-                continue  # Skip invalid values
-            
-            # Only include if money_spent is different from previous entry
-            # Use a small epsilon for float comparison to handle floating point precision
-            if previous_money_spent is None or abs(current_money_spent_float - previous_money_spent) > 0.001:
-                filtered_history.append(entry)
-                previous_money_spent = current_money_spent_float
-        
-        # Reverse back to show most recent first
-        filtered_history.reverse()
-        
-        return jsonify({
-            'history': filtered_history
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
 @app.route('/reports/export/excel')
 @login_required
-@role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager', 'Auditing Staff')
+@role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager')
 def export_reports_excel():
     """Export filtered reports to an Excel file with frozen columns"""
     # Lazy imports to avoid hard dependency during app startup
@@ -18699,12 +18387,6 @@ def export_reports_excel():
 
     # Show ALL statuses by default (consistent with reports() view), but exclude archived requests
     query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
-    
-    # Auditing Staff: restrict to Completed, Recurring, and proof-related statuses in exports
-    if current_user.role == 'Auditing Staff':
-        query = query.filter(PaymentRequest.status.in_([
-            'Completed', 'Recurring', 'Proof Pending', 'Proof Sent', 'Proof Rejected'
-        ]))
     
     # Filter for Department Managers based on their department (same logic as reports() view)
     if current_user.role == 'Department Manager':
@@ -18825,13 +18507,6 @@ def export_reports_excel():
     if payment_method_filter:
         # Handle multiple payment method filters
         query = query.filter(PaymentRequest.payment_method.in_(payment_method_filter))
-    
-    # Reference number search (Auditing-specific search uses this GET param)
-    # Use prefix matching to avoid unrelated substring matches (e.g., '100' matching 'A100B')
-    reference_number = request.args.get('reference_number', '').strip()
-    if reference_number:
-        query = query.filter(PaymentRequest.reference_number.ilike(f'{reference_number}%'))
-    
     # Date filtering - when a date range is provided, filter by completion_date.
     # Requests without a completion_date should NOT appear in date-scoped results.
     if date_from:
@@ -19145,7 +18820,7 @@ def export_reports_excel():
 
 @app.route('/reports/export/pdf')
 @login_required
-@role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager', 'Auditing Staff')
+@role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager')
 def export_reports_pdf():
     """Export filtered reports to a PDF including total amount and full list"""
     # Lazy imports to avoid hard dependency during app startup
@@ -19188,12 +18863,6 @@ def export_reports_pdf():
 
     # Show ALL statuses by default (consistent with reports() view), but exclude archived requests
     query = PaymentRequest.query.filter(PaymentRequest.is_archived == False)
-    
-    # Auditing Staff: restrict to Completed, Recurring, and proof-related statuses in exports
-    if current_user.role == 'Auditing Staff':
-        query = query.filter(PaymentRequest.status.in_([
-            'Completed', 'Recurring', 'Proof Pending', 'Proof Sent', 'Proof Rejected'
-        ]))
     
     # Filter for Department Managers based on their department (same logic as reports() view)
     if current_user.role == 'Department Manager':
@@ -19316,12 +18985,6 @@ def export_reports_pdf():
     # Payment method filter (handle multiple values)
     if payment_method_filter:
         query = query.filter(PaymentRequest.payment_method.in_(payment_method_filter))
-    
-    # Reference number search (Auditing-specific search uses this GET param)
-    # Use prefix matching to avoid unrelated substring matches (e.g., '100' matching 'A100B')
-    reference_number = request.args.get('reference_number', '').strip()
-    if reference_number:
-        query = query.filter(PaymentRequest.reference_number.ilike(f'{reference_number}%'))
 
     # Date filtering - when a date range is provided, filter by completion_date.
     # Requests without a completion_date should NOT appear in date-scoped results.
@@ -20690,7 +20353,7 @@ def settings():
 
         # Unset assignment if no manager selected
         if not new_manager_id or new_manager_id == 'none':
-            existing = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == (department or '').strip().lower()).first()
+            existing = DepartmentTemporaryManager.query.filter_by(department=department).first()
             if existing:
                 old_manager = existing.temporary_manager
                 db.session.delete(existing)
@@ -20718,7 +20381,7 @@ def settings():
             flash('Selected user does not exist.', 'error')
             return redirect(url_for('settings'))
 
-        existing = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == (department or '').strip().lower()).first()
+        existing = DepartmentTemporaryManager.query.filter_by(department=department).first()
         if existing and existing.temporary_manager_id == int(new_manager_id):
             flash('Selected manager is already assigned as the temporary manager for this department.', 'info')
             return redirect(url_for('settings'))
@@ -20856,7 +20519,7 @@ def unassign_temp_manager():
         flash('No department specified.', 'error')
         return redirect(url_for('settings'))
 
-    existing = DepartmentTemporaryManager.query.filter(func.lower(DepartmentTemporaryManager.department) == (department or '').strip().lower()).first()
+    existing = DepartmentTemporaryManager.query.filter_by(department=department).first()
     if not existing:
         flash(f'No temporary manager set for {department}.', 'info')
         return redirect(url_for('settings'))
