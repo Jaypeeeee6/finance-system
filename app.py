@@ -4502,6 +4502,31 @@ def procurement_dashboard():
                          on_hold_amount=on_hold_amount)
 
 
+@app.route('/api/procurement/money-spent', methods=['GET'])
+@login_required
+def get_procurement_money_spent():
+    """API endpoint to get the current Money Spent value for Procurement department"""
+    # Only allow Procurement Department Managers to access this endpoint
+    if current_user.department != 'Procurement' or current_user.role != 'Department Manager':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        # Get item requests with status "Assigned to Procurement" and their invoice amounts
+        assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
+        item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
+        
+        # Get completed item requests and their invoice amounts
+        completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+        completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
+        
+        # Money Spent = Assigned item requests + Completed item requests
+        money_spent = item_requests_amount + completed_item_requests_amount
+        
+        return jsonify({'money_spent': money_spent})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/procurement/item-requests')
 @login_required
 def procurement_item_requests():
