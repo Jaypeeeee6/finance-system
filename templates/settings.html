@@ -346,6 +346,17 @@
             <form method="POST" action="{{ url_for('settings') }}">
                 <div class="form-row">
                     <div class="form-group" style="min-width: 240px;">
+                        <label for="request_type">Type of Request</label>
+                        <select name="request_type" id="request_type" required>
+                            <option value="">-- Select Type of Request --</option>
+                            <option value="Finance Payment Request">Finance Payment Request</option>
+                            <option value="Procurement Item Request">Procurement Item Request</option>
+                            <option value="Both Payment and Item Request">Both Payment and Item Request</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row" style="margin-top: 0.75rem;">
+                    <div class="form-group" style="min-width: 240px;">
                         <label for="department">Department</label>
                         <select name="department" id="department" required>
                             <option value="">-- Select Department --</option>
@@ -402,13 +413,14 @@
             <div style="margin-bottom:10px; width:100%;">
                 <div class="assign-search-field" style="position:relative; width:100%;">
                     <img src="{{ url_for('static', filename='css/icons/search.svg') }}" class="assign-search-icon" alt="Search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%);" onclick="document.getElementById('assignment_search').focus();" >
-                    <input type="search" id="assignment_search" class="form-control assign-search-input" placeholder="Search by department or temporary manager name" aria-label="Search assignments" style="padding-left:44px; width:100%;">
+                    <input type="search" id="assignment_search" class="form-control assign-search-input" placeholder="Search by type of request, department, or temporary manager name" aria-label="Search assignments" style="padding-left:44px; width:100%;">
                 </div>
             </div>
             <div class="table-responsive">
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th>Type of Request</th>
                             <th>Department</th>
                             <th>Temporary Manager</th>
                             <th>Set By</th>
@@ -417,8 +429,11 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for dept, entry in assignments.items()|sort %}
+                        {% for key, entry in assignments.items()|sort %}
+                        {% set dept = entry.department %}
+                        {% set req_type = entry.request_type if entry.request_type else 'N/A' %}
                         <tr>
+                            <td>{{ req_type }}</td>
                             <td>{{ dept }}</td>
                             <td>{{ entry.temporary_manager.name if entry.temporary_manager else entry.temporary_manager_id }}</td>
                             <td>{{ entry.set_by_user.name if entry.set_by_user else '' }}</td>
@@ -432,7 +447,8 @@
                             <td>
                                 <form method="POST" action="{{ url_for('unassign_temp_manager') }}" style="display:inline;">
                                     <input type="hidden" name="department" value="{{ dept }}">
-                                    <button type="submit" class="btn btn-sm btn-unassign" onclick="return confirm('Unassign temporary manager for {{ dept }}?')">
+                                    <input type="hidden" name="request_type" value="{{ entry.request_type if entry.request_type else '' }}">
+                                    <button type="submit" class="btn btn-sm btn-unassign" onclick="return confirm('Unassign temporary manager for {{ dept }} ({{ req_type }})?')">
                                         <i class="fas fa-user-slash"></i> Unassign
                                     </button>
                                 </form>
@@ -462,9 +478,10 @@
                 var q = normalizeText(this.value);
                 var anyVisible = false;
                 rows.forEach(function(r){
-                    var dept = normalizeText(r.cells[0] && r.cells[0].textContent);
-                    var mgr  = normalizeText(r.cells[1] && r.cells[1].textContent);
-                    if(!q || dept.indexOf(q) !== -1 || mgr.indexOf(q) !== -1){
+                    var reqType = normalizeText(r.cells[0] && r.cells[0].textContent);
+                    var dept = normalizeText(r.cells[1] && r.cells[1].textContent);
+                    var mgr  = normalizeText(r.cells[2] && r.cells[2].textContent);
+                    if(!q || reqType.indexOf(q) !== -1 || dept.indexOf(q) !== -1 || mgr.indexOf(q) !== -1){
                         r.style.display = '';
                         anyVisible = true;
                     } else {
@@ -828,6 +845,14 @@
                         </div>
                     </div>
                     
+                    <!-- Info message about department and role permissions -->
+                    <div style="margin: 12px 16px; padding: 12px; background: #e7f3ff; border-left: 4px solid #2196F3; border-radius: 4px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-info-circle" style="color: #2196F3; font-size: 1.1rem;"></i>
+                        <span style="color: #333; font-size: 0.95rem;">
+                            To view all department and role permissions, <a href="#" id="viewPermissionsLink" style="color: #2196F3; text-decoration: underline; cursor: pointer;">click here</a>
+                        </span>
+                    </div>
+                    
                     <div class="card-body">
                         {% if users_list %}
                             <div class="table-responsive">
@@ -957,6 +982,43 @@
                         </form>
                     </div>
                 </div>
+
+                <!-- Department and Role Permissions Modal -->
+                <div id="permissionsModal" style="display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);">
+                    <div style="background-color: #fefefe; margin: 3% auto; padding: 24px; border: 1px solid #888; width: 90%; max-width: 1000px; border-radius: 10px; max-height: 85vh; overflow-y: auto;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 2px solid #e9ecef; padding-bottom: 16px;">
+                            <h2 style="margin: 0; color: #333;"><i class="fas fa-shield-alt"></i> Department & Role Permissions</h2>
+                            <button onclick="closePermissionsModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888; padding: 4px 8px;">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div id="permissionsModalContent" style="color: #333;">
+                            <!-- Content will be populated dynamically or via Jinja2 -->
+                            <div style="text-align: center; padding: 40px; color: #666;">
+                                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 16px;"></i>
+                                <p>Loading permissions...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <style>
+                    /* Permissions Modal Styles */
+                    #permissionsModal .role-chevron-toggle {
+                        transition: transform 0.2s ease;
+                    }
+                    #permissionsModal .role-chevron-toggle i {
+                        transition: transform 0.2s ease;
+                    }
+                    #permissionsModal .role-chevron-toggle:hover {
+                        color: #495057;
+                    }
+                    #permissionsModal .role-details {
+                        transition: max-height 0.3s ease, opacity 0.3s ease;
+                    }
+                    #permissionsModal [onclick*="toggleRoleDetails"]:hover {
+                        background: #e9ecef !important;
+                    }
+                </style>
 
                 <!-- Edit Permissions Side Panel (frontend only) -->
                 <div id="permissionsBackdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:1999;"></div>
@@ -1279,6 +1341,307 @@
                     currentUserId = null;
                 }
 
+                // Open Department and Role Permissions Modal
+                function openPermissionsModal() {
+                    var modal = document.getElementById('permissionsModal');
+                    if (!modal) return;
+                    modal.style.display = 'block';
+                    // Prevent background scrolling
+                    document.body.style.overflow = 'hidden';
+                    // Populate modal content
+                    populatePermissionsModal();
+                }
+
+                // Close Department and Role Permissions Modal
+                function closePermissionsModal() {
+                    var modal = document.getElementById('permissionsModal');
+                    if (!modal) return;
+                    modal.style.display = 'none';
+                    // Restore background scrolling
+                    document.body.style.overflow = '';
+                }
+
+                // Populate the permissions modal with department and role permissions
+                function populatePermissionsModal() {
+                    var content = document.getElementById('permissionsModalContent');
+                    if (!content) return;
+                    
+                    var permissionsData = {
+                        'Finance': {
+                            'Finance Admin': {
+                                view: ['All departments, all roles', {
+                                    main: 'Finance-related statuses:',
+                                    sublist: ['Pending Finance Approval', 'Returned to Manager', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
+                                }, {
+                                    main: 'Additional: Pending Manager Approval (Abdalaziz Al-Brashdi):',
+                                    sublist: ['Finance Dept requests', 'Finance Staff requests', 'General Manager requests', 'Operation Manager requests', 'CEO requests']
+                                }, 'Rejected by Manager (Finance Dept requests and special submitter roles for Abdalaziz Al-Brashdi)'],
+                                approve: ['All departments as Finance Admin approvers (after manager approval)'],
+                                reject: ['All departments as Finance Admin approvers (after manager approval)'],
+                                edit: ['None'],
+                                forms: ['Procurement Item Request', 'Finance Payment Request'],
+                                notifications: ['New submissions at Pending Finance Approval', 'Updates on own requests', 'Proof uploaded', 'Recurring payment due', 'Installment date edited', 'System-wide notifications', 'Additional (Abdalaziz): New submissions from Finance Staff/CEO/GM/Operation Manager', 'Additional (Abdalaziz): Updates on Finance Staff/GM/Operation Manager requests']
+                            },
+                            'Finance Staff': {
+                                view: ['All departments, all roles', {
+                                    main: 'Finance-related statuses:',
+                                    sublist: ['Pending Finance Approval', 'Returned to Manager', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
+                                }, 'Pending Manager Approval (own requests only)', 'Rejected by Manager (own requests only)'],
+                                approve: ['None'],
+                                reject: ['None'],
+                                edit: ['Payment date for own recurring payment request installments'],
+                                forms: ['Procurement Item Request', 'Finance Payment Request'],
+                                notifications: ['New submissions at Pending Finance Approval', 'Updates on own requests', 'Proof uploaded', 'Recurring payment due', 'System-wide notifications']
+                            }
+                        },
+                        'IT': {
+                            'IT Department Manager': {
+                                view: ['All departments, all roles', 'Amounts censored except for IT department requests'],
+                                approve: ['IT department only'],
+                                reject: ['IT department only'],
+                                edit: ['None'],
+                                forms: ['Procurement Item Request', 'Finance Payment Request'],
+                                notifications: ['New submissions from IT Staff', 'Updates on own requests', 'System-wide notifications', 'User management notifications']
+                            },
+                            'IT Staff': {
+                                view: ['All departments, all roles', 'Amounts censored except for IT department requests'],
+                                approve: ['None'],
+                                reject: ['None'],
+                                edit: ['Payment date for own recurring payment request installments'],
+                                forms: ['Procurement Item Request', 'Finance Payment Request'],
+                                notifications: ['Updates on own requests', 'System-wide notifications']
+                            }
+                        },
+                        'Project': {
+                            'Project Staff': {
+                                view: ['Own requests only'],
+                                approve: ['None (Operation Manager handles approvals)'],
+                                reject: ['None'],
+                                edit: ['Payment date for own recurring payment request installments'],
+                                forms: ['Procurement Item Request', 'Finance Payment Request'],
+                                notifications: ['Updates on own requests', 'System-wide notifications']
+                            }
+                        },
+                        'Management': {
+                            'General Manager': {
+                                view: ['All departments, all roles', 'All statuses'],
+                                approve: ['All requests regardless of department and role (Manager Stage)'],
+                                reject: ['All requests regardless of department and role (Manager Stage)'],
+                                edit: ['None'],
+                                forms: ['Procurement Item Request', 'Finance Payment Request'],
+                                notifications: ['New submissions from ALL users', 'Updates on ALL requests', 'Overdue notifications for ALL requests', 'System-wide notifications']
+                            },
+                            'CEO': {
+                                view: ['All departments, all roles', 'All statuses'],
+                                approve: ['None'],
+                                reject: ['None'],
+                                edit: ['None'],
+                                forms: ['Procurement Item Request', 'Finance Payment Request'],
+                                notifications: ['Updates on own requests only', 'System-wide notifications']
+                            },
+                            'Operation Manager': {
+                                view: ['All departments, all roles', 'All statuses'],
+                                approve: ['All requests regardless of department and role (Manager Stage)', 'Project requests'],
+                                reject: ['All requests regardless of department and role (Manager Stage)', 'Project requests'],
+                                edit: ['None'],
+                                forms: ['Procurement Item Request', 'Finance Payment Request'],
+                                notifications: ['New submissions from ALL users', 'Updates on ALL requests', 'Overdue notifications for ALL requests', 'System-wide notifications']
+                            }
+                        },
+                        'Department Managers': {
+                            'Department Manager': {
+                                view: ['At minimum their domain', 'Primary role is approval within their department'],
+                                approve: ['Own department only'],
+                                reject: ['Own department only'],
+                                edit: ['None'],
+                                forms: ['Procurement Item Request', 'Finance Payment Request'],
+                                notifications: ['New submissions from own department staff', 'Updates on own requests', 'System-wide notifications'],
+                                departments: ['PR', 'Maintenance', 'Marketing', 'Logistic', 'HR', 'Quality Control', 'Procurement', 'Customer Service']
+                            }
+                        },
+                        'Department Staff': {
+                            'Department Staff': {
+                                view: ['Own requests only'],
+                                approve: ['None'],
+                                reject: ['None'],
+                                edit: ['Payment date for own recurring payment request installments'],
+                                forms: ['Procurement Item Request', 'Finance Payment Request'],
+                                notifications: ['Updates on own requests', 'System-wide notifications'],
+                                departments: ['PR', 'Maintenance', 'Marketing', 'Logistic', 'HR', 'Quality Control', 'Procurement', 'Customer Service', 'Finance', 'IT', 'Operation']
+                            }
+                        },
+                        'Branch': {
+                            'Branch Manager': {
+                                view: ['At minimum their domain', 'Primary role is approval within their department'],
+                                approve: ['Branch department only'],
+                                reject: ['Branch department only'],
+                                edit: ['None'],
+                                forms: ['Procurement Item Request'],
+                                notifications: ['New submissions from own department staff', 'Updates on own requests', 'System-wide notifications']
+                            },
+                            'Supervisor': {
+                                view: ['At minimum their domain', 'Primary role is approval within their department'],
+                                approve: ['Branch department only'],
+                                reject: ['Branch department only'],
+                                edit: ['None'],
+                                forms: ['Procurement Item Request'],
+                                notifications: ['New submissions from own department staff', 'Updates on own requests', 'System-wide notifications']
+                            },
+                            'Branch Inventory Officer': {
+                                view: ['All item requests (procurement item requests)', 'Item request submissions and related updates'],
+                                approve: ['None'],
+                                reject: ['None'],
+                                edit: ['None'],
+                                forms: ['Procurement Item Request'],
+                                notifications: ['Item request submissions', 'Item request updates', 'System-wide notifications']
+                            }
+                        },
+                        'Procurement': {
+                            'Procurement Staff': {
+                                view: ['Own requests only', 'Item requests from all departments when status is: Assigned to Procurement, Final Approval, or Completed'],
+                                approve: ['None'],
+                                reject: ['None'],
+                                edit: ['Payment date for own recurring payment request installments'],
+                                forms: ['Procurement Item Request', 'Finance Payment Request'],
+                                notifications: ['Updates on own requests', 'System-wide notifications']
+                            },
+                            'Procurement Manager': {
+                                view: ['Procurement department requests', 'Item requests from all departments when status is: Pending Procurement Manager Approval, Final Approval, Assigned to Procurement, or Completed', 'Item requests where user is authorized approver'],
+                                approve: ['Procurement department only (payment requests)', 'Item requests (procurement item requests)'],
+                                reject: ['Procurement department only (payment requests)', 'Item requests (procurement item requests)'],
+                                edit: ['None'],
+                                forms: ['Procurement Item Request', 'Finance Payment Request'],
+                                notifications: ['New submissions from own department staff', 'Updates on own requests', 'Item request submissions', 'System-wide notifications']
+                            }
+                        },
+                        'Auditing': {
+                            'Auditing Staff': {
+                                view: ['Own requests only', 'Completed and Recurring requests from all departments (view-only)'],
+                                approve: ['None'],
+                                reject: ['None'],
+                                edit: ['Payment date for own recurring payment request installments'],
+                                forms: ['Procurement Item Request', 'Finance Payment Request'],
+                                notifications: ['Updates on own requests', 'System-wide notifications']
+                            }
+                        }
+                    };
+                    
+                    var html = '<div style="margin-bottom: 24px;"><p style="color: #666; margin-bottom: 16px;">This modal displays the universal permissions for each department and role in the system. These are the default permissions that apply to all users with a specific role.</p></div>';
+                    
+                    // Iterate through departments/roles
+                    Object.keys(permissionsData).forEach(function(deptGroup) {
+                        html += '<div style="margin-bottom: 32px; border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden;">';
+                        html += '<div style="background: #f8f9fa; padding: 16px; border-bottom: 1px solid #e9ecef;"><h3 style="margin: 0; color: #333;"><i class="fas fa-building"></i> ' + deptGroup + '</h3></div>';
+                        html += '<div style="padding: 16px;">';
+                        
+                        Object.keys(permissionsData[deptGroup]).forEach(function(role) {
+                            var roleData = permissionsData[deptGroup][role];
+                            var roleId = 'role-' + deptGroup.replace(/\s+/g, '-').toLowerCase() + '-' + role.replace(/\s+/g, '-').toLowerCase();
+                            html += '<div style="margin-bottom: 24px; background: #fff; border: 1px solid #e9ecef; border-radius: 6px; overflow: hidden;">';
+                            html += '<div style="padding: 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #f8f9fa;" onclick="toggleRoleDetails(\'' + roleId + '\')">';
+                            html += '<h4 style="margin: 0; color: #495057; display: flex; align-items: center; gap: 8px;"><i class="fas fa-user-tag"></i> ' + role;
+                            if (roleData.departments) {
+                                html += ' <span style="font-size: 0.85rem; font-weight: normal; color: #6c757d;">(' + roleData.departments.join(', ') + ')</span>';
+                            }
+                            html += '</h4>';
+                            html += '<button type="button" class="role-chevron-toggle" data-role-id="' + roleId + '" style="background: none; border: none; padding: 4px; cursor: pointer; color: #6c757d; display: flex; align-items: center; justify-content: center; transition: transform 0.2s;" aria-label="Toggle details">';
+                            html += '<i class="fas fa-chevron-down" style="font-size: 0.85rem;"></i>';
+                            html += '</button>';
+                            html += '</div>';
+                            
+                            html += '<div id="' + roleId + '" class="role-details" style="display: none; padding: 16px; border-top: 1px solid #e9ecef;">';
+                            html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">';
+                            
+                            if (roleData.view && roleData.view.length > 0) {
+                                html += '<div><strong style="color: #495057; display: block; margin-bottom: 6px;"><i class="fas fa-eye"></i> View:</strong><ul style="margin: 0; padding-left: 20px; color: #666; font-size: 0.9rem;">';
+                                roleData.view.forEach(function(v) {
+                                    if (typeof v === 'object' && v.main && v.sublist) {
+                                        // Handle nested list structure
+                                        html += '<li style="margin-bottom: 4px;">' + v.main;
+                                        html += '<ul style="margin: 4px 0 0 0; padding-left: 20px;">';
+                                        v.sublist.forEach(function(sub) {
+                                            html += '<li>' + sub + '</li>';
+                                        });
+                                        html += '</ul></li>';
+                                    } else {
+                                        html += '<li>' + v + '</li>';
+                                    }
+                                });
+                                html += '</ul></div>';
+                            }
+                            
+                            if (roleData.approve && roleData.approve.length > 0) {
+                                html += '<div><strong style="color: #495057; display: block; margin-bottom: 6px;"><i class="fas fa-check-circle"></i> Approve:</strong><ul style="margin: 0; padding-left: 20px; color: #666; font-size: 0.9rem;">';
+                                roleData.approve.forEach(function(a) { html += '<li>' + a + '</li>'; });
+                                html += '</ul></div>';
+                            }
+                            
+                            if (roleData.reject && roleData.reject.length > 0) {
+                                html += '<div><strong style="color: #495057; display: block; margin-bottom: 6px;"><i class="fas fa-times-circle"></i> Reject:</strong><ul style="margin: 0; padding-left: 20px; color: #666; font-size: 0.9rem;">';
+                                roleData.reject.forEach(function(r) { html += '<li>' + r + '</li>'; });
+                                html += '</ul></div>';
+                            }
+                            
+                            if (roleData.edit && roleData.edit.length > 0) {
+                                html += '<div><strong style="color: #495057; display: block; margin-bottom: 6px;"><i class="fas fa-edit"></i> Edit:</strong><ul style="margin: 0; padding-left: 20px; color: #666; font-size: 0.9rem;">';
+                                roleData.edit.forEach(function(e) { html += '<li>' + e + '</li>'; });
+                                html += '</ul></div>';
+                            }
+                            
+                            if (roleData.forms && roleData.forms.length > 0) {
+                                html += '<div><strong style="color: #495057; display: block; margin-bottom: 6px;"><i class="fas fa-file-alt"></i> Request Types:</strong><ul style="margin: 0; padding-left: 20px; color: #666; font-size: 0.9rem;">';
+                                roleData.forms.forEach(function(f) { html += '<li>' + f + '</li>'; });
+                                html += '</ul></div>';
+                            }
+                            
+                            if (roleData.notifications && roleData.notifications.length > 0) {
+                                html += '<div><strong style="color: #495057; display: block; margin-bottom: 6px;"><i class="fas fa-bell"></i> Notifications:</strong><ul style="margin: 0; padding-left: 20px; color: #666; font-size: 0.9rem;">';
+                                roleData.notifications.forEach(function(n) { html += '<li>' + n + '</li>'; });
+                                html += '</ul></div>';
+                            }
+                            
+                            html += '</div></div></div>';
+                        });
+                        
+                        html += '</div></div>';
+                    });
+                    
+                    content.innerHTML = html;
+                    
+                    // Initialize all chevrons to point down (collapsed state)
+                    setTimeout(function() {
+                        document.querySelectorAll('.role-chevron-toggle i').forEach(function(icon) {
+                            icon.style.transform = 'rotate(0deg)';
+                        });
+                    }, 0);
+                }
+                
+                // Toggle role details visibility (make it globally accessible)
+                window.toggleRoleDetails = function(roleId) {
+                    var details = document.getElementById(roleId);
+                    var toggle = document.querySelector('.role-chevron-toggle[data-role-id="' + roleId + '"]');
+                    if (!details || !toggle) return;
+                    
+                    var icon = toggle.querySelector('i');
+                    var isExpanded = details.style.display !== 'none' && details.style.display !== '';
+                    
+                    if (isExpanded) {
+                        details.style.display = 'none';
+                        if (icon) icon.style.transform = 'rotate(0deg)';
+                    } else {
+                        details.style.display = 'block';
+                        if (icon) icon.style.transform = 'rotate(180deg)';
+                    }
+                };
+
+                // Close modal when clicking outside
+                window.addEventListener('click', function(event) {
+                    var modal = document.getElementById('permissionsModal');
+                    if (event.target == modal) {
+                        closePermissionsModal();
+                    }
+                });
+
                 function validatePasswordReset() {
                     const newPassword = document.getElementById('newPassword').value;
                     const confirmPassword = document.getElementById('confirmPassword').value;
@@ -1513,6 +1876,17 @@
                         alert('Failed to apply permissions.');
                     });
                 }
+
+                // Open permissions modal when clicking the link
+                document.addEventListener('DOMContentLoaded', function() {
+                    var permissionsLink = document.getElementById('viewPermissionsLink');
+                    if (permissionsLink) {
+                        permissionsLink.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            openPermissionsModal();
+                        });
+                    }
+                });
 
                 // Search functionality
                 document.addEventListener('DOMContentLoaded', function() {

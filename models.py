@@ -342,16 +342,20 @@ class DepartmentTemporaryManager(db.Model):
     __tablename__ = 'department_temporary_managers'
 
     id = db.Column(db.Integer, primary_key=True)
-    department = db.Column(db.String(100), nullable=False, unique=True)
+    request_type = db.Column(db.String(100), nullable=False)  # Finance Payment Request or Procurement Item Request
+    department = db.Column(db.String(100), nullable=False)
     temporary_manager_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
     set_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
     set_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Unique constraint on combination of department and request_type
+    __table_args__ = (db.UniqueConstraint('department', 'request_type', name='unique_dept_request_type'),)
 
     temporary_manager = db.relationship('User', foreign_keys=[temporary_manager_id], backref='department_temporary_assignments')
     set_by_user = db.relationship('User', foreign_keys=[set_by_user_id], backref='department_temporary_set_actions')
 
     def __repr__(self):
-        return f"<DepartmentTemporaryManager dept={self.department} temp_manager={self.temporary_manager.name if self.temporary_manager else self.temporary_manager_id}>"
+        return f"<DepartmentTemporaryManager dept={self.department} request_type={self.request_type} temp_manager={self.temporary_manager.name if self.temporary_manager else self.temporary_manager_id}>"
 
 
 class PaidNotification(db.Model):

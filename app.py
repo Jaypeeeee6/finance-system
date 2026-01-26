@@ -1177,15 +1177,32 @@ def get_authorized_manager_approvers(request):
         return authorized_users
 
     # If a department-level temporary manager is assigned, include that user among authorized approvers
+    # Only include temporary managers assigned for "Finance Payment Request" or "Both Payment and Item Request"
+    # NOT those assigned only for "Procurement Item Request"
     try:
-        dept_temp = DepartmentTemporaryManager.query.filter_by(department=(request.department or '')).first()
+        req_dept = (request.department or '').strip()
+        if req_dept:
+            # Query all temporary managers for payment requests, then filter by department (case-insensitive)
+            dept_temp = None
+            for dt in DepartmentTemporaryManager.query.filter(
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).all():
+                dt_dept = (dt.department or '').strip()
+                if dt_dept.lower() == req_dept.lower():
+                    dept_temp = dt
+                    break
+        else:
+            dept_temp = None
     except Exception:
         dept_temp = None
     if dept_temp:
         temp_manager = User.query.get(dept_temp.temporary_manager_id)
         if temp_manager:
             authorized_users.append(temp_manager)
-            print(f"DEBUG: Added department-level temporary manager for {request.department}: {temp_manager.name} (ID: {temp_manager.user_id})")
+            print(f"DEBUG: Added department-level temporary manager for payment request (dept: {req_dept}, request_type: {dept_temp.request_type}): {temp_manager.name} (ID: {temp_manager.user_id})")
     
     # No temporary manager, use standard authorization checks
     
@@ -1286,14 +1303,32 @@ def get_authorized_manager_approvers_for_item_request(item_request):
     authorized_users = []
     
     # If a department-level temporary manager is assigned for this item_request.department, include that user among authorized approvers
+    # Only include temporary managers assigned for "Procurement Item Request" or "Both Payment and Item Request"
+    # NOT those assigned only for "Finance Payment Request"
     try:
-        dept_temp = DepartmentTemporaryManager.query.filter_by(department=(item_request.department or '')).first()
+        req_dept = (item_request.department or '').strip()
+        if req_dept:
+            # Query all temporary managers for item requests, then filter by department (case-insensitive)
+            dept_temp = None
+            for dt in DepartmentTemporaryManager.query.filter(
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).all():
+                dt_dept = (dt.department or '').strip()
+                if dt_dept.lower() == req_dept.lower():
+                    dept_temp = dt
+                    break
+        else:
+            dept_temp = None
     except Exception:
         dept_temp = None
     if dept_temp:
         temp_manager = User.query.get(dept_temp.temporary_manager_id)
         if temp_manager:
             authorized_users.append(temp_manager)
+            print(f"DEBUG: Added department-level temporary manager for item request (dept: {req_dept}, request_type: {dept_temp.request_type}): {temp_manager.name} (ID: {temp_manager.user_id})")
     
     # Get the requestor user - explicitly load from database if needed
     if not item_request.user_id:
@@ -1456,7 +1491,12 @@ def notify_users_by_role(request, notification_type, title, message, request_id=
             req_dept = (requestor_department or '').strip()
             if req_dept:
                 dept_temp = None
-                for dt in DepartmentTemporaryManager.query.all():
+                for dt in DepartmentTemporaryManager.query.filter(
+                    db.or_(
+                        DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                        DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                    )
+                ).all():
                     if (dt.department or '').strip().lower() == req_dept.lower():
                         dept_temp = dt
                         break
@@ -3499,7 +3539,13 @@ def department_dashboard():
                     visible_request_ids.add(req.request_id)
                 # Department-level temporary manager (assignment in settings) - include requests from departments
                 try:
-                    dt = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+                    dt = DepartmentTemporaryManager.query.filter(
+                        DepartmentTemporaryManager.department == (req.department or ''),
+                        db.or_(
+                            DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                            DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                        )
+                    ).first()
                 except Exception:
                     dt = None
                 if dt and getattr(dt, 'temporary_manager_id', None) == current_user.user_id:
@@ -3561,7 +3607,13 @@ def department_dashboard():
                     temp_manager_ids.add(req.request_id)
                 # Check department-level temporary manager assignment for this request's department
                 try:
-                    dt = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+                    dt = DepartmentTemporaryManager.query.filter(
+                        DepartmentTemporaryManager.department == (req.department or ''),
+                        db.or_(
+                            DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                            DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                        )
+                    ).first()
                 except Exception:
                     dt = None
                 if dt and getattr(dt, 'temporary_manager_id', None) == current_user.user_id:
@@ -5072,25 +5124,78 @@ def view_item_request_page(request_id):
     if item_request.user_id:
         requestor_user = User.query.get(item_request.user_id)
     
-    # Check if there's a temporary manager assigned (IT Department feature)
-    # Note: ProcurementItemRequest doesn't have temporary_manager_id, but we check for consistency
-    # If it's added in the future, uncomment this:
-    # if hasattr(item_request, 'temporary_manager_id') and item_request.temporary_manager_id:
-    #     temp_manager = User.query.get(item_request.temporary_manager_id)
-    #     if temp_manager:
-    #         temporary_manager_name = temp_manager.name
-    # Department-level temporary manager (settings assignment) - include as temporary manager display
+    # CRITICAL: For ITEM REQUESTS, check department-level temporary manager based on request_type
+    # This applies to ALL requests (old and new)
+    # For item requests, only show temporary managers assigned for:
+    #   - "Procurement Item Request" OR
+    #   - "Both Payment and Item Request"
+    # DO NOT show temporary managers assigned only for "Finance Payment Request"
+    dt = None
     try:
-        dt = DepartmentTemporaryManager.query.filter_by(department=(item_request.department or '')).first()
-    except Exception:
+        req_dept = (item_request.department or '').strip()
+        print(f"=== ITEM REQUEST TEMP MANAGER LOOKUP ===")
+        print(f"Item Request ID: {item_request.id}, Department: '{req_dept}' (length: {len(req_dept)})")
+        
+        if req_dept:
+            # Step 1: Query ONLY temporary managers that are valid for item requests
+            # This explicitly excludes "Finance Payment Request" only entries
+            item_temp_managers = DepartmentTemporaryManager.query.filter(
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).all()
+            
+            print(f"Found {len(item_temp_managers)} temporary manager(s) for item requests")
+            
+            # Normalize request department for comparison
+            req_dept_normalized = req_dept.lower().strip()
+            
+            # Step 2: Priority 1 - Look for exact "Procurement Item Request" match first
+            for temp_dt in item_temp_managers:
+                dt_dept = (temp_dt.department or '').strip()
+                dt_dept_normalized = dt_dept.lower().strip()
+                
+                print(f"  Checking: dept='{dt_dept}' (normalized: '{dt_dept_normalized}'), request_type='{temp_dt.request_type}', manager_id={temp_dt.temporary_manager_id}")
+                
+                if dt_dept_normalized == req_dept_normalized and temp_dt.request_type == 'Procurement Item Request':
+                    dt = temp_dt
+                    print(f"  ✓ MATCHED 'Procurement Item Request'! Selected: manager_id={dt.temporary_manager_id}")
+                    break
+            
+            # Step 3: Priority 2 - If no exact match, look for "Both Payment and Item Request"
+            if not dt:
+                for temp_dt in item_temp_managers:
+                    dt_dept = (temp_dt.department or '').strip()
+                    dt_dept_normalized = dt_dept.lower().strip()
+                    
+                    if dt_dept_normalized == req_dept_normalized and temp_dt.request_type == 'Both Payment and Item Request':
+                        dt = temp_dt
+                        print(f"  ✓ MATCHED 'Both Payment and Item Request'! Selected: manager_id={dt.temporary_manager_id}")
+                        break
+            
+            if not dt:
+                print(f"  ✗ No matching item request temporary manager found for department '{req_dept}'")
+    except Exception as e:
+        print(f"ERROR: Exception finding item request temporary manager: {e}")
+        import traceback
+        traceback.print_exc()
         dt = None
+    
+    # Step 4: Get the user name for the selected temporary manager
     if dt:
         try:
             temp_user = User.query.get(dt.temporary_manager_id)
             if temp_user:
                 temporary_manager_name = temp_user.name
-        except Exception:
+                print(f"=== FINAL RESULT: temporary_manager_name = '{temp_user.name}' (ID: {dt.temporary_manager_id}, request_type: '{dt.request_type}') ===")
+            else:
+                print(f"WARNING: Temporary manager user not found for ID: {dt.temporary_manager_id}")
+        except Exception as e:
+            print(f"ERROR: Exception getting temporary manager user: {e}")
             pass
+    else:
+        print(f"=== FINAL RESULT: No temporary manager found, temporary_manager_name = None ===")
     
     # Determine manager name for all statuses (pending and completed)
     if requestor_user and requestor_user.manager_id:
@@ -7452,7 +7557,12 @@ def update_item_request_quantities_manager(request_id):
                 req_dept = (item_request.department or '').strip()
                 if req_dept:
                     dept_temp = None
-                    for dt in DepartmentTemporaryManager.query.all():
+                    for dt in DepartmentTemporaryManager.query.filter(
+                        db.or_(
+                            DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                            DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                        )
+                    ).all():
                         if (dt.department or '').strip().lower() == req_dept.lower():
                             dept_temp = dt
                             break
@@ -13074,7 +13184,13 @@ def view_request(request_id):
     # Quick allow: if current user is the department-level temporary manager for this request's department,
     # grant view access regardless of their role (this mirrors item-request behavior).
     try:
-        _dept_temp = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+        _dept_temp = DepartmentTemporaryManager.query.filter(
+            DepartmentTemporaryManager.department == (req.department or ''),
+            db.or_(
+                DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+            )
+        ).first()
     except Exception:
         _dept_temp = None
     allowed_by_dept_temp = bool(_dept_temp and getattr(_dept_temp, 'temporary_manager_id', None) == current_user.user_id)
@@ -13257,24 +13373,93 @@ def view_request(request_id):
     manager_name = None
     temporary_manager_name = None
     
-    # Check if there's a temporary manager assigned (IT Department feature)
-    if req.temporary_manager_id:
-        temp_manager = User.query.get(req.temporary_manager_id)
-        if temp_manager:
-            temporary_manager_name = temp_manager.name
-    else:
-        # If no per-request temporary manager, check department-level temporary manager (settings)
+    # CRITICAL: For PAYMENT REQUESTS, check department-level temporary manager based on request_type
+    # This applies to ALL requests (old and new), regardless of per-request temporary manager
+    # Priority: Department-level temporary manager (based on request_type) > Per-request temporary manager
+    # For payment requests, only show temporary managers assigned for:
+    #   - "Finance Payment Request" OR
+    #   - "Both Payment and Item Request"
+    # DO NOT show temporary managers assigned only for "Procurement Item Request"
+    dt = None
+    try:
+        req_dept = (req.department or '').strip()
+        print(f"=== PAYMENT REQUEST TEMP MANAGER LOOKUP ===")
+        print(f"Request ID: {request_id}, Department: '{req_dept}' (length: {len(req_dept)})")
+        print(f"Per-request temporary_manager_id: {req.temporary_manager_id}")
+        
+        if req_dept:
+            # Step 1: Query ONLY temporary managers that are valid for payment requests
+            # This explicitly excludes "Procurement Item Request" only entries
+            payment_temp_managers = DepartmentTemporaryManager.query.filter(
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).all()
+            
+            print(f"Found {len(payment_temp_managers)} temporary manager(s) for payment requests")
+            
+            # Normalize request department for comparison
+            req_dept_normalized = req_dept.lower().strip()
+            
+            # Step 2: Priority 1 - Look for exact "Finance Payment Request" match first
+            for temp_dt in payment_temp_managers:
+                dt_dept = (temp_dt.department or '').strip()
+                dt_dept_normalized = dt_dept.lower().strip()
+                
+                print(f"  Checking: dept='{dt_dept}' (normalized: '{dt_dept_normalized}'), request_type='{temp_dt.request_type}', manager_id={temp_dt.temporary_manager_id}")
+                
+                if dt_dept_normalized == req_dept_normalized and temp_dt.request_type == 'Finance Payment Request':
+                    dt = temp_dt
+                    print(f"  ✓ MATCHED 'Finance Payment Request'! Selected: manager_id={dt.temporary_manager_id}")
+                    break
+            
+            # Step 3: Priority 2 - If no exact match, look for "Both Payment and Item Request"
+            if not dt:
+                for temp_dt in payment_temp_managers:
+                    dt_dept = (temp_dt.department or '').strip()
+                    dt_dept_normalized = dt_dept.lower().strip()
+                    
+                    if dt_dept_normalized == req_dept_normalized and temp_dt.request_type == 'Both Payment and Item Request':
+                        dt = temp_dt
+                        print(f"  ✓ MATCHED 'Both Payment and Item Request'! Selected: manager_id={dt.temporary_manager_id}")
+                        break
+            
+            if not dt:
+                print(f"  ✗ No matching payment request temporary manager found for department '{req_dept}'")
+                # Show all available for debugging
+                print(f"  Available payment request temp managers:")
+                for temp_dt in payment_temp_managers:
+                    dt_dept = (temp_dt.department or '').strip()
+                    print(f"    - dept='{dt_dept}', request_type='{temp_dt.request_type}', manager_id={temp_dt.temporary_manager_id}")
+    except Exception as e:
+        print(f"ERROR: Exception finding payment request temporary manager: {e}")
+        import traceback
+        traceback.print_exc()
+        dt = None
+    
+    # Step 4: Get the user name for the selected department-level temporary manager
+    # This takes priority over per-request temporary manager for display purposes
+    if dt:
         try:
-            dt = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
-        except Exception:
-            dt = None
-        if dt:
-            try:
-                temp_user = User.query.get(dt.temporary_manager_id)
-                if temp_user:
-                    temporary_manager_name = temp_user.name
-            except Exception:
-                pass
+            temp_user = User.query.get(dt.temporary_manager_id)
+            if temp_user:
+                temporary_manager_name = temp_user.name
+                print(f"=== FINAL RESULT: temporary_manager_name = '{temp_user.name}' (ID: {dt.temporary_manager_id}, request_type: '{dt.request_type}') ===")
+            else:
+                print(f"WARNING: Temporary manager user not found for ID: {dt.temporary_manager_id}")
+        except Exception as e:
+            print(f"ERROR: Exception getting temporary manager user: {e}")
+            pass
+    else:
+        # Fallback: If no department-level temporary manager, check per-request temporary manager
+        if req.temporary_manager_id:
+            temp_manager = User.query.get(req.temporary_manager_id)
+            if temp_manager:
+                temporary_manager_name = temp_manager.name
+                print(f"=== FALLBACK: Using per-request temporary manager: '{temp_manager.name}' (ID: {req.temporary_manager_id}) ===")
+        else:
+            print(f"=== FINAL RESULT: No temporary manager found, temporary_manager_name = None ===")
     
     # Determine manager name for all statuses (pending and completed)
     if req.user.manager_id:
@@ -13505,7 +13690,13 @@ def view_request(request_id):
     
     # Determine if current user is the department-level temporary manager for this request's department
     try:
-        _dt_for_req = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+        _dt_for_req = DepartmentTemporaryManager.query.filter(
+            DepartmentTemporaryManager.department == (req.department or ''),
+            db.or_(
+                DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+            )
+        ).first()
     except Exception:
         _dt_for_req = None
     is_dept_temp_for_req = bool(_dt_for_req and getattr(_dt_for_req, 'temporary_manager_id', None) == current_user.user_id)
@@ -15688,7 +15879,13 @@ def manager_approve_request(request_id):
     else:
         # No per-request temporary manager assigned - check for department-level temporary manager
         try:
-            dept_temp = DepartmentTemporaryManager.query.filter_by(department=(req.department or '')).first()
+            dept_temp = DepartmentTemporaryManager.query.filter(
+                DepartmentTemporaryManager.department == (req.department or ''),
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).first()
         except Exception:
             dept_temp = None
         if dept_temp and dept_temp.temporary_manager_id == current_user.user_id:
@@ -15698,13 +15895,18 @@ def manager_approve_request(request_id):
         # Continue with standard authorization checks even when a department-level temporary manager exists.
         # This ensures GM and Operation Manager remain authorized as before.
         # Hard rule: Requests submitted by GM/CEO/Operation Manager can ONLY be approved by Abdalaziz (Finance Admin)
+        # Exception: Department-level temporary managers can still approve these requests
         if req.user.role in ['GM', 'CEO', 'Operation Manager']:
             if current_user.name == 'Abdalaziz Al-Brashdi':
                 is_authorized = True
                 print("DEBUG: Authorized via Abdalaziz-only rule for GM/CEO/Operation Manager submitter")
+            elif dept_temp and dept_temp.temporary_manager_id == current_user.user_id:
+                # Department-level temporary manager exception for GM/CEO/Operation Manager requests
+                is_authorized = True
+                print("DEBUG: Authorized via department-level temporary manager for GM/CEO/Operation Manager submitter")
             else:
                 is_authorized = False
-                print("DEBUG: Blocked - only Abdalaziz can approve GM/CEO/Operation Manager submitter")
+                print("DEBUG: Blocked - only Abdalaziz or department-level temporary manager can approve GM/CEO/Operation Manager submitter")
         # General rule for other requests
         elif current_user.role in ['GM', 'Operation Manager']:
             is_authorized = True
@@ -20344,8 +20546,13 @@ def settings():
         return redirect(url_for('dashboard'))
     # Temporary manager for whole department can be any registered user.
     if request.method == 'POST':
+        request_type = (request.form.get('request_type') or '').strip()
         department = (request.form.get('department') or '').strip()
         new_manager_id = request.form.get('temporary_manager_id')
+
+        if not request_type:
+            flash('Please select a type of request.', 'error')
+            return redirect(url_for('settings'))
 
         if not department:
             flash('Please select a department.', 'error')
@@ -20353,22 +20560,22 @@ def settings():
 
         # Unset assignment if no manager selected
         if not new_manager_id or new_manager_id == 'none':
-            existing = DepartmentTemporaryManager.query.filter_by(department=department).first()
+            existing = DepartmentTemporaryManager.query.filter_by(department=department, request_type=request_type).first()
             if existing:
                 old_manager = existing.temporary_manager
                 db.session.delete(existing)
                 db.session.commit()
-                log_action(f"Removed department-level temporary manager for {department} by {current_user.name}")
+                log_action(f"Removed department-level temporary manager for {department} ({request_type}) by {current_user.name}")
                 if old_manager:
                     create_notification(
                         user_id=old_manager.user_id,
                         title="Temporary Manager Assignment Removed",
-                        message=f"You are no longer the temporary manager for the {department} department.",
+                        message=f"You are no longer the temporary manager for the {department} department ({request_type}).",
                         notification_type="temporary_manager_unassigned"
                     )
-                flash(f'Department-level temporary manager for {department} has been removed.', 'success')
+                flash(f'Department-level temporary manager for {department} ({request_type}) has been removed.', 'success')
             else:
-                flash(f'No temporary manager was set for {department}.', 'info')
+                flash(f'No temporary manager was set for {department} ({request_type}).', 'info')
             return redirect(url_for('settings'))
 
         # Validate new manager (allow any registered user)
@@ -20381,9 +20588,9 @@ def settings():
             flash('Selected user does not exist.', 'error')
             return redirect(url_for('settings'))
 
-        existing = DepartmentTemporaryManager.query.filter_by(department=department).first()
+        existing = DepartmentTemporaryManager.query.filter_by(department=department, request_type=request_type).first()
         if existing and existing.temporary_manager_id == int(new_manager_id):
-            flash('Selected manager is already assigned as the temporary manager for this department.', 'info')
+            flash('Selected manager is already assigned as the temporary manager for this department and request type.', 'info')
             return redirect(url_for('settings'))
 
         old_manager = existing.temporary_manager if existing else None
@@ -20393,6 +20600,7 @@ def settings():
             existing.set_at = datetime.utcnow()
         else:
             new_entry = DepartmentTemporaryManager(
+                request_type=request_type,
                 department=department,
                 temporary_manager_id=int(new_manager_id),
                 set_by_user_id=current_user.user_id
@@ -20402,22 +20610,26 @@ def settings():
         db.session.commit()
 
         # Notifications
+        if request_type == 'Both Payment and Item Request':
+            approval_text = "both payment and item requests"
+        else:
+            approval_text = request_type.lower()
         create_notification(
             user_id=new_manager.user_id,
             title="Temporary Manager Assignment",
-            message=f"You have been temporarily assigned as manager for the {department} department. You will be responsible for manager approvals for payment and item requests in that department.",
+            message=f"You have been temporarily assigned as manager for the {department} department ({request_type}). You will be responsible for manager approvals for {approval_text} in that department.",
             notification_type="temporary_manager_assignment"
         )
         if old_manager and old_manager.user_id != new_manager.user_id:
             create_notification(
                 user_id=old_manager.user_id,
                 title="Temporary Manager Assignment Removed",
-                message=f"You are no longer the temporary manager for the {department} department.",
+                message=f"You are no longer the temporary manager for the {department} department ({request_type}).",
                 notification_type="temporary_manager_unassigned"
             )
 
-        log_action(f"Assigned department-level temporary manager for {department} to {new_manager.name} by {current_user.name}")
-        flash(f'{new_manager.name} has been assigned as temporary manager for {department}.', 'success')
+        log_action(f"Assigned department-level temporary manager for {department} ({request_type}) to {new_manager.name} by {current_user.name}")
+        flash(f'{new_manager.name} has been assigned as temporary manager for {department} ({request_type}).', 'success')
         # Additional notifications per policy:
         # - IT Department (IT Staff and Department Manager)
         # - GM
@@ -20484,10 +20696,14 @@ def settings():
                 continue
             if user.user_id in notified_ids:
                 continue
+            if request_type == 'Both Payment and Item Request':
+                type_text = "both payment and item requests"
+            else:
+                type_text = request_type.lower()
             create_notification(
                 user_id=user.user_id,
                 title="Temporary Manager Assigned",
-                message=f"The {department} department has a temporary manager: {new_manager.name}. Please take note of the temporary approval flow.",
+                message=f"The {department} department has a temporary manager for {type_text}: {new_manager.name}. Please take note of the temporary approval flow.",
                 notification_type="temporary_manager_assignment"
             )
             notified_ids.add(user.user_id)
@@ -20502,7 +20718,11 @@ def settings():
 
     # Load all users and group them by department in the template
     managers = User.query.order_by(User.department, User.name).all()
-    assignments = {a.department: a for a in DepartmentTemporaryManager.query.all()}
+    # Create a dictionary with composite key (department, request_type) -> entry
+    assignments = {}
+    for a in DepartmentTemporaryManager.query.all():
+        key = f"{a.department}|{a.request_type}" if a.request_type else a.department
+        assignments[key] = a
     return render_template('settings.html', departments=departments, managers=managers, assignments=assignments)
 
 
@@ -20515,13 +20735,19 @@ def unassign_temp_manager():
         flash('You do not have permission to access this page.', 'danger')
         return redirect(url_for('dashboard'))
     department = (request.form.get('department') or '').strip()
+    request_type = (request.form.get('request_type') or '').strip()
     if not department:
         flash('No department specified.', 'error')
         return redirect(url_for('settings'))
 
-    existing = DepartmentTemporaryManager.query.filter_by(department=department).first()
+    if request_type:
+        existing = DepartmentTemporaryManager.query.filter_by(department=department, request_type=request_type).first()
+    else:
+        # Fallback for old entries without request_type
+        existing = DepartmentTemporaryManager.query.filter_by(department=department).first()
+    
     if not existing:
-        flash(f'No temporary manager set for {department}.', 'info')
+        flash(f'No temporary manager set for {department}' + (f' ({request_type})' if request_type else '') + '.', 'info')
         return redirect(url_for('settings'))
 
     old_manager = existing.temporary_manager
@@ -20534,7 +20760,7 @@ def unassign_temp_manager():
         flash('Failed to unassign temporary manager. Please try again.', 'danger')
         return redirect(url_for('settings'))
 
-    log_action(f"Removed department-level temporary manager for {department} by {current_user.name}")
+    log_action(f"Removed department-level temporary manager for {department}" + (f" ({request_type})" if request_type else "") + f" by {current_user.name}")
 
     notified_ids = set()
     # Notify the former temporary manager directly
