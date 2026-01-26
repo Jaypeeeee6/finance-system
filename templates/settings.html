@@ -1090,6 +1090,19 @@
 
                         <div class="permissions-list" style="display:flex; flex-direction:column; gap:12px;">
                             <div style="overflow:auto;">
+                                {% set statuses = [
+                                    {'key':'pending_manager_approval','label':'Pending Manager Approval'},
+                                    {'key':'returned_to_requestor','label':'Returned to Requestor'},
+                                    {'key':'on_hold','label':'On Hold'},
+                                    {'key':'pending_finance_approval','label':'Pending Finance Approval'},
+                                    {'key':'returned_to_manager','label':'Returned to Manager'},
+                                    {'key':'proof_pending','label':'Proof Pending'},
+                                    {'key':'proof_sent','label':'Proof Sent'},
+                                    {'key':'proof_rejected','label':'Proof Rejected'},
+                                    {'key':'recurring','label':'Recurring'},
+                                    {'key':'completed','label':'Completed'},
+                                    {'key':'rejected','label':'Rejected'}
+                                ] %}
                                 <table class="data-table" style="width:100%; border-collapse:collapse;">
                                     <thead>
                                 <tr>
@@ -1107,18 +1120,41 @@
                                         </tr>
                                         {% set group_idx = loop.index0 %}
                                         {% for perm in group.perms %}
-                                        <tr data-group="{{ group_idx }}">
-                                            <td style="padding:10px 12px;">{{ perm }}</td>
-                                            {% set key = perm|lower|replace(' ', '_') %}
+                                        {% set key = perm|lower|replace(' ', '_') %}
+                                        <tr data-group="{{ group_idx }}" data-perm-key="{{ key }}" class="perm-main-row">
+                                            <td style="padding:10px 12px;">
+                                                <div style="display:flex; align-items:center; gap:8px;">
+                                                    <button type="button" class="perm-chevron-toggle" data-perm-key="{{ key }}" style="background:none; border:none; padding:4px; cursor:pointer; color:#6c757d; display:flex; align-items:center; justify-content:center; transition:transform 0.2s;" aria-label="Toggle details">
+                                                        <i class="fas fa-chevron-right" style="font-size:0.85rem;"></i>
+                                                    </button>
+                                                    <span>{{ perm }}</span>
+                                                </div>
+                                            </td>
                                             <td style="text-align:center; padding:8px 12px;">
-                                                <label class="perm-toggle" style="display:inline-block; cursor:pointer;">
-                                                    <input type="checkbox" name="perm_full_{{ key }}" style="display:none;" aria-label="Full access">
+                                                <label class="perm-toggle perm-main-toggle" data-perm-key="{{ key }}" style="display:inline-block; cursor:pointer;">
+                                                    <input type="checkbox" name="perm_full_{{ key }}" class="perm-main-checkbox" data-perm-key="{{ key }}" style="display:none;" aria-label="Full access">
                                                     <span class="perm-switch" style="display:inline-block; width:44px; height:24px; background:#e9ecef; border-radius:999px; position:relative; vertical-align:middle;">
                                                         <span class="perm-knob" style="position:absolute; top:3px; left:3px; width:18px; height:18px; background:white; border-radius:50%; box-shadow:0 1px 3px rgba(0,0,0,0.15); transition: left 0.18s;"></span>
                                                     </span>
                                                 </label>
                                             </td>
                                         </tr>
+                                        <!-- Status rows for this permission (hidden by default) -->
+                                        {% for status in statuses %}
+                                        <tr data-group="{{ group_idx }}" data-perm-key="{{ key }}" data-status-key="{{ status.key }}" class="perm-status-row" style="display:none; background:#fafafa;">
+                                            <td style="padding:10px 12px; padding-left:40px;">
+                                                <span style="color:#212529;">{{ status.label }}</span>
+                                            </td>
+                                            <td style="text-align:center; padding:8px 12px;">
+                                                <label class="perm-toggle perm-status-toggle" data-perm-key="{{ key }}" data-status-key="{{ status.key }}" style="display:inline-block; cursor:pointer;">
+                                                    <input type="checkbox" name="perm_status_{{ key }}_{{ status.key }}" class="perm-status-checkbox" data-perm-key="{{ key }}" data-status-key="{{ status.key }}" style="display:none;" aria-label="Status access">
+                                                    <span class="perm-switch" style="display:inline-block; width:44px; height:24px; background:#e9ecef; border-radius:999px; position:relative; vertical-align:middle;">
+                                                        <span class="perm-knob" style="position:absolute; top:3px; left:3px; width:18px; height:18px; background:white; border-radius:50%; box-shadow:0 1px 3px rgba(0,0,0,0.15); transition: left 0.18s;"></span>
+                                                    </span>
+                                                </label>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
                                         {% endfor %}
                                         {% endfor %}
                                     </tbody>
@@ -1167,59 +1203,6 @@
                                 {% endfor %}
                             </div>
                         </div>
-                        <!-- Status Scope (per-action allowed statuses) -->
-                        <div style="margin-top:18px; border-top:1px solid #eef0f2; padding-top:14px;">
-                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-                                <div style="font-weight:700;">Status Scope (per action)</div>
-                                <div style="color:#6c757d; font-size:0.95rem;">Use role defaults toggles turn off the custom scope</div>
-                            </div>
-
-                            {% set statuses = [
-                                {'key':'draft','label':'Draft'},
-                                {'key':'pending_manager_approval','label':'Submitted / Pending Manager Approval'},
-                                {'key':'returned_to_requestor','label':'Returned to Requestor'},
-                                {'key':'approved_by_manager','label':'Approved by Manager / Pending Finance'},
-                                {'key':'returned_by_finance','label':'Returned by Finance'},
-                                {'key':'completed','label':'Completed / Paid'},
-                                {'key':'rejected','label':'Rejected / Cancelled'}
-                            ] %}
-
-                            {% set actions = [
-                                {'key':'approve','label':'Approve'},
-                                {'key':'return','label':'Return to Requestor'},
-                                {'key':'reject','label':'Reject'},
-                                {'key':'complete','label':'Complete (Mark as Paid)'},
-                                {'key':'attach_receipt','label':'Attach Receipt'},
-                                {'key':'verify_docs','label':'Verify Documents'},
-                                {'key':'comment','label':'Comment/Note'}
-                            ] %}
-
-                            <div class="status-scope-list" style="display:flex; flex-direction:column; gap:12px;">
-                                {% for action in actions %}
-                                <div class="action-row" data-action="{{ action.key }}" style="border:1px solid #f1f3f5; border-radius:8px; overflow:hidden;">
-                                    <button type="button" class="action-header" style="width:100%; text-align:left; padding:10px 12px; background:#fff; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
-                                        <div style="font-weight:600;">{{ action.label }}</div>
-                                        <div style="display:flex; align-items:center; gap:10px;">
-                                            <label style="display:flex; align-items:center; gap:8px; font-weight:600; color:#6c757d;">
-                                                <input type="checkbox" class="use-role-defaults" data-action="{{ action.key }}" checked> Use role defaults
-                                            </label>
-                                            <span class="action-caret">▾</span>
-                                        </div>
-                                    </button>
-                                    <div class="action-body" style="display:none; padding:10px 12px; background:#fafafa;">
-                                        <div style="display:flex; flex-wrap:wrap; gap:10px;">
-                                            {% for st in statuses %}
-                                            <label style="display:inline-flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; background:#fff; border:1px solid #eef0f2;">
-                                                <input type="checkbox" class="status-checkbox" data-action="{{ action.key }}" value="{{ st.key }}">
-                                                <span style="font-size:0.95rem;">{{ st.label }}</span>
-                                            </label>
-                                            {% endfor %}
-                                        </div>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
                     </div>
                 </div>
                 <style>
@@ -1261,6 +1244,20 @@
                     }
                     #permissionsPanel label.perm-toggle input[type="checkbox"]:checked + .perm-switch {
                         background: #28a745 !important;
+                    }
+                    /* Chevron toggle styles */
+                    #permissionsPanel .perm-chevron-toggle {
+                        transition: transform 0.2s ease;
+                    }
+                    #permissionsPanel .perm-chevron-toggle i {
+                        transition: transform 0.2s ease;
+                    }
+                    #permissionsPanel .perm-chevron-toggle:hover {
+                        color: #495057;
+                    }
+                    /* Ensure status rows are hidden by default */
+                    #permissionsPanel .perm-status-row {
+                        display: none !important;
                     }
                 </style>
                 <script>
@@ -1346,15 +1343,62 @@
                         .then(res => res.json())
                         .then(data => {
                             const perms = data.permissions || {};
-                            // Update each checkbox
+                            const statusPerms = data.status_permissions || data.statusPermissions || {};
+                            // Update each main checkbox and status toggles
                             document.querySelectorAll('#permissionsPanel input[type="checkbox"][name^="perm_full_"]').forEach(function(cb){
                                 const name = cb.getAttribute('name').replace(/^perm_full_/, '');
-                                const checked = !!perms[name];
-                                cb.checked = checked;
-                                // ensure visual state by toggling checked (CSS handles appearance), but force knob position fallback
+                                var permKey = cb.getAttribute('data-perm-key') || name;
+                                
+                                // Check if we have status-specific permissions for this permission
+                                var hasStatusPerms = statusPerms[permKey] && Object.keys(statusPerms[permKey]).length > 0;
+                                
+                                if (hasStatusPerms) {
+                                    // Load individual status permissions
+                                    var statusCheckboxes = document.querySelectorAll('.perm-status-checkbox[data-perm-key="' + permKey + '"]');
+                                    var allStatusChecked = true;
+                                    statusCheckboxes.forEach(function(scb){
+                                        var statusKey = scb.getAttribute('data-status-key');
+                                        var statusChecked = !!(statusPerms[permKey] && statusPerms[permKey][statusKey]);
+                                        scb.checked = statusChecked;
+                                        if (!statusChecked) allStatusChecked = false;
+                                        
+                                        var sw = scb.nextElementSibling;
+                                        if (sw && sw.querySelector('.perm-knob')) {
+                                            if (statusChecked) {
+                                                sw.style.background = '#28a745';
+                                                sw.querySelector('.perm-knob').style.left = 'calc(100% - 3px - 18px)';
+                                            } else {
+                                                sw.style.background = '#e9ecef';
+                                                sw.querySelector('.perm-knob').style.left = '3px';
+                                            }
+                                        }
+                                    });
+                                    // Set main checkbox based on all status checkboxes
+                                    cb.checked = allStatusChecked;
+                                } else {
+                                    // Use main permission value and sync all status toggles
+                                    const checked = !!perms[name];
+                                    cb.checked = checked;
+                                    var statusCheckboxes = document.querySelectorAll('.perm-status-checkbox[data-perm-key="' + permKey + '"]');
+                                    statusCheckboxes.forEach(function(scb){
+                                        scb.checked = checked;
+                                        var sw = scb.nextElementSibling;
+                                        if (sw && sw.querySelector('.perm-knob')) {
+                                            if (checked) {
+                                                sw.style.background = '#28a745';
+                                                sw.querySelector('.perm-knob').style.left = 'calc(100% - 3px - 18px)';
+                                            } else {
+                                                sw.style.background = '#e9ecef';
+                                                sw.querySelector('.perm-knob').style.left = '3px';
+                                            }
+                                        }
+                                    });
+                                }
+                                
+                                // Update main toggle visual
                                 const sw = cb.nextElementSibling;
                                 if (sw && sw.querySelector('.perm-knob')) {
-                                    if (checked) {
+                                    if (cb.checked) {
                                         sw.style.background = '#28a745';
                                         sw.querySelector('.perm-knob').style.left = 'calc(100% - 3px - 18px)';
                                     } else {
@@ -1379,26 +1423,6 @@
                                     }
                                 }
                             });
-                            // populate status scopes if provided
-                            const statusScopes = data.status_scopes || data.statusScopes || {};
-                            document.querySelectorAll('.action-row').forEach(function(row){
-                                var action = row.getAttribute('data-action');
-                                var sc = statusScopes[action];
-                                var useDefaults = true;
-                                if (sc && typeof sc.use_role_defaults !== 'undefined') useDefaults = !!sc.use_role_defaults;
-                                var boxes = row.querySelectorAll('.status-checkbox');
-                                boxes.forEach(function(b){
-                                    if (sc && Array.isArray(sc.statuses)) {
-                                        b.checked = sc.statuses.indexOf(b.value) !== -1;
-                                    } else {
-                                        b.checked = false;
-                                    }
-                                    b.disabled = useDefaults;
-                                    b.style.opacity = useDefaults ? '0.5' : '1';
-                                });
-                                var useCb = row.querySelector('.use-role-defaults');
-                                if (useCb) useCb.checked = useDefaults;
-                            });
                         }).catch(err => {
                             console.error('Failed to load permissions', err);
                         });
@@ -1417,6 +1441,15 @@
                         const name = i.getAttribute('name').replace(/^perm_full_/, '');
                         perms[name] = !!i.checked;
                     });
+                    // collect status-specific permissions
+                    const statusPerms = {};
+                    document.querySelectorAll('.perm-status-checkbox').forEach(function(cb){
+                        var permKey = cb.getAttribute('data-perm-key');
+                        var statusKey = cb.getAttribute('data-status-key');
+                        if (!permKey || !statusKey) return;
+                        if (!statusPerms[permKey]) statusPerms[permKey] = {};
+                        statusPerms[permKey][statusKey] = !!cb.checked;
+                    });
                     // collect overrides
                     const overrides = {};
                     document.querySelectorAll('.override-row').forEach(function(row){
@@ -1433,24 +1466,10 @@
                         }
                         overrides[key] = { enabled: enabled, value: value };
                     });
-                    // collect status scopes per action
-                    const status_scopes = {};
-                    document.querySelectorAll('.action-row').forEach(function(row){
-                        var action = row.getAttribute('data-action');
-                        if (!action) return;
-                        var useDefaultsEl = row.querySelector('.use-role-defaults');
-                        var useDefaults = true;
-                        if (useDefaultsEl) useDefaults = !!useDefaultsEl.checked;
-                        var checkedStatuses = [];
-                        row.querySelectorAll('.status-checkbox:checked').forEach(function(cb){
-                            checkedStatuses.push(cb.value);
-                        });
-                        status_scopes[action] = { use_role_defaults: useDefaults, statuses: checkedStatuses };
-                    });
                     fetch(`/api/users/${userId}/permissions`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ permissions: perms, overrides: overrides, status_scopes: status_scopes })
+                        body: JSON.stringify({ permissions: perms, status_permissions: statusPerms, overrides: overrides })
                     }).then(res => res.json())
                     .then(data => {
                         if (data && (data.success || data.status === 'ok')) {
@@ -1661,29 +1680,105 @@
                         });
                     }
 
-                    // Status-scope accordion behavior
-                    document.querySelectorAll('.action-header').forEach(function(btn){
+                    // Helper function to update main toggle state based on status toggles
+                    function updateMainToggleState(permKey) {
+                        var statusCheckboxes = document.querySelectorAll('.perm-status-checkbox[data-perm-key="' + permKey + '"]');
+                        var mainCheckbox = document.querySelector('.perm-main-checkbox[data-perm-key="' + permKey + '"]');
+                        if (!mainCheckbox || statusCheckboxes.length === 0) return;
+                        
+                        var allChecked = true;
+                        statusCheckboxes.forEach(function(cb){
+                            if (!cb.checked) allChecked = false;
+                        });
+                        
+                        // Update main checkbox state
+                        mainCheckbox.checked = allChecked;
+                        // Update visual state
+                        var mainSwitch = mainCheckbox.nextElementSibling;
+                        if (mainSwitch && mainSwitch.querySelector('.perm-knob')) {
+                            if (allChecked) {
+                                mainSwitch.style.background = '#28a745';
+                                mainSwitch.querySelector('.perm-knob').style.left = 'calc(100% - 3px - 18px)';
+                            } else {
+                                mainSwitch.style.background = '#e9ecef';
+                                mainSwitch.querySelector('.perm-knob').style.left = '3px';
+                            }
+                        }
+                    }
+
+                    // Helper function to update status toggle visuals
+                    function updateStatusToggleVisual(cb) {
+                        var sw = cb.nextElementSibling;
+                        if (sw && sw.querySelector('.perm-knob')) {
+                            if (cb.checked) {
+                                sw.style.background = '#28a745';
+                                sw.querySelector('.perm-knob').style.left = 'calc(100% - 3px - 18px)';
+                            } else {
+                                sw.style.background = '#e9ecef';
+                                sw.querySelector('.perm-knob').style.left = '3px';
+                            }
+                        }
+                    }
+
+                    // Chevron toggle behavior for permission rows
+                    document.querySelectorAll('.perm-chevron-toggle').forEach(function(btn){
                         btn.addEventListener('click', function(e){
-                            // ignore clicks on the use-role-defaults checkbox
-                            if (e.target && e.target.classList && e.target.classList.contains('use-role-defaults')) return;
-                            var parent = btn.parentElement;
-                            var body = parent.querySelector('.action-body');
-                            if (!body) return;
-                            var isOpen = body.style.display === 'block';
-                            // close all others
-                            document.querySelectorAll('.action-body').forEach(function(b){ b.style.display = 'none'; });
-                            if (!isOpen) body.style.display = 'block';
+                            e.preventDefault();
+                            e.stopPropagation();
+                            var permKey = btn.getAttribute('data-perm-key');
+                            if (!permKey) return;
+                            
+                            var icon = btn.querySelector('i');
+                            if (!icon) return;
+                            var isExpanded = btn.classList.contains('expanded');
+                            var statusRows = document.querySelectorAll('.perm-status-row[data-perm-key="' + permKey + '"]');
+                            
+                            if (isExpanded) {
+                                btn.classList.remove('expanded');
+                                icon.style.transform = 'rotate(0deg)';
+                                statusRows.forEach(function(row){ 
+                                    row.style.display = 'none';
+                                    row.style.setProperty('display', 'none', 'important');
+                                });
+                            } else {
+                                btn.classList.add('expanded');
+                                icon.style.transform = 'rotate(90deg)';
+                                statusRows.forEach(function(row){ 
+                                    row.style.display = 'table-row';
+                                    row.style.setProperty('display', 'table-row', 'important');
+                                });
+                            }
                         });
                     });
 
-                    // Use role defaults toggles status checkbox enabling
-                    document.querySelectorAll('.use-role-defaults').forEach(function(cb){
+                    // Main toggle controls all status toggles
+                    document.querySelectorAll('.perm-main-checkbox').forEach(function(cb){
                         cb.addEventListener('change', function(){
-                            var action = cb.getAttribute('data-action');
-                            var parent = cb.closest('.action-row');
-                            if (!parent) return;
-                            var boxes = parent.querySelectorAll('.status-checkbox');
-                            boxes.forEach(function(b){ b.disabled = cb.checked; b.style.opacity = cb.checked ? '0.5' : '1'; });
+                            var permKey = cb.getAttribute('data-perm-key');
+                            if (!permKey) return;
+                            
+                            var checked = cb.checked;
+                            var statusCheckboxes = document.querySelectorAll('.perm-status-checkbox[data-perm-key="' + permKey + '"]');
+                            
+                            // Update all status checkboxes
+                            statusCheckboxes.forEach(function(scb){
+                                scb.checked = checked;
+                                updateStatusToggleVisual(scb);
+                            });
+                            
+                            // Update main toggle visual
+                            updateStatusToggleVisual(cb);
+                        });
+                    });
+
+                    // Status toggle changes update main toggle state
+                    document.querySelectorAll('.perm-status-checkbox').forEach(function(cb){
+                        cb.addEventListener('change', function(){
+                            var permKey = cb.getAttribute('data-perm-key');
+                            if (!permKey) return;
+                            
+                            updateStatusToggleVisual(cb);
+                            updateMainToggleState(permKey);
                         });
                     });
                 });
