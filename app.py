@@ -3463,12 +3463,30 @@ def department_dashboard():
         'Department Manager', 'Operation Manager'
     }
     try:
-        is_temp_manager_any = DepartmentTemporaryManager.query.filter_by(temporary_manager_id=current_user.user_id).first() is not None
+        # Check if user is a temporary manager for payment requests (Finance Payment Request or Both)
+        is_temp_manager_any = DepartmentTemporaryManager.query.filter(
+            DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+            db.or_(
+                DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+            )
+        ).first() is not None
     except Exception:
         is_temp_manager_any = False
-    # Compute list of departments the current user temporarily manages (for UI filters)
+    # Compute list of departments the current user temporarily manages for PAYMENT REQUESTS (for UI filters)
+    # Only include departments where user is assigned for "Finance Payment Request" or "Both Payment and Item Request"
     try:
-        temp_departments = [dt.department.strip() for dt in DepartmentTemporaryManager.query.filter_by(temporary_manager_id=current_user.user_id).all() if dt.department]
+        temp_departments = [
+            dt.department.strip() 
+            for dt in DepartmentTemporaryManager.query.filter(
+                DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).all() 
+            if dt.department
+        ]
     except Exception:
         temp_departments = []
 
@@ -3592,6 +3610,23 @@ def department_dashboard():
             department_match_ids = set()
             temp_manager_ids = set()
             
+            # First, get all departments where current user is a temporary manager for payment requests
+            temp_manager_payment_depts = set()
+            try:
+                temp_assignments = DepartmentTemporaryManager.query.filter(
+                    DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+                    db.or_(
+                        DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                        DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                    )
+                ).all()
+                for ta in temp_assignments:
+                    if ta.department:
+                        temp_manager_payment_depts.add(ta.department.strip().lower())
+                print(f"DEBUG: User is temp manager for payment requests in departments: {temp_manager_payment_depts}")
+            except Exception as e:
+                print(f"DEBUG: Error getting temp manager departments: {e}")
+            
             for req in all_non_archived:
                 # Check if requestor's department matches (this ensures we only show requests from their department)
                 requestor_dept = (req.user.department or '').strip() if req.user else ''
@@ -3605,19 +3640,15 @@ def department_dashboard():
                 # Check per-request temporary manager
                 if req.temporary_manager_id == current_user.user_id:
                     temp_manager_ids.add(req.request_id)
+                
                 # Check department-level temporary manager assignment for this request's department
-                try:
-                    dt = DepartmentTemporaryManager.query.filter(
-                        DepartmentTemporaryManager.department == (req.department or ''),
-                        db.or_(
-                            DepartmentTemporaryManager.request_type == 'Finance Payment Request',
-                            DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
-                        )
-                    ).first()
-                except Exception:
-                    dt = None
-                if dt and getattr(dt, 'temporary_manager_id', None) == current_user.user_id:
+                # For PAYMENT REQUESTS, check for "Finance Payment Request" or "Both Payment and Item Request"
+                # Use case-insensitive matching to include ALL requests (old and new) from assigned departments
+                req_dept_normalized = req_dept.lower().strip() if req_dept else ''
+                if req_dept_normalized and req_dept_normalized in temp_manager_payment_depts:
+                    # User is assigned as temp manager for this department - include ALL requests from this department
                     temp_manager_ids.add(req.request_id)
+                    print(f"DEBUG: Added payment request {req.request_id} to temp_manager_ids (dept: {req_dept}, normalized: {req_dept_normalized})")
                 
                 # Check if user is an authorized approver (based on requestor, not request department)
                 authorized_approvers = get_authorized_manager_approvers(req)
@@ -3661,21 +3692,49 @@ def department_dashboard():
         # include requests for the departments they temporarily manage (only when assignment exists).
         if is_temp_manager_any:
             try:
-                temp_departments = [dt.department.strip() for dt in DepartmentTemporaryManager.query.filter_by(temporary_manager_id=current_user.user_id).all() if dt.department]
+                # Only include departments where user is assigned for "Finance Payment Request" or "Both Payment and Item Request"
+                temp_departments = [
+                    dt.department.strip() 
+                    for dt in DepartmentTemporaryManager.query.filter(
+                        DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+                        db.or_(
+                            DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                            DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                        )
+                    ).all() 
+                    if dt.department
+                ]
             except Exception:
                 temp_departments = []
             if temp_departments:
+                print(f"DEBUG: Building base_query for temp manager. temp_departments: {temp_departments}")
+                # Build case-insensitive department filter using OR conditions
+                # Include ALL requests from assigned departments (both old and new), regardless of requestor's department
+                dept_conditions = []
+                for dept in temp_departments:
+                    dept_normalized = dept.strip().lower()
+                    # Match by request department only (case-insensitive) - include ALL requests from this department
+                    dept_conditions.append(
+                        db.func.lower(db.func.trim(PaymentRequest.department)) == dept_normalized
+                    )
+                
+                if dept_conditions:
+                    dept_filter = db.or_(*dept_conditions)
+                else:
+                    dept_filter = db.false()  # No departments, no matches
+                
                 base_query = PaymentRequest.query.outerjoin(User, PaymentRequest.user_id == User.user_id).filter(
                     db.and_(
                         db.or_(
-                            db.and_(PaymentRequest.department.in_(temp_departments), User.department.in_(temp_departments)),
-                            PaymentRequest.temporary_manager_id == current_user.user_id,
-                            PaymentRequest.user_id == current_user.user_id
+                            dept_filter,  # All requests from assigned departments
+                            PaymentRequest.temporary_manager_id == current_user.user_id,  # Per-request temp manager
+                            PaymentRequest.user_id == current_user.user_id  # Own requests
                         ),
                         PaymentRequest.is_archived == False,
                         PaymentRequest.is_draft == False
                     )
                 )
+                print(f"DEBUG: base_query built with {len(temp_departments)} temp_departments - will show ALL requests from these departments")
             else:
                 base_query = PaymentRequest.query.filter(
                     PaymentRequest.user_id == current_user.user_id,
@@ -3973,11 +4032,29 @@ def procurement_dashboard():
     except Exception as e:
         print(f"Warning: Could not migrate columns: {e}")
     
-    # Allow ALL users with Procurement department to access this dashboard
+    # Allow ALL users with Procurement department OR temporary managers for Procurement to access this dashboard
     # Normalize department value (strip whitespace and handle case)
     dept = current_user.department.strip() if current_user.department else ''
-    if dept.lower() != 'procurement':
-        session['permission_denied'] = 'You do not have permission to access this page. This dashboard is only for Procurement department users.'
+    is_procurement_user = dept.lower() == 'procurement'
+    
+    # Check if user is a temporary manager for Procurement department (payment requests)
+    is_temp_manager_for_procurement = False
+    try:
+        temp_procurement = DepartmentTemporaryManager.query.filter(
+            DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+            db.func.lower(db.func.trim(DepartmentTemporaryManager.department)) == 'procurement',
+            db.or_(
+                DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+            )
+        ).first()
+        is_temp_manager_for_procurement = temp_procurement is not None
+        print(f"DEBUG: procurement_dashboard - is_procurement_user: {is_procurement_user}, is_temp_manager_for_procurement: {is_temp_manager_for_procurement}")
+    except Exception as e:
+        print(f"DEBUG: Error checking temp manager for procurement: {e}")
+    
+    if not is_procurement_user and not is_temp_manager_for_procurement:
+        session['permission_denied'] = 'You do not have permission to access this page. This dashboard is only for Procurement department users or temporary managers for Procurement.'
         return redirect(url_for('dashboard'))
     
     page = request.args.get('page', 1, type=int)
@@ -4011,6 +4088,23 @@ def procurement_dashboard():
         department_match_ids = set()
         temp_manager_ids = set()
         
+        # Get all departments where current user is a temporary manager for payment requests
+        temp_manager_payment_depts = set()
+        try:
+            temp_assignments = DepartmentTemporaryManager.query.filter(
+                DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).all()
+            for ta in temp_assignments:
+                if ta.department:
+                    temp_manager_payment_depts.add(ta.department.strip().lower())
+            print(f"DEBUG: procurement_dashboard (Dept Manager) - User is temp manager for payment requests in departments: {temp_manager_payment_depts}")
+        except Exception as e:
+            print(f"DEBUG: Error getting temp manager departments (Dept Manager): {e}")
+        
         for req in all_non_archived:
             # Check if requestor's department matches (this ensures we only show requests from their department)
             requestor_dept = (req.user.department or '').strip() if req.user else ''
@@ -4021,9 +4115,17 @@ def procurement_dashboard():
             if req_dept.lower() == user_dept.lower() and requestor_dept.lower() == user_dept.lower():
                 department_match_ids.add(req.request_id)
             
-            # Check temporary manager
+            # Check per-request temporary manager
             if req.temporary_manager_id == current_user.user_id:
                 temp_manager_ids.add(req.request_id)
+            
+            # Check department-level temporary manager assignment for this request's department
+            # Use case-insensitive matching to include ALL requests (old and new) from assigned departments
+            req_dept_normalized = req_dept.lower().strip() if req_dept else ''
+            if req_dept_normalized and req_dept_normalized in temp_manager_payment_depts:
+                # User is assigned as temp manager for this department - include ALL requests from this department
+                temp_manager_ids.add(req.request_id)
+                print(f"DEBUG: procurement_dashboard (Dept Manager) - Added payment request {req.request_id} to temp_manager_ids (dept: {req_dept}, normalized: {req_dept_normalized})")
             
             # Check if user is an authorized approver (based on requestor, not request department)
             authorized_approvers = get_authorized_manager_approvers(req)
@@ -4045,11 +4147,51 @@ def procurement_dashboard():
                 PaymentRequest.request_id == -1  # Impossible condition
             )
     else:
-        # For regular Procurement Staff users, show their own requests (exclude archived)
-        base_query = PaymentRequest.query.filter(
-            PaymentRequest.user_id == current_user.user_id,
-            PaymentRequest.is_archived == False
-        )
+        # For regular Procurement Staff users OR temporary managers for Procurement
+        # Show their own requests + all requests from departments they're assigned to as temp manager
+        temp_manager_payment_depts = set()
+        try:
+            temp_assignments = DepartmentTemporaryManager.query.filter(
+                DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).all()
+            for ta in temp_assignments:
+                if ta.department:
+                    temp_manager_payment_depts.add(ta.department.strip().lower())
+            print(f"DEBUG: procurement_dashboard (regular user) - User is temp manager for payment requests in departments: {temp_manager_payment_depts}")
+        except Exception as e:
+            print(f"DEBUG: Error getting temp manager departments (regular user): {e}")
+        
+        if temp_manager_payment_depts:
+            # Build case-insensitive department filter
+            dept_conditions = []
+            for dept in temp_manager_payment_depts:
+                dept_conditions.append(
+                    db.func.lower(db.func.trim(PaymentRequest.department)) == dept
+                )
+            dept_filter = db.or_(*dept_conditions) if dept_conditions else db.false()
+            
+            base_query = PaymentRequest.query.filter(
+                db.and_(
+                    db.or_(
+                        PaymentRequest.user_id == current_user.user_id,  # Own requests
+                        dept_filter,  # All requests from assigned departments
+                        PaymentRequest.temporary_manager_id == current_user.user_id  # Per-request temp manager
+                    ),
+                    PaymentRequest.is_archived == False,
+                    PaymentRequest.is_draft == False
+                )
+            )
+        else:
+            # For regular Procurement Staff users, show their own requests (exclude archived)
+            base_query = PaymentRequest.query.filter(
+                PaymentRequest.user_id == current_user.user_id,
+                PaymentRequest.is_archived == False,
+                PaymentRequest.is_draft == False
+            )
     
     # Exclude CEO-submitted requests for non-authorized roles (visibility hardening)
     if current_user.role not in ['Finance Admin', 'GM', 'Operation Manager']:
@@ -4434,15 +4576,63 @@ def procurement_item_requests():
         own_requests_unfiltered_procurement = ProcurementItemRequest.query.filter_by(user_id=current_user.user_id).all()
     
     # Filter requests based on user role (after database-level filters)
-    if current_user.department == 'Procurement':
+    # Check if user is from Procurement OR is a temporary manager for Procurement
+    is_procurement_user = current_user.department == 'Procurement'
+    is_temp_manager_for_procurement_items = False
+    try:
+        temp_procurement_items = DepartmentTemporaryManager.query.filter(
+            DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+            db.func.lower(db.func.trim(DepartmentTemporaryManager.department)) == 'procurement',
+            db.or_(
+                DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+            )
+        ).first()
+        is_temp_manager_for_procurement_items = temp_procurement_items is not None
+        print(f"DEBUG: procurement_item_requests - is_procurement_user: {is_procurement_user}, is_temp_manager_for_procurement_items: {is_temp_manager_for_procurement_items}")
+    except Exception as e:
+        print(f"DEBUG: Error checking temp manager for procurement items: {e}")
+    
+    if is_procurement_user or is_temp_manager_for_procurement_items:
         # Procurement Department Manager should see:
         # - All requests belonging to the Procurement department (any status)
         # - Requests from other departments ONLY when they are at procurement-manager level
         #   (e.g., 'Pending Procurement Manager Approval') or when the manager is an authorized approver
         # Procurement staff (non-manager) keep previous behaviour but always see their own requests.
-        if current_user.role == 'Department Manager':
+        # For Procurement Department Managers OR temporary managers for Procurement
+        # Show all Procurement department requests + external statuses + authorized approver requests
+        if current_user.role == 'Department Manager' or is_temp_manager_for_procurement_items:
             authorized_approvers_ids = set()
+            temp_manager_item_ids = set()
+            
+            # Get all departments where current user is a temporary manager for item requests
+            temp_manager_item_depts = set()
+            if is_temp_manager_for_procurement_items:
+                try:
+                    temp_item_assignments = DepartmentTemporaryManager.query.filter(
+                        DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+                        db.or_(
+                            DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                            DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                        )
+                    ).all()
+                    for ta in temp_item_assignments:
+                        if ta.department:
+                            temp_manager_item_depts.add(ta.department.strip().lower())
+                    print(f"DEBUG: procurement_item_requests - User is temp manager for item requests in departments: {temp_manager_item_depts}")
+                except Exception as e:
+                    print(f"DEBUG: Error getting temp manager item departments: {e}")
+            
             for req in all_requests:
+                # Check if user is a department-level temporary manager for this item request
+                # Use case-insensitive matching to include ALL requests (old and new) from assigned departments
+                req_dept_normalized = (req.department or '').strip().lower() if req.department else ''
+                if req_dept_normalized and req_dept_normalized in temp_manager_item_depts:
+                    # User is assigned as temp manager for this department - include ALL item requests from this department
+                    temp_manager_item_ids.add(req.id)
+                    print(f"DEBUG: procurement_item_requests - Added item request {req.id} to temp_manager_item_ids (dept: {req.department}, normalized: {req_dept_normalized})")
+                
+                # Also check via authorized approvers function
                 approvers = get_authorized_manager_approvers_for_item_request(req)
                 approver_ids = [a.user_id for a in approvers]
                 if current_user.user_id in approver_ids:
@@ -4458,10 +4648,11 @@ def procurement_item_requests():
 
             base_item_requests = [
                 r for r in all_requests
-                if r.department == 'Procurement'
-                or (r.department != 'Procurement' and r.status in external_statuses)
-                or r.id in authorized_approvers_ids
-                or r.user_id == current_user.user_id
+                if r.department == 'Procurement'  # All Procurement department requests
+                or (r.department != 'Procurement' and r.status in external_statuses)  # External statuses
+                or r.id in authorized_approvers_ids  # Authorized approver
+                or r.id in temp_manager_item_ids  # Temporary manager for this department
+                or r.user_id == current_user.user_id  # Own requests
             ]
         else:
             # Procurement staff (non-managers) visibility rules:
@@ -4484,8 +4675,37 @@ def procurement_item_requests():
         base_item_requests = [r for r in all_requests if r.status == 'Completed']
     else:
         # Managers see requests from their department or requests they created
+        # Also includes temporary managers assigned for "Procurement Item Request" or "Both Payment and Item Request"
         authorized_approvers_ids = set()
+        temp_manager_item_ids = set()
+        
+        # First, get all departments where current user is a temporary manager for item requests
+        temp_manager_item_depts = set()
+        try:
+            temp_item_assignments = DepartmentTemporaryManager.query.filter(
+                DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).all()
+            for ta in temp_item_assignments:
+                if ta.department:
+                    temp_manager_item_depts.add(ta.department.strip().lower())
+            print(f"DEBUG: User is temp manager for item requests in departments: {temp_manager_item_depts}")
+        except Exception as e:
+            print(f"DEBUG: Error getting temp manager item departments: {e}")
+        
         for req in all_requests:
+            # Check if user is a department-level temporary manager for this item request
+            # Use case-insensitive matching to include ALL requests (old and new) from assigned departments
+            req_dept_normalized = (req.department or '').strip().lower() if req.department else ''
+            if req_dept_normalized and req_dept_normalized in temp_manager_item_depts:
+                # User is assigned as temp manager for this department - include ALL item requests from this department
+                temp_manager_item_ids.add(req.id)
+                print(f"DEBUG: Added item request {req.id} to temp_manager_item_ids (dept: {req.department}, normalized: {req_dept_normalized})")
+            
+            # Also check via authorized approvers function
             approvers = get_authorized_manager_approvers_for_item_request(req)
             approver_ids = [a.user_id for a in approvers]
             if current_user.user_id in approver_ids:
@@ -4493,8 +4713,9 @@ def procurement_item_requests():
         
         # Also show requests created by current user
         my_requests = [r.id for r in all_requests if r.user_id == current_user.user_id]
-        visible_request_ids = authorized_approvers_ids.union(my_requests)
+        visible_request_ids = authorized_approvers_ids.union(temp_manager_item_ids).union(my_requests)
         base_item_requests = [r for r in all_requests if r.id in visible_request_ids]
+        print(f"DEBUG: Item requests visibility - authorized: {len(authorized_approvers_ids)}, temp_manager: {len(temp_manager_item_ids)}, my_requests: {len(my_requests)}, total visible: {len(visible_request_ids)}")
     
     # Build status options visible to current user (based on base_item_requests).
     # If user is viewing their 'My Requests' tab, compute from their own requests so all statuses appear.
@@ -4586,9 +4807,47 @@ def procurement_item_requests():
     # Sort item requests: first by status priority, then by datetime (most recent first)
     # This matches the sorting logic used in payment requests dashboard
     # Use a tuple key: (status_priority, -timestamp) where timestamp is negated for descending order
+    
+    # Check if user is a temporary manager for item requests
+    is_temp_manager_for_items = False
+    try:
+        temp_item_assignments = DepartmentTemporaryManager.query.filter(
+            DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+            db.or_(
+                DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+            )
+        ).first()
+        is_temp_manager_for_items = temp_item_assignments is not None
+        print(f"DEBUG: sort_key - is_temp_manager_for_items: {is_temp_manager_for_items}")
+    except Exception as e:
+        print(f"DEBUG: Error checking temp manager for items in sort_key: {e}")
+    
     def sort_key(req):
+        # For temporary managers assigned for item requests, prioritize "Pending Manager Approval" first
+        if is_temp_manager_for_items:
+            # Custom priority order for temporary managers:
+            # 1. Pending Manager Approval (highest priority - they need to approve these)
+            # 2. Pending Procurement Manager Approval
+            # 3. Final Approval
+            # 4. Assigned to Procurement
+            # 5. On Hold
+            # 6. Completed
+            # 7. Rejected by Manager
+            # 8. Rejected by Procurement Manager
+            temp_manager_status_priority = {
+                'Pending Manager Approval': 1,  # Highest priority for temp managers
+                'Pending Procurement Manager Approval': 2,
+                'Final Approval': 3,
+                'Assigned to Procurement': 4,
+                'On Hold': 5,
+                'Completed': 6,
+                'Rejected by Manager': 7,
+                'Rejected by Procurement Manager': 8,
+            }
+            status_priority = temp_manager_status_priority.get(req.status, 99)
         # For Procurement Department Manager, use specific priority order
-        if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
+        elif current_user.department == 'Procurement' and current_user.role == 'Department Manager':
             # Custom priority order for Procurement Department Manager:
             # 1. Pending Procurement Manager Approval
             # 2. Final Approval (after Pending Procurement Manager Approval)
