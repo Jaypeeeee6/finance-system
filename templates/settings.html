@@ -397,6 +397,17 @@
                         </div>
                     </div>
                 </div>
+                <div class="form-row" id="procurement_approvals_checkbox_row" style="display: none; margin-top: 0.75rem;">
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" name="include_procurement_approvals" id="include_procurement_approvals" value="1">
+                            <span>Include the Procurement Manager Approval and Final Approval for Item Requests</span>
+                        </label>
+                        <small class="form-text text-muted" style="margin-top: 4px; display: block;">
+                            When enabled, the temporary manager will also be responsible for Procurement Manager Approval and Final Approval steps for item requests from ALL departments.
+                        </small>
+                    </div>
+                </div>
                 <div style="margin-top: 12px;">
                     <button type="submit" class="btn btn-save"><i class="fas fa-save"></i> Save</button>
                 </div>
@@ -435,7 +446,14 @@
                         <tr>
                             <td>{{ req_type }}</td>
                             <td>{{ dept }}</td>
-                            <td>{{ entry.temporary_manager.name if entry.temporary_manager else entry.temporary_manager_id }}</td>
+                            <td>
+                                {{ entry.temporary_manager.name if entry.temporary_manager else entry.temporary_manager_id }}
+                                {% if entry.include_procurement_approvals %}
+                                    <span class="badge badge-info" style="margin-left: 8px; font-size: 0.75em;" title="Can approve Procurement Manager Approval and Final Approval for item requests from all departments">
+                                        <i class="fas fa-check-circle"></i> Procurement Approvals
+                                    </span>
+                                {% endif %}
+                            </td>
                             <td>{{ entry.set_by_user.name if entry.set_by_user else '' }}</td>
                             <td>
                                 {% if entry.set_at %}
@@ -721,7 +739,42 @@
     </script>
     <script>
     // Initialize a grouped searchable dropdown for managers (single selection)
-    document.addEventListener('DOMContentLoaded', function() {
+        // Show/hide procurement approvals checkbox based on department and request type
+        document.addEventListener('DOMContentLoaded', function() {
+            const requestTypeSelect = document.getElementById('request_type');
+            const departmentSelect = document.getElementById('department');
+            const checkboxRow = document.getElementById('procurement_approvals_checkbox_row');
+            
+            function toggleProcurementApprovalsCheckbox() {
+                if (!requestTypeSelect || !departmentSelect || !checkboxRow) return;
+                
+                const requestType = requestTypeSelect.value;
+                const department = departmentSelect.value;
+                
+                // Show checkbox only if:
+                // 1. Department is "Procurement"
+                // 2. Request Type is "Procurement Item Request" or "Both Payment and Item Request"
+                const shouldShow = department.toLowerCase() === 'procurement' && 
+                                 (requestType === 'Procurement Item Request' || requestType === 'Both Payment and Item Request');
+                
+                checkboxRow.style.display = shouldShow ? 'block' : 'none';
+                
+                // Uncheck checkbox if hidden
+                const checkbox = document.getElementById('include_procurement_approvals');
+                if (checkbox && !shouldShow) {
+                    checkbox.checked = false;
+                }
+            }
+            
+            if (requestTypeSelect && departmentSelect) {
+                requestTypeSelect.addEventListener('change', toggleProcurementApprovalsCheckbox);
+                departmentSelect.addEventListener('change', toggleProcurementApprovalsCheckbox);
+                // Check on initial load
+                toggleProcurementApprovalsCheckbox();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.getElementById('manager_search');
         const hiddenSelect = document.getElementById('temporary_manager_id');
         const dropdown = document.getElementById('manager_dropdown');

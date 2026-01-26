@@ -2597,19 +2597,74 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
     else:
         # Department Staff: Updates on their own requests only + recurring payment due for their own requests + item request assignments
         # Also allow 'new_submission' and 'item_request_submission' types for users who were explicitly targeted
-        query = Notification.query.filter(
-            db.and_(
-                Notification.user_id == user.user_id,
-                Notification.notification_type.in_([
-                    'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
-                    'status_changed', 'recurring_due', 'proof_required', 'recurring_approved',
-                    'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled',
-                        'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold',
-                    'request_pending_approval', 'temporary_manager_assignment', 'temporary_manager_unassigned',
-                    'new_submission', 'item_request_submission'
-                ])
-            )
-        ).order_by(Notification.created_at.desc())
+        # Check if user is a temporary manager for item requests - if so, include all item request notifications
+        is_temp_manager_for_items = False
+        try:
+            temp_item_assignments = DepartmentTemporaryManager.query.filter(
+                DepartmentTemporaryManager.temporary_manager_id == user.user_id,
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).first()
+            is_temp_manager_for_items = temp_item_assignments is not None
+        except Exception:
+            pass
+        
+        if is_temp_manager_for_items:
+            # Temporary managers for item requests should see all item request notifications
+            # Get departments they're assigned to
+            temp_item_depts = set()
+            try:
+                temp_assignments = DepartmentTemporaryManager.query.filter(
+                    DepartmentTemporaryManager.temporary_manager_id == user.user_id,
+                    db.or_(
+                        DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                        DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                    )
+                ).all()
+                for ta in temp_assignments:
+                    if ta.department:
+                        temp_item_depts.add(ta.department.strip().lower())
+            except Exception:
+                pass
+            
+            # Include all item request notifications, plus filter by department if needed
+            query = Notification.query.filter(
+                db.and_(
+                    Notification.user_id == user.user_id,
+                    db.or_(
+                        # All item request related notifications
+                        Notification.notification_type.in_([
+                            'item_request_submission', 'item_request_assigned', 'item_request_updated',
+                            'request_approved', 'request_rejected', 'request_pending_approval',
+                            'request_on_hold', 'request_returned'
+                        ]),
+                        # Other standard notifications
+                        Notification.notification_type.in_([
+                            'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
+                            'status_changed', 'recurring_due', 'proof_required', 'recurring_approved',
+                            'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled',
+                            'temporary_manager_assignment', 'temporary_manager_unassigned',
+                            'new_submission'
+                        ])
+                    )
+                )
+            ).order_by(Notification.created_at.desc())
+        else:
+            query = Notification.query.filter(
+                db.and_(
+                    Notification.user_id == user.user_id,
+                    Notification.notification_type.in_([
+                        'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
+                        'status_changed', 'recurring_due', 'proof_required', 'recurring_approved',
+                        'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled',
+                            'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold',
+                        'request_pending_approval', 'temporary_manager_assignment', 'temporary_manager_unassigned',
+                        'new_submission', 'item_request_submission'
+                    ])
+                )
+            ).order_by(Notification.created_at.desc())
 
     # Handle pagination, limit, or return all
     if page is not None and per_page is not None:
@@ -2790,13 +2845,46 @@ def get_unread_count_for_user(user):
     else:
         # Department Staff: Updates on their own requests only + recurring payment due for their own requests + item request assignments
         # Also include temporary_manager_assignment so department users see when a temp manager is set/removed
-        return Notification.query.filter(
-            db.and_(
-                Notification.user_id == user.user_id,
-                Notification.is_read == False,
-                Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold', 'request_pending_approval', 'temporary_manager_assignment', 'temporary_manager_unassigned', 'new_submission', 'item_request_submission'])
-            )
-        ).count()
+        # Check if user is a temporary manager for item requests - if so, include all item request notifications
+        is_temp_manager_for_items = False
+        try:
+            temp_item_assignments = DepartmentTemporaryManager.query.filter(
+                DepartmentTemporaryManager.temporary_manager_id == user.user_id,
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).first()
+            is_temp_manager_for_items = temp_item_assignments is not None
+        except Exception:
+            pass
+        
+        if is_temp_manager_for_items:
+            # Temporary managers for item requests should see all item request notifications
+            return Notification.query.filter(
+                db.and_(
+                    Notification.user_id == user.user_id,
+                    Notification.is_read == False,
+                    Notification.notification_type.in_([
+                        'item_request_submission', 'item_request_assigned', 'item_request_updated',
+                        'request_approved', 'request_rejected', 'request_pending_approval',
+                        'request_on_hold', 'request_returned',
+                        'request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected',
+                        'status_changed', 'recurring_due', 'proof_required', 'recurring_approved',
+                        'request_completed', 'installment_paid', 'finance_note_added', 'one_time_payment_scheduled',
+                        'temporary_manager_assignment', 'temporary_manager_unassigned',
+                        'new_submission'
+                    ])
+                )
+            ).count()
+        else:
+            return Notification.query.filter(
+                db.and_(
+                    Notification.user_id == user.user_id,
+                    Notification.is_read == False,
+                    Notification.notification_type.in_(['request_rejected', 'request_approved', 'proof_uploaded', 'proof_rejected', 'status_changed', 'recurring_due', 'proof_required', 'recurring_approved', 'request_completed', 'installment_paid', 'one_time_payment_scheduled', 'item_request_assigned', 'item_request_updated', 'request_returned', 'request_on_hold', 'request_pending_approval', 'temporary_manager_assignment', 'temporary_manager_unassigned', 'new_submission', 'item_request_submission'])
+                )
+            ).count()
 
 def notify_finance_and_admin(title, message, notification_type, request_id=None):
     """Notify Finance and Admin users about new submissions"""
@@ -5170,9 +5258,27 @@ def view_item_request(request_id):
                 can_reject_manager = True
     
     # Procurement Manager approval: Only Procurement Department Manager can approve
+    # OR temporary managers with include_procurement_approvals=True
     # Also allow when status is 'On Hold' (if it was put on hold by procurement manager)
     if item_request.status in ['Pending Procurement Manager Approval', 'On Hold', 'Final Approval']:
-        if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
+        is_procurement_dept_manager = current_user.department == 'Procurement' and current_user.role == 'Department Manager'
+        
+        # Check if user is a temporary manager with include_procurement_approvals enabled
+        is_temp_procurement_approver = False
+        try:
+            temp_procurement_approvers = DepartmentTemporaryManager.query.filter(
+                DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+                DepartmentTemporaryManager.include_procurement_approvals == True,
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).all()
+            is_temp_procurement_approver = len(temp_procurement_approvers) > 0
+        except Exception:
+            pass
+        
+        if is_procurement_dept_manager or is_temp_procurement_approver:
             # Check if it's on hold by procurement manager (not manager)
             if item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id:
                 can_approve_procurement_manager = True
@@ -5303,7 +5409,32 @@ def view_item_request_page(request_id):
     
     # Check access permissions
     can_view = False
-    if current_user.department == 'Procurement':
+    
+    # Check if user is a temporary manager for item requests (this overrides regular permissions)
+    is_temp_manager_for_item = False
+    try:
+        req_dept_normalized = (item_request.department or '').strip().lower() if item_request.department else ''
+        if req_dept_normalized:
+            temp_assignments = DepartmentTemporaryManager.query.filter(
+                DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).all()
+            for ta in temp_assignments:
+                ta_dept_normalized = (ta.department or '').strip().lower() if ta.department else ''
+                if ta_dept_normalized == req_dept_normalized:
+                    is_temp_manager_for_item = True
+                    print(f"DEBUG: view_item_request_page - User {current_user.user_id} is temp manager for item requests from department '{item_request.department}'")
+                    break
+    except Exception as e:
+        print(f"DEBUG: Error checking temp manager for item in view: {e}")
+    
+    # If user is a temporary manager, they can view ALL requests from their assigned department
+    if is_temp_manager_for_item:
+        can_view = True
+    elif current_user.department == 'Procurement':
         # Procurement Department Manager can view all Procurement department requests regardless of status
         if current_user.role == 'Department Manager' and item_request.department == 'Procurement':
             can_view = True
@@ -5369,10 +5500,42 @@ def view_item_request_page(request_id):
         manager_rejector_name = item_request.manager_rejector
     
     # Get procurement manager approver name
+    # IMPORTANT: Only modify the name for "Final Approval" status when showing "Pending by"
+    # For "Pending Manager Approval" and "Pending Procurement Manager Approval" tabs,
+    # always show the actual approver's name (even if they're unassigned) for historical accuracy
     procurement_manager_approver_name = None
     if item_request.procurement_manager_approver_user_id:
         pm_user = User.query.get(item_request.procurement_manager_approver_user_id)
         procurement_manager_approver_name = pm_user.name if pm_user else item_request.procurement_manager_approver
+    
+    # Special handling ONLY for "Final Approval" status "Pending by" display
+    # If the approver was a temp manager who is now unassigned, show Procurement Department Manager instead
+    if item_request.status == 'Final Approval' and item_request.procurement_manager_approver_user_id:
+        # Check if the approver is still a temporary manager with include_procurement_approvals
+        is_still_temp_manager = False
+        try:
+            temp_assign = DepartmentTemporaryManager.query.filter(
+                DepartmentTemporaryManager.temporary_manager_id == item_request.procurement_manager_approver_user_id,
+                DepartmentTemporaryManager.include_procurement_approvals == True,
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).first()
+            is_still_temp_manager = temp_assign is not None
+        except Exception:
+            pass
+        
+        if not is_still_temp_manager:
+            # No longer a temp manager - show Procurement Department Manager instead for "Pending by"
+            procurement_managers = User.query.filter_by(
+                department='Procurement',
+                role='Department Manager'
+            ).all()
+            if procurement_managers:
+                procurement_manager_approver_name = procurement_managers[0].name
+            else:
+                procurement_manager_approver_name = 'Procurement Manager'
     
     # Determine the manager's name for display (same logic as payment requests)
     manager_name = None
@@ -5526,9 +5689,27 @@ def view_item_request_page(request_id):
                 can_reject_manager = True
     
     # Procurement Manager approval: Only Procurement Department Manager can approve
+    # OR temporary managers with include_procurement_approvals=True
     # Also allow when status is 'On Hold' (if it was put on hold by procurement manager)
     if item_request.status in ['Pending Procurement Manager Approval', 'On Hold', 'Final Approval']:
-        if current_user.department == 'Procurement' and current_user.role == 'Department Manager':
+        is_procurement_dept_manager = current_user.department == 'Procurement' and current_user.role == 'Department Manager'
+        
+        # Check if user is a temporary manager with include_procurement_approvals enabled
+        is_temp_procurement_approver = False
+        try:
+            temp_procurement_approvers = DepartmentTemporaryManager.query.filter(
+                DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+                DepartmentTemporaryManager.include_procurement_approvals == True,
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).all()
+            is_temp_procurement_approver = len(temp_procurement_approvers) > 0
+        except Exception:
+            pass
+        
+        if is_procurement_dept_manager or is_temp_procurement_approver:
             # Check if it's on hold by procurement manager (not manager)
             if item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id:
                 can_approve_procurement_manager = True
@@ -5736,7 +5917,31 @@ def get_item_request_quantity_history(request_id):
     
     # Check access permissions (same as view_item_request_page)
     can_view = False
-    if current_user.department == 'Procurement':
+    
+    # Check if user is a temporary manager for item requests (this overrides regular permissions)
+    is_temp_manager_for_item = False
+    try:
+        req_dept_normalized = (item_request.department or '').strip().lower() if item_request.department else ''
+        if req_dept_normalized:
+            temp_assignments = DepartmentTemporaryManager.query.filter(
+                DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).all()
+            for ta in temp_assignments:
+                ta_dept_normalized = (ta.department or '').strip().lower() if ta.department else ''
+                if ta_dept_normalized == req_dept_normalized:
+                    is_temp_manager_for_item = True
+                    break
+    except Exception:
+        pass
+    
+    # If user is a temporary manager, they can view ALL requests from their assigned department
+    if is_temp_manager_for_item:
+        can_view = True
+    elif current_user.department == 'Procurement':
         if item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
             can_view = True
     elif current_user.role in ['GM', 'Operation Manager']:
@@ -6052,7 +6257,7 @@ def item_request_manager_approve_handler(request_id, item_request):
             item_request_id=request_id
         )
     
-    # Notify Procurement Managers
+    # Notify Procurement Managers and temporary managers with include_procurement_approvals
     procurement_managers = User.query.filter_by(
         department='Procurement',
         role='Department Manager'
@@ -6065,6 +6270,28 @@ def item_request_manager_approve_handler(request_id, item_request):
             notification_type="new_submission",
             item_request_id=request_id
         )
+    
+    # Notify temporary managers with include_procurement_approvals enabled
+    try:
+        temp_procurement_approvers = DepartmentTemporaryManager.query.filter(
+            DepartmentTemporaryManager.include_procurement_approvals == True,
+            db.or_(
+                DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+            )
+        ).all()
+        for temp_assign in temp_procurement_approvers:
+            temp_manager = User.query.get(temp_assign.temporary_manager_id)
+            if temp_manager:
+                create_notification(
+                    user_id=temp_manager.user_id,
+                    title="New Item Request for Procurement Manager Approval",
+                    message=f"Item request #{request_id} from {item_request.requestor_name} ({item_request.department}) requires your procurement manager approval.",
+                    notification_type="new_submission",
+                    item_request_id=request_id
+                )
+    except Exception as e:
+        print(f"DEBUG: Error notifying temp procurement approvers: {e}")
     
     # Notify other authorized managers (who could have approved but didn't) that the request was approved
     authorized_approvers = get_authorized_manager_approvers_for_item_request(item_request)
@@ -6268,11 +6495,28 @@ def item_request_manager_reject(request_id):
 
 @app.route('/procurement/item-request/<int:request_id>/procurement-manager-decision', methods=['POST'])
 @login_required
-@role_required('Department Manager')
 def item_request_procurement_manager_decision(request_id):
     """Unified route for procurement manager decisions (approve, reject, on_hold)"""
-    if current_user.department != 'Procurement' or current_user.role != 'Department Manager':
-        flash('Access denied. Only Procurement Department Managers can perform this action.', 'danger')
+    is_procurement_dept_manager = current_user.department == 'Procurement' and current_user.role == 'Department Manager'
+    
+    # Check if user is a temporary manager with include_procurement_approvals enabled
+    is_temp_procurement_approver = False
+    try:
+        temp_procurement_approvers = DepartmentTemporaryManager.query.filter(
+            DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+            DepartmentTemporaryManager.include_procurement_approvals == True,
+            db.or_(
+                DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+            )
+        ).all()
+        is_temp_procurement_approver = len(temp_procurement_approvers) > 0
+        print(f"DEBUG: procurement-manager-decision - User {current_user.user_id} is_temp_procurement_approver: {is_temp_procurement_approver}")
+    except Exception as e:
+        print(f"DEBUG: Error checking temp procurement approver: {e}")
+    
+    if not is_procurement_dept_manager and not is_temp_procurement_approver:
+        flash('Access denied. Only Procurement Department Managers or temporary managers with procurement approval permissions can perform this action.', 'danger')
         return redirect(url_for('procurement_item_requests'))
     
     item_request = ProcurementItemRequest.query.get_or_404(request_id)
@@ -20808,6 +21052,7 @@ def settings():
         request_type = (request.form.get('request_type') or '').strip()
         department = (request.form.get('department') or '').strip()
         new_manager_id = request.form.get('temporary_manager_id')
+        include_procurement_approvals = request.form.get('include_procurement_approvals') == '1'
 
         if not request_type:
             flash('Please select a type of request.', 'error')
@@ -20816,6 +21061,15 @@ def settings():
         if not department:
             flash('Please select a department.', 'error')
             return redirect(url_for('settings'))
+
+        # Validate include_procurement_approvals: only allowed for Procurement department with item request types
+        if include_procurement_approvals:
+            if department.lower() != 'procurement':
+                flash('Procurement approvals can only be included for Procurement department.', 'error')
+                return redirect(url_for('settings'))
+            if request_type not in ['Procurement Item Request', 'Both Payment and Item Request']:
+                flash('Procurement approvals can only be included for Procurement Item Request or Both Payment and Item Request.', 'error')
+                return redirect(url_for('settings'))
 
         # Unset assignment if no manager selected
         if not new_manager_id or new_manager_id == 'none':
@@ -20849,7 +21103,15 @@ def settings():
 
         existing = DepartmentTemporaryManager.query.filter_by(department=department, request_type=request_type).first()
         if existing and existing.temporary_manager_id == int(new_manager_id):
-            flash('Selected manager is already assigned as the temporary manager for this department and request type.', 'info')
+            # Update include_procurement_approvals even if manager is the same
+            if existing.include_procurement_approvals != include_procurement_approvals:
+                existing.include_procurement_approvals = include_procurement_approvals
+                existing.set_by_user_id = current_user.user_id
+                existing.set_at = datetime.utcnow()
+                db.session.commit()
+                flash('Procurement approvals setting updated for this assignment.', 'success')
+            else:
+                flash('Selected manager is already assigned as the temporary manager for this department and request type.', 'info')
             return redirect(url_for('settings'))
 
         old_manager = existing.temporary_manager if existing else None
@@ -20857,12 +21119,14 @@ def settings():
             existing.temporary_manager_id = int(new_manager_id)
             existing.set_by_user_id = current_user.user_id
             existing.set_at = datetime.utcnow()
+            existing.include_procurement_approvals = include_procurement_approvals
         else:
             new_entry = DepartmentTemporaryManager(
                 request_type=request_type,
                 department=department,
                 temporary_manager_id=int(new_manager_id),
-                set_by_user_id=current_user.user_id
+                set_by_user_id=current_user.user_id,
+                include_procurement_approvals=include_procurement_approvals
             )
             db.session.add(new_entry)
 
@@ -20873,10 +21137,15 @@ def settings():
             approval_text = "both payment and item requests"
         else:
             approval_text = request_type.lower()
+        
+        notification_message = f"You have been temporarily assigned as manager for the {department} department ({request_type}). You will be responsible for manager approvals for {approval_text} in that department."
+        if include_procurement_approvals:
+            notification_message += " Additionally, you will be responsible for Procurement Manager Approval and Final Approval steps for item requests from ALL departments."
+        
         create_notification(
             user_id=new_manager.user_id,
             title="Temporary Manager Assignment",
-            message=f"You have been temporarily assigned as manager for the {department} department ({request_type}). You will be responsible for manager approvals for {approval_text} in that department.",
+            message=notification_message,
             notification_type="temporary_manager_assignment"
         )
         if old_manager and old_manager.user_id != new_manager.user_id:

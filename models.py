@@ -347,6 +347,7 @@ class DepartmentTemporaryManager(db.Model):
     temporary_manager_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
     set_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
     set_at = db.Column(db.DateTime, default=datetime.utcnow)
+    include_procurement_approvals = db.Column(db.Boolean, default=False)  # If True, temp manager can also do Procurement Manager Approval and Final Approval for item requests from ALL departments
 
     # Unique constraint on combination of department and request_type
     __table_args__ = (db.UniqueConstraint('department', 'request_type', name='unique_dept_request_type'),)
@@ -355,7 +356,7 @@ class DepartmentTemporaryManager(db.Model):
     set_by_user = db.relationship('User', foreign_keys=[set_by_user_id], backref='department_temporary_set_actions')
 
     def __repr__(self):
-        return f"<DepartmentTemporaryManager dept={self.department} request_type={self.request_type} temp_manager={self.temporary_manager.name if self.temporary_manager else self.temporary_manager_id}>"
+        return f"<DepartmentTemporaryManager dept={self.department} request_type={self.request_type} temp_manager={self.temporary_manager.name if self.temporary_manager else self.temporary_manager_id} include_procurement_approvals={self.include_procurement_approvals}>"
 
 
 class PaidNotification(db.Model):
