@@ -4527,6 +4527,59 @@ def get_procurement_money_spent():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/procurement/money-spent-history', methods=['GET'])
+@login_required
+def get_procurement_money_spent_history():
+    """API endpoint to get the Money Spent history for Procurement department"""
+    # Only allow Procurement Department Managers, GM, Operation Manager, IT, and Auditing to access this endpoint
+    allowed_roles = ['Department Manager', 'GM', 'Operation Manager']
+    allowed_departments = ['Procurement', 'IT', 'Auditing']
+    
+    # Check if user has access
+    has_access = (
+        (current_user.role in allowed_roles) or 
+        (current_user.department in allowed_departments)
+    )
+    
+    if not has_access:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        # Get snapshot entries for Procurement department, ordered by date descending
+        entries = CurrentMoneyEntry.query.filter(
+            CurrentMoneyEntry.department == 'Procurement',
+            CurrentMoneyEntry.entry_kind == 'snapshot',
+            CurrentMoneyEntry.money_spent.isnot(None)  # Filter out entries with null money_spent
+        ).order_by(CurrentMoneyEntry.entry_date.desc()).all()
+        
+        # Convert to list of dictionaries with the fields expected by the frontend
+        history = []
+        last_money_spent = None
+        
+        for entry in entries:
+            money_spent_value = float(entry.money_spent) if entry.money_spent is not None else None
+            
+            # Skip entries with null money_spent (shouldn't happen due to filter, but double-check)
+            if money_spent_value is None:
+                continue
+            
+            # Skip duplicate consecutive entries (same money_spent value as previous entry)
+            if last_money_spent is not None and abs(money_spent_value - last_money_spent) < 0.001:
+                continue
+            
+            history.append({
+                'entry_date': entry.entry_date.isoformat() if entry.entry_date else None,
+                'money_spent': money_spent_value,
+                'available_balance': float(entry.available_balance) if entry.available_balance is not None else None
+            })
+            
+            last_money_spent = money_spent_value
+        
+        return jsonify({'history': history})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/procurement/item-requests')
 @login_required
 def procurement_item_requests():
