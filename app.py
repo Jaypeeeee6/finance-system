@@ -8966,6 +8966,51 @@ def procurement_request_item():
                 evidence_paths = _json.dumps(evidence_filenames) if evidence_filenames else None
         # Create procurement item request record
         current_time = datetime.utcnow()
+        
+        # Check if user has a role that auto-approves manager approval
+        auto_approve_roles = ['Department Manager', 'GM', 'General Manager', 'Operation Manager', 'Finance Admin']
+        should_auto_approve = False
+        if current_user and not is_save_draft:
+            # Check role (normalize for comparison)
+            user_role = (current_user.role or '').strip()
+            # Check exact match first
+            should_auto_approve = user_role in auto_approve_roles
+            # Also check case-insensitive match as fallback
+            if not should_auto_approve:
+                user_role_lower = user_role.lower()
+                should_auto_approve = any(role.lower() == user_role_lower for role in auto_approve_roles)
+            
+            # Log for debugging
+            log_action(f"Item request submission - User: {current_user.name} (ID: {current_user.user_id}), Role: '{user_role}', Department: {current_user.department}, Auto-approve: {should_auto_approve}, is_save_draft: {is_save_draft}")
+            
+            # Check if there's a temporary manager for this department (for logging purposes)
+            try:
+                req_dept = (current_user.department or '').strip()
+                if req_dept:
+                    dept_temp = None
+                    for dt in DepartmentTemporaryManager.query.filter(
+                        db.or_(
+                            DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                            DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                        )
+                    ).all():
+                        dt_dept = (dt.department or '').strip()
+                        if dt_dept.lower() == req_dept.lower():
+                            dept_temp = dt
+                            break
+                    if dept_temp:
+                        temp_manager = User.query.get(dept_temp.temporary_manager_id)
+                        if temp_manager:
+                            log_action(f"Item request submission - Temporary manager found for department '{req_dept}': {temp_manager.name} (ID: {temp_manager.user_id}), but auto-approving anyway for role '{user_role}'")
+            except Exception as e:
+                log_action(f"Item request submission - Error checking temporary manager: {e}")
+        
+        # Determine initial status
+        if should_auto_approve:
+            initial_status = 'Pending Procurement Manager Approval'
+        else:
+            initial_status = 'Pending Manager Approval' if not is_save_draft else 'Draft'
+        
         item_request = ProcurementItemRequest(
             requestor_name=requestor_name,
             department=current_user.department if current_user else '',
@@ -8978,12 +9023,21 @@ def procurement_request_item():
             is_urgent=False,  # Will be set by manager during approval
             notes=notes if notes else None,
             is_draft=is_save_draft,  # Mark as draft if saving as draft
-            status='Pending Manager Approval' if not is_save_draft else 'Draft',
+            status=initial_status,
             user_id=current_user.user_id if current_user else None,
             requestor_item_upload_path=upload_paths,
             requestor_evidence_upload_path=evidence_paths,
             manager_approval_start_time=current_time if not is_save_draft else None
         )
+        
+        # Auto-approve manager approval for specified roles
+        if should_auto_approve:
+            item_request.manager_approval_date = current_time.date()
+            item_request.manager_approver = current_user.name
+            item_request.manager_approver_user_id = current_user.user_id
+            item_request.manager_approval_end_time = current_time
+            item_request.manager_approval_reason = 'Auto-approved (Manager role)'
+            log_action(f"Item request auto-approved - Setting manager_approver: {current_user.name} (ID: {current_user.user_id}), status: {initial_status}, date: {current_time.date()}")
         
         db.session.add(item_request)
         db.session.commit()
@@ -8998,16 +9052,26 @@ def procurement_request_item():
         
         # Notify the requestor
         if current_user:
-            create_notification(
-                user_id=current_user.user_id,
-                title="Item Request Submitted",
-                message=f"Your item request for {item_name} has been submitted successfully and is awaiting manager approval.",
-                notification_type="new_submission",
-                item_request_id=item_request.id
-            )
+            if should_auto_approve:
+                # For auto-approved requests, notify that it's been auto-approved and sent to procurement manager
+                create_notification(
+                    user_id=current_user.user_id,
+                    title="Item Request Submitted",
+                    message=f"Your item request for {item_name} has been submitted successfully. Manager approval was automatically approved and sent to Procurement Manager.",
+                    notification_type="new_submission",
+                    item_request_id=item_request.id
+                )
+            else:
+                create_notification(
+                    user_id=current_user.user_id,
+                    title="Item Request Submitted",
+                    message=f"Your item request for {item_name} has been submitted successfully and is awaiting manager approval.",
+                    notification_type="new_submission",
+                    item_request_id=item_request.id
+                )
         
-        # Notify manager(s) - similar to payment requests
-        if current_user:
+        # Notify manager(s) - similar to payment requests (skip for auto-approved requests)
+        if current_user and not should_auto_approve:
             # Get manager approvers - ensure we reload the item_request with user relationship
             item_request = ProcurementItemRequest.query.get(item_request.id)
             
@@ -9029,6 +9093,53 @@ def procurement_request_item():
                 except Exception as e:
                     # Silently handle notification errors - don't log to audit
                     pass
+        
+        # For auto-approved requests, notify Procurement Managers directly
+        if should_auto_approve:
+            # Refresh the item_request to ensure relationships are loaded
+            item_request = ProcurementItemRequest.query.get(item_request.id)
+            
+            # Notify Procurement Managers
+            procurement_managers = User.query.filter_by(
+                department='Procurement',
+                role='Department Manager'
+            ).all()
+            for pm in procurement_managers:
+                try:
+                    create_notification(
+                        user_id=pm.user_id,
+                        title="New Item Request for Approval",
+                        message=f"Item request #{item_request.id} from {requestor_name} ({item_request.department}) requires your approval.",
+                        notification_type="new_submission",
+                        item_request_id=item_request.id
+                    )
+                except Exception as e:
+                    pass
+            
+            # Notify temporary managers with include_procurement_approvals enabled
+            try:
+                temp_procurement_approvers = DepartmentTemporaryManager.query.filter(
+                    DepartmentTemporaryManager.include_procurement_approvals == True,
+                    db.or_(
+                        DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                        DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                    )
+                ).all()
+                for temp_assign in temp_procurement_approvers:
+                    temp_manager = User.query.get(temp_assign.temporary_manager_id)
+                    if temp_manager:
+                        try:
+                            create_notification(
+                                user_id=temp_manager.user_id,
+                                title="New Item Request for Procurement Manager Approval",
+                                message=f"Item request #{item_request.id} from {requestor_name} ({item_request.department}) requires your procurement manager approval.",
+                                notification_type="new_submission",
+                                item_request_id=item_request.id
+                            )
+                        except Exception as e:
+                            pass
+            except Exception as e:
+                print(f"DEBUG: Error notifying temp procurement approvers: {e}")
         
         # Notify IT department users about new item request (all IT Staff and IT Department Manager)
         it_users = User.query.filter(
@@ -13277,32 +13388,103 @@ def edit_item_draft(draft_id):
         if not is_save_draft:
             # Submit the draft
             draft.is_draft = False
-            draft.status = 'Pending Manager Approval'
-            draft.manager_approval_start_time = datetime.utcnow()
+            
+            # Check if user has a role that auto-approves manager approval
+            auto_approve_roles = ['Department Manager', 'GM', 'General Manager', 'Operation Manager', 'Finance Admin']
+            should_auto_approve = current_user and current_user.role in auto_approve_roles
+            
+            current_time = datetime.utcnow()
+            
+            if should_auto_approve:
+                # Auto-approve manager approval
+                draft.status = 'Pending Procurement Manager Approval'
+                draft.manager_approval_start_time = current_time
+                draft.manager_approval_date = current_time.date()
+                draft.manager_approver = current_user.name
+                draft.manager_approver_user_id = current_user.user_id
+                draft.manager_approval_end_time = current_time
+                draft.manager_approval_reason = 'Auto-approved (Manager role)'
+            else:
+                draft.status = 'Pending Manager Approval'
+                draft.manager_approval_start_time = current_time
+            
             db.session.commit()
             
             # Send notifications (similar to new item request)
             if current_user:
-                create_notification(
-                    user_id=current_user.user_id,
-                    title="Item Request Submitted",
-                    message=f"Your item request for {draft.item_name} has been submitted successfully and is awaiting manager approval.",
-                    notification_type="new_submission",
-                    item_request_id=draft.id
-                )
-            
-            authorized_approvers = get_authorized_manager_approvers_for_item_request(draft)
-            for approver in authorized_approvers:
-                try:
+                if should_auto_approve:
                     create_notification(
-                        user_id=approver.user_id,
-                        title="New Item Request for Approval",
-                        message=f"New item request submitted by {draft.requestor_name} from {draft.department} department for {draft.item_name} - requires your approval",
-                        notification_type="item_request_submission",
+                        user_id=current_user.user_id,
+                        title="Item Request Submitted",
+                        message=f"Your item request for {draft.item_name} has been submitted successfully. Manager approval was automatically approved and sent to Procurement Manager.",
+                        notification_type="new_submission",
                         item_request_id=draft.id
                     )
+                else:
+                    create_notification(
+                        user_id=current_user.user_id,
+                        title="Item Request Submitted",
+                        message=f"Your item request for {draft.item_name} has been submitted successfully and is awaiting manager approval.",
+                        notification_type="new_submission",
+                        item_request_id=draft.id
+                    )
+            
+            if should_auto_approve:
+                # Notify Procurement Managers directly
+                procurement_managers = User.query.filter_by(
+                    department='Procurement',
+                    role='Department Manager'
+                ).all()
+                for pm in procurement_managers:
+                    try:
+                        create_notification(
+                            user_id=pm.user_id,
+                            title="New Item Request for Approval",
+                            message=f"Item request #{draft.id} from {draft.requestor_name} ({draft.department}) requires your approval.",
+                            notification_type="new_submission",
+                            item_request_id=draft.id
+                        )
+                    except Exception as e:
+                        pass
+                
+                # Notify temporary managers with include_procurement_approvals enabled
+                try:
+                    temp_procurement_approvers = DepartmentTemporaryManager.query.filter(
+                        DepartmentTemporaryManager.include_procurement_approvals == True,
+                        db.or_(
+                            DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                            DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                        )
+                    ).all()
+                    for temp_assign in temp_procurement_approvers:
+                        temp_manager = User.query.get(temp_assign.temporary_manager_id)
+                        if temp_manager:
+                            try:
+                                create_notification(
+                                    user_id=temp_manager.user_id,
+                                    title="New Item Request for Procurement Manager Approval",
+                                    message=f"Item request #{draft.id} from {draft.requestor_name} ({draft.department}) requires your procurement manager approval.",
+                                    notification_type="new_submission",
+                                    item_request_id=draft.id
+                                )
+                            except Exception as e:
+                                pass
                 except Exception as e:
-                    pass
+                    print(f"DEBUG: Error notifying temp procurement approvers: {e}")
+            else:
+                # Notify manager approvers (normal flow)
+                authorized_approvers = get_authorized_manager_approvers_for_item_request(draft)
+                for approver in authorized_approvers:
+                    try:
+                        create_notification(
+                            user_id=approver.user_id,
+                            title="New Item Request for Approval",
+                            message=f"New item request submitted by {draft.requestor_name} from {draft.department} department for {draft.item_name} - requires your approval",
+                            notification_type="item_request_submission",
+                            item_request_id=draft.id
+                        )
+                    except Exception as e:
+                        pass
             
             flash(f'Item request submitted successfully! Item: {draft.item_name}', 'success')
             log_action(f'Submitted item request draft #{draft_id}: {draft.item_name}')

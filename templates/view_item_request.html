@@ -882,7 +882,7 @@ body.flash-success-open {
                     Submit Request
                 </div>
             </li>
-            <li class="step-tab {% if item_request.status == 'Rejected by Manager' %}rejected{% elif item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id %}completed{% elif item_request.status == 'Pending Manager Approval' or (item_request.status == 'On Hold' and item_request.manager_on_hold_by_user_id) %}warning{% elif item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed', 'Final Approval'] %}completed{% else %}disabled{% endif %}" data-step="manager">
+            <li class="step-tab {% if item_request.status == 'Rejected by Manager' %}rejected{% elif item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id %}completed{% elif item_request.status == 'Pending Manager Approval' or (item_request.status == 'On Hold' and item_request.manager_on_hold_by_user_id) %}warning{% elif item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed', 'Final Approval'] or (item_request.manager_approver_user_id and item_request.manager_approver_user_id == item_request.user_id) %}completed{% else %}disabled{% endif %}" data-step="manager">
                 <div class="step-tab-content">
                     Manager Approval
                 </div>
@@ -1167,7 +1167,7 @@ body.flash-success-open {
         <div class="step-content" id="step-manager">
             <h3><i class="fas fa-user-tie"></i> Manager Approval</h3>
             
-            {% if item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed', 'Final Approval', 'Rejected by Manager'] or (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) %}
+            {% if item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed', 'Final Approval', 'Rejected by Manager'] or (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) or (item_request.manager_approver_user_id and item_request.manager_approver_user_id == item_request.user_id) %}
                 <div class="admin-mode-warning" style="background: #28a745; color: white;">
                     <i class="fas fa-check-circle"></i>
                     <span>Manager Approval: {% if item_request.status == 'Rejected by Manager' %}Rejected{% else %}Completed{% endif %}</span>
