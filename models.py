@@ -815,6 +815,73 @@ class ProcurementItemRequest(db.Model):
         return f'<ProcurementItemRequest {self.id} - {self.item_name} ({self.status})>'
 
 
+class ProcurementReceiptEntry(db.Model):
+    """Receipt entries for procurement item requests - stores amount and reference number per receipt file"""
+    __tablename__ = 'procurement_receipt_entries'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    item_request_id = db.Column(db.Integer, db.ForeignKey('procurement_item_requests.id'), nullable=False)
+    filename = db.Column(db.String(500), nullable=False)  # The uploaded receipt filename
+    amount = db.Column(db.Numeric(10, 3), nullable=False)  # Receipt amount (can be 0)
+    reference_number = db.Column(db.String(100), nullable=False)  # Receipt reference number
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationship to item request
+    item_request = db.relationship('ProcurementItemRequest', backref='receipt_entries')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'item_request_id': self.item_request_id,
+            'filename': self.filename,
+            'amount': float(self.amount) if self.amount is not None else None,
+            'reference_number': self.reference_number,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
+    
+    def __repr__(self):
+        return f'<ProcurementReceiptEntry {self.id} - {self.filename} (Request {self.item_request_id})>'
+
+
+class ProcurementInvoiceEntry(db.Model):
+    """Invoice entries for procurement item requests - stores amount and items per invoice file"""
+    __tablename__ = 'procurement_invoice_entries'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    item_request_id = db.Column(db.Integer, db.ForeignKey('procurement_item_requests.id'), nullable=False)
+    filename = db.Column(db.String(500), nullable=False)  # The uploaded invoice filename
+    amount = db.Column(db.Numeric(10, 3), nullable=False)  # Invoice amount (must be > 0)
+    items = db.Column(db.Text, nullable=False)  # JSON array of item names this invoice covers
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationship to item request
+    item_request = db.relationship('ProcurementItemRequest', backref='invoice_entries')
+    
+    def to_dict(self):
+        import json
+        items_list = []
+        if self.items:
+            try:
+                items_list = json.loads(self.items)
+            except:
+                items_list = []
+        return {
+            'id': self.id,
+            'item_request_id': self.item_request_id,
+            'filename': self.filename,
+            'amount': float(self.amount) if self.amount is not None else None,
+            'items': items_list,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
+    
+    def __repr__(self):
+        return f'<ProcurementInvoiceEntry {self.id} - {self.filename} (Request {self.item_request_id})>'
+
+
 class ProcurementCategory(db.Model):
     """Procurement category options for specific departments"""
     __tablename__ = 'procurement_categories'

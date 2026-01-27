@@ -2977,33 +2977,52 @@ body.flash-success-open {
                         {% if receipt_files %}
                         <div class="form-group" id="uploaded-receipts-list">
                             <label><i class="fas fa-check-circle"></i> Receipt (Proof of transfer made by the Procurement Manager)</label>
+                            {% set receipt_amount_lookup = {} %}
+                            {% set receipt_ref_lookup = {} %}
+                            {% set receipt_total_ns = namespace(total=0.0) %}
+                            {% for rec in receipt_entries or [] %}
+                                {% if rec.filename %}
+                                    {% set rec_amt = rec['amount'] if rec['amount'] is defined else None %}
+                                    {% set rec_ref = rec['reference_number'] if rec['reference_number'] is defined else None %}
+                                    {% set _ = receipt_amount_lookup.update({rec.filename: rec_amt}) %}
+                                    {% set _ = receipt_ref_lookup.update({rec.filename: rec_ref}) %}
+                                    {% if rec_amt %}
+                                        {% set receipt_total_ns.total = receipt_total_ns.total + (rec_amt | float) %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
                             {% for file in receipt_files %}
                             <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
                                 <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
                                     <i class="fas fa-download"></i> View Receipt {{ loop.index }}
                                 </a>
                                 <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                                {% set file_amount = receipt_amount_lookup.get(file) %}
+                                {% set file_ref = receipt_ref_lookup.get(file) %}
+                                {% if file_amount is not none %}
+                                <div style="margin-top: 6px; font-weight: 600; color: #1f2937;">Amount: OMR {{ '%.3f'|format(file_amount|float) }}</div>
+                                {% endif %}
+                                {% if file_ref %}
+                                <div style="margin-top: 4px; color: #374151;">
+                                    <strong>Reference Number:</strong> {{ file_ref }}
+                                </div>
+                                {% endif %}
                             </div>
                             {% endfor %}
+                            {% if receipt_total_ns is not defined %}
+                                {% set receipt_total_ns = namespace(total=0.0) %}
+                            {% endif %}
+                            {% set receipt_total_value = (receipt_total_ns.total if receipt_total_ns.total > 0 else item_request.receipt_amount) %}
+                            {% if receipt_total_value is not none %}
+                            <div class="form-group" style="margin-top: 10px;">
+                                <label>Receipt Amount (OMR)</label>
+                                <input type="text"
+                                       value="{{ '%.3f'|format(receipt_total_value) }}"
+                                       readonly
+                                       style="background: #f5f5f5;">
+                            </div>
+                            {% endif %}
                         </div>
-                        {% if item_request.receipt_amount %}
-                        <div class="form-group" style="margin-top: 10px;">
-                            <label>Receipt Amount (OMR)</label>
-                            <input type="text"
-                                   value="{{ '%.3f'|format(item_request.receipt_amount) }}"
-                                   readonly
-                                   style="background: #f5f5f5;">
-                        </div>
-                        {% endif %}
-                        {% if item_request.receipt_reference_number %}
-                        <div class="form-group">
-                            <label>Receipt Reference Number</label>
-                            <input type="text"
-                                   value="{{ item_request.receipt_reference_number }}"
-                                   readonly
-                                   style="background: #f5f5f5;">
-                        </div>
-                        {% endif %}
                         {% endif %}
                         {% if invoice_files %}
                         <div class="form-group" id="uploaded-invoices-list">
@@ -3328,34 +3347,12 @@ body.flash-success-open {
                                                 })();
                                             </script>
                                         </div>
-
-                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                            <div class="form-group" style="margin-bottom: 0;">
-                                                <label for="completion_receipt_amount">Receipt Amount (OMR) <span style="color: red;">*</span></label>
-                                                <input type="number"
-                                                       name="receipt_amount"
-                                                       id="completion_receipt_amount"
-                                                       class="form-control"
-                                                       step="0.001"
-                                                       min="0"
-                                                       placeholder="Enter amount transferred to procurement staff in OMR"
-                                                       value="{% if item_request.receipt_amount is not none %}{{ '%.3f'|format(item_request.receipt_amount) }}{% endif %}"
-                                                       required>
-                                            </div>
-
-                                            <div class="form-group" style="margin-bottom: 0;">
-                                                <label for="completion_receipt_reference_number">Receipt Reference Number <span style="color: red;">*</span></label>
-                                                <input type="text"
-                                                       name="receipt_reference_number"
-                                                       id="completion_receipt_reference_number"
-                                                       class="form-control"
-                                                       placeholder="Enter the bank transfer or receipt reference number (letters and numbers only)"
-                                                       pattern="[A-Za-z0-9]+"
-                                                       oninput="this.value = this.value.replace(/[^a-zA-Z0-9]/g, '')"
-                                                       value="{{ item_request.receipt_reference_number or '' }}"
-                                                       required>
-                                            </div>
+                                        <div class="form-group" id="receipt-mapping" style="margin-top: 10px; display: none;">
+                                            <label>Enter amount and reference number for each receipt: <span style="color: red;">*</span></label>
+                                            <div id="receipt-mapping-list" style="display: grid; gap: 10px;"></div>
+                                            <small class="form-text text-muted">Amount and reference number are required for each receipt (amount can be 0).</small>
                                         </div>
+                                        <input type="hidden" name="receipt_map" id="receipt_map_input">
                                         
                                         <div class="form-group" style="margin-top: 2.5rem;">
                                             <div id="item-invoice-upload-container" 
@@ -3848,46 +3845,53 @@ body.flash-success-open {
                         </div>
                         {% endif %}
                         {% if receipt_files %}
-                        <div class="form-group">
+                        <div class="form-group" id="uploaded-receipts-list">
                             <label><i class="fas fa-check-circle"></i> Receipt (Proof of transfer made by the Procurement Manager)</label>
+                            {% set receipt_amount_lookup = {} %}
+                            {% set receipt_ref_lookup = {} %}
+                            {% set receipt_total_ns = namespace(total=0.0) %}
+                            {% for rec in receipt_entries or [] %}
+                                {% if rec.filename %}
+                                    {% set rec_amt = rec['amount'] if rec['amount'] is defined else None %}
+                                    {% set rec_ref = rec['reference_number'] if rec['reference_number'] is defined else None %}
+                                    {% set _ = receipt_amount_lookup.update({rec.filename: rec_amt}) %}
+                                    {% set _ = receipt_ref_lookup.update({rec.filename: rec_ref}) %}
+                                    {% if rec_amt %}
+                                        {% set receipt_total_ns.total = receipt_total_ns.total + (rec_amt | float) %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
                             {% for file in receipt_files %}
                             <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
                                 <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
                                     <i class="fas fa-download"></i> View Receipt {{ loop.index }}
                                 </a>
                                 <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
+                                {% set file_amount = receipt_amount_lookup.get(file) %}
+                                {% set file_ref = receipt_ref_lookup.get(file) %}
+                                {% if file_amount is not none %}
+                                <div style="margin-top: 6px; font-weight: 600; color: #1f2937;">Amount: OMR {{ '%.3f'|format(file_amount|float) }}</div>
+                                {% endif %}
+                                {% if file_ref %}
+                                <div style="margin-top: 4px; color: #374151;">
+                                    <strong>Reference Number:</strong> {{ file_ref }}
+                                </div>
+                                {% endif %}
                             </div>
                             {% endfor %}
-                            {% if invoice_total_ns is not defined %}
-                                {% set invoice_total_ns = namespace(total=0.0) %}
+                            {% if receipt_total_ns is not defined %}
+                                {% set receipt_total_ns = namespace(total=0.0) %}
                             {% endif %}
-                            {% set invoice_total_value = (invoice_total_ns.total if invoice_total_ns.total > 0 else item_request.invoice_amount) %}
-                            {% if invoice_total_value is not none %}
+                            {% set receipt_total_value = (receipt_total_ns.total if receipt_total_ns.total > 0 else item_request.receipt_amount) %}
+                            {% if receipt_total_value is not none %}
                             <div class="form-group" style="margin-top: 10px;">
-                                <label>Invoice Amount (OMR)</label>
+                                <label>Receipt Amount (OMR)</label>
                                 <input type="text"
-                                       value="{{ '%.3f'|format(invoice_total_value) }}"
+                                       value="{{ '%.3f'|format(receipt_total_value) }}"
                                        readonly
                                        style="background: #f5f5f5;">
                             </div>
                             {% endif %}
-                        </div>
-                        {% endif %}
-
-                        {% if item_request.receipt_amount is not none or item_request.receipt_reference_number %}
-                        <div class="form-group" style="margin-top: 8px;">
-                            <label>Receipt Amount (OMR)</label>
-                            <input type="text"
-                                   value="{% if item_request.receipt_amount is not none %}{{ '%.3f'|format(item_request.receipt_amount) }}{% else %}-{% endif %}"
-                                   readonly
-                                   style="background: #f5f5f5;">
-                        </div>
-                        <div class="form-group">
-                            <label>Receipt Reference Number</label>
-                            <input type="text"
-                                   value="{{ item_request.receipt_reference_number or '-' }}"
-                                   readonly
-                                   style="background: #f5f5f5;">
                         </div>
                         {% endif %}
 
@@ -4443,18 +4447,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Disable/enable other related inputs: receipt amount, receipt reference, and invoice mapping inputs
-                const receiptAmountInputEl = itemRequestCompleteForm.querySelector('#completion_receipt_amount');
-                const receiptRefEl = itemRequestCompleteForm.querySelector('#completion_receipt_reference_number');
-                if (receiptAmountInputEl) {
-                    receiptAmountInputEl.disabled = noReceiptFromStore;
-                    if (noReceiptFromStore) receiptAmountInputEl.removeAttribute('required');
-                    else receiptAmountInputEl.setAttribute('required', 'true');
-                }
-                if (receiptRefEl) {
-                    receiptRefEl.disabled = noReceiptFromStore;
-                    if (noReceiptFromStore) receiptRefEl.removeAttribute('required');
-                    else receiptRefEl.setAttribute('required', 'true');
+                // Disable/enable receipt mapping inputs
+                if (receiptMappingWrapper) {
+                    if (noReceiptFromStore) {
+                        receiptMappingWrapper.style.display = 'none';
+                        if (receiptMapInput) receiptMapInput.value = '';
+                        if (receiptMappingList) receiptMappingList.innerHTML = '';
+                    } else {
+                        refreshReceiptMapping();
+                    }
                 }
 
                 if (invoiceMappingList) {
@@ -4680,6 +4681,178 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Initialize mapping UI
         refreshInvoiceMapping();
+
+        // Receipt mapping (amount and reference number for each receipt)
+        const receiptMappingWrapper = document.getElementById('receipt-mapping');
+        const receiptMappingList = document.getElementById('receipt-mapping-list');
+        const receiptMapInput = document.getElementById('receipt_map_input');
+
+        const syncReceiptMapInput = () => {
+            if (!receiptMapInput || !receiptMappingList) return {};
+            const map = {};
+            receiptMappingList.querySelectorAll('[data-receipt-file]').forEach(group => {
+                const fileName = group.getAttribute('data-receipt-file');
+                const amountInput = group.querySelector('input[type="number"][data-receipt-amount]');
+                const refInput = group.querySelector('input[type="text"][data-receipt-reference]');
+                let amountVal = amountInput ? parseFloat(amountInput.value) : null;
+                if (isNaN(amountVal)) {
+                    amountVal = null;
+                }
+                const refVal = refInput ? refInput.value.trim() : '';
+                if (fileName) {
+                    map[fileName] = {
+                        amount: amountVal,
+                        reference_number: refVal,
+                    };
+                }
+            });
+            receiptMapInput.value = JSON.stringify(map);
+            return map;
+        };
+
+        const renderReceiptMapping = (files) => {
+            if (!receiptMappingWrapper || !receiptMappingList) return;
+            const fileList = Array.from(files || []);
+            
+            // Get existing files that are already rendered
+            const existingFileNames = new Set();
+            document.querySelectorAll('[data-receipt-file]').forEach(elem => {
+                existingFileNames.add(elem.getAttribute('data-receipt-file'));
+            });
+            
+            // Filter to only new files (not already rendered)
+            const newFiles = fileList.filter(file => !existingFileNames.has(file.name));
+            
+            // If no new files and list is empty, hide the wrapper
+            if (newFiles.length === 0 && receiptMappingList.children.length === 0) {
+                receiptMappingWrapper.style.display = 'none';
+                if (receiptMapInput) {
+                    receiptMapInput.value = '';
+                }
+                return;
+            }
+            
+            // Show wrapper if there are files
+            if (fileList.length > 0) {
+                receiptMappingWrapper.style.display = 'block';
+            }
+            
+            newFiles.forEach((file, idx) => {
+                const fileRow = document.createElement('div');
+                fileRow.className = 'receipt-mapping-row';
+                fileRow.style.padding = '10px';
+                fileRow.style.border = '1px solid #dee2e6';
+                fileRow.style.borderRadius = '6px';
+                fileRow.style.background = '#f8f9fa';
+                fileRow.setAttribute('data-receipt-file', file.name);
+
+                const title = document.createElement('div');
+                title.style.fontWeight = '600';
+                title.style.marginBottom = '8px';
+                title.textContent = file.name;
+                if (noReceiptFromStore) {
+                    title.style.color = '#6b7280';
+                    title.style.opacity = '0.95';
+                }
+                fileRow.appendChild(title);
+
+                const inputsWrap = document.createElement('div');
+                inputsWrap.style.display = 'grid';
+                inputsWrap.style.gridTemplateColumns = '1fr 1fr';
+                inputsWrap.style.gap = '10px';
+
+                // Amount input
+                const amountWrap = document.createElement('div');
+                const amountLabel = document.createElement('label');
+                amountLabel.textContent = 'Receipt amount (OMR) *';
+                amountLabel.style.display = 'block';
+                amountLabel.style.fontWeight = '500';
+                amountLabel.style.marginBottom = '4px';
+                const amountInput = document.createElement('input');
+                amountInput.type = 'number';
+                amountInput.min = '0';
+                amountInput.step = '0.001';
+                amountInput.required = true;
+                amountInput.setAttribute('data-receipt-amount', 'true');
+                amountInput.style.width = '100%';
+                amountInput.placeholder = '0.000';
+                if (noReceiptFromStore) {
+                    amountInput.disabled = true;
+                    amountInput.removeAttribute('required');
+                    amountLabel.style.color = '#6b7280';
+                    amountLabel.style.opacity = '0.9';
+                }
+                amountWrap.appendChild(amountLabel);
+                amountWrap.appendChild(amountInput);
+                inputsWrap.appendChild(amountWrap);
+
+                // Reference number input
+                const refWrap = document.createElement('div');
+                const refLabel = document.createElement('label');
+                refLabel.textContent = 'Reference number *';
+                refLabel.style.display = 'block';
+                refLabel.style.fontWeight = '500';
+                refLabel.style.marginBottom = '4px';
+                const refInput = document.createElement('input');
+                refInput.type = 'text';
+                refInput.setAttribute('data-receipt-reference', 'true');
+                refInput.required = true;
+                refInput.style.width = '100%';
+                refInput.placeholder = 'Enter reference number';
+                refInput.pattern = '[A-Za-z0-9]+';
+                refInput.oninput = function() {
+                    this.value = this.value.replace(/[^a-zA-Z0-9]/g, '');
+                };
+                if (noReceiptFromStore) {
+                    refInput.disabled = true;
+                    refInput.removeAttribute('required');
+                    refLabel.style.color = '#6b7280';
+                    refLabel.style.opacity = '0.9';
+                }
+                refWrap.appendChild(refLabel);
+                refWrap.appendChild(refInput);
+                inputsWrap.appendChild(refWrap);
+
+                fileRow.appendChild(inputsWrap);
+                receiptMappingList.appendChild(fileRow);
+            });
+
+            syncReceiptMapInput();
+        };
+
+        if (receiptMappingList) {
+            receiptMappingList.addEventListener('input', function(e) {
+                if (e.target && (e.target.hasAttribute('data-receipt-amount') || e.target.hasAttribute('data-receipt-reference'))) {
+                    syncReceiptMapInput();
+                }
+            });
+        }
+
+        const refreshReceiptMapping = () => {
+            if (receiptUploadContainer && receiptUploadContainer.uploadComponent) {
+                renderReceiptMapping(receiptUploadContainer.uploadComponent.getFiles());
+            } else {
+                const fallbackInput = itemRequestCompleteForm.querySelector('input[name="receipt_files"]');
+                renderReceiptMapping(fallbackInput ? fallbackInput.files : []);
+            }
+        };
+
+        if (receiptUploadContainer) {
+            receiptUploadContainer.addEventListener('multipleFileUpload:changed', (evt) => {
+                renderReceiptMapping(evt.detail?.files || []);
+            });
+        }
+
+        const receiptFileInputFallback = itemRequestCompleteForm.querySelector('input[name="receipt_files"]');
+        if (receiptFileInputFallback) {
+            receiptFileInputFallback.addEventListener('change', (e) => {
+                renderReceiptMapping(e.target.files);
+            });
+        }
+
+        // Initialize receipt mapping UI
+        refreshReceiptMapping();
+
         // Helper to render uploaded files card without a full reload
         const renderUploadedFiles = (receipts, invoices) => {
             const card = document.getElementById('uploaded-files-card');
@@ -4752,7 +4925,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 const invoiceFileList = invoiceComponent
                     ? invoiceComponent.getFiles()
                     : (invoiceInput && invoiceInput.files ? Array.from(invoiceInput.files) : []);
+                const receiptMap = syncReceiptMapInput();
                 const invoiceMap = syncInvoiceItemMapInput();
+                
+                // Validate receipt mapping
+                if (receiptFileList && receiptFileList.length > 0) {
+                    const missingReceiptMappings = receiptFileList.filter(f => {
+                        const entry = receiptMap[f.name];
+                        const hasAmount = entry && entry.amount !== null && entry.amount !== undefined;
+                        const hasRef = entry && entry.reference_number && entry.reference_number.trim() !== '';
+                        return !entry || !hasAmount || !hasRef;
+                    });
+                    if (missingReceiptMappings.length > 0) {
+                        const missingDetails = missingReceiptMappings.map(f => {
+                            const entry = receiptMap[f.name];
+                            const issues = [];
+                            if (!entry || entry.amount === null || entry.amount === undefined) {
+                                issues.push('amount');
+                            }
+                            if (!entry || !entry.reference_number || entry.reference_number.trim() === '') {
+                                issues.push('reference number');
+                            }
+                            return `${f.name} (missing: ${issues.join(', ')})`;
+                        });
+                        showReceiptUploadErrorDialog('Please enter a receipt amount and reference number for each receipt file: ' + missingDetails.join('; '));
+                        return;
+                    }
+                }
+                
+                // Validate invoice mapping
                 if (invoiceFileList && invoiceFileList.length > 0) {
                     const missingMappings = invoiceFileList.filter(f => {
                         const entry = invoiceMap[f.name];
@@ -4767,7 +4968,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 saveUploadsBtn.disabled = true;
                 saveUploadsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
 
-                // Ensure the latest mapping is in the form before submission
+                // Ensure the latest mappings are in the form before submission
+                syncReceiptMapInput();
                 syncInvoiceItemMapInput();
 
                 const formData = new FormData(itemRequestCompleteForm);
@@ -4802,7 +5004,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 formData.append('save_uploads', 'true');
-
+                
+                // Ensure receipt and invoice mappings are captured and explicitly added to FormData
+                syncReceiptMapInput();
+                syncInvoiceItemMapInput();
+                
+                // Explicitly add receipt_map and invoice_item_map to FormData
+                const receiptMapValue = document.getElementById('receipt_map_input')?.value || '';
+                const invoiceMapValue = document.getElementById('invoice_item_map_input')?.value || '';
+                if (receiptMapValue) {
+                    formData.append('receipt_map', receiptMapValue);
+                }
+                if (invoiceMapValue) {
+                    formData.append('invoice_item_map', invoiceMapValue);
+                }
+                
                 fetch("{{ url_for('item_request_save_uploads', request_id=item_request.id) }}", {
                     method: 'POST',
                     headers: {
@@ -4948,8 +5164,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const receiptContainer = receiptUploadContainer;
             const invoiceContainer = invoiceUploadContainer;
             
-            // Validate receipt files
+            // Validate receipt files and mapping
             let receiptFilesMissing = false;
+            let receiptMappingMissing = false;
             if (!hasExistingReceipts && !noReceiptFromStore) {
                 if (receiptContainer && receiptContainer.uploadComponent) {
                     const receiptComponent = receiptContainer.uploadComponent;
@@ -5019,26 +5236,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 return false;
             }
             
-            // Validate receipt amount - must be > 0
-            // Validate receipt amount - must be > 0 only if a new receipt is being uploaded
-            const receiptAmountInput = this.querySelector('input[name="receipt_amount"]');
-            if (receiptAmountInput && !hasExistingReceipts && !noReceiptFromStore) {
-                const receiptAmount = parseFloat(receiptAmountInput.value);
-                if (isNaN(receiptAmount) || receiptAmount <= 0) {
-                    resetButton();
-                    showMarkCompleteValidationErrorDialog('Receipt Amount must be greater than 0.');
-                    return false;
+            // Validate receipt mapping (amount and reference number for each receipt)
+            const receiptMap = syncReceiptMapInput();
+            let receiptFileList = [];
+            if (!noReceiptFromStore) {
+                if (receiptContainer && receiptContainer.uploadComponent) {
+                    receiptFileList = receiptContainer.uploadComponent.getFiles();
+                } else {
+                    const receiptFileInput = this.querySelector('input[name="receipt_files"]');
+                    receiptFileList = receiptFileInput && receiptFileInput.files ? Array.from(receiptFileInput.files) : [];
                 }
-            }
-            
-            // Validate receipt reference number - must not be empty only if a new receipt is being uploaded
-            const receiptRefInput = this.querySelector('input[name="receipt_reference_number"]');
-            if (receiptRefInput && !hasExistingReceipts && !noReceiptFromStore) {
-                const receiptRef = receiptRefInput.value.trim();
-                if (!receiptRef || receiptRef === '') {
-                    resetButton();
-                    showMarkCompleteValidationErrorDialog('Receipt Reference Number is required.');
-                    return false;
+                if (receiptFileList.length > 0) {
+                    const missingReceiptMapping = receiptFileList.filter(f => {
+                        const entry = receiptMap[f.name];
+                        const hasAmount = entry && entry.amount !== null && entry.amount !== undefined;
+                        const hasRef = entry && entry.reference_number && entry.reference_number.trim() !== '';
+                        return !entry || !hasAmount || !hasRef;
+                    });
+                    if (missingReceiptMapping.length > 0) {
+                        resetButton();
+                        const missingDetails = missingReceiptMapping.map(f => {
+                            const entry = receiptMap[f.name];
+                            const issues = [];
+                            if (!entry || entry.amount === null || entry.amount === undefined) {
+                                issues.push('amount');
+                            }
+                            if (!entry || !entry.reference_number || entry.reference_number.trim() === '') {
+                                issues.push('reference number');
+                            }
+                            return `${f.name} (missing: ${issues.join(', ')})`;
+                        });
+                        showMarkCompleteValidationErrorDialog('Please enter a receipt amount and reference number for each receipt file: ' + missingDetails.join('; '));
+                        return false;
+                    }
                 }
             }
             
@@ -5055,8 +5285,9 @@ document.addEventListener('DOMContentLoaded', function() {
             };
 
             const submitCompletion = () => {
-                // Ensure invoice item mapping is captured
+                // Ensure invoice item mapping and receipt mapping are captured
                 syncInvoiceItemMapInput();
+                syncReceiptMapInput();
                 const formData = new FormData(this);
                 if (assignedForm) {
                     const extraFields = assignedForm.querySelectorAll('input[name], textarea[name], select[name]');

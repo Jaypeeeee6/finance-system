@@ -12,7 +12,7 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, UserPermission, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry, DepartmentTemporaryManager
+from models import db, User, UserPermission, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, ProcurementReceiptEntry, ProcurementInvoiceEntry, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry, DepartmentTemporaryManager
 from config import Config
 import json
 from playwright.sync_api import sync_playwright
@@ -4774,11 +4774,131 @@ def procurement_item_requests():
             cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN invoice_amount NUMERIC(10, 3)")
             conn.commit()
             print("✓ Added 'invoice_amount' column to procurement_item_requests table")
+        
+        # Create procurement_receipt_entries table if it doesn't exist
+        cursor.execute("""
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='procurement_receipt_entries'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("""
+                CREATE TABLE procurement_receipt_entries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    item_request_id INTEGER NOT NULL,
+                    filename VARCHAR(500) NOT NULL,
+                    amount NUMERIC(10, 3) NOT NULL,
+                    reference_number VARCHAR(100) NOT NULL,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL,
+                    FOREIGN KEY (item_request_id) REFERENCES procurement_item_requests(id)
+                )
+            """)
+            conn.commit()
+            print("✓ Created 'procurement_receipt_entries' table")
+        
+        # Create procurement_invoice_entries table if it doesn't exist
+        cursor.execute("""
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='procurement_invoice_entries'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("""
+                CREATE TABLE procurement_invoice_entries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    item_request_id INTEGER NOT NULL,
+                    filename VARCHAR(500) NOT NULL,
+                    amount NUMERIC(10, 3) NOT NULL,
+                    items TEXT NOT NULL,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL,
+                    FOREIGN KEY (item_request_id) REFERENCES procurement_item_requests(id)
+                )
+            """)
+            conn.commit()
+            print("✓ Created 'procurement_invoice_entries' table")
 
         if 'procurement_manager_quantities' not in existing_columns:
             cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN procurement_manager_quantities TEXT")
             conn.commit()
             print("✓ Added 'procurement_manager_quantities' column to procurement_item_requests table")
+        
+        # Migrate existing JSON data to new tables (one-time migration)
+        try:
+            # Check if migration has been done
+            cursor.execute("SELECT COUNT(*) FROM procurement_receipt_entries")
+            receipt_count = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM procurement_invoice_entries")
+            invoice_count = cursor.fetchone()[0]
+            
+            # Only migrate if tables are empty
+            if receipt_count == 0 and invoice_count == 0:
+                cursor.execute("SELECT id, receipt_path, invoice_path FROM procurement_item_requests WHERE receipt_path IS NOT NULL OR invoice_path IS NOT NULL")
+                items_to_migrate = cursor.fetchall()
+                
+                migrated_receipts = 0
+                migrated_invoices = 0
+                
+                for item_id, receipt_path, invoice_path in items_to_migrate:
+                    # Migrate receipts
+                    if receipt_path:
+                        try:
+                            receipt_data = json.loads(receipt_path)
+                            if isinstance(receipt_data, list):
+                                for entry in receipt_data:
+                                    if isinstance(entry, dict):
+                                        filename = entry.get('filename') or entry.get('file') or entry.get('name')
+                                        amount = entry.get('amount') or 0
+                                        ref_num = entry.get('reference_number') or entry.get('referenceNumber') or ''
+                                        if filename:
+                                            cursor.execute("""
+                                                INSERT INTO procurement_receipt_entries 
+                                                (item_request_id, filename, amount, reference_number, created_at, updated_at)
+                                                VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+                                            """, (item_id, filename, amount, ref_num))
+                                            migrated_receipts += 1
+                                    elif isinstance(entry, str):
+                                        cursor.execute("""
+                                            INSERT INTO procurement_receipt_entries 
+                                            (item_request_id, filename, amount, reference_number, created_at, updated_at)
+                                            VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+                                        """, (item_id, entry, 0, ''))
+                                        migrated_receipts += 1
+                        except Exception as e:
+                            print(f"Warning: Could not migrate receipts for item request {item_id}: {e}")
+                    
+                    # Migrate invoices
+                    if invoice_path:
+                        try:
+                            invoice_data = json.loads(invoice_path)
+                            if isinstance(invoice_data, list):
+                                for entry in invoice_data:
+                                    if isinstance(entry, dict):
+                                        filename = entry.get('filename') or entry.get('file') or entry.get('name')
+                                        amount = entry.get('amount') or 0
+                                        items = entry.get('items') or []
+                                        if filename:
+                                            items_json = json.dumps(items) if isinstance(items, list) else '[]'
+                                            cursor.execute("""
+                                                INSERT INTO procurement_invoice_entries 
+                                                (item_request_id, filename, amount, items, created_at, updated_at)
+                                                VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+                                            """, (item_id, filename, amount, items_json))
+                                            migrated_invoices += 1
+                                    elif isinstance(entry, str):
+                                        cursor.execute("""
+                                            INSERT INTO procurement_invoice_entries 
+                                            (item_request_id, filename, amount, items, created_at, updated_at)
+                                            VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+                                        """, (item_id, entry, 0, '[]'))
+                                        migrated_invoices += 1
+                        except Exception as e:
+                            print(f"Warning: Could not migrate invoices for item request {item_id}: {e}")
+                
+                if migrated_receipts > 0 or migrated_invoices > 0:
+                    conn.commit()
+                    print(f"✓ Migrated {migrated_receipts} receipt entries and {migrated_invoices} invoice entries from JSON to database tables")
+        except Exception as e:
+            print(f"Warning: Could not migrate existing data: {e}")
 
         if 'manager_quantity_rejection_reason' not in existing_columns:
             cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN manager_quantity_rejection_reason TEXT")
@@ -5560,43 +5680,78 @@ def view_item_request(request_id):
         completed_user = User.query.get(item_request.completed_by_user_id)
         completed_by_name = completed_user.name if completed_user else None
     
-    receipt_files = []
-    if item_request.receipt_path:
-        try:
-            data = json.loads(item_request.receipt_path)
+    # Get receipt entries from database (preferred) or fallback to JSON parsing for legacy data
+    receipt_entries_db = ProcurementReceiptEntry.query.filter_by(item_request_id=request_id).all()
+    if receipt_entries_db:
+        receipt_entries = [{'filename': e.filename, 'amount': float(e.amount), 'reference_number': e.reference_number} for e in receipt_entries_db]
+        receipt_files = [e.filename for e in receipt_entries_db]
+    else:
+        # Fallback to parsing JSON for legacy data
+        def _parse_receipt_entries_for_api(raw_value):
+            entries = []
+            if not raw_value:
+                return entries
+            try:
+                data = json.loads(raw_value)
+            except (json.JSONDecodeError, TypeError):
+                return [{'filename': raw_value, 'amount': None, 'reference_number': None}]
+
             if isinstance(data, list):
-                receipt_files = data
+                for entry in data:
+                    if isinstance(entry, dict):
+                        fname = entry.get('filename') or entry.get('file') or entry.get('name')
+                        amount_val = entry.get('amount')
+                        ref_num = entry.get('reference_number') or entry.get('referenceNumber')
+                        if fname:
+                            entries.append({'filename': fname, 'amount': amount_val, 'reference_number': ref_num})
+                    elif isinstance(entry, str):
+                        entries.append({'filename': entry, 'amount': None, 'reference_number': None})
+            elif isinstance(data, dict):
+                fname = data.get('filename') or data.get('file') or data.get('name')
+                amount_val = data.get('amount')
+                ref_num = data.get('reference_number') or data.get('referenceNumber')
+                if fname:
+                    entries.append({'filename': fname, 'amount': amount_val, 'reference_number': ref_num})
             else:
-                receipt_files = [item_request.receipt_path]
-        except (json.JSONDecodeError, TypeError):
-            receipt_files = [item_request.receipt_path]
+                entries.append({'filename': raw_value, 'amount': None, 'reference_number': None})
+
+            return entries
+
+        receipt_entries = _parse_receipt_entries_for_api(item_request.receipt_path)
+        receipt_files = [entry.get('filename') for entry in receipt_entries if entry.get('filename')]
     
-    def _parse_invoice_files(raw_value):
-        files = []
-        if not raw_value:
+    # Get invoice files from database (preferred) or fallback to JSON parsing for legacy data
+    invoice_entries_db = ProcurementInvoiceEntry.query.filter_by(item_request_id=request_id).all()
+    if invoice_entries_db:
+        invoice_files = [e.filename for e in invoice_entries_db]
+    else:
+        # Fallback to parsing JSON for legacy data
+        def _parse_invoice_files(raw_value):
+            files = []
+            if not raw_value:
+                return files
+            try:
+                data = json.loads(raw_value)
+            except (json.JSONDecodeError, TypeError):
+                return [raw_value]
+
+            if isinstance(data, list):
+                for entry in data:
+                    if isinstance(entry, dict):
+                        fname = entry.get('filename') or entry.get('file') or entry.get('name')
+                        if fname:
+                            files.append(fname)
+                    elif isinstance(entry, str):
+                        files.append(entry)
+            elif isinstance(data, dict):
+                fname = data.get('filename') or data.get('file') or data.get('name')
+                if fname:
+                    files.append(fname)
+            else:
+                files.append(raw_value)
             return files
-        try:
-            data = json.loads(raw_value)
-        except (json.JSONDecodeError, TypeError):
-            return [raw_value]
 
-        if isinstance(data, list):
-            for entry in data:
-                if isinstance(entry, dict):
-                    fname = entry.get('filename') or entry.get('file') or entry.get('name')
-                    if fname:
-                        files.append(fname)
-                elif isinstance(entry, str):
-                    files.append(entry)
-        elif isinstance(data, dict):
-            fname = data.get('filename') or data.get('file') or data.get('name')
-            if fname:
-                files.append(fname)
-        else:
-            files.append(raw_value)
-        return files
-
-    invoice_files = _parse_invoice_files(item_request.invoice_path)
+        invoice_files = _parse_invoice_files(item_request.invoice_path)
     
     return jsonify({
         'success': True,
@@ -5622,6 +5777,7 @@ def view_item_request(request_id):
             'completion_date': item_request.completion_date.strftime('%Y-%m-%d %H:%M:%S') if item_request.completion_date else None,
             'completion_notes': item_request.completion_notes,
             'receipt_files': receipt_files,
+            'receipt_entries': receipt_entries,
             'invoice_files': invoice_files
         },
         'permissions': {
@@ -6014,17 +6170,45 @@ def view_item_request_page(request_id):
             # Fail-safe: do not break view if any of the above fails
             print(f"DEBUG: Error computing can_schedule_payment_date or scheduled_by: {e}")
     
-    # Prepare receipt files list
-    receipt_files = []
-    if item_request.receipt_path:
-        try:
-            data = json.loads(item_request.receipt_path)
+    # Get receipt entries from database (preferred) or fallback to JSON parsing for legacy data
+    receipt_entries_db = ProcurementReceiptEntry.query.filter_by(item_request_id=request_id).all()
+    if receipt_entries_db:
+        receipt_entries = [{'filename': e.filename, 'amount': float(e.amount), 'reference_number': e.reference_number} for e in receipt_entries_db]
+        receipt_files = [e.filename for e in receipt_entries_db]
+    else:
+        # Fallback to parsing JSON for legacy data
+        def _parse_receipt_entries_for_view(raw_value):
+            entries = []
+            if not raw_value:
+                return entries
+            try:
+                data = json.loads(raw_value)
+            except (json.JSONDecodeError, TypeError):
+                return [{'filename': raw_value, 'amount': None, 'reference_number': None}]
+
             if isinstance(data, list):
-                receipt_files = data
+                for entry in data:
+                    if isinstance(entry, dict):
+                        fname = entry.get('filename') or entry.get('file') or entry.get('name')
+                        amount_val = entry.get('amount')
+                        ref_num = entry.get('reference_number') or entry.get('referenceNumber')
+                        if fname:
+                            entries.append({'filename': fname, 'amount': amount_val, 'reference_number': ref_num})
+                    elif isinstance(entry, str):
+                        entries.append({'filename': entry, 'amount': None, 'reference_number': None})
+            elif isinstance(data, dict):
+                fname = data.get('filename') or data.get('file') or data.get('name')
+                amount_val = data.get('amount')
+                ref_num = data.get('reference_number') or data.get('referenceNumber')
+                if fname:
+                    entries.append({'filename': fname, 'amount': amount_val, 'reference_number': ref_num})
             else:
-                receipt_files = [item_request.receipt_path]
-        except (json.JSONDecodeError, TypeError):
-            receipt_files = [item_request.receipt_path]
+                entries.append({'filename': raw_value, 'amount': None, 'reference_number': None})
+
+            return entries
+
+        receipt_entries = _parse_receipt_entries_for_view(item_request.receipt_path)
+        receipt_files = [entry.get('filename') for entry in receipt_entries if entry.get('filename')]
     
     # Prepare requestor-uploaded item files (stored in requestor_item_upload_path)
     requestor_item_uploads = []
@@ -6049,45 +6233,57 @@ def view_item_request_page(request_id):
         except (json.JSONDecodeError, TypeError):
             requestor_evidence_uploads = [item_request.requestor_evidence_upload_path]
 
-    # Prepare invoice files list (supports legacy string list and new metadata objects)
-    def _parse_invoice_entries(raw_value):
-        entries = []
-        if not raw_value:
+    # Get invoice entries from database (preferred) or fallback to JSON parsing for legacy data
+    invoice_entries_db = ProcurementInvoiceEntry.query.filter_by(item_request_id=request_id).all()
+    if invoice_entries_db:
+        invoice_entries = []
+        for e in invoice_entries_db:
+            try:
+                items_list = json.loads(e.items) if e.items else []
+            except:
+                items_list = []
+            invoice_entries.append({'filename': e.filename, 'items': items_list, 'amount': float(e.amount)})
+        invoice_files = [e.filename for e in invoice_entries_db]
+    else:
+        # Fallback to parsing JSON for legacy data
+        def _parse_invoice_entries(raw_value):
+            entries = []
+            if not raw_value:
+                return entries
+            try:
+                data = json.loads(raw_value)
+            except (json.JSONDecodeError, TypeError):
+                return [{'filename': raw_value, 'items': [], 'amount': None}]
+
+            if isinstance(data, list):
+                for entry in data:
+                    if isinstance(entry, dict):
+                        fname = entry.get('filename') or entry.get('file') or entry.get('name')
+                        items = entry.get('items') or entry.get('item_names') or []
+                        amount_val = entry.get('amount')
+                        if fname:
+                            if not isinstance(items, list):
+                                items = []
+                            clean_items = [itm.strip() for itm in items if isinstance(itm, str) and itm.strip()]
+                            entries.append({'filename': fname, 'items': clean_items, 'amount': amount_val})
+                    elif isinstance(entry, str):
+                        entries.append({'filename': entry, 'items': [], 'amount': None})
+            elif isinstance(data, dict):
+                fname = data.get('filename') or data.get('file') or data.get('name')
+                items = data.get('items') or []
+                amount_val = data.get('amount')
+                if fname:
+                    if not isinstance(items, list):
+                        items = []
+                    clean_items = [itm.strip() for itm in items if isinstance(itm, str) and itm.strip()]
+                    entries.append({'filename': fname, 'items': clean_items, 'amount': amount_val})
+            else:
+                entries.append({'filename': raw_value, 'items': [], 'amount': None})
+
             return entries
-        try:
-            data = json.loads(raw_value)
-        except (json.JSONDecodeError, TypeError):
-            return [{'filename': raw_value, 'items': [], 'amount': None}]
 
-        if isinstance(data, list):
-            for entry in data:
-                if isinstance(entry, dict):
-                    fname = entry.get('filename') or entry.get('file') or entry.get('name')
-                    items = entry.get('items') or entry.get('item_names') or []
-                    amount_val = entry.get('amount')
-                    if fname:
-                        if not isinstance(items, list):
-                            items = []
-                        clean_items = [itm.strip() for itm in items if isinstance(itm, str) and itm.strip()]
-                        entries.append({'filename': fname, 'items': clean_items, 'amount': amount_val})
-                elif isinstance(entry, str):
-                    entries.append({'filename': entry, 'items': [], 'amount': None})
-        elif isinstance(data, dict):
-            fname = data.get('filename') or data.get('file') or data.get('name')
-            items = data.get('items') or []
-            amount_val = data.get('amount')
-            if fname:
-                if not isinstance(items, list):
-                    items = []
-                clean_items = [itm.strip() for itm in items if isinstance(itm, str) and itm.strip()]
-                entries.append({'filename': fname, 'items': clean_items, 'amount': amount_val})
-        else:
-            entries.append({'filename': raw_value, 'items': [], 'amount': None})
-
-        return entries
-
-    invoice_entries = _parse_invoice_entries(item_request.invoice_path)
-    invoice_files = [entry.get('filename') for entry in invoice_entries if entry.get('filename')]
+        invoice_entries = _parse_invoice_entries(item_request.invoice_path)
+        invoice_files = [entry.get('filename') for entry in invoice_entries if entry.get('filename')]
 
     # Items assigned to this request (used for invoice-to-item mapping)
     assigned_items = []
@@ -6138,6 +6334,7 @@ def view_item_request_page(request_id):
                          procurement_members=procurement_members,
                          assigned_to_name=assigned_to_name,
                          assigned_by_name=assigned_by_name,
+                         receipt_entries=receipt_entries,
                          completed_by_name=completed_by_name,
                          receipt_files=receipt_files,
                          requestor_item_uploads=requestor_item_uploads,
@@ -7199,21 +7396,6 @@ def item_request_save_uploads(request_id):
     if not item_request.assigned_to_user_id or item_request.assigned_to_user_id != current_user.user_id:
         return error_response('Only the assigned procurement staff member can save uploads for this request.')
 
-    # Optional fields (validate if provided)
-    receipt_amount_value = None
-    receipt_amount_str = request.form.get('receipt_amount', '').strip()
-    if receipt_amount_str:
-        try:
-            receipt_amount_value = float(receipt_amount_str)
-            if receipt_amount_value <= 0:
-                raise ValueError()
-        except Exception:
-            return error_response('Please enter a valid positive receipt amount in OMR or leave it blank.')
-
-    receipt_reference_number = request.form.get('receipt_reference_number', '').strip()
-    if receipt_reference_number and not re.match(r'^[A-Za-z0-9]+$', receipt_reference_number):
-        return error_response('Receipt reference number must contain only letters and numbers (no spaces or symbols).')
-
     completion_notes = request.form.get('completion_notes', '').strip()
     # Checkbox: item from store, no receipt/invoice expected
     from_store_flag = bool(request.form.get('from_store_no_receipt'))
@@ -7222,22 +7404,17 @@ def item_request_save_uploads(request_id):
     if item_request.item_name:
         assigned_items = [itm.strip() for itm in item_request.item_name.split(',') if itm.strip()]
 
-    # Parse invoice-to-item selections (required when uploading invoice files)
-    invoice_item_map_raw = request.form.get('invoice_item_map', '').strip()
-    invoice_item_map = {}
-    if invoice_item_map_raw:
+    # Parse receipt map (amount and reference_number for each receipt file)
+    receipt_map_raw = request.form.get('receipt_map', '').strip()
+    receipt_map = {}
+    if receipt_map_raw:
         try:
-            parsed_map = json.loads(invoice_item_map_raw) or {}
+            parsed_map = json.loads(receipt_map_raw) or {}
             if isinstance(parsed_map, dict):
-                invoice_item_map = parsed_map
-        except Exception:
-            flash('Could not read the invoice-to-item selections. Please try again.', 'danger')
-            return redirect(url_for('view_item_request_page', request_id=request_id))
-
-    # Items assigned to this request (for invoice-to-item validation)
-    assigned_items = []
-    if item_request.item_name:
-        assigned_items = [itm.strip() for itm in item_request.item_name.split(',') if itm.strip()]
+                receipt_map = parsed_map
+        except Exception as e:
+            app.logger.error(f"Error parsing receipt_map for item request #{request_id}: {e}, raw: {receipt_map_raw[:200]}")
+            return error_response('Could not read the receipt information. Please try again.')
 
     # Parse invoice-to-item selections (required when uploading invoice files)
     invoice_item_map_raw = request.form.get('invoice_item_map', '').strip()
@@ -7247,9 +7424,9 @@ def item_request_save_uploads(request_id):
             parsed_map = json.loads(invoice_item_map_raw) or {}
             if isinstance(parsed_map, dict):
                 invoice_item_map = parsed_map
-        except Exception:
-            flash('Could not read the invoice-to-item selections. Please try again.', 'danger')
-            return redirect(url_for('view_item_request_page', request_id=request_id))
+        except Exception as e:
+            app.logger.error(f"Error parsing invoice_item_map for item request #{request_id}: {e}, raw: {invoice_item_map_raw[:200]}")
+            return error_response('Could not read the invoice-to-item selections. Please try again.')
 
     # Collect uploaded files
     receipt_files = request.files.getlist('receipt_files')
@@ -7263,12 +7440,12 @@ def item_request_save_uploads(request_id):
     amounts = request.form.getlist('amounts[]')
     has_quantities_or_amounts = any(q.strip() for q in quantities if q.strip() and q.strip() != '0') or any(a.strip() for a in amounts if a.strip() and a.strip() != '0')
 
-    if not has_new_receipts and not has_new_invoices and not any([receipt_amount_str, receipt_reference_number, completion_notes]) and not has_quantities_or_amounts:
+    if not has_new_receipts and not has_new_invoices and not completion_notes and not has_quantities_or_amounts:
         return error_response('Please upload at least one file or enter some data to save.')
 
     allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
     max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
-    uploaded_receipt_filenames = []
+    uploaded_receipt_entries = []
     uploaded_invoice_entries = []
 
     # Helper to load existing files safely
@@ -7282,6 +7459,36 @@ def item_request_save_uploads(request_id):
             return [json_field]
         except Exception:
             return [json_field]
+
+    def _parse_receipt_entries(raw_value):
+        entries = []
+        if not raw_value:
+            return entries
+        try:
+            data = json.loads(raw_value)
+        except Exception:
+            return [{'filename': raw_value, 'amount': None, 'reference_number': None}]
+
+        if isinstance(data, list):
+            for entry in data:
+                if isinstance(entry, dict):
+                    fname = entry.get('filename') or entry.get('file') or entry.get('name')
+                    amount_val = entry.get('amount')
+                    ref_num = entry.get('reference_number') or entry.get('referenceNumber')
+                    if fname:
+                        entries.append({'filename': fname, 'amount': amount_val, 'reference_number': ref_num})
+                elif isinstance(entry, str):
+                    entries.append({'filename': entry, 'amount': None, 'reference_number': None})
+        elif isinstance(data, dict):
+            fname = data.get('filename') or data.get('file') or data.get('name')
+            amount_val = data.get('amount')
+            ref_num = data.get('reference_number') or data.get('referenceNumber')
+            if fname:
+                entries.append({'filename': fname, 'amount': amount_val, 'reference_number': ref_num})
+        else:
+            entries.append({'filename': raw_value, 'amount': None, 'reference_number': None})
+
+        return entries
 
     def _parse_invoice_entries(raw_value):
         entries = []
@@ -7319,21 +7526,37 @@ def item_request_save_uploads(request_id):
 
         return entries
 
-    existing_receipts = _load_existing(item_request.receipt_path)
+    existing_receipt_entries = _parse_receipt_entries(item_request.receipt_path)
     existing_invoice_entries = _parse_invoice_entries(item_request.invoice_path)
-    had_receipts_before = len(existing_receipts) > 0
+    had_receipts_before = len(existing_receipt_entries) > 0
     had_invoices_before = len(existing_invoice_entries) > 0
-    has_saved_receipt_values = item_request.receipt_amount is not None and bool(item_request.receipt_reference_number)
+    has_saved_receipt_values = item_request.receipt_amount is not None or any(
+        isinstance(entry, dict) and entry.get('amount') for entry in existing_receipt_entries
+    )
     has_saved_invoice_amount = item_request.invoice_amount is not None or any(
         isinstance(entry, dict) and entry.get('amount') for entry in existing_invoice_entries
     )
 
-    # Enforce required receipt fields on first receipt upload
+    # Enforce required receipt fields on first receipt upload (allow 0 amount)
     if has_new_receipts and not (had_receipts_before or has_saved_receipt_values):
-        if receipt_amount_value is None:
-            return error_response('Receipt amount is required when uploading the first receipt.')
-        if not receipt_reference_number:
-            return error_response('Receipt reference number is required when uploading the first receipt.')
+        for rec_file in receipt_files or []:
+            if rec_file and rec_file.filename:
+                selected_entry = receipt_map.get(rec_file.filename) or {}
+                amount_raw = selected_entry.get('amount') if isinstance(selected_entry, dict) else None
+                ref_num_raw = selected_entry.get('reference_number') if isinstance(selected_entry, dict) else None
+                try:
+                    amount_val = float(amount_raw) if amount_raw not in [None, ''] else None
+                except Exception:
+                    amount_val = None
+                # Allow 0 amount, but require that amount field is provided (even if 0)
+                if amount_val is None:
+                    return error_response('Receipt amount is required for each uploaded receipt (can be 0).')
+                # Reference number is required
+                if not ref_num_raw or not ref_num_raw.strip():
+                    return error_response(f'Receipt reference number is required for "{rec_file.filename}".')
+                # Validate reference number format
+                if not re.match(r'^[A-Za-z0-9]+$', ref_num_raw):
+                    return error_response(f'Receipt reference number for "{rec_file.filename}" must contain only letters and numbers (no spaces or symbols).')
 
     # Enforce required invoice amount on first invoice upload
     if has_new_invoices and not (had_invoices_before or has_saved_invoice_amount):
@@ -7357,23 +7580,49 @@ def item_request_save_uploads(request_id):
     if has_new_receipts:
         for receipt_file in receipt_files:
             if receipt_file and receipt_file.filename:
-                file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
+                original_name = receipt_file.filename
+                file_extension = original_name.rsplit('.', 1)[1].lower() if '.' in original_name else ''
                 if file_extension not in allowed_extensions:
-                    flash(f'Invalid file type for receipt "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'danger')
-                    return redirect(url_for('view_item_request_page', request_id=request_id))
+                    return error_response(f'Invalid file type for receipt "{original_name}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX')
 
                 file_size = len(receipt_file.read())
                 if file_size > max_file_size:
-                    flash(f'Receipt file "{receipt_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'danger')
-                    return redirect(url_for('view_item_request_page', request_id=request_id))
+                    return error_response(f'Receipt file "{original_name}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.')
 
                 receipt_file.seek(0)
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
-                filename = secure_filename(receipt_file.filename)
+                filename = secure_filename(original_name)
                 filename = f"item_receipt_{request_id}_{timestamp}_{filename}"
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 receipt_file.save(filepath)
-                uploaded_receipt_filenames.append(filename)
+
+                selected_entry = receipt_map.get(original_name) or receipt_map.get(filename) or {}
+                amount_val = None
+                ref_num = None
+                if isinstance(selected_entry, dict):
+                    try:
+                        amount_raw = selected_entry.get('amount')
+                        if amount_raw is not None and amount_raw != '':
+                            amount_val = float(amount_raw)
+                    except Exception:
+                        pass
+                    ref_num = selected_entry.get('reference_number') or selected_entry.get('referenceNumber') or ''
+                    if ref_num:
+                        ref_num = ref_num.strip()
+
+                # Amount is required (can be 0)
+                if amount_val is None:
+                    return error_response(f'Please enter a receipt amount for "{original_name}" (can be 0).')
+                
+                # Reference number is required
+                if not ref_num or not ref_num.strip():
+                    return error_response(f'Please enter a receipt reference number for "{original_name}".')
+                
+                # Validate reference number format
+                if not re.match(r'^[A-Za-z0-9]+$', ref_num):
+                    return error_response(f'Receipt reference number for "{original_name}" must contain only letters and numbers (no spaces or symbols).')
+
+                uploaded_receipt_entries.append({'filename': filename, 'amount': amount_val, 'reference_number': ref_num})
 
     # Process invoice files
     if has_new_invoices:
@@ -7382,13 +7631,11 @@ def item_request_save_uploads(request_id):
                 original_name = invoice_file.filename
                 file_extension = original_name.rsplit('.', 1)[1].lower() if '.' in original_name else ''
                 if file_extension not in allowed_extensions:
-                    flash(f'Invalid file type for invoice "{original_name}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'danger')
-                    return redirect(url_for('view_item_request_page', request_id=request_id))
+                    return error_response(f'Invalid file type for invoice "{original_name}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX')
 
                 file_size = len(invoice_file.read())
                 if file_size > max_file_size:
-                    flash(f'Invoice file "{original_name}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'danger')
-                    return redirect(url_for('view_item_request_page', request_id=request_id))
+                    return error_response(f'Invoice file "{original_name}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.')
 
                 invoice_file.seek(0)
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
@@ -7425,33 +7672,70 @@ def item_request_save_uploads(request_id):
 
                 uploaded_invoice_entries.append({'filename': filename, 'items': clean_items, 'amount': amount_val})
 
-    # Merge new and existing files
-    all_receipts = existing_receipts + uploaded_receipt_filenames
-    all_invoices = existing_invoice_entries + uploaded_invoice_entries
+    # Delete existing receipt entries for this request (we'll recreate them)
+    ProcurementReceiptEntry.query.filter_by(item_request_id=request_id).delete()
+    # Delete existing invoice entries for this request (we'll recreate them)
+    ProcurementInvoiceEntry.query.filter_by(item_request_id=request_id).delete()
+    
+    # Create database entries for receipts
+    receipt_total = 0.0
+    for entry in uploaded_receipt_entries:
+        receipt_entry = ProcurementReceiptEntry(
+            item_request_id=request_id,
+            filename=entry['filename'],
+            amount=entry['amount'],
+            reference_number=entry['reference_number']
+        )
+        db.session.add(receipt_entry)
+        receipt_total += float(entry['amount'] or 0)
+    
+    # Also add existing receipt entries back to database
+    for entry in existing_receipt_entries:
+        if isinstance(entry, dict) and entry.get('filename'):
+            receipt_entry = ProcurementReceiptEntry(
+                item_request_id=request_id,
+                filename=entry['filename'],
+                amount=entry.get('amount') or 0,
+                reference_number=entry.get('reference_number') or ''
+            )
+            db.session.add(receipt_entry)
+            receipt_total += float(entry.get('amount') or 0)
+    
+    # Create database entries for invoices
+    invoice_total = 0.0
+    for entry in uploaded_invoice_entries:
+        invoice_entry = ProcurementInvoiceEntry(
+            item_request_id=request_id,
+            filename=entry['filename'],
+            amount=entry['amount'],
+            items=json.dumps(entry['items'])
+        )
+        db.session.add(invoice_entry)
+        invoice_total += float(entry['amount'] or 0)
+    
+    # Also add existing invoice entries back to database
+    for entry in existing_invoice_entries:
+        if isinstance(entry, dict) and entry.get('filename'):
+            invoice_entry = ProcurementInvoiceEntry(
+                item_request_id=request_id,
+                filename=entry['filename'],
+                amount=entry.get('amount') or 0,
+                items=json.dumps(entry.get('items') or [])
+            )
+            db.session.add(invoice_entry)
+            invoice_total += float(entry.get('amount') or 0)
+    
+    # Update receipt_path and invoice_path for backward compatibility (just filenames)
+    all_receipt_filenames = [e['filename'] for e in uploaded_receipt_entries] + [e.get('filename') for e in existing_receipt_entries if isinstance(e, dict) and e.get('filename')]
+    all_invoice_filenames = [e['filename'] for e in uploaded_invoice_entries] + [e.get('filename') for e in existing_invoice_entries if isinstance(e, dict) and e.get('filename')]
+    
+    item_request.receipt_path = json.dumps(all_receipt_filenames) if all_receipt_filenames else None
+    item_request.invoice_path = json.dumps(all_invoice_filenames) if all_invoice_filenames else None
 
-    # Persist combined invoice total (for legacy views/exports) using per-file amounts when present
-    def _invoice_total(entries):
-        total = 0.0
-        for entry in entries:
-            if isinstance(entry, dict):
-                try:
-                    amt = float(entry.get('amount') or 0)
-                    total += amt
-                except Exception:
-                    continue
-        return total if total > 0 else None
-
-    invoice_total = _invoice_total(all_invoices)
-
-    item_request.receipt_path = json.dumps(all_receipts) if all_receipts else None
-    item_request.invoice_path = json.dumps(all_invoices) if all_invoices else None
-
-    if receipt_amount_value is not None:
-        item_request.receipt_amount = receipt_amount_value
-    if invoice_total is not None:
+    if receipt_total > 0:
+        item_request.receipt_amount = receipt_total
+    if invoice_total > 0:
         item_request.invoice_amount = invoice_total
-    if receipt_reference_number:
-        item_request.receipt_reference_number = receipt_reference_number
     if completion_notes:
         item_request.completion_notes = completion_notes
     # Persist from-store flag
@@ -7475,7 +7759,12 @@ def item_request_save_uploads(request_id):
         item_request.procurement_quantity_rejection_reason = rejection_reason
 
     item_request.updated_at = datetime.utcnow()
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Database error saving uploads for item request #{request_id}: {e}")
+        return error_response('Database error occurred while saving. Please try again.')
 
     # Notify authorized users about saved uploads
     try:
@@ -7506,15 +7795,17 @@ def item_request_save_uploads(request_id):
 
     # Return JSON for AJAX saves, otherwise redirect with flash
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        # Get receipt and invoice entries from database
+        receipt_entries_db = ProcurementReceiptEntry.query.filter_by(item_request_id=request_id).all()
+        invoice_entries_db = ProcurementInvoiceEntry.query.filter_by(item_request_id=request_id).all()
+        
         return jsonify({
             'success': True,
             'message': 'Changes saved successfully.',
-            'receipt_files': all_receipts,
-            'invoice_files': [
-                entry.get('filename') if isinstance(entry, dict) else entry
-                for entry in all_invoices
-                if (isinstance(entry, dict) and entry.get('filename')) or isinstance(entry, str)
-            ]
+            'receipt_files': [e.filename for e in receipt_entries_db],
+            'receipt_entries': [{'filename': e.filename, 'amount': float(e.amount), 'reference_number': e.reference_number} for e in receipt_entries_db],
+            'invoice_files': [e.filename for e in invoice_entries_db],
+            'invoice_entries': [{'filename': e.filename, 'amount': float(e.amount), 'items': json.loads(e.items)} for e in invoice_entries_db]
         })
 
     flash('Changes saved successfully. You can make more changes before marking this request as completed.', 'success')
@@ -7554,6 +7845,18 @@ def item_request_complete(request_id):
     if item_request.item_name:
         assigned_items = [itm.strip() for itm in item_request.item_name.split(',') if itm.strip()]
 
+    # Parse receipt map (amount and reference_number for each receipt file)
+    receipt_map_raw = request.form.get('receipt_map', '').strip()
+    receipt_map = {}
+    if receipt_map_raw:
+        try:
+            parsed_map = json.loads(receipt_map_raw) or {}
+            if isinstance(parsed_map, dict):
+                receipt_map = parsed_map
+        except Exception:
+            flash('Could not read the receipt information. Please try again.', 'danger')
+            return redirect(url_for('view_item_request_page', request_id=request_id))
+
     # Parse invoice-to-item selections (required when uploading invoice files)
     invoice_item_map_raw = request.form.get('invoice_item_map', '').strip()
     invoice_item_map = {}
@@ -7566,80 +7869,100 @@ def item_request_complete(request_id):
             flash('Could not read the invoice-to-item selections. Please try again.', 'danger')
             return redirect(url_for('view_item_request_page', request_id=request_id))
     
-    # Receipt Amount and reference (required unless item is from store)
-    receipt_amount_str = request.form.get('receipt_amount', '').strip()
-    receipt_reference_number = request.form.get('receipt_reference_number', '').strip()
-    if not from_store_flag:
-        if not receipt_amount_str:
-            flash('Receipt amount is required.', 'danger')
-            return redirect(url_for('view_item_request_page', request_id=request_id))
-        try:
-            receipt_amount_value = float(receipt_amount_str)
-            if receipt_amount_value <= 0:
-                raise ValueError()
-        except Exception:
-            flash('Please enter a valid positive receipt amount in OMR.', 'danger')
-            return redirect(url_for('view_item_request_page', request_id=request_id))
-        if not receipt_reference_number:
-            flash('Receipt reference number is required.', 'danger')
-            return redirect(url_for('view_item_request_page', request_id=request_id))
-        if not re.match(r'^[A-Za-z0-9]+$', receipt_reference_number):
-            flash('Receipt reference number must contain only letters and numbers (no spaces or symbols).', 'danger')
-            return redirect(url_for('view_item_request_page', request_id=request_id))
-    
-    # Handle receipt file upload (allow reuse of existing saved receipts)
-    existing_receipt_files = []
-    try:
-        if item_request.receipt_path:
-            existing_receipt_files = json.loads(item_request.receipt_path) or []
-    except Exception:
-        existing_receipt_files = []
+    # Get existing receipt entries from database (preferred) or fallback to JSON parsing
+    receipt_entries_db = ProcurementReceiptEntry.query.filter_by(item_request_id=request_id).all()
+    if receipt_entries_db:
+        existing_receipt_entries = [{'filename': e.filename, 'amount': float(e.amount), 'reference_number': e.reference_number} for e in receipt_entries_db]
+    else:
+        # Fallback to parsing JSON for legacy data
+        def _parse_receipt_entries(raw_value):
+            entries = []
+            if not raw_value:
+                return entries
+            try:
+                data = json.loads(raw_value)
+            except Exception:
+                return [{'filename': raw_value, 'amount': None, 'reference_number': None}]
+
+            if isinstance(data, list):
+                for entry in data:
+                    if isinstance(entry, dict):
+                        fname = entry.get('filename') or entry.get('file') or entry.get('name')
+                        amount_val = entry.get('amount')
+                        ref_num = entry.get('reference_number') or entry.get('referenceNumber')
+                        if fname:
+                            entries.append({'filename': fname, 'amount': amount_val, 'reference_number': ref_num})
+                    elif isinstance(entry, str):
+                        entries.append({'filename': entry, 'amount': None, 'reference_number': None})
+            elif isinstance(data, dict):
+                fname = data.get('filename') or data.get('file') or data.get('name')
+                amount_val = data.get('amount')
+                ref_num = data.get('reference_number') or data.get('referenceNumber')
+                if fname:
+                    entries.append({'filename': fname, 'amount': amount_val, 'reference_number': ref_num})
+            else:
+                entries.append({'filename': raw_value, 'amount': None, 'reference_number': None})
+
+            return entries
+
+        existing_receipt_entries = _parse_receipt_entries(item_request.receipt_path)
 
     receipt_files = request.files.getlist('receipt_files')
     has_new_receipts = receipt_files and any(f.filename for f in receipt_files)
     if not from_store_flag:
-        if not has_new_receipts and not existing_receipt_files:
+        if not has_new_receipts and not existing_receipt_entries:
             flash('Upload Receipt file is required.', 'danger')
             return redirect(url_for('view_item_request_page', request_id=request_id))
     
-    # Handle invoice file upload (allow reuse of existing saved invoices)
-    def _parse_invoice_entries(raw_value):
-        entries = []
-        if not raw_value:
+    # Get existing invoice entries from database (preferred) or fallback to JSON parsing
+    invoice_entries_db = ProcurementInvoiceEntry.query.filter_by(item_request_id=request_id).all()
+    if invoice_entries_db:
+        existing_invoice_entries = []
+        for e in invoice_entries_db:
+            try:
+                items_list = json.loads(e.items) if e.items else []
+            except:
+                items_list = []
+            existing_invoice_entries.append({'filename': e.filename, 'items': items_list, 'amount': float(e.amount)})
+    else:
+        # Fallback to parsing JSON for legacy data
+        def _parse_invoice_entries(raw_value):
+            entries = []
+            if not raw_value:
+                return entries
+            try:
+                data = json.loads(raw_value)
+            except Exception:
+                return [{'filename': raw_value, 'items': [], 'amount': None}]
+
+            if isinstance(data, list):
+                for entry in data:
+                    if isinstance(entry, dict):
+                        fname = entry.get('filename') or entry.get('file') or entry.get('name')
+                        items = entry.get('items') or []
+                        amount_val = entry.get('amount')
+                        if fname:
+                            if not isinstance(items, list):
+                                items = []
+                            clean_items = [itm.strip() for itm in items if isinstance(itm, str) and itm.strip()]
+                            entries.append({'filename': fname, 'items': clean_items, 'amount': amount_val})
+                    elif isinstance(entry, str):
+                        entries.append({'filename': entry, 'items': [], 'amount': None})
+            elif isinstance(data, dict):
+                fname = data.get('filename') or data.get('file') or data.get('name')
+                items = data.get('items') or []
+                amount_val = data.get('amount')
+                if fname:
+                    if not isinstance(items, list):
+                        items = []
+                    clean_items = [itm.strip() for itm in items if isinstance(itm, str) and itm.strip()]
+                    entries.append({'filename': fname, 'items': clean_items, 'amount': amount_val})
+            else:
+                entries.append({'filename': raw_value, 'items': [], 'amount': None})
+
             return entries
-        try:
-            data = json.loads(raw_value)
-        except Exception:
-            return [{'filename': raw_value, 'items': [], 'amount': None}]
 
-        if isinstance(data, list):
-            for entry in data:
-                if isinstance(entry, dict):
-                    fname = entry.get('filename') or entry.get('file') or entry.get('name')
-                    items = entry.get('items') or []
-                    amount_val = entry.get('amount')
-                    if fname:
-                        if not isinstance(items, list):
-                            items = []
-                        clean_items = [itm.strip() for itm in items if isinstance(itm, str) and itm.strip()]
-                        entries.append({'filename': fname, 'items': clean_items, 'amount': amount_val})
-                elif isinstance(entry, str):
-                    entries.append({'filename': entry, 'items': [], 'amount': None})
-        elif isinstance(data, dict):
-            fname = data.get('filename') or data.get('file') or data.get('name')
-            items = data.get('items') or []
-            amount_val = data.get('amount')
-            if fname:
-                if not isinstance(items, list):
-                    items = []
-                clean_items = [itm.strip() for itm in items if isinstance(itm, str) and itm.strip()]
-                entries.append({'filename': fname, 'items': clean_items, 'amount': amount_val})
-        else:
-            entries.append({'filename': raw_value, 'items': [], 'amount': None})
-
-        return entries
-
-    existing_invoice_entries = _parse_invoice_entries(item_request.invoice_path)
+        existing_invoice_entries = _parse_invoice_entries(item_request.invoice_path)
 
     invoice_files = request.files.getlist('invoice_files')
     has_new_invoices = invoice_files and any(f.filename for f in invoice_files)
@@ -7660,29 +7983,59 @@ def item_request_complete(request_id):
     
     allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
     max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
-    uploaded_receipt_filenames = []
+    uploaded_receipt_entries = []
     uploaded_invoice_entries = []
     
     # Process receipt files
     for receipt_file in receipt_files or []:
         if receipt_file and receipt_file.filename:
-            file_extension = receipt_file.filename.rsplit('.', 1)[1].lower() if '.' in receipt_file.filename else ''
+            original_name = receipt_file.filename
+            file_extension = original_name.rsplit('.', 1)[1].lower() if '.' in original_name else ''
             if file_extension not in allowed_extensions:
-                flash(f'Invalid file type for receipt "{receipt_file.filename}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'danger')
+                flash(f'Invalid file type for receipt "{original_name}". Allowed types: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX', 'danger')
                 return redirect(url_for('view_item_request_page', request_id=request_id))
             
             file_size = len(receipt_file.read())
             if file_size > max_file_size:
-                flash(f'Receipt file "{receipt_file.filename}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'danger')
+                flash(f'Receipt file "{original_name}" is too large. Maximum size is {max_file_size // (1024 * 1024)}MB.', 'danger')
                 return redirect(url_for('view_item_request_page', request_id=request_id))
             
             receipt_file.seek(0)
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = secure_filename(receipt_file.filename)
+            filename = secure_filename(original_name)
             filename = f"item_receipt_{request_id}_{timestamp}_{filename}"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             receipt_file.save(filepath)
-            uploaded_receipt_filenames.append(filename)
+
+            selected_entry = receipt_map.get(original_name) or receipt_map.get(filename) or {}
+            amount_val = None
+            ref_num = None
+            if isinstance(selected_entry, dict):
+                try:
+                    amount_raw = selected_entry.get('amount')
+                    if amount_raw is not None and amount_raw != '':
+                        amount_val = float(amount_raw)
+                except Exception:
+                    pass
+                ref_num = selected_entry.get('reference_number') or selected_entry.get('referenceNumber') or ''
+                if ref_num:
+                    ref_num = ref_num.strip()
+
+            # Amount is required (can be 0) unless from store
+            if not from_store_flag:
+                if amount_val is None:
+                    flash(f'Please enter a receipt amount for "{original_name}" (can be 0).', 'danger')
+                    return redirect(url_for('view_item_request_page', request_id=request_id))
+                # Reference number is required
+                if not ref_num or not ref_num.strip():
+                    flash(f'Please enter a receipt reference number for "{original_name}".', 'danger')
+                    return redirect(url_for('view_item_request_page', request_id=request_id))
+                # Validate reference number format
+                if not re.match(r'^[A-Za-z0-9]+$', ref_num):
+                    flash(f'Receipt reference number for "{original_name}" must contain only letters and numbers (no spaces or symbols).', 'danger')
+                    return redirect(url_for('view_item_request_page', request_id=request_id))
+
+            uploaded_receipt_entries.append({'filename': filename, 'amount': amount_val, 'reference_number': ref_num})
     
     # Process invoice files
     for invoice_file in invoice_files or []:
@@ -7738,9 +8091,15 @@ def item_request_complete(request_id):
     
     current_time = datetime.utcnow()
     
-    # Update request (reuse existing files if none uploaded)
-    final_receipts = uploaded_receipt_filenames if uploaded_receipt_filenames else existing_receipt_files
+    # Determine final receipts and invoices (reuse existing if none uploaded)
+    # IMPORTANT: Read existing entries from database BEFORE deleting them
+    final_receipts = uploaded_receipt_entries if uploaded_receipt_entries else existing_receipt_entries
     final_invoices = uploaded_invoice_entries if uploaded_invoice_entries else existing_invoice_entries
+    
+    # Delete existing receipt entries for this request (we'll recreate them)
+    ProcurementReceiptEntry.query.filter_by(item_request_id=request_id).delete()
+    # Delete existing invoice entries for this request (we'll recreate them)
+    ProcurementInvoiceEntry.query.filter_by(item_request_id=request_id).delete()
 
     # Ensure all invoice entries carry a valid amount
     for entry in final_invoices:
@@ -7753,35 +8112,57 @@ def item_request_complete(request_id):
                 flash('Please ensure every invoice has a positive amount.', 'danger')
                 return redirect(url_for('view_item_request_page', request_id=request_id))
 
-    # Sum invoice amounts from entries for storage/exports
-    def _invoice_total(entries):
-        total = 0.0
-        for entry in entries:
-            if isinstance(entry, dict):
-                try:
-                    total += float(entry.get('amount') or 0)
-                except Exception:
-                    continue
-        return total if total > 0 else None
-
-    invoice_total = _invoice_total(final_invoices)
+    # Create database entries for receipts
+    receipt_total = 0.0
+    for entry in final_receipts:
+        if isinstance(entry, dict) and entry.get('filename'):
+            receipt_entry = ProcurementReceiptEntry(
+                item_request_id=request_id,
+                filename=entry['filename'],
+                amount=entry.get('amount') or 0,
+                reference_number=entry.get('reference_number') or ''
+            )
+            db.session.add(receipt_entry)
+            receipt_total += float(entry.get('amount') or 0)
+    
+    # Create database entries for invoices
+    invoice_total = 0.0
+    for entry in final_invoices:
+        if isinstance(entry, dict) and entry.get('filename'):
+            invoice_entry = ProcurementInvoiceEntry(
+                item_request_id=request_id,
+                filename=entry['filename'],
+                amount=entry.get('amount') or 0,
+                items=json.dumps(entry.get('items') or [])
+            )
+            db.session.add(invoice_entry)
+            invoice_total += float(entry.get('amount') or 0)
 
     item_request.status = 'Final Approval'
-    # Only set receipt amount/reference when not marked as from-store (no receipt expected)
+    # Only set receipt amount when not marked as from-store (no receipt expected)
     if not from_store_flag:
-        item_request.receipt_amount = receipt_amount_value
-        item_request.receipt_reference_number = receipt_reference_number
+        if receipt_total > 0:
+            item_request.receipt_amount = receipt_total
     else:
         # Clear receipt fields when item is from store
         item_request.receipt_amount = None
-        item_request.receipt_reference_number = None
-    if invoice_total is not None:
+    if invoice_total > 0:
         item_request.invoice_amount = invoice_total
-    item_request.receipt_path = json.dumps(final_receipts)
-    item_request.invoice_path = json.dumps(final_invoices)
+    
+    # Update receipt_path and invoice_path for backward compatibility (just filenames)
+    receipt_filenames = [e.get('filename') for e in final_receipts if isinstance(e, dict) and e.get('filename')]
+    invoice_filenames = [e.get('filename') for e in final_invoices if isinstance(e, dict) and e.get('filename')]
+    item_request.receipt_path = json.dumps(receipt_filenames) if receipt_filenames else None
+    item_request.invoice_path = json.dumps(invoice_filenames) if invoice_filenames else None
     item_request.updated_at = current_time
     
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Database error completing item request #{request_id}: {e}")
+        flash('Database error occurred while completing the request. Please try again.', 'danger')
+        return redirect(url_for('view_item_request_page', request_id=request_id))
     
     log_action(f"Procurement member submitted item request #{request_id} for final approval")
     
