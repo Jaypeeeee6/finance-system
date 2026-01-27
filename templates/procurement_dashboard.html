@@ -1811,8 +1811,17 @@ function loadMoneySpentHistory() {
             
             data.history.forEach(entry => {
                 // Parse UTC date and convert to GST (UTC+4)
-                const date = new Date(entry.entry_date);
-                // Add 4 hours for GST timezone
+                // The API returns ISO format without timezone, so we need to treat it as UTC
+                let dateStr = entry.entry_date;
+                if (dateStr) {
+                    // If the string doesn't end with 'Z' or have timezone offset, append 'Z' to indicate UTC
+                    if (!dateStr.endsWith('Z') && !dateStr.match(/[+-]\d{2}:\d{2}$/)) {
+                        dateStr += 'Z';
+                    }
+                }
+                const date = new Date(dateStr);
+                
+                // Add 4 hours for GST timezone (UTC+4)
                 const gstDate = new Date(date.getTime() + (4 * 60 * 60 * 1000));
                 
                 // Format date similar to system format: "Jan 15, 2024 at 02:30 PM"
@@ -1826,14 +1835,14 @@ function loadMoneySpentHistory() {
                 const displayHours = hours % 12 || 12;
                 const displayMinutes = minutes.toString().padStart(2, '0');
                 
-                const dateStr = month + ' ' + day + ', ' + year;
+                const dateStrFormatted = month + ' ' + day + ', ' + year;
                 const timeStr = displayHours + ':' + displayMinutes + ' ' + ampm;
                 
                 const moneySpent = entry.money_spent !== null && entry.money_spent !== undefined ? parseFloat(entry.money_spent).toFixed(3) : 'N/A';
                 const availableBalance = entry.available_balance !== null && entry.available_balance !== undefined ? parseFloat(entry.available_balance).toFixed(3) : 'N/A';
                 
                 html += '<tr>';
-                html += '<td class="date-cell">' + dateStr + '<br><small style="color: #999;">' + timeStr + '</small></td>';
+                html += '<td class="date-cell">' + dateStrFormatted + '<br><small style="color: #999;">' + timeStr + '</small></td>';
                 html += '<td class="amount-cell">OMR ' + moneySpent + '</td>';
                 html += '<td style="text-align: right; color: #495057;">OMR ' + availableBalance + '</td>';
                 html += '</tr>';
