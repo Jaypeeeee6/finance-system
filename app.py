@@ -16434,11 +16434,6 @@ def manager_approve_request(request_id):
     """Manager approves a payment request"""
     req = PaymentRequest.query.get_or_404(request_id)
     
-    # Never allow users to approve their own requests at the manager stage
-    if req.user_id == current_user.user_id:
-        flash('You cannot approve your own request at the manager stage.', 'error')
-        return redirect(url_for('view_request', request_id=request_id))
-
     # Debug information
     print(f"DEBUG: Current user: {current_user.name} (ID: {current_user.user_id}, Role: {current_user.role}, Department: {current_user.department})")
     print(f"DEBUG: Request submitter: {req.user.name} (ID: {req.user.user_id}, Role: {req.user.role}, Department: {req.user.department})")
@@ -16447,11 +16442,14 @@ def manager_approve_request(request_id):
     
     # Check if current user is authorized to approve this request
     is_authorized = False
+    is_temp_manager = False
+    dept_temp = None
     
     # First, enforce temporary manager exclusivity (IT Department feature)
     if req.temporary_manager_id:
         if req.temporary_manager_id == current_user.user_id:
             is_authorized = True
+            is_temp_manager = True
             print("DEBUG: Authorized via temporary manager assignment")
         else:
             # When a temporary manager is assigned for this specific request, only they can approve it
@@ -16471,12 +16469,20 @@ def manager_approve_request(request_id):
             dept_temp = None
         if dept_temp and dept_temp.temporary_manager_id == current_user.user_id:
             is_authorized = True
+            is_temp_manager = True
             print("DEBUG: Authorized via department-level temporary manager assignment")
+    
+    # Never allow users to approve their own requests at the manager stage
+    # EXCEPTION: Allow temporary managers to approve their own requests when assigned as temp manager for their own department
+    if req.user_id == current_user.user_id and not is_temp_manager:
+        flash('You cannot approve your own request at the manager stage.', 'error')
+        return redirect(url_for('view_request', request_id=request_id))
 
-        # Continue with standard authorization checks even when a department-level temporary manager exists.
-        # This ensures GM and Operation Manager remain authorized as before.
-        # Hard rule: Requests submitted by GM/CEO/Operation Manager can ONLY be approved by Abdalaziz (Finance Admin)
-        # Exception: Department-level temporary managers can still approve these requests
+    # Continue with standard authorization checks even when a department-level temporary manager exists.
+    # This ensures GM and Operation Manager remain authorized as before.
+    # Hard rule: Requests submitted by GM/CEO/Operation Manager can ONLY be approved by Abdalaziz (Finance Admin)
+    # Exception: Department-level temporary managers can still approve these requests
+    if not is_authorized:
         if req.user.role in ['GM', 'CEO', 'Operation Manager']:
             if current_user.name == 'Abdalaziz Al-Brashdi':
                 is_authorized = True
@@ -16493,7 +16499,7 @@ def manager_approve_request(request_id):
             is_authorized = True
             print("DEBUG: Authorized via global GM/Operation Manager rule")
         else:
-        # Check if current user is the manager of the request submitter
+            # Check if current user is the manager of the request submitter
             if req.user.manager_id and req.user.manager_id == current_user.user_id:
                 is_authorized = True
                 print("DEBUG: Authorized via manager_id relationship")
