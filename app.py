@@ -18528,7 +18528,21 @@ def item_request_reports():
     ]])
     
     # Calculate total amount (from receipt_amount field)
-    total_amount = sum(float(r.receipt_amount) if r.receipt_amount else 0 for r in all_filtered_requests)
+    # Exclude "Rejected by Manager" and "Rejected by Procurement Manager" from total amount
+    # UNLESS those statuses are explicitly included in the status filter
+    rejected_statuses = ['Rejected by Manager', 'Rejected by Procurement Manager']
+    has_rejected_filter = status_filter and any(status in rejected_statuses for status in status_filter)
+    
+    if has_rejected_filter:
+        # If rejected statuses are in the filter, include all requests in total
+        total_amount = sum(float(r.receipt_amount) if r.receipt_amount else 0 for r in all_filtered_requests)
+    else:
+        # Exclude rejected requests from total amount
+        total_amount = sum(
+            float(r.receipt_amount) if r.receipt_amount else 0 
+            for r in all_filtered_requests 
+            if r.status not in rejected_statuses
+        )
     
     # Paginate the query for display
     pagination = query.order_by(ProcurementItemRequest.created_at.desc()).paginate(
@@ -18765,7 +18779,21 @@ def export_item_request_reports_excel():
             return 0.0
     
     # Sum all amounts
-    total_amount = sum(to_float(r.receipt_amount) for r in all_requests)
+    # Exclude "Rejected by Manager" and "Rejected by Procurement Manager" from total amount
+    # UNLESS those statuses are explicitly included in the status filter
+    rejected_statuses = ['Rejected by Manager', 'Rejected by Procurement Manager']
+    has_rejected_filter = status_filter and any(status in rejected_statuses for status in status_filter)
+    
+    if has_rejected_filter:
+        # If rejected statuses are in the filter, include all requests in total
+        total_amount = sum(to_float(r.receipt_amount) for r in all_requests)
+    else:
+        # Exclude rejected requests from total amount
+        total_amount = sum(
+            to_float(r.receipt_amount) 
+            for r in all_requests 
+            if r.status not in rejected_statuses
+        )
     
     try:
         # Create Excel workbook
@@ -19059,7 +19087,21 @@ def export_item_request_reports_pdf():
             return 0.0
     
     # Sum all amounts
-    total_amount = sum(to_float(r.receipt_amount) for r in result_requests)
+    # Exclude "Rejected by Manager" and "Rejected by Procurement Manager" from total amount
+    # UNLESS those statuses are explicitly included in the status filter
+    rejected_statuses = ['Rejected by Manager', 'Rejected by Procurement Manager']
+    has_rejected_filter = status_filter and any(status in rejected_statuses for status in status_filter)
+    
+    if has_rejected_filter:
+        # If rejected statuses are in the filter, include all requests in total
+        total_amount = sum(to_float(r.receipt_amount) for r in result_requests)
+    else:
+        # Exclude rejected requests from total amount
+        total_amount = sum(
+            to_float(r.receipt_amount) 
+            for r in result_requests 
+            if r.status not in rejected_statuses
+        )
     
     try:
         # Build PDF in landscape orientation (matching payment reports)
