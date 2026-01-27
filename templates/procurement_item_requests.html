@@ -157,9 +157,9 @@
         </div>
         <div class="filters-right" style="margin-left:auto;">
             <div class="filter-controls">
-                {# Show department filter only to users who can view across departments (Procurement, IT, GM/CEO/Operation Manager).
+                {# Show department filter only to users who can view across departments (Procurement, IT, GM/CEO/Operation Manager, Finance Admin).
                    Hide for users who only see their own or their department's requests. Also hide on My Requests tab. #}
-                {% if (user.department in ['Procurement', 'IT'] or user.role in ['GM', 'CEO', 'Operation Manager']) and active_tab != 'my_requests' %}
+                {% if (user.department in ['Procurement', 'IT'] or user.role in ['GM', 'CEO', 'Operation Manager', 'Finance Admin']) and active_tab != 'my_requests' %}
                 <select id="departmentFilter" onchange="applyDepartmentFilter()" class="form-select">
                     <option value="">All Departments</option>
                     {% for dept in departments %}

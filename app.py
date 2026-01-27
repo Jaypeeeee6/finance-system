@@ -1359,12 +1359,14 @@ def get_authorized_manager_approvers_for_item_request(item_request):
             authorized_users.append(abdalaziz)
     else:
         # General Manager - can approve all requests (except GM/CEO/Operation Manager)
+        # This includes Finance department requests - GM can approve Finance department item requests
         gm_users = User.query.filter_by(role='GM').all()
         for user in gm_users:
             if user.user_id != requestor.user_id:
                 authorized_users.append(user)
         
         # Operation Manager - can approve all requests (except GM/CEO/Operation Manager)
+        # This includes Finance department requests - Operation Manager can approve Finance department item requests
         op_manager_users = User.query.filter_by(role='Operation Manager').all()
         for user in op_manager_users:
             if user.user_id != requestor.user_id:
@@ -1403,12 +1405,14 @@ def get_authorized_manager_approvers_for_item_request(item_request):
                 if user.user_id != requestor.user_id and user not in authorized_users:
                     authorized_users.append(user)
         
-        # Special case: Finance Admin can approve Finance department requests
+        # Special case: Finance department item requests
+        # Authorized approvers: Abdalaziz (Finance Admin), GM, Operation Manager, and any assigned temporary manager
+        # Only Abdalaziz is authorized from Finance Admin role, not other Finance Admin users (unless they are temporary managers)
+        # GM and Operation Manager are already added above for all requests, so they're included here
         if requestor.department == 'Finance' and requestor.role != 'Finance Admin':
-            finance_admins = User.query.filter_by(role='Finance Admin').all()
-            for user in finance_admins:
-                if user.user_id != requestor.user_id and user not in authorized_users:
-                    authorized_users.append(user)
+            abdalaziz = User.query.filter_by(name='Abdalaziz Al-Brashdi').first()
+            if abdalaziz and abdalaziz not in authorized_users:
+                authorized_users.append(abdalaziz)
         
         # Special case: IT Department Manager can approve IT department requests
         if requestor.department == 'IT' and requestor.role != 'Department Manager':
@@ -2388,6 +2392,7 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
             ).order_by(Notification.created_at.desc())
         elif user.name == 'Abdalaziz Al-Brashdi':
             # Abdalaziz gets finance notifications + new_submission from GM/Operation Manager/Finance Staff + updates on Finance Staff, GM, and Operation Manager requests
+            # Also gets item request notifications for Finance department (as manager of Finance department)
             query = Notification.query.filter(
                 db.and_(
                     Notification.user_id == user.user_id,
@@ -2413,6 +2418,21 @@ def get_notifications_for_user(user, limit=5, page=None, per_page=None):
                                     PaymentRequest.request_id == Notification.request_id,
                                     PaymentRequest.user_id == User.user_id,
                                     User.role.in_(['GM', 'CEO', 'Operation Manager', 'Finance Staff'])
+                                )
+                            )
+                        ),
+                        # Item request notifications for Finance department (Abdalaziz is manager of Finance department)
+                        db.and_(
+                            Notification.notification_type.in_([
+                                'item_request_submission', 'item_request_assigned', 'item_request_updated',
+                                'request_approved', 'request_rejected', 'request_pending_approval',
+                                'request_on_hold', 'request_returned'
+                            ]),
+                            Notification.item_request_id.isnot(None),
+                            db.exists().where(
+                                db.and_(
+                                    ProcurementItemRequest.id == Notification.item_request_id,
+                                    ProcurementItemRequest.department == 'Finance'
                                 )
                             )
                         )
@@ -2705,6 +2725,7 @@ def get_unread_count_for_user(user):
             ).count()
         elif user.name == 'Abdalaziz Al-Brashdi':
             # Abdalaziz gets finance notifications + new_submission from GM/Operation Manager/Finance Staff + updates on Finance Staff, GM, and Operation Manager requests
+            # Also gets item request notifications for Finance department (as manager of Finance department)
             return Notification.query.filter(
                 db.and_(
                     Notification.user_id == user.user_id,
@@ -2721,6 +2742,21 @@ def get_unread_count_for_user(user):
                                     PaymentRequest.request_id == Notification.request_id,
                                     PaymentRequest.user_id == User.user_id,
                                     User.role.in_(['GM', 'CEO', 'Operation Manager', 'Finance Staff'])
+                                )
+                            )
+                        ),
+                        # Item request notifications for Finance department (Abdalaziz is manager of Finance department)
+                        db.and_(
+                            Notification.notification_type.in_([
+                                'item_request_submission', 'item_request_assigned', 'item_request_updated',
+                                'request_approved', 'request_rejected', 'request_pending_approval',
+                                'request_on_hold', 'request_returned'
+                            ]),
+                            Notification.item_request_id.isnot(None),
+                            db.exists().where(
+                                db.and_(
+                                    ProcurementItemRequest.id == Notification.item_request_id,
+                                    ProcurementItemRequest.department == 'Finance'
                                 )
                             )
                         )
@@ -4620,8 +4656,8 @@ def get_procurement_money_spent():
 @login_required
 def get_procurement_money_spent_history():
     """API endpoint to get the Money Spent history for Procurement department"""
-    # Only allow Procurement Department Managers, GM, Operation Manager, IT, and Auditing to access this endpoint
-    allowed_roles = ['Department Manager', 'GM', 'Operation Manager']
+    # Only allow Procurement Department Managers, GM, Operation Manager, Finance Admin, IT, and Auditing to access this endpoint
+    allowed_roles = ['Department Manager', 'GM', 'Operation Manager', 'Finance Admin']
     allowed_departments = ['Procurement', 'IT', 'Auditing']
     
     # Check if user has access
@@ -4929,8 +4965,8 @@ def procurement_item_requests():
     elif current_user.role in ['GM', 'Operation Manager']:
         # General Manager and Operation Manager see all requests (view-only, same as Procurement Manager)
         base_item_requests = all_requests
-    elif current_user.department == 'IT':
-        # IT department can see all item requests (view-only, similar to payment requests visibility)
+    elif current_user.department == 'IT' or current_user.role == 'Finance Admin':
+        # IT department and Finance Admin can see all item requests (view-only, similar to payment requests visibility)
         base_item_requests = all_requests
     elif current_user.department == 'Auditing':
         # Auditing department can see all completed item requests for auditing purposes
@@ -5034,12 +5070,12 @@ def procurement_item_requests():
         else:  # tab == 'all'
             # Show all requests (default)
             item_requests = base_item_requests
-    elif current_user.department == 'IT':
+    elif current_user.department == 'IT' or current_user.role == 'Finance Admin':
         if tab == 'my_requests':
-            # IT: show only item requests created by the current IT user
+            # IT/Finance Admin: show only item requests created by the current user
             item_requests = [r for r in base_item_requests if r.user_id == current_user.user_id]
         elif tab == 'completed':
-            # IT: show all completed item requests
+            # IT/Finance Admin: show all completed item requests
             item_requests = [r for r in base_item_requests if r.status == 'Completed']
         else:  # tab == 'all' or any other value
             item_requests = base_item_requests
@@ -5224,8 +5260,11 @@ def procurement_item_requests():
     if current_user.department == 'Procurement':
         # All Procurement staff (Manager and Staff) stats exclude "Pending Manager Approval" and "Rejected by Manager"
         stats_requests = [r for r in all_item_requests_for_stats if r.status not in ['Pending Manager Approval', 'Rejected by Manager']]
-    elif current_user.role in ['GM', 'Operation Manager']:
-        # General Manager and Operation Manager see all requests (view-only, same as Procurement Manager)
+    elif current_user.role in ['GM', 'Operation Manager', 'Finance Admin']:
+        # General Manager, Operation Manager, and Finance Admin see all requests (view-only, same as Procurement Manager)
+        stats_requests = all_item_requests_for_stats
+    elif current_user.department == 'IT':
+        # IT department sees all requests (view-only, same as GM/Operation Manager)
         stats_requests = all_item_requests_for_stats
     elif current_user.department == 'Auditing':
         # Auditing department stats show only completed requests
@@ -5261,16 +5300,16 @@ def procurement_item_requests():
         is_procurement_user = True
     elif current_user.department == 'Procurement':
         is_procurement_user = True
-    elif current_user.role in ['GM', 'Operation Manager']:
-        # GM and Operation Manager see statistics like Procurement Manager (view-only)
+    elif current_user.role in ['GM', 'Operation Manager', 'Finance Admin']:
+        # GM, Operation Manager, and Finance Admin see statistics like Procurement Manager (view-only)
         is_procurement_user = True
     
-    # Calculate Bank Money statistics for Current Money Status section (for Procurement Manager, GM, Operation Manager, IT, and Auditing)
+    # Calculate Bank Money statistics for Current Money Status section (for Procurement Manager, GM, Operation Manager, IT, Finance Admin, and Auditing)
     available_balance = None
     completed_amount = None
     pending_amount = None
     on_hold_amount = None
-    if current_user.role in ['GM', 'Operation Manager'] or (current_user.department == 'Procurement' and current_user.role == 'Department Manager') or current_user.department in ['IT', 'Auditing']:
+    if current_user.role in ['GM', 'Operation Manager', 'Finance Admin'] or (current_user.department == 'Procurement' and current_user.role == 'Department Manager') or current_user.department in ['IT', 'Auditing']:
         # Calculate Bank Money statistics for Current Money Status section
         bank_money_requests = PaymentRequest.query.options(
             db.joinedload(PaymentRequest.user)
@@ -5660,8 +5699,8 @@ def view_item_request_page(request_id):
         # All Procurement staff (Manager and Staff) can view all requests except "Pending Manager Approval" and "Rejected by Manager"
         elif item_request.status not in ['Pending Manager Approval', 'Rejected by Manager']:
             can_view = True
-    elif current_user.role in ['GM', 'Operation Manager']:
-        # General Manager and Operation Manager can view all requests (view-only)
+    elif current_user.role in ['GM', 'Operation Manager', 'Finance Admin']:
+        # General Manager, Operation Manager, and Finance Admin can view all requests (view-only)
         can_view = True
     elif current_user.department == 'IT':
         # IT department can view all item requests (view-only, consistent with item requests listing)
