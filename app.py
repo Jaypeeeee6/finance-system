@@ -18398,7 +18398,7 @@ def reports():
 
 @app.route('/procurement/item-requests/reports')
 @login_required
-@role_required('Procurement Manager', 'Procurement Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager', 'Auditing Staff')
+@role_required('Procurement Manager', 'Procurement Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager', 'Auditing Staff', 'Finance Admin')
 def item_request_reports():
     """View item request reports page"""
     # Get filter parameters (support multiple values)
@@ -18422,7 +18422,7 @@ def item_request_reports():
     if current_user.role == 'Auditing Staff':
         query = query.filter(ProcurementItemRequest.status == 'Completed')
     
-    # GM, CEO, IT Staff, and Operation Manager can see ALL requests from all statuses
+    # GM, CEO, IT Staff, Operation Manager, and Finance Admin can see ALL requests from all statuses
     # Only filter for Department Managers
     if current_user.role == 'Department Manager':
         if current_user.department == 'IT':
@@ -18441,7 +18441,7 @@ def item_request_reports():
         else:
             # Other Department Managers can ONLY see their own department's requests
             query = query.filter(ProcurementItemRequest.department == current_user.department)
-    # GM, CEO, IT Staff, Operation Manager, and Procurement Staff can see all requests (no filtering)
+    # GM, CEO, IT Staff, Operation Manager, Finance Admin, and Procurement Staff can see all requests (no filtering)
     
     # Status filter
     if status_filter:

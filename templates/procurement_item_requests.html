@@ -25,8 +25,8 @@
         {% endif %}
     </div>
 
-    <!-- Statistics Summary (only for Procurement users) -->
-    {% if is_procurement_user %}
+    <!-- Statistics Summary (only for Procurement users, but not Finance Admin) -->
+    {% if is_procurement_user and user.role != 'Finance Admin' %}
     <div class="card" style="margin-bottom: 30px; background: #f8f9fa;">
         <div class="card-body request-statistics" style="padding: 25px;">
             <h3 style="margin-top: 0; color: #333;">
