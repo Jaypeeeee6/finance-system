@@ -4417,7 +4417,9 @@ def procurement_dashboard():
     )
     
     # Calculate Bank Money statistics for Current Money Status section
-    bank_money_requests = PaymentRequest.query.filter(
+    bank_money_requests = PaymentRequest.query.options(
+        db.joinedload(PaymentRequest.user)
+    ).filter(
         PaymentRequest.department == 'Procurement',
         PaymentRequest.request_type == 'Bank money',
         PaymentRequest.is_archived == False
@@ -4432,20 +4434,27 @@ def procurement_dashboard():
     pending_amount = sum(float(r.amount) for r in pending_requests_bm)
     on_hold_amount = sum(float(r.amount) for r in on_hold_requests_bm)
     
-    # Get item requests with status "Assigned to Procurement" and their invoice amounts
-    assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
-    item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
-    
-    # Get completed item requests and their invoice amounts
+    # Get completed item requests and their receipt amounts
+    # NOTE: Only Completed status is included, NOT Final Approval
     completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
-    completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
+    completed_item_requests_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
     
-    # Adjust calculations: deduct from available balance, add to money spent
-    # Money Spent = Assigned item requests + Completed item requests (only item requests, not payment requests)
-    money_spent = item_requests_amount + completed_item_requests_amount
-    # Available Balance = Completed payment requests - Completed item requests only
-    # (Only completed item requests reduce available balance, not assigned/pending items)
-    # Include reconciled/manual adjustments that have been marked to affect reports
+    # Get completed Bank money payment requests from Procurement Department Manager
+    # These amounts are added to Available Balance and subtracted from Money Spent
+    completed_bank_money_requests = [
+        r for r in completed_requests_bm 
+        if r.user and r.user.role == 'Department Manager' and r.user.department == 'Procurement'
+    ]
+    completed_bank_money_amount = sum(float(r.amount) for r in completed_bank_money_requests)
+    
+    # Money Spent = Completed item requests - Completed Bank money payment requests from Procurement Department Manager
+    # (Final Approval status is NOT included in calculations)
+    money_spent = completed_item_requests_amount - completed_bank_money_amount
+    
+    # Available Balance = Completed Bank money payment requests - Completed item requests + adjustments
+    # When Bank money payment is completed, it ADDS to available balance (already included in completed_amount)
+    # When item request is completed, it SUBTRACTS from available balance
+    # NOTE: completed_bank_money_amount is NOT added here because it's already included in completed_amount
     try:
         adjustments_sum = db.session.query(func.coalesce(func.sum(CurrentMoneyEntry.adjustment_amount), 0)).filter(
             CurrentMoneyEntry.department == 'Procurement',
@@ -4467,7 +4476,7 @@ def procurement_dashboard():
             department='Procurement',
             entry_kind='snapshot',
             completed_amount=completed_amount,
-            item_requests_assigned_amount=item_requests_amount,
+            item_requests_assigned_amount=None,  # Not used in calculations (Final Approval excluded)
             completed_item_requests_amount=completed_item_requests_amount,
             money_spent=money_spent,
             available_balance=available_balance,
@@ -4511,16 +4520,29 @@ def get_procurement_money_spent():
         return jsonify({'error': 'Unauthorized'}), 403
     
     try:
-        # Get item requests with status "Assigned to Procurement" and their invoice amounts
-        assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
-        item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
-        
-        # Get completed item requests and their invoice amounts
+        # Get completed item requests and their receipt amounts
+        # NOTE: Only Completed status is included, NOT Final Approval
         completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
-        completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
+        completed_item_requests_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
         
-        # Money Spent = Assigned item requests + Completed item requests
-        money_spent = item_requests_amount + completed_item_requests_amount
+        # Get completed Bank money payment requests from Procurement Department Manager
+        # These amounts are added to Available Balance and subtracted from Money Spent
+        bank_money_requests = PaymentRequest.query.options(
+            db.joinedload(PaymentRequest.user)
+        ).filter(
+            PaymentRequest.department == 'Procurement',
+            PaymentRequest.request_type == 'Bank money',
+            PaymentRequest.is_archived == False
+        ).all()
+        completed_bank_money_requests = [
+            r for r in bank_money_requests 
+            if r.status == 'Completed' and r.user and r.user.role == 'Department Manager' and r.user.department == 'Procurement'
+        ]
+        completed_bank_money_amount = sum(float(r.amount) for r in completed_bank_money_requests)
+        
+        # Money Spent = Completed item requests - Completed Bank money payment requests from Procurement Department Manager
+        # (Final Approval status is NOT included in calculations)
+        money_spent = completed_item_requests_amount - completed_bank_money_amount
         
         return jsonify({'money_spent': money_spent})
     except Exception as e:
@@ -5176,7 +5198,9 @@ def procurement_item_requests():
     on_hold_amount = None
     if current_user.role in ['GM', 'Operation Manager'] or (current_user.department == 'Procurement' and current_user.role == 'Department Manager') or current_user.department in ['IT', 'Auditing']:
         # Calculate Bank Money statistics for Current Money Status section
-        bank_money_requests = PaymentRequest.query.filter(
+        bank_money_requests = PaymentRequest.query.options(
+            db.joinedload(PaymentRequest.user)
+        ).filter(
             PaymentRequest.department == 'Procurement',
             PaymentRequest.request_type == 'Bank money',
             PaymentRequest.is_archived == False
@@ -5190,19 +5214,27 @@ def procurement_item_requests():
         pending_amount = sum(float(r.amount) for r in pending_requests_bm)
         on_hold_amount = sum(float(r.amount) for r in on_hold_requests_bm)
         
-        # Get item requests with status "Assigned to Procurement" and their invoice amounts
-        assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
-        item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
-        
-        # Get completed item requests and their invoice amounts
+        # Get completed item requests and their receipt amounts
+        # NOTE: Only Completed status is included, NOT Final Approval
         completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
-        completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
+        completed_item_requests_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
         
-        # Adjust calculations: deduct from available balance, add to money spent
-        # Money Spent = Assigned item requests + Completed item requests (only item requests, not payment requests)
-        completed_amount = item_requests_amount + completed_item_requests_amount
-        # Available Balance = Completed payment requests - Completed item requests only
-        # (Only completed item requests reduce available balance, not assigned/pending items)
+        # Get completed Bank money payment requests from Procurement Department Manager
+        # These amounts are added to Available Balance and subtracted from Money Spent
+        completed_bank_money_requests = [
+            r for r in completed_requests_bm 
+            if r.user and r.user.role == 'Department Manager' and r.user.department == 'Procurement'
+        ]
+        completed_bank_money_amount = sum(float(r.amount) for r in completed_bank_money_requests)
+        
+        # Money Spent = Completed item requests - Completed Bank money payment requests from Procurement Department Manager
+        # (Final Approval status is NOT included in calculations)
+        completed_amount = completed_item_requests_amount - completed_bank_money_amount
+        
+        # Available Balance = Completed Bank money payment requests - Completed item requests + adjustments
+        # When Bank money payment is completed, it ADDS to available balance (already included in completed_amount_bm)
+        # When item request is completed, it SUBTRACTS from available balance
+        # NOTE: completed_bank_money_amount is NOT added here because it's already included in completed_amount_bm
         try:
             adjustments_sum = db.session.query(func.coalesce(func.sum(CurrentMoneyEntry.adjustment_amount), 0)).filter(
                 CurrentMoneyEntry.department == 'Procurement',
@@ -5224,7 +5256,7 @@ def procurement_item_requests():
                 department='Procurement',
                 entry_kind='snapshot',
                 completed_amount=completed_amount_bm,
-                item_requests_assigned_amount=item_requests_amount,
+                item_requests_assigned_amount=None,  # Not used in calculations (Final Approval excluded)
                 completed_item_requests_amount=completed_item_requests_amount,
                 money_spent=None,
                 available_balance=available_balance,
@@ -5242,7 +5274,7 @@ def procurement_item_requests():
                 department='Procurement',
                 entry_kind='snapshot',
                 completed_amount=completed_amount_bm,
-                item_requests_assigned_amount=item_requests_amount,
+                item_requests_assigned_amount=None,  # Not used in calculations (Final Approval excluded)
                 completed_item_requests_amount=completed_item_requests_amount,
                 money_spent=completed_amount,
                 available_balance=available_balance,
@@ -6655,7 +6687,7 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         
         # Get completed item requests
         completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
-        completed_item_requests_amount = sum(float(r.invoice_amount) for r in completed_item_requests if r.invoice_amount is not None)
+        completed_item_requests_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
         
         # Calculate available balance
         # Available Balance = Completed payment requests - Completed item requests only

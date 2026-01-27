@@ -307,8 +307,8 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if req.invoice_amount %}
-                                    OMR {{ "%.3f"|format(req.invoice_amount) }}
+                                {% if req.receipt_amount %}
+                                    OMR {{ "%.3f"|format(req.receipt_amount) }}
                                 {% else %}
                                     <span style="color: #999;">-</span>
                                 {% endif %}
