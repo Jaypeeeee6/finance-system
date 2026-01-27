@@ -1790,20 +1790,15 @@ function loadMoneySpentHistory() {
                 return;
             }
             
-            // Calculate total money spent
-            let totalMoneySpent = 0;
-            data.history.forEach(entry => {
-                if (entry.money_spent !== null && entry.money_spent !== undefined) {
-                    totalMoneySpent += parseFloat(entry.money_spent);
-                }
-            });
+            // Get total all-time money spent from API response (sum of all receipt_amount from all completed item requests)
+            const totalAllTimeMoneySpent = data.total_all_time_money_spent !== undefined ? data.total_all_time_money_spent : 0;
             
             // Format total with commas
-            const formattedTotal = totalMoneySpent.toFixed(3).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            const formattedTotal = totalAllTimeMoneySpent.toFixed(3).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
             
             // Build table with total money spent above
             let html = '<div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;">';
-            html += '<div style="font-size: 14px; color: #666; margin-bottom: 5px;">Total Money Spent</div>';
+            html += '<div style="font-size: 14px; color: #666; margin-bottom: 5px;">Total Money Spent (of All-Time)</div>';
             html += '<div style="font-size: 24px; font-weight: bold; color: #f5576c;">OMR ' + formattedTotal + '</div>';
             html += '</div>';
             html += '<table class="money-spent-history-table">';

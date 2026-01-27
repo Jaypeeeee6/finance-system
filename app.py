@@ -4434,38 +4434,74 @@ def procurement_dashboard():
     pending_amount = sum(float(r.amount) for r in pending_requests_bm)
     on_hold_amount = sum(float(r.amount) for r in on_hold_requests_bm)
     
-    # Get completed item requests and their receipt amounts
-    # NOTE: Only Completed status is included, NOT Final Approval
-    completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
-    completed_item_requests_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
+    # Get the most recent snapshot to use as base values
+    # New transactions will be calculated and added/subtracted from these base values
+    latest_snapshot = CurrentMoneyEntry.query.filter(
+        CurrentMoneyEntry.department == 'Procurement',
+        CurrentMoneyEntry.entry_kind == 'snapshot',
+        CurrentMoneyEntry.money_spent.isnot(None),
+        CurrentMoneyEntry.available_balance.isnot(None)
+    ).order_by(CurrentMoneyEntry.entry_date.desc()).first()
     
-    # Get completed Bank money payment requests from Procurement Department Manager
-    # These amounts are added to Available Balance and subtracted from Money Spent
-    completed_bank_money_requests = [
-        r for r in completed_requests_bm 
-        if r.user and r.user.role == 'Department Manager' and r.user.department == 'Procurement'
-    ]
-    completed_bank_money_amount = sum(float(r.amount) for r in completed_bank_money_requests)
+    # Use snapshot values as base, or default to 0 if no snapshot exists
+    base_money_spent = float(latest_snapshot.money_spent) if latest_snapshot and latest_snapshot.money_spent is not None else 0.0
+    base_available_balance = float(latest_snapshot.available_balance) if latest_snapshot and latest_snapshot.available_balance is not None else 0.0
+    snapshot_date = latest_snapshot.entry_date if latest_snapshot else None
     
-    # Money Spent = Completed item requests - Completed Bank money payment requests from Procurement Department Manager
+    # Calculate NEW transactions (those completed AFTER the latest snapshot)
+    # Get completed item requests completed AFTER the snapshot
+    if snapshot_date:
+        # Filter in Python to handle NULL completion_date (use updated_at as fallback)
+        all_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+        new_completed_item_requests = [
+            r for r in all_completed_item_requests
+            if (r.completion_date and r.completion_date > snapshot_date) or 
+               (not r.completion_date and r.updated_at and r.updated_at > snapshot_date)
+        ]
+    else:
+        # If no snapshot, consider all completed item requests as "new"
+        new_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+    
+    new_completed_item_requests_amount = sum(float(r.receipt_amount) for r in new_completed_item_requests if r.receipt_amount is not None)
+    
+    # Get NEW completed Bank money payment requests from Procurement Department Manager
+    if snapshot_date:
+        # Convert snapshot_date to date for comparison with PaymentRequest.completion_date (Date type)
+        snapshot_date_only = snapshot_date.date() if hasattr(snapshot_date, 'date') else snapshot_date
+        new_completed_bank_money_requests = [
+            r for r in completed_requests_bm 
+            if r.user and r.user.role == 'Department Manager' and r.user.department == 'Procurement'
+            and ((r.completion_date and r.completion_date > snapshot_date_only) or 
+                 (not r.completion_date and r.updated_at and r.updated_at > snapshot_date))
+        ]
+    else:
+        # If no snapshot, consider all as "new"
+        new_completed_bank_money_requests = [
+            r for r in completed_requests_bm 
+            if r.user and r.user.role == 'Department Manager' and r.user.department == 'Procurement'
+        ]
+    
+    new_completed_bank_money_amount = sum(float(r.amount) for r in new_completed_bank_money_requests)
+    
+    # Calculate Money Spent: Base + New completed items - New completed Bank money payments
     # (Final Approval status is NOT included in calculations)
-    money_spent = completed_item_requests_amount - completed_bank_money_amount
+    money_spent = base_money_spent + new_completed_item_requests_amount - new_completed_bank_money_amount
     
-    # Available Balance = Completed Bank money payment requests - Completed item requests + adjustments
-    # When Bank money payment is completed, it ADDS to available balance (already included in completed_amount)
+    # Calculate Available Balance: Base - New completed items + New completed Bank money payments + adjustments
+    # When Bank money payment is completed, it ADDS to available balance
     # When item request is completed, it SUBTRACTS from available balance
-    # NOTE: completed_bank_money_amount is NOT added here because it's already included in completed_amount
     try:
         adjustments_sum = db.session.query(func.coalesce(func.sum(CurrentMoneyEntry.adjustment_amount), 0)).filter(
             CurrentMoneyEntry.department == 'Procurement',
             CurrentMoneyEntry.entry_kind == 'manual_adjustment',
-            CurrentMoneyEntry.include_in_balance == True
+            CurrentMoneyEntry.include_in_balance == True,
+            CurrentMoneyEntry.entry_date > snapshot_date if snapshot_date else True
         ).scalar() or 0
         adjustments_sum = float(adjustments_sum)
     except Exception:
         adjustments_sum = 0.0
 
-    available_balance = completed_amount - completed_item_requests_amount + adjustments_sum
+    available_balance = base_available_balance - new_completed_item_requests_amount + new_completed_bank_money_amount + adjustments_sum
     
     # Check and notify if balance is low
     check_and_notify_low_balance(available_balance)
@@ -4520,13 +4556,32 @@ def get_procurement_money_spent():
         return jsonify({'error': 'Unauthorized'}), 403
     
     try:
-        # Get completed item requests and their receipt amounts
-        # NOTE: Only Completed status is included, NOT Final Approval
-        completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
-        completed_item_requests_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
+        # Get the most recent snapshot to use as base value
+        latest_snapshot = CurrentMoneyEntry.query.filter(
+            CurrentMoneyEntry.department == 'Procurement',
+            CurrentMoneyEntry.entry_kind == 'snapshot',
+            CurrentMoneyEntry.money_spent.isnot(None)
+        ).order_by(CurrentMoneyEntry.entry_date.desc()).first()
         
-        # Get completed Bank money payment requests from Procurement Department Manager
-        # These amounts are added to Available Balance and subtracted from Money Spent
+        # Use snapshot value as base, or default to 0 if no snapshot exists
+        base_money_spent = float(latest_snapshot.money_spent) if latest_snapshot and latest_snapshot.money_spent is not None else 0.0
+        snapshot_date = latest_snapshot.entry_date if latest_snapshot else None
+        
+        # Calculate NEW transactions (those completed AFTER the latest snapshot)
+        if snapshot_date:
+            # Filter in Python to handle NULL completion_date (use updated_at as fallback)
+            all_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+            new_completed_item_requests = [
+                r for r in all_completed_item_requests
+                if (r.completion_date and r.completion_date > snapshot_date) or 
+                   (not r.completion_date and r.updated_at and r.updated_at > snapshot_date)
+            ]
+        else:
+            new_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+        
+        new_completed_item_requests_amount = sum(float(r.receipt_amount) for r in new_completed_item_requests if r.receipt_amount is not None)
+        
+        # Get NEW completed Bank money payment requests from Procurement Department Manager
         bank_money_requests = PaymentRequest.query.options(
             db.joinedload(PaymentRequest.user)
         ).filter(
@@ -4534,15 +4589,27 @@ def get_procurement_money_spent():
             PaymentRequest.request_type == 'Bank money',
             PaymentRequest.is_archived == False
         ).all()
-        completed_bank_money_requests = [
-            r for r in bank_money_requests 
-            if r.status == 'Completed' and r.user and r.user.role == 'Department Manager' and r.user.department == 'Procurement'
-        ]
-        completed_bank_money_amount = sum(float(r.amount) for r in completed_bank_money_requests)
         
-        # Money Spent = Completed item requests - Completed Bank money payment requests from Procurement Department Manager
+        if snapshot_date:
+            # Convert snapshot_date to date for comparison with PaymentRequest.completion_date (Date type)
+            snapshot_date_only = snapshot_date.date() if hasattr(snapshot_date, 'date') else snapshot_date
+            new_completed_bank_money_requests = [
+                r for r in bank_money_requests 
+                if r.status == 'Completed' and r.user and r.user.role == 'Department Manager' and r.user.department == 'Procurement'
+                and ((r.completion_date and r.completion_date > snapshot_date_only) or 
+                     (not r.completion_date and r.updated_at and r.updated_at > snapshot_date))
+            ]
+        else:
+            new_completed_bank_money_requests = [
+                r for r in bank_money_requests 
+                if r.status == 'Completed' and r.user and r.user.role == 'Department Manager' and r.user.department == 'Procurement'
+            ]
+        
+        new_completed_bank_money_amount = sum(float(r.amount) for r in new_completed_bank_money_requests)
+        
+        # Money Spent = Base + New completed items - New completed Bank money payments
         # (Final Approval status is NOT included in calculations)
-        money_spent = completed_item_requests_amount - completed_bank_money_amount
+        money_spent = base_money_spent + new_completed_item_requests_amount - new_completed_bank_money_amount
         
         return jsonify({'money_spent': money_spent})
     except Exception as e:
@@ -4597,7 +4664,14 @@ def get_procurement_money_spent_history():
             
             last_money_spent = money_spent_value
         
-        return jsonify({'history': history})
+        # Calculate Total Money Spent (of All-Time): Sum of ALL receipt_amount from ALL completed item requests
+        all_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+        total_all_time_money_spent = sum(float(r.receipt_amount) for r in all_completed_item_requests if r.receipt_amount is not None)
+        
+        return jsonify({
+            'history': history,
+            'total_all_time_money_spent': total_all_time_money_spent
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -5214,38 +5288,70 @@ def procurement_item_requests():
         pending_amount = sum(float(r.amount) for r in pending_requests_bm)
         on_hold_amount = sum(float(r.amount) for r in on_hold_requests_bm)
         
-        # Get completed item requests and their receipt amounts
-        # NOTE: Only Completed status is included, NOT Final Approval
-        completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
-        completed_item_requests_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
+        # Get the most recent snapshot to use as base values
+        latest_snapshot = CurrentMoneyEntry.query.filter(
+            CurrentMoneyEntry.department == 'Procurement',
+            CurrentMoneyEntry.entry_kind == 'snapshot',
+            CurrentMoneyEntry.money_spent.isnot(None),
+            CurrentMoneyEntry.available_balance.isnot(None)
+        ).order_by(CurrentMoneyEntry.entry_date.desc()).first()
         
-        # Get completed Bank money payment requests from Procurement Department Manager
-        # These amounts are added to Available Balance and subtracted from Money Spent
-        completed_bank_money_requests = [
-            r for r in completed_requests_bm 
-            if r.user and r.user.role == 'Department Manager' and r.user.department == 'Procurement'
-        ]
-        completed_bank_money_amount = sum(float(r.amount) for r in completed_bank_money_requests)
+        # Use snapshot values as base, or default to 0 if no snapshot exists
+        base_money_spent = float(latest_snapshot.money_spent) if latest_snapshot and latest_snapshot.money_spent is not None else 0.0
+        base_available_balance = float(latest_snapshot.available_balance) if latest_snapshot and latest_snapshot.available_balance is not None else 0.0
+        snapshot_date = latest_snapshot.entry_date if latest_snapshot else None
         
-        # Money Spent = Completed item requests - Completed Bank money payment requests from Procurement Department Manager
+        # Calculate NEW transactions (those completed AFTER the latest snapshot)
+        if snapshot_date:
+            # Filter in Python to handle NULL completion_date (use updated_at as fallback)
+            all_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+            new_completed_item_requests = [
+                r for r in all_completed_item_requests
+                if (r.completion_date and r.completion_date > snapshot_date) or 
+                   (not r.completion_date and r.updated_at and r.updated_at > snapshot_date)
+            ]
+        else:
+            new_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+        
+        new_completed_item_requests_amount = sum(float(r.receipt_amount) for r in new_completed_item_requests if r.receipt_amount is not None)
+        
+        # Get NEW completed Bank money payment requests from Procurement Department Manager
+        if snapshot_date:
+            # Convert snapshot_date to date for comparison with PaymentRequest.completion_date (Date type)
+            snapshot_date_only = snapshot_date.date() if hasattr(snapshot_date, 'date') else snapshot_date
+            new_completed_bank_money_requests = [
+                r for r in completed_requests_bm 
+                if r.user and r.user.role == 'Department Manager' and r.user.department == 'Procurement'
+                and ((r.completion_date and r.completion_date > snapshot_date_only) or 
+                     (not r.completion_date and r.updated_at and r.updated_at > snapshot_date))
+            ]
+        else:
+            new_completed_bank_money_requests = [
+                r for r in completed_requests_bm 
+                if r.user and r.user.role == 'Department Manager' and r.user.department == 'Procurement'
+            ]
+        
+        new_completed_bank_money_amount = sum(float(r.amount) for r in new_completed_bank_money_requests)
+        
+        # Money Spent = Base + New completed items - New completed Bank money payments
         # (Final Approval status is NOT included in calculations)
-        completed_amount = completed_item_requests_amount - completed_bank_money_amount
+        completed_amount = base_money_spent + new_completed_item_requests_amount - new_completed_bank_money_amount
         
-        # Available Balance = Completed Bank money payment requests - Completed item requests + adjustments
-        # When Bank money payment is completed, it ADDS to available balance (already included in completed_amount_bm)
+        # Available Balance = Base - New completed items + New completed Bank money payments + adjustments
+        # When Bank money payment is completed, it ADDS to available balance
         # When item request is completed, it SUBTRACTS from available balance
-        # NOTE: completed_bank_money_amount is NOT added here because it's already included in completed_amount_bm
         try:
             adjustments_sum = db.session.query(func.coalesce(func.sum(CurrentMoneyEntry.adjustment_amount), 0)).filter(
                 CurrentMoneyEntry.department == 'Procurement',
                 CurrentMoneyEntry.entry_kind == 'manual_adjustment',
-                CurrentMoneyEntry.include_in_balance == True
+                CurrentMoneyEntry.include_in_balance == True,
+                CurrentMoneyEntry.entry_date > snapshot_date if snapshot_date else True
             ).scalar() or 0
             adjustments_sum = float(adjustments_sum)
         except Exception:
             adjustments_sum = 0.0
 
-        available_balance = completed_amount_bm - completed_item_requests_amount + adjustments_sum
+        available_balance = base_available_balance - new_completed_item_requests_amount + new_completed_bank_money_amount + adjustments_sum
         
         # Check and notify if balance is low
         check_and_notify_low_balance(available_balance)
