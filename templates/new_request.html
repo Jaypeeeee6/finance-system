@@ -70,6 +70,16 @@
                                 {% endif %}
                             </select>
                             <input type="hidden" name="branch_names" id="branch_names" value="">
+                            <div class="branch-checkbox-container" style="display: none;">
+                                <label class="branch-checkbox-label">
+                                    <input type="checkbox" id="branch_type_branch" name="branch_type" value="branch" checked>
+                                    <span>Branch</span>
+                                </label>
+                                <label class="branch-checkbox-label">
+                                    <input type="checkbox" id="branch_type_flats" name="branch_type" value="flats">
+                                    <span>Flats</span>
+                                </label>
+                            </div>
                             <div id="branch_dropdown" class="branch-dropdown" style="display: none;"></div>
                         </div>
                         <small class="form-text text-muted">Type to search or select the branch location for this request</small>
@@ -141,6 +151,7 @@
                         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                     }
                     
+                    
                     .branch-group {
                         background-color: #f8f9fa;
                         padding: 8px 12px;
@@ -187,6 +198,43 @@
                     
                     optgroup option {
                         font-weight: normal;
+                    }
+                    
+                    .branch-checkbox-container {
+                        position: absolute;
+                        top: 100%;
+                        left: 0;
+                        right: 0;
+                        display: flex;
+                        gap: 20px;
+                        padding: 12px 20px;
+                        background-color: white;
+                        border-top: none;
+                        border-bottom: none;
+                        border-left: none;
+                        border-right: none;
+                        z-index: 999;
+                    }
+                    
+                    .branch-checkbox-label {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        color: #495057;
+                        user-select: none;
+                    }
+                    
+                    .branch-checkbox-label input[type="checkbox"] {
+                        cursor: pointer;
+                        width: 16px;
+                        height: 16px;
+                    }
+                    
+                    .branch-checkbox-label:hover {
+                        color: #007bff;
+                    }
                         color: #212529;
                         padding-left: 20px;
                     }
@@ -1079,15 +1127,46 @@ function initializeBranchSearch() {
     const dropdown = document.getElementById('branch_dropdown');
     const chipsContainer = document.getElementById('branch_chips_container');
     const hiddenInput = document.getElementById('branch_names');
+    const branchSelectContainer = document.querySelector('.branch-select-container');
     
     if (!searchInput || !hiddenSelect || !dropdown || !chipsContainer || !hiddenInput) return;
+    
+    // Helper function to toggle dropdown visibility and update checkbox container position
+    function setDropdownVisible(visible, rebuild = false) {
+        dropdown.style.display = visible ? 'block' : 'none';
+        if (branchSelectContainer) {
+            if (visible) {
+                branchSelectContainer.classList.add('dropdown-open');
+                // Only rebuild dropdown if explicitly requested (e.g., when branches are selected/deselected)
+                if (rebuild) {
+                    buildDropdown();
+                }
+                // Adjust dropdown position based on checkbox visibility
+                updateDropdownPosition();
+            } else {
+                branchSelectContainer.classList.remove('dropdown-open');
+            }
+        }
+    }
+    
+    // Function to update dropdown position based on checkbox visibility
+    function updateDropdownPosition() {
+        const checkboxContainer = branchSelectContainer.querySelector('.branch-checkbox-container');
+        if (checkboxContainer && checkboxContainer.style.display === 'flex') {
+            // Checkboxes are visible, move dropdown down
+            dropdown.style.top = 'calc(100% + 48px)';
+        } else {
+            // Checkboxes are hidden, dropdown at normal position
+            dropdown.style.top = '100%';
+        }
+    }
     
     // Array to store selected branches {value: string, text: string}
     let selectedBranches = [];
     
     // Flag to track if we're clicking on an option
     let clickingOnOption = false;
-    let blurTimeout = null;
+    let optionClickTimeout = null;
     
     // Flag to prevent dropdown from opening during initial draft population
     let suppressDropdownOpen = false;
@@ -1107,6 +1186,21 @@ function initializeBranchSearch() {
         
         // Update hidden input with comma-separated values
         hiddenInput.value = selectedBranches.map(b => b.value).join(',');
+        
+        // Show/hide checkboxes based on whether branches are selected
+        const checkboxContainer = branchSelectContainer.querySelector('.branch-checkbox-container');
+        if (checkboxContainer) {
+            if (selectedBranches.length > 0) {
+                checkboxContainer.style.display = 'flex';
+            } else {
+                checkboxContainer.style.display = 'none';
+            }
+        }
+        
+        // Update dropdown position if it's open
+        if (dropdown.style.display === 'block' || dropdown.style.display === '') {
+            updateDropdownPosition();
+        }
     }
     
     // Function to remove a branch chip
@@ -1169,8 +1263,21 @@ function initializeBranchSearch() {
                 
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 clickingOnOption = true;
                 optionHandled = true;
+                
+                // Clear any existing timeout for option click tracking
+                if (optionClickTimeout) {
+                    clearTimeout(optionClickTimeout);
+                }
+                
+                // Set flag to prevent document click from closing dropdown
+                optionClickTimeout = setTimeout(() => {
+                    clickingOnOption = false;
+                    optionClickTimeout = null;
+                }, 500);
+                
                 selectBranch(option.value, option.textContent);
                 
                 // Clear any existing timeout
@@ -1200,6 +1307,9 @@ function initializeBranchSearch() {
             // Mouseup as additional fallback for soft trackpad touches
             // Some soft touches might not trigger mousedown but will trigger mouseup
             optionDiv.addEventListener('mouseup', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
                 // Only handle if mousedown didn't already handle it
                 setTimeout(() => {
                     if (!optionHandled) {
@@ -1210,6 +1320,9 @@ function initializeBranchSearch() {
             
             // Touchend as fallback for soft touches
             optionDiv.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
                 // Only handle if touchstart didn't already handle it
                 setTimeout(() => {
                     if (!optionHandled) {
@@ -1220,6 +1333,9 @@ function initializeBranchSearch() {
             
             // Keep click as final fallback for accessibility and edge cases
             optionDiv.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
                 // Only handle if no other event handled it
                 setTimeout(() => {
                     if (!optionHandled && !clickingOnOption) {
@@ -1236,12 +1352,6 @@ function initializeBranchSearch() {
     
     // Make selectBranch globally accessible for draft pre-fill
     window.selectBranch = function(value, text) {
-        // Clear any pending blur timeout
-        if (blurTimeout) {
-            clearTimeout(blurTimeout);
-            blurTimeout = null;
-        }
-        
         // Check if branch is already selected - if so, remove it (toggle behavior)
         const existingIndex = selectedBranches.findIndex(b => b.value === value);
         if (existingIndex !== -1) {
@@ -1254,7 +1364,7 @@ function initializeBranchSearch() {
             if (!suppressDropdownOpen) {
                 // Clear search input but keep dropdown open so user can continue selecting
                 searchInput.value = '';
-                dropdown.style.display = 'block';
+                setDropdownVisible(true, false); // Don't rebuild, just show dropdown
                 // Re-focus after a small delay to ensure it works with soft touches
                 setTimeout(() => {
                     searchInput.focus();
@@ -1277,7 +1387,7 @@ function initializeBranchSearch() {
         if (!suppressDropdownOpen) {
             // Clear search input but keep dropdown open so user can continue selecting
             searchInput.value = '';
-            dropdown.style.display = 'block';
+            setDropdownVisible(true, false); // Don't rebuild, just show dropdown
             // Re-focus after a small delay to ensure it works with soft touches
             setTimeout(() => {
                 searchInput.focus();
@@ -1328,7 +1438,11 @@ function initializeBranchSearch() {
             }
         });
         
-        dropdown.style.display = hasVisibleOptions ? 'block' : 'none';
+        if (hasVisibleOptions) {
+            setDropdownVisible(true, false); // Don't rebuild during filtering
+        } else {
+            setDropdownVisible(false);
+        }
     }
     
     // Event listeners
@@ -1344,33 +1458,22 @@ function initializeBranchSearch() {
             dropdown.querySelectorAll('.branch-group').forEach(group => {
                 group.style.display = 'block';
             });
-            dropdown.style.display = 'block';
+            setDropdownVisible(true, false); // Don't rebuild when showing all options
         }
     });
     
     searchInput.addEventListener('focus', function() {
         if (this.value.trim() === '') {
-            dropdown.style.display = 'block';
+            // Only rebuild if dropdown is empty (first time opening)
+            const needsRebuild = dropdown.innerHTML === '';
+            setDropdownVisible(true, needsRebuild);
         }
     });
     
-    searchInput.addEventListener('blur', function() {
-        // Delay hiding to allow clicks on options (especially for soft trackpad touches)
-        // Clear any existing timeout first
-        if (blurTimeout) {
-            clearTimeout(blurTimeout);
-        }
-        blurTimeout = setTimeout(() => {
-            // Only hide if not clicking on an option
-            // Give extra time for soft touches that might have delayed event firing
-            if (!clickingOnOption) {
-                dropdown.style.display = 'none';
-            }
-            blurTimeout = null;
-        }, 300); // Increased timeout for better soft trackpad support
-    });
+    // Get checkbox container reference
+    const checkboxContainer = branchSelectContainer.querySelector('.branch-checkbox-container');
     
-    // Also prevent blur on mousedown/touchstart on dropdown options
+    // Prevent blur on mousedown/touchstart on dropdown options and checkbox container
     dropdown.addEventListener('mousedown', function(e) {
         e.preventDefault();
     });
@@ -1383,17 +1486,77 @@ function initializeBranchSearch() {
         e.preventDefault();
     });
     
-    // Hide dropdown when clicking outside
+    if (checkboxContainer) {
+        checkboxContainer.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+        });
+        
+        checkboxContainer.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+        });
+        
+        checkboxContainer.addEventListener('pointerdown', function(e) {
+            e.preventDefault();
+        });
+    }
+    
+    // Hide dropdown only when clicking outside (search input, dropdown, chips, or checkbox container)
     document.addEventListener('click', function(e) {
-        if (!searchInput.contains(e.target) && !dropdown.contains(e.target) && !chipsContainer.contains(e.target)) {
-            dropdown.style.display = 'none';
+        // Check if click is on an option or inside dropdown
+        const clickedOption = e.target.closest('.branch-option');
+        if (clickedOption) {
+            // Click is on an option, don't close
+            return;
+        }
+        
+        // Don't close if we're currently clicking on an option
+        if (clickingOnOption || optionClickTimeout) {
+            return;
+        }
+        
+        const isClickInside = searchInput.contains(e.target) || 
+                             dropdown.contains(e.target) || 
+                             chipsContainer.contains(e.target) ||
+                             (checkboxContainer && checkboxContainer.contains(e.target));
+        
+        if (!isClickInside) {
+            // Small delay to ensure option clicks are processed first
+            setTimeout(() => {
+                // Double-check we're not clicking on an option
+                if (!clickingOnOption && !optionClickTimeout) {
+                    setDropdownVisible(false);
+                }
+            }, 10);
         }
     });
     
     // Also handle touch events for better mobile/trackpad support
     document.addEventListener('touchend', function(e) {
-        if (!searchInput.contains(e.target) && !dropdown.contains(e.target) && !chipsContainer.contains(e.target)) {
-            dropdown.style.display = 'none';
+        // Check if touch is on an option or inside dropdown
+        const touchedOption = e.target.closest('.branch-option');
+        if (touchedOption) {
+            // Touch is on an option, don't close
+            return;
+        }
+        
+        // Don't close if we're currently clicking on an option
+        if (clickingOnOption || optionClickTimeout) {
+            return;
+        }
+        
+        const isClickInside = searchInput.contains(e.target) || 
+                             dropdown.contains(e.target) || 
+                             chipsContainer.contains(e.target) ||
+                             (checkboxContainer && checkboxContainer.contains(e.target));
+        
+        if (!isClickInside) {
+            // Small delay to ensure option touches are processed first
+            setTimeout(() => {
+                // Double-check we're not touching on an option
+                if (!clickingOnOption && !optionClickTimeout) {
+                    setDropdownVisible(false);
+                }
+            }, 10);
         }
     });
     
@@ -1997,7 +2160,7 @@ function initializeSupplierSearch() {
                     currentSelectedSupplier = null;
                 }
                 
-                dropdown.style.display = 'none';
+                setDropdownVisible(false);
             }
             blurTimeout = null;
         }, 200);
