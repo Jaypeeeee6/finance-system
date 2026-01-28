@@ -61,6 +61,16 @@
                                 {% endif %}
                             </select>
                             <input type="hidden" name="branch_names" id="branch_names" value="">
+                            <div class="branch-checkbox-container" style="display: none;">
+                                <label class="branch-checkbox-label">
+                                    <input type="checkbox" id="branch_type_branch" name="branch_type" value="branch" checked>
+                                    <span>Branch</span>
+                                </label>
+                                <label class="branch-checkbox-label">
+                                    <input type="checkbox" id="branch_type_flats" name="branch_type" value="flats">
+                                    <span>Flats</span>
+                                </label>
+                            </div>
                             <div id="branch_dropdown" class="branch-dropdown" style="display: none;"></div>
                         </div>
                         <small class="form-text text-muted">Choose which branches the items are for</small>
@@ -487,6 +497,42 @@
 
 .branch-option.hidden {
     display: none;
+}
+
+.branch-checkbox-container {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    display: flex;
+    gap: 20px;
+    padding: 12px 20px;
+    background-color: white;
+    border-top: none;
+    border-bottom: none;
+    border-left: none;
+    border-right: none;
+    z-index: 999;
+}
+
+.branch-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #495057;
+    user-select: none;
+}
+
+.branch-checkbox-label input[type="checkbox"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+.branch-checkbox-label:hover {
+    color: #007bff;
 }
 
 /* Error message styles */
@@ -1358,8 +1404,39 @@ function initializeBranchSearch() {
     const dropdown = document.getElementById('branch_dropdown');
     const chipsContainer = document.getElementById('branch_chips_container');
     const hiddenInput = document.getElementById('branch_names');
+    const branchSelectContainer = document.querySelector('.branch-select-container');
     
     if (!searchInput || !hiddenSelect || !dropdown || !chipsContainer || !hiddenInput) return;
+    
+    // Helper function to toggle dropdown visibility and update checkbox container position
+    function setDropdownVisible(visible, rebuild = false) {
+        dropdown.style.display = visible ? 'block' : 'none';
+        if (branchSelectContainer) {
+            if (visible) {
+                branchSelectContainer.classList.add('dropdown-open');
+                // Only rebuild dropdown if explicitly requested
+                if (rebuild) {
+                    buildDropdown();
+                }
+                // Adjust dropdown position based on checkbox visibility
+                updateDropdownPosition();
+            } else {
+                branchSelectContainer.classList.remove('dropdown-open');
+            }
+        }
+    }
+    
+    // Function to update dropdown position based on checkbox visibility
+    function updateDropdownPosition() {
+        const checkboxContainer = branchSelectContainer.querySelector('.branch-checkbox-container');
+        if (checkboxContainer && checkboxContainer.style.display === 'flex') {
+            // Checkboxes are visible, move dropdown down
+            dropdown.style.top = 'calc(100% + 48px)';
+        } else {
+            // Checkboxes are hidden, dropdown at normal position
+            dropdown.style.top = '100%';
+        }
+    }
     
     // Array to store selected branches {value: string, text: string}
     let selectedBranches = [];
@@ -1367,6 +1444,7 @@ function initializeBranchSearch() {
     // Flags to track selection state - much more robust than timeouts
     let isSelectionInProgress = false;
     let blurTimeout = null;
+    let optionClickTimeout = null;
     
     // Store dropdown visibility state to prevent unwanted closing
     let shouldKeepDropdownOpen = false;
@@ -1386,6 +1464,21 @@ function initializeBranchSearch() {
         
         // Update hidden input with comma-separated values
         hiddenInput.value = selectedBranches.map(b => b.value).join(',');
+        
+        // Show/hide checkboxes based on whether branches are selected
+        const checkboxContainer = branchSelectContainer.querySelector('.branch-checkbox-container');
+        if (checkboxContainer) {
+            if (selectedBranches.length > 0) {
+                checkboxContainer.style.display = 'flex';
+            } else {
+                checkboxContainer.style.display = 'none';
+            }
+        }
+        
+        // Update dropdown position if it's open
+        if (dropdown.style.display === 'block' || dropdown.style.display === '') {
+            updateDropdownPosition();
+        }
     }
     
     // Function to remove a branch chip
@@ -1437,23 +1530,85 @@ function initializeBranchSearch() {
             optionDiv.setAttribute('data-value', option.value);
             optionDiv.setAttribute('data-restaurant', restaurant);
             
-            // Use pointerdown for best trackpad support across all devices
-            // pointerdown fires reliably before blur on both mouse and trackpad
-            optionDiv.addEventListener('pointerdown', function(e) {
-                e.preventDefault(); // Prevent blur from firing
-                e.stopPropagation(); // Prevent event bubbling
-                selectBranch(option.value, option.textContent);
-            });
+            let optionHandled = false;
             
-            // Keep mousedown as fallback for older browsers
-            optionDiv.addEventListener('mousedown', function(e) {
+            // Function to handle option selection with debouncing
+            function handleOptionSelection(e) {
+                if (optionHandled) {
+                    return;
+                }
+                
                 e.preventDefault();
                 e.stopPropagation();
-                // Only call if pointerdown hasn't already handled it
-                if (!isSelectionInProgress) {
-                    selectBranch(option.value, option.textContent);
+                e.stopImmediatePropagation();
+                isSelectionInProgress = true;
+                optionHandled = true;
+                
+                // Clear any existing timeout for option click tracking
+                if (optionClickTimeout) {
+                    clearTimeout(optionClickTimeout);
                 }
-            });
+                
+                // Set flag to prevent document click from closing dropdown
+                optionClickTimeout = setTimeout(() => {
+                    isSelectionInProgress = false;
+                    optionClickTimeout = null;
+                }, 500);
+                
+                selectBranch(option.value, option.textContent);
+                
+                // Reset flag after a delay to allow for soft touches
+                setTimeout(() => {
+                    optionHandled = false;
+                }, 400);
+            }
+            
+            // Use mousedown for better trackpad support (fires before blur)
+            optionDiv.addEventListener('mousedown', handleOptionSelection, { passive: false });
+            
+            // Support for touch devices and trackpads (soft touches)
+            optionDiv.addEventListener('touchstart', handleOptionSelection, { passive: false });
+            
+            // Pointer events for better cross-device support (including soft trackpad touches)
+            optionDiv.addEventListener('pointerdown', function(e) {
+                handleOptionSelection(e);
+            }, { passive: false });
+            
+            // Mouseup as additional fallback for soft trackpad touches
+            optionDiv.addEventListener('mouseup', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                setTimeout(() => {
+                    if (!optionHandled) {
+                        handleOptionSelection(e);
+                    }
+                }, 10);
+            }, { passive: false });
+            
+            // Touchend as fallback for soft touches
+            optionDiv.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                setTimeout(() => {
+                    if (!optionHandled) {
+                        handleOptionSelection(e);
+                    }
+                }, 10);
+            }, { passive: false });
+            
+            // Keep click as final fallback for accessibility and edge cases
+            optionDiv.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                setTimeout(() => {
+                    if (!optionHandled && !isSelectionInProgress) {
+                        handleOptionSelection(e);
+                    }
+                }, 50);
+            }, { passive: false });
             
             dropdown.appendChild(optionDiv);
         });
@@ -1489,14 +1644,14 @@ function initializeBranchSearch() {
             
             // Clear search input but keep dropdown open so user can continue selecting
             searchInput.value = '';
-            dropdown.style.display = 'block';
+            setDropdownVisible(true, false); // Don't rebuild, just show dropdown
             
             // Re-focus AFTER DOM updates to ensure focus is properly restored
             // Use a microtask (Promise) for more reliable timing than setTimeout
             Promise.resolve().then(() => {
                 searchInput.focus();
                 // Ensure dropdown is still visible after focus
-                dropdown.style.display = 'block';
+                setDropdownVisible(true, false);
             }).catch(err => console.error('Error in selectBranch focus:', err))
             .finally(() => {
                 // Mark selection as complete after focus is restored
@@ -1557,13 +1712,15 @@ function initializeBranchSearch() {
             dropdown.querySelectorAll('.branch-group').forEach(group => {
                 group.style.display = 'block';
             });
-            dropdown.style.display = 'block';
+            setDropdownVisible(true, false); // Don't rebuild when showing all options
         }
     });
     
     searchInput.addEventListener('focus', function() {
         if (this.value.trim() === '') {
-            dropdown.style.display = 'block';
+            // Only rebuild if dropdown is empty (first time opening)
+            const needsRebuild = dropdown.innerHTML === '';
+            setDropdownVisible(true, needsRebuild);
         }
     });
     
@@ -1597,26 +1754,100 @@ function initializeBranchSearch() {
             
             // Only hide dropdown if clicking outside the entire container
             if (!isClickingInsideContainer) {
-                dropdown.style.display = 'none';
+                setDropdownVisible(false);
                 shouldKeepDropdownOpen = false;
             }
             blurTimeout = null;
         }, 100);
     });
     
-    // Hide dropdown when clicking outside
+    // Get checkbox container reference
+    const checkboxContainer = branchSelectContainer.querySelector('.branch-checkbox-container');
+    
+    // Prevent blur on mousedown/touchstart on dropdown options and checkbox container
+    dropdown.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+    });
+    
+    dropdown.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+    });
+    
+    dropdown.addEventListener('pointerdown', function(e) {
+        e.preventDefault();
+    });
+    
+    if (checkboxContainer) {
+        checkboxContainer.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+        });
+        
+        checkboxContainer.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+        });
+        
+        checkboxContainer.addEventListener('pointerdown', function(e) {
+            e.preventDefault();
+        });
+    }
+    
+    // Hide dropdown only when clicking outside (search input, dropdown, chips, or checkbox container)
     document.addEventListener('click', function(e) {
-        // Never close if selection is in progress
-        if (isSelectionInProgress) {
+        // Check if click is on an option or inside dropdown
+        const clickedOption = e.target.closest('.branch-option');
+        if (clickedOption) {
+            // Click is on an option, don't close
             return;
         }
         
-        const branchContainer = searchInput.closest('.branch-select-container');
-        const isClickingInsideContainer = branchContainer && branchContainer.contains(e.target);
+        // Don't close if we're currently clicking on an option
+        if (isSelectionInProgress || optionClickTimeout) {
+            return;
+        }
         
-        // Only hide if clicking completely outside the container
-        if (!isClickingInsideContainer && !shouldKeepDropdownOpen) {
-            dropdown.style.display = 'none';
+        const isClickInside = searchInput.contains(e.target) || 
+                             dropdown.contains(e.target) || 
+                             chipsContainer.contains(e.target) ||
+                             (checkboxContainer && checkboxContainer.contains(e.target));
+        
+        if (!isClickInside) {
+            // Small delay to ensure option clicks are processed first
+            setTimeout(() => {
+                // Double-check we're not clicking on an option
+                if (!isSelectionInProgress && !optionClickTimeout) {
+                    setDropdownVisible(false);
+                }
+            }, 10);
+        }
+    });
+    
+    // Also handle touch events for better mobile/trackpad support
+    document.addEventListener('touchend', function(e) {
+        // Check if touch is on an option or inside dropdown
+        const touchedOption = e.target.closest('.branch-option');
+        if (touchedOption) {
+            // Touch is on an option, don't close
+            return;
+        }
+        
+        // Don't close if we're currently clicking on an option
+        if (isSelectionInProgress || optionClickTimeout) {
+            return;
+        }
+        
+        const isClickInside = searchInput.contains(e.target) || 
+                             dropdown.contains(e.target) || 
+                             chipsContainer.contains(e.target) ||
+                             (checkboxContainer && checkboxContainer.contains(e.target));
+        
+        if (!isClickInside) {
+            // Small delay to ensure option touches are processed first
+            setTimeout(() => {
+                // Double-check we're not touching on an option
+                if (!isSelectionInProgress && !optionClickTimeout) {
+                    setDropdownVisible(false);
+                }
+            }, 10);
         }
     });
     
