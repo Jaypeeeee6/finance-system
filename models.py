@@ -643,39 +643,6 @@ class LocationPriority(db.Model):
         return f'<LocationPriority {self.id} - {self.location_name} (priority={self.priority})>'
 
 
-class Flat(db.Model):
-    """Flats associated with branches"""
-    __tablename__ = 'flats'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=False)  # Foreign key to Branch
-    flat_name = db.Column(db.String(100), nullable=False)  # e.g., "Flat 1", "Flat A", "Unit 101"
-    is_active = db.Column(db.Boolean, default=True)  # Whether this flat is currently active
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
-    
-    # Relationships
-    branch = db.relationship('Branch', backref='flats')
-    created_by = db.relationship('User', backref='created_flats')
-    
-    def to_dict(self):
-        """Convert flat to dictionary"""
-        return {
-            'id': self.id,
-            'branch_id': self.branch_id,
-            'branch_name': self.branch.name if self.branch else 'N/A',
-            'flat_name': self.flat_name,
-            'is_active': self.is_active,
-            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'created_by': self.created_by.name if self.created_by else 'System'
-        }
-    
-    def __repr__(self):
-        return f'<Flat {self.id} - {self.flat_name} (branch_id={self.branch_id})>'
-
-
 class FinanceAdminNote(db.Model):
     """Model for storing multiple finance admin notes for payment requests"""
     __tablename__ = 'finance_admin_notes'

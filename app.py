@@ -12,7 +12,7 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, UserPermission, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, ProcurementReceiptEntry, ProcurementInvoiceEntry, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry, DepartmentTemporaryManager, Flat
+from models import db, User, UserPermission, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, ProcurementReceiptEntry, ProcurementInvoiceEntry, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry, DepartmentTemporaryManager
 from config import Config
 import json
 from playwright.sync_api import sync_playwright
@@ -10613,9 +10613,6 @@ def it_dashboard():
     
     branches = branches_query.order_by(Branch.id).all()
     
-    # Get flats for the Flats Management section
-    flats = Flat.query.order_by(Flat.id).all()
-    
     # Get all departments for the filter dropdown and normalize legacy label
     all_departments = db.session.query(RequestType.department).distinct().order_by(RequestType.department).all()
     departments = []
@@ -10643,7 +10640,6 @@ def it_dashboard():
                          procurement_department_filter=procurement_department_filter,
                          procurement_search=procurement_search,
                          branches=branches,
-                         flats=flats,
                          departments=departments,
                          user=current_user,
                          notifications=notifications,
@@ -12405,164 +12401,6 @@ def add_location():
     next_priority = (max_priority or 0) + 1
     
     return render_template('add_location.html', user=current_user, next_priority=next_priority)
-
-
-@app.route('/it/flats/add', methods=['GET', 'POST'])
-@login_required
-@role_required('IT Staff', 'Department Manager')
-def add_flat():
-    """Add new flat - IT only"""
-    # Restrict Department Managers to IT department only
-    if current_user.role == 'Department Manager' and current_user.department != 'IT':
-        flash('You do not have permission to access this page.', 'danger')
-        return redirect(url_for('dashboard'))
-    
-    if request.method == 'POST':
-        branch_id = request.form.get('branch_id', type=int)
-        flat_name = request.form.get('flat_name', '').strip()
-        is_active = request.form.get('is_active') == 'on'
-        
-        if not branch_id:
-            flash('Branch is required.', 'danger')
-            return redirect(url_for('add_flat'))
-        
-        if not flat_name:
-            flash('Flat name is required.', 'danger')
-            return redirect(url_for('add_flat'))
-        
-        # Check if branch exists
-        branch = Branch.query.get(branch_id)
-        if not branch:
-            flash('Selected branch does not exist.', 'danger')
-            return redirect(url_for('add_flat'))
-        
-        # Check if flat already exists for this branch
-        existing = Flat.query.filter_by(branch_id=branch_id, flat_name=flat_name).first()
-        if existing:
-            flash(f'Flat "{flat_name}" already exists for branch "{branch.name}".', 'danger')
-            return redirect(url_for('add_flat'))
-        
-        try:
-            flat = Flat(
-                branch_id=branch_id,
-                flat_name=flat_name,
-                is_active=is_active,
-                created_by_user_id=current_user.user_id
-            )
-            
-            db.session.add(flat)
-            db.session.commit()
-            
-            # Log the action
-            log_action(f'Added flat: {flat_name} for branch {branch.name}')
-            
-            flash(f'Flat "{flat_name}" added successfully for branch "{branch.name}".', 'success')
-            return redirect(url_for('it_dashboard', tab='branches'))
-            
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error adding flat: {str(e)}', 'danger')
-            return redirect(url_for('add_flat'))
-    
-    # Get all active branches for the dropdown
-    available_branches = Branch.query.filter_by(is_active=True).order_by(Branch.name).all()
-    
-    return render_template('add_flat.html', user=current_user, available_branches=available_branches)
-
-
-@app.route('/it/flats/edit/<int:flat_id>', methods=['GET', 'POST'])
-@login_required
-@role_required('IT Staff', 'Department Manager')
-def edit_flat(flat_id):
-    """Edit flat - IT only"""
-    # Restrict Department Managers to IT department only
-    if current_user.role == 'Department Manager' and current_user.department != 'IT':
-        flash('You do not have permission to access this page.', 'danger')
-        return redirect(url_for('dashboard'))
-    
-    flat = Flat.query.get_or_404(flat_id)
-    
-    if request.method == 'POST':
-        branch_id = request.form.get('branch_id', type=int)
-        flat_name = request.form.get('flat_name', '').strip()
-        is_active = request.form.get('is_active') == 'on'
-        
-        if not branch_id:
-            flash('Branch is required.', 'danger')
-            return redirect(url_for('edit_flat', flat_id=flat_id))
-        
-        if not flat_name:
-            flash('Flat name is required.', 'danger')
-            return redirect(url_for('edit_flat', flat_id=flat_id))
-        
-        # Check if branch exists
-        branch = Branch.query.get(branch_id)
-        if not branch:
-            flash('Selected branch does not exist.', 'danger')
-            return redirect(url_for('edit_flat', flat_id=flat_id))
-        
-        # Check if another flat with same name exists for this branch
-        existing = Flat.query.filter(Flat.branch_id == branch_id, Flat.flat_name == flat_name, Flat.id != flat_id).first()
-        if existing:
-            flash(f'Flat "{flat_name}" already exists for branch "{branch.name}".', 'danger')
-            return redirect(url_for('edit_flat', flat_id=flat_id))
-        
-        try:
-            old_name = flat.flat_name
-            old_branch_name = flat.branch.name if flat.branch else 'N/A'
-            
-            flat.branch_id = branch_id
-            flat.flat_name = flat_name
-            flat.is_active = is_active
-            flat.updated_at = datetime.utcnow()
-            
-            db.session.commit()
-            
-            # Log the action
-            log_action(f'Updated flat: {old_name} (branch: {old_branch_name}) -> {flat_name} (branch: {branch.name})')
-            
-            flash(f'Flat "{flat_name}" updated successfully.', 'success')
-            return redirect(url_for('it_dashboard', tab='branches'))
-            
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error updating flat: {str(e)}', 'danger')
-            return redirect(url_for('edit_flat', flat_id=flat_id))
-    
-    # Get all active branches for the dropdown
-    available_branches = Branch.query.filter_by(is_active=True).order_by(Branch.name).all()
-    
-    return render_template('edit_flat.html', flat=flat, user=current_user, available_branches=available_branches)
-
-
-@app.route('/it/flats/toggle/<int:flat_id>', methods=['POST'])
-@login_required
-@role_required('IT Staff', 'Department Manager')
-def toggle_flat(flat_id):
-    """Toggle flat active status - IT only"""
-    # Restrict Department Managers to IT department only
-    if current_user.role == 'Department Manager' and current_user.department != 'IT':
-        flash('You do not have permission to access this page.', 'danger')
-        return redirect(url_for('dashboard'))
-    
-    flat = Flat.query.get_or_404(flat_id)
-    
-    try:
-        flat.is_active = not flat.is_active
-        flat.updated_at = datetime.utcnow()
-        
-        db.session.commit()
-        
-        status = 'activated' if flat.is_active else 'deactivated'
-        log_action(f'{status.title()} flat: {flat.flat_name}')
-        
-        flash(f'Flat "{flat.flat_name}" {status} successfully.', 'success')
-        
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error updating flat: {str(e)}', 'danger')
-    
-    return redirect(url_for('it_dashboard', tab='branches'))
 
 
 @app.route('/it/locations/edit/<int:location_id>', methods=['GET', 'POST'])
