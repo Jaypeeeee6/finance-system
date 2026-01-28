@@ -1362,8 +1362,7 @@ function initializeBranchSearch() {
             
             // Only open dropdown if not suppressed (during draft population)
             if (!suppressDropdownOpen) {
-                // Clear search input but keep dropdown open so user can continue selecting
-                searchInput.value = '';
+                // Keep dropdown open so user can continue selecting
                 setDropdownVisible(true, false); // Don't rebuild, just show dropdown
                 // Re-focus after a small delay to ensure it works with soft touches
                 setTimeout(() => {
@@ -1385,8 +1384,7 @@ function initializeBranchSearch() {
         
         // Only open dropdown if not suppressed (during draft population)
         if (!suppressDropdownOpen) {
-            // Clear search input but keep dropdown open so user can continue selecting
-            searchInput.value = '';
+            // Keep dropdown open so user can continue selecting
             setDropdownVisible(true, false); // Don't rebuild, just show dropdown
             // Re-focus after a small delay to ensure it works with soft touches
             setTimeout(() => {

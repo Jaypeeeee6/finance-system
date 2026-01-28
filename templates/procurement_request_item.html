@@ -1642,8 +1642,7 @@ function initializeBranchSearch() {
             updateChips();
             updateDropdownSelection();
             
-            // Clear search input but keep dropdown open so user can continue selecting
-            searchInput.value = '';
+            // Keep dropdown open so user can continue selecting
             setDropdownVisible(true, false); // Don't rebuild, just show dropdown
             
             // Re-focus AFTER DOM updates to ensure focus is properly restored
