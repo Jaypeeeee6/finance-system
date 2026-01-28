@@ -2203,6 +2203,17 @@ function clearSearch() {
 }
 
 function showTab(tabName) {
+    // Update URL when switching tabs
+    if (tabName === 'requests') {
+        // Redirect to base IT dashboard URL (remove tab parameter)
+        const url = new URL(window.location);
+        url.pathname = url.pathname; // Keep the same path
+        url.searchParams.delete('tab'); // Remove tab parameter
+        url.searchParams.set('page', '1'); // Reset to page 1
+        window.location.href = url.toString();
+        return;
+    }
+    
     // Hide all main dashboard tabs (not nested ones)
     const mainTabs = document.querySelectorAll('#requests-tab, #settings-tab, #users-tab, #request-types-tab, #person-company-names-tab, #procurement-categories-items-tab, #branches-tab, #logs-tab');
     mainTabs.forEach(tab => {
