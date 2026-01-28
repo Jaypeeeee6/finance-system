@@ -9253,6 +9253,8 @@ def procurement_request_item():
         # Use branch_names if available, otherwise use branch_name
         if branch_names:
             branch_name = branch_names
+        # Branch type selection from radio buttons: 'branch' (Branch) or 'flats'
+        branch_type = request.form.get('branch_type', 'branch')
         # Date is automatically set to today's date (no longer required from form)
         request_date = datetime.utcnow().date()
         notes = request.form.get('notes', '').strip()
@@ -9449,6 +9451,7 @@ def procurement_request_item():
             procurement_quantities=quantity if quantity else None,  # Store requested quantities as formatted string (not raw JSON)
             purpose=purpose,
             branch_name=branch_name,
+            branch_type=branch_type or None,
             request_date=request_date,
             is_urgent=False,  # Will be set by manager during approval
             notes=notes if notes else None,
@@ -13128,6 +13131,8 @@ def new_request():
         # Use branch_names if available, otherwise use branch_name
         if branch_names:
             branch_name = branch_names
+        # Branch type selection from radio buttons: 'branch' (Branch) or 'flats'
+        branch_type = request.form.get('branch_type', 'branch')
         date = datetime.utcnow().date()  # Automatically use today's date
         purpose = request.form.get('purpose')
         payment_method = request.form.get('payment_method', 'Card')  # Default to Card
@@ -13311,6 +13316,7 @@ def new_request():
             request_type=final_request_type or 'Draft',
             requestor_name=requestor_name or current_user.name,
             branch_name=branch_name or '',
+            branch_type=branch_type or None,
             person_company=person_company or None,  # Store person_company regardless of type
             department=current_user.department,
             date=date,

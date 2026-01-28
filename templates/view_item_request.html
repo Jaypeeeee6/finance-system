@@ -1046,6 +1046,13 @@ body.flash-success-open {
                 </div>
             </div>
 
+            {% if item_request.branch_type %}
+            <div class="form-group">
+                <label>Branch Type</label>
+                <input type="text" value="{% if item_request.branch_type == 'branch' %}Branch{% elif item_request.branch_type == 'flats' %}Flats{% else %}{{ item_request.branch_type }}{% endif %}" readonly style="background: #f5f5f5;">
+            </div>
+            {% endif %}
+
             <div class="form-group">
                 <label>Purpose/Description</label>
                 <textarea rows="4" readonly style="background: #f5f5f5;">{{ item_request.purpose }}</textarea>

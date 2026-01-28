@@ -648,6 +648,13 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     <input type="text" id="branch_name" value="{{ request.branch_name|replace(',', ', ') }}" readonly style="background: #f5f5f5; cursor: not-allowed;">
                 </div>
 
+                {% if request.branch_type %}
+                <div class="form-group">
+                    <label>Branch Type</label>
+                    <input type="text" value="{% if request.branch_type == 'branch' %}Branch{% elif request.branch_type == 'flats' %}Flats{% else %}{{ request.branch_type }}{% endif %}" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                </div>
+                {% endif %}
+
                 <div class="form-group" id="personCompanyGroupView">
                     <label for="person_company">
                         {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="person_company" required>{% endif %}

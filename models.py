@@ -167,6 +167,7 @@ class PaymentRequest(db.Model):
     request_type = db.Column(db.String(50), nullable=False)  # Request type (e.g., Person, Company, Supplier/Rental, Item, Others)
     requestor_name = db.Column(db.String(100), nullable=False)
     branch_name = db.Column(db.String(100), nullable=False)  # Branch name for the request
+    branch_type = db.Column(db.String(20), nullable=True)  # 'branch' (Restaurant) or 'flats'
     
     # Dynamic field for Person/Company Name
     person_company = db.Column(db.String(200))  # For Person/Company type
@@ -734,6 +735,7 @@ class ProcurementItemRequest(db.Model):
     procurement_quantity_rejection_reason = db.Column(db.Text, nullable=True)  # Reason when assigned procurement sets quantity to 0
     purpose = db.Column(db.Text, nullable=False)
     branch_name = db.Column(db.String(100), nullable=False)
+    branch_type = db.Column(db.String(20), nullable=True)  # 'branch' (Restaurant) or 'flats'
     request_date = db.Column(db.Date, nullable=False)
     is_urgent = db.Column(db.Boolean, default=False)
     notes = db.Column(db.Text, nullable=True)
