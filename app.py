@@ -4500,6 +4500,11 @@ def procurement_dashboard():
     
     new_completed_item_requests_amount = sum(float(r.receipt_amount) for r in new_completed_item_requests if r.receipt_amount is not None)
     
+    # Calculate total completed item requests amount (for snapshot recording)
+    # This is the total of ALL completed item requests, not just new ones
+    all_completed_item_requests_total = ProcurementItemRequest.query.filter_by(status='Completed').all()
+    completed_item_requests_amount = sum(float(r.receipt_amount) for r in all_completed_item_requests_total if r.receipt_amount is not None)
+    
     # Get NEW completed Bank money payment requests from Procurement Department Manager
     if snapshot_date:
         # Convert snapshot_date to date for comparison with PaymentRequest.completion_date (Date type)
@@ -5473,6 +5478,11 @@ def procurement_item_requests():
             new_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
         
         new_completed_item_requests_amount = sum(float(r.receipt_amount) for r in new_completed_item_requests if r.receipt_amount is not None)
+        
+        # Calculate total completed item requests amount (for snapshot recording)
+        # This is the total of ALL completed item requests, not just new ones
+        all_completed_item_requests_total = ProcurementItemRequest.query.filter_by(status='Completed').all()
+        completed_item_requests_amount = sum(float(r.receipt_amount) for r in all_completed_item_requests_total if r.receipt_amount is not None)
         
         # Get NEW completed Bank money payment requests from Procurement Department Manager
         if snapshot_date:
