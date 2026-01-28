@@ -45,7 +45,19 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="branch_name">Branch Name *</label>
+                        <div class="branch-label-container">
+                            <label for="branch_name">Branch Name *</label>
+                            <div class="branch-checkbox-container">
+                                <label class="branch-checkbox-label">
+                                    <input type="radio" id="branch_type_branch" name="branch_type" value="branch" checked>
+                                    <span>Restaurant</span>
+                                </label>
+                                <label class="branch-checkbox-label">
+                                    <input type="radio" id="branch_type_flats" name="branch_type" value="flats">
+                                    <span>Flats</span>
+                                </label>
+                            </div>
+                        </div>
                         <div class="branch-select-container">
                             <div id="branch_chips_container" class="branch-chips-container"></div>
                             <input type="text" id="branch_search" class="form-control" placeholder="Search branches..." autocomplete="off">
@@ -70,16 +82,6 @@
                                 {% endif %}
                             </select>
                             <input type="hidden" name="branch_names" id="branch_names" value="">
-                            <div class="branch-checkbox-container" style="display: none;">
-                                <label class="branch-checkbox-label">
-                                    <input type="checkbox" id="branch_type_branch" name="branch_type" value="branch" checked>
-                                    <span>Branch</span>
-                                </label>
-                                <label class="branch-checkbox-label">
-                                    <input type="checkbox" id="branch_type_flats" name="branch_type" value="flats">
-                                    <span>Flats</span>
-                                </label>
-                            </div>
                             <div id="branch_dropdown" class="branch-dropdown" style="display: none;"></div>
                         </div>
                         <small class="form-text text-muted">Type to search or select the branch location for this request</small>
@@ -200,20 +202,19 @@
                         font-weight: normal;
                     }
                     
+                    .branch-label-container {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 0.5px;
+                    }
+                    
                     .branch-checkbox-container {
-                        position: absolute;
-                        top: 100%;
-                        left: 0;
-                        right: 0;
                         display: flex;
                         gap: 20px;
-                        padding: 12px 20px;
-                        background-color: white;
-                        border-top: none;
-                        border-bottom: none;
-                        border-left: none;
-                        border-right: none;
-                        z-index: 999;
+                        padding: 0 0 0 0; /* no bottom padding */
+                        margin: 0;
+                        background-color: transparent;
                     }
                     
                     .branch-checkbox-label {
@@ -226,7 +227,7 @@
                         user-select: none;
                     }
                     
-                    .branch-checkbox-label input[type="checkbox"] {
+                    .branch-checkbox-label input[type="radio"] {
                         cursor: pointer;
                         width: 16px;
                         height: 16px;
@@ -358,6 +359,20 @@
         .tooltip-wrapper .tooltip-text {
             font-size: 0.95rem;
             max-width: 280px;
+        }
+    }
+    
+    /* Radio buttons responsive - matches navbar breakpoint */
+    @media (max-width: 1024px) {
+        .branch-label-container {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        
+        .branch-checkbox-container {
+            width: 100%;
+            margin-top: 4px;
         }
     }
 
@@ -1151,14 +1166,10 @@ function initializeBranchSearch() {
     
     // Function to update dropdown position based on checkbox visibility
     function updateDropdownPosition() {
-        const checkboxContainer = branchSelectContainer.querySelector('.branch-checkbox-container');
-        if (checkboxContainer && checkboxContainer.style.display === 'flex') {
-            // Checkboxes are visible, move dropdown down
-            dropdown.style.top = 'calc(100% + 48px)';
-        } else {
-            // Checkboxes are hidden, dropdown at normal position
-            dropdown.style.top = '100%';
-        }
+        // Dropdown should always appear directly below the branch input area.
+        // Since the checkbox container is now in normal document flow,
+        // we keep a consistent offset so it renders just under the selector.
+        dropdown.style.top = '100%';
     }
     
     // Array to store selected branches {value: string, text: string}
@@ -1187,14 +1198,10 @@ function initializeBranchSearch() {
         // Update hidden input with comma-separated values
         hiddenInput.value = selectedBranches.map(b => b.value).join(',');
         
-        // Show/hide checkboxes based on whether branches are selected
+        // Ensure radio buttons for branch type are always visible
         const checkboxContainer = branchSelectContainer.querySelector('.branch-checkbox-container');
         if (checkboxContainer) {
-            if (selectedBranches.length > 0) {
-                checkboxContainer.style.display = 'flex';
-            } else {
-                checkboxContainer.style.display = 'none';
-            }
+            checkboxContainer.style.display = 'flex';
         }
         
         // Update dropdown position if it's open
