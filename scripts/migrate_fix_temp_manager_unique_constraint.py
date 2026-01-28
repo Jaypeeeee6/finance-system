@@ -2,6 +2,7 @@
 """
 Migration script to fix the unique constraint on department_temporary_managers table.
 Changes from unique(department) to unique(department, request_type).
+Also ensures include_procurement_approvals column exists.
 This requires recreating the table in SQLite.
 Safe to run multiple times.
 """
@@ -42,6 +43,7 @@ def recreate_table_with_composite_constraint():
                         temporary_manager_id INTEGER NOT NULL,
                         set_by_user_id INTEGER,
                         set_at DATETIME,
+                        include_procurement_approvals INTEGER DEFAULT 0,
                         FOREIGN KEY (temporary_manager_id) REFERENCES users(user_id),
                         FOREIGN KEY (set_by_user_id) REFERENCES users(user_id),
                         UNIQUE(department, request_type)
@@ -62,6 +64,12 @@ def recreate_table_with_composite_constraint():
                     conn.execute(text("UPDATE department_temporary_managers SET request_type = 'Finance Payment Request' WHERE request_type IS NULL"))
                 trans.commit()
             
+            # Check if include_procurement_approvals column exists, add it if not
+            if not column_exists(conn, 'department_temporary_managers', 'include_procurement_approvals'):
+                print("Adding include_procurement_approvals column...")
+                conn.execute(text("ALTER TABLE department_temporary_managers ADD COLUMN include_procurement_approvals INTEGER DEFAULT 0"))
+                trans.commit()
+            
             # Check if the composite unique constraint already exists
             if index_exists(conn, 'unique_dept_request_type'):
                 print("Composite unique constraint 'unique_dept_request_type' already exists. Nothing to do.")
@@ -79,6 +87,7 @@ def recreate_table_with_composite_constraint():
                     temporary_manager_id INTEGER NOT NULL,
                     set_by_user_id INTEGER,
                     set_at DATETIME,
+                    include_procurement_approvals INTEGER DEFAULT 0,
                     FOREIGN KEY (temporary_manager_id) REFERENCES users(user_id),
                     FOREIGN KEY (set_by_user_id) REFERENCES users(user_id),
                     UNIQUE(department, request_type)
@@ -89,13 +98,24 @@ def recreate_table_with_composite_constraint():
             # First, ensure all rows have request_type set
             conn.execute(text("UPDATE department_temporary_managers SET request_type = 'Finance Payment Request' WHERE request_type IS NULL"))
             
-            # Copy data
-            conn.execute(text("""
-                INSERT INTO department_temporary_managers_new 
-                (id, request_type, department, temporary_manager_id, set_by_user_id, set_at)
-                SELECT id, request_type, department, temporary_manager_id, set_by_user_id, set_at
-                FROM department_temporary_managers
-            """))
+            # Check if include_procurement_approvals exists in old table
+            has_include_procurement = column_exists(conn, 'department_temporary_managers', 'include_procurement_approvals')
+            
+            # Copy data - include include_procurement_approvals if it exists, otherwise use default 0
+            if has_include_procurement:
+                conn.execute(text("""
+                    INSERT INTO department_temporary_managers_new 
+                    (id, request_type, department, temporary_manager_id, set_by_user_id, set_at, include_procurement_approvals)
+                    SELECT id, request_type, department, temporary_manager_id, set_by_user_id, set_at, COALESCE(include_procurement_approvals, 0)
+                    FROM department_temporary_managers
+                """))
+            else:
+                conn.execute(text("""
+                    INSERT INTO department_temporary_managers_new 
+                    (id, request_type, department, temporary_manager_id, set_by_user_id, set_at, include_procurement_approvals)
+                    SELECT id, request_type, department, temporary_manager_id, set_by_user_id, set_at, 0
+                    FROM department_temporary_managers
+                """))
             
             # Step 3: Drop old table
             conn.execute(text("DROP TABLE department_temporary_managers"))
