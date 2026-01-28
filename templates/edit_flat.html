@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Flat{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-edit"></i> Edit Flat</h1>
+        <p>Edit flat: <strong>{{ flat.flat_name }}</strong></p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('edit_flat', flat_id=flat.id) }}">
+                <div class="form-group">
+                    <label for="branch_id">Branch Name *</label>
+                    <select name="branch_id" id="branch_id" class="form-control" required>
+                        <option value="">-- Select Branch --</option>
+                        {% if available_branches %}
+                            {% for branch in available_branches %}
+                                <option value="{{ branch.id }}" {% if flat.branch_id == branch.id %}selected{% endif %}>{{ branch.name }}</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                    <small class="form-text text-muted">Select the branch for this flat</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="flat_name">Flat Name *</label>
+                    <input type="text" name="flat_name" id="flat_name" class="form-control" required 
+                           value="{{ flat.flat_name }}" placeholder="e.g., Flat 1, Flat A, Unit 101">
+                    <small class="form-text text-muted">Enter a descriptive name for this flat</small>
+                </div>
+
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" name="is_active" id="is_active" class="form-check-input" 
+                               {% if flat.is_active %}checked{% endif %}>
+                        <label for="is_active" class="form-check-label">
+                            Active
+                        </label>
+                    </div>
+                    <small class="form-text text-muted">Active flats will be available for selection</small>
+                </div>
+
+                <!-- Display additional information -->
+                <div class="form-group">
+                    <div class="info-box">
+                        <h6><i class="fas fa-info-circle"></i> Flat Information</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Created By:</strong> {{ flat.created_by.name if flat.created_by else 'System' }}</p>
+                                <p><strong>Created Date:</strong> {{ flat.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Last Updated:</strong> {{ flat.updated_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                                <p><strong>Current Status:</strong> 
+                                    <span class="badge {% if flat.is_active %}badge-success{% else %}badge-secondary{% endif %}">
+                                        {% if flat.is_active %}Active{% else %}Inactive{% endif %}
+                                    </span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Update Flat
+                    </button>
+                    <a href="{{ url_for('it_dashboard', tab='branches') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Warning Section -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-exclamation-triangle"></i> Important Notes</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning">
+                <i class="fas fa-warning"></i>
+                <strong>Warning:</strong> Changing the name or branch of a flat may affect existing records that use this flat. 
+                Please ensure that the changes are appropriate and necessary.
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Name Changes:</h5>
+                    <ul>
+                        <li>Existing records will show the new name</li>
+                        <li>Reports and filters will use the new name</li>
+                        <li>Make sure the new name is clear and descriptive</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add some basic validation
+    const form = document.querySelector('form');
+    const flatNameInput = document.getElementById('flat_name');
+    const branchInput = document.getElementById('branch_id');
+    
+    form.addEventListener('submit', function(e) {
+        const flatName = flatNameInput.value.trim();
+        const branchId = branchInput.value;
+        
+        if (!branchId) {
+            e.preventDefault();
+            alert('Please select a branch.');
+            branchInput.focus();
+            return;
+        }
+        
+        if (!flatName) {
+            e.preventDefault();
+            alert('Please fill in the flat name.');
+            flatNameInput.focus();
+            return;
+        }
+        
+        // Basic name validation
+        if (flatName.length < 2) {
+            e.preventDefault();
+            alert('Flat name must be at least 2 characters long.');
+            flatNameInput.focus();
+            return;
+        }
+        
+        if (flatName.length > 100) {
+            e.preventDefault();
+            alert('Flat name must be less than 100 characters long.');
+            flatNameInput.focus();
+            return;
+        }
+        
+        // Warn about significant changes
+        const originalName = '{{ flat.flat_name }}';
+        const originalBranchId = {{ flat.branch_id }};
+        
+        if (flatName !== originalName || parseInt(branchId) !== originalBranchId) {
+            if (!confirm('You are about to change the name or branch of this flat. This may affect existing records. Are you sure you want to continue?')) {
+                e.preventDefault();
+                return;
+            }
+        }
+    });
+    
+    // Allow free-form text input without auto-formatting
+});
+</script>
+
+<style>
+.info-box {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.info-box h6 {
+    color: #495057;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.info-box p {
+    margin-bottom: 5px;
+    color: #6c757d;
+}
+</style>
+{% endblock %}
