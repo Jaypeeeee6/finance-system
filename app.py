@@ -18468,6 +18468,7 @@ def reports():
     request_type_filter = request.args.getlist('request_type')  # List of request types
     company_filter = request.args.getlist('company')  # List of companies
     branch_filter = request.args.getlist('branch')  # List of branches
+    branch_type_filter = request.args.getlist('branch_type')  # List of branch types
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
     status_filter = request.args.getlist('status')  # List of statuses
@@ -18580,6 +18581,9 @@ def reports():
                 all_branch_conditions.append(db.or_(*conditions))
         if all_branch_conditions:
             query = query.filter(db.or_(*all_branch_conditions))
+    # Branch type filter (handle multiple values)
+    if branch_type_filter:
+        query = query.filter(PaymentRequest.branch_type.in_(branch_type_filter))
     # Payment type filter (handle multiple values)
     if payment_type_filter:
         payment_type_conditions = []
@@ -18804,6 +18808,7 @@ def item_request_reports():
     department_filter = request.args.getlist('department')  # List of departments
     category_filter = request.args.getlist('category')  # List of categories
     branch_filter = request.args.getlist('branch')  # List of branches
+    branch_type_filter = request.args.getlist('branch_type')  # List of branch types
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
     status_filter = request.args.getlist('status')  # List of statuses
@@ -18894,6 +18899,10 @@ def item_request_reports():
                 all_branch_conditions.append(db.or_(*conditions))
         if all_branch_conditions:
             query = query.filter(db.or_(*all_branch_conditions))
+    
+    # Branch type filter (handle multiple values)
+    if branch_type_filter:
+        query = query.filter(ProcurementItemRequest.branch_type.in_(branch_type_filter))
     
     # Date filtering - when a date range is provided, filter by completion_date.
     # Requests without a completion_date should NOT appear in date-scoped results.
@@ -19154,6 +19163,10 @@ def export_item_request_reports_excel():
         if all_branch_conditions:
             query = query.filter(db.or_(*all_branch_conditions))
     
+    # Branch type filter (handle multiple values)
+    if branch_type_filter:
+        query = query.filter(ProcurementItemRequest.branch_type.in_(branch_type_filter))
+    
     # Date filtering - when a date range is provided, filter by completion_date.
     # Requests without a completion_date should NOT appear in date-scoped results.
     if date_from:
@@ -19228,7 +19241,7 @@ def export_item_request_reports_excel():
         ws['A5'].font = Font(size=12, bold=True)
         
         # Add headers starting from row 7 (include Completion Date)
-        headers = ['ID', 'Category', 'Item Name', 'Quantity', 'Requestor', 'Department', 'Branch', 'Request Date', 'Completion Date', 'Status', 'Amount (OMR)', 'Assigned To']
+        headers = ['ID', 'Category', 'Item Name', 'Quantity', 'Requestor', 'Department', 'Branch', 'Branch Type', 'Request Date', 'Completion Date', 'Status', 'Amount (OMR)', 'Assigned To']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=7, column=col, value=str(header))
             cell.font = Font(bold=True)
@@ -19280,6 +19293,16 @@ def export_item_request_reports_excel():
             branches = req.branch_name.split(',') if req.branch_name else []
             branch_display = '\n'.join([branch.strip() for branch in branches if branch.strip()]) if branches else ''
             
+            # Format branch_type for display
+            branch_type_display = ''
+            if req.branch_type:
+                if req.branch_type == 'branch':
+                    branch_type_display = 'Branch'
+                elif req.branch_type == 'flats':
+                    branch_type_display = 'Flats'
+                else:
+                    branch_type_display = str(req.branch_type)
+            
             row_data = [
                 f"#{req.id}",
                 str(req.category or ''),
@@ -19288,6 +19311,7 @@ def export_item_request_reports_excel():
                 str(req.requestor_name or ''),
                 str(req.department or ''),
                 branch_display or '',
+                branch_type_display,
                 request_date_str,
                 completion_date_str,
                 str(req.status or ''),
@@ -19296,8 +19320,8 @@ def export_item_request_reports_excel():
             ]
             
             for col, data in enumerate(row_data, 1):
-                # For Amount column (now column 11), explicitly set as float
-                if col == 11:
+                # For Amount column (now column 12 after adding Branch Type), explicitly set as float
+                if col == 12:
                     numeric_value = float(amount_value) if amount_value is not None else 0.0
                     cell = ws.cell(row=row_idx, column=col, value=numeric_value)
                     cell.number_format = '#,##0.000'
@@ -19462,6 +19486,10 @@ def export_item_request_reports_pdf():
                 all_branch_conditions.append(db.or_(*conditions))
         if all_branch_conditions:
             query = query.filter(db.or_(*all_branch_conditions))
+    
+    # Branch type filter (handle multiple values)
+    if branch_type_filter:
+        query = query.filter(ProcurementItemRequest.branch_type.in_(branch_type_filter))
     
     # Date filtering - use completion_date for item request reports (exclude those without completion_date)
     if date_from:
@@ -20062,6 +20090,9 @@ def export_reports_excel():
                 all_branch_conditions.append(db.or_(*conditions))
         if all_branch_conditions:
             query = query.filter(db.or_(*all_branch_conditions))
+    # Branch type filter (handle multiple values)
+    if branch_type_filter:
+        query = query.filter(PaymentRequest.branch_type.in_(branch_type_filter))
     if payment_type_filter:
         # Handle multiple payment type filters
         payment_type_conditions = []
@@ -20160,7 +20191,7 @@ def export_reports_excel():
         # Include Ref. No. only for Auditing users
         if current_user.department == 'Auditing' or current_user.role == 'Auditing Staff':
             headers.append('Ref. No.')
-        headers += ['Type', 'Requestor', 'Department', 'Payment Type', 'Payment Method', 'Amount', 'Branch', 'Company', 'Submitted', 'Approved', 'Approver', 'Manager Duration', 'Finance Duration']
+        headers += ['Type', 'Requestor', 'Department', 'Payment Type', 'Payment Method', 'Amount', 'Branch', 'Branch Type', 'Company', 'Submitted', 'Approved', 'Approver', 'Manager Duration', 'Finance Duration']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=7, column=col, value=str(header))
             cell.font = Font(bold=True)
@@ -20249,6 +20280,15 @@ def export_reports_excel():
             row_data = [f"#{r.request_id}"]
             if current_user.department == 'Auditing' or current_user.role == 'Auditing Staff':
                 row_data.append(str(r.reference_number or ''))
+            # Format branch_type for display
+            branch_type_display = ''
+            if r.branch_type:
+                if r.branch_type == 'branch':
+                    branch_type_display = 'Branch'
+                elif r.branch_type == 'flats':
+                    branch_type_display = 'Flats'
+                else:
+                    branch_type_display = str(r.branch_type)
             row_data += [
                 str(r.request_type or ''),
                 str(r.requestor_name or ''),
@@ -20257,6 +20297,7 @@ def export_reports_excel():
                 str(r.payment_method or 'Card'),
                 amount_value,  # Amount column (depends on presence of Ref. No.)
                 str(r.branch_name or '').replace(',', ', '),
+                branch_type_display,
                 str(company_display or ''),
                 submitted_date_str,  # Submitted column
                 approved_date_str,   # Approved column
@@ -20267,9 +20308,10 @@ def export_reports_excel():
             
             for col, data in enumerate(row_data, 1):
                 # For Amount column, explicitly set as float to ensure Excel treats it as number
+                # Column indices updated after adding Branch Type column
                 amount_col_index = 8 if (current_user.department == 'Auditing' or current_user.role == 'Auditing Staff') else 7
-                submitted_col_index = 11 if (current_user.department == 'Auditing' or current_user.role == 'Auditing Staff') else 10
-                approved_col_index = 12 if (current_user.department == 'Auditing' or current_user.role == 'Auditing Staff') else 11
+                submitted_col_index = 12 if (current_user.department == 'Auditing' or current_user.role == 'Auditing Staff') else 11
+                approved_col_index = 13 if (current_user.department == 'Auditing' or current_user.role == 'Auditing Staff') else 12
 
                 if col == amount_col_index:
                     # Ensure the value is a proper float, not string or None
@@ -20288,9 +20330,9 @@ def export_reports_excel():
                 else:
                     cell = ws.cell(row=row_idx, column=col, value=str(data) if data is not None else '')
                     # Enable text wrapping for columns that may have long text (Branch, Company)
-                    # Branch and Company indices changed when Ref. No. is present
+                    # Branch, Branch Type, and Company indices changed when Ref. No. is present
                     branch_col = 9 if (current_user.department == 'Auditing' or current_user.role == 'Auditing Staff') else 8
-                    company_col = 10 if (current_user.department == 'Auditing' or current_user.role == 'Auditing Staff') else 9
+                    company_col = 11 if (current_user.department == 'Auditing' or current_user.role == 'Auditing Staff') else 10
                     if col in [branch_col, company_col]:
                         cell.alignment = Alignment(wrap_text=True, vertical='top')
                     else:
@@ -20538,6 +20580,10 @@ def export_reports_pdf():
                 all_branch_conditions.append(db.or_(*conditions))
         if all_branch_conditions:
             query = query.filter(db.or_(*all_branch_conditions))
+    
+    # Branch type filter (handle multiple values)
+    if branch_type_filter:
+        query = query.filter(PaymentRequest.branch_type.in_(branch_type_filter))
     
     # Payment type filter (handle multiple values)
     if payment_type_filter:

@@ -1053,6 +1053,21 @@
                 </div>
 
                 <div class="form-group">
+                    <label>Branch Type</label>
+                    <div id="branch_type_chips_container" class="filter-chips-container"></div>
+                    <div class="checkbox-group" id="branch_type-group">
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="branch_type" id="branch_type_branch" value="branch" {% if 'branch' in request.args.getlist('branch_type') %}checked{% endif %}>
+                            <label for="branch_type_branch">Branch</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" name="branch_type" id="branch_type_flats" value="flats" {% if 'flats' in request.args.getlist('branch_type') %}checked{% endif %}>
+                            <label for="branch_type_flats">Flats</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
                     <label>Payment Type</label>
                     <div id="payment_type_chips_container" class="filter-chips-container"></div>
                     <div class="checkbox-group" id="payment_type-group">
@@ -1213,6 +1228,16 @@
                         <input type="text" id="inline_branch_search" class="filter-search-input" placeholder="Search branches..." autocomplete="off">
                         <div id="inline_branch_dropdown" class="filter-dropdown"></div>
                         <input type="hidden" name="branch" id="inline_branch_hidden" value="">
+                    </div>
+                </div>
+
+                <div class="inline-filter-group">
+                    <label>Branch Type</label>
+                    <div class="filter-select-container">
+                        <div id="inline_branch_type_chips_container" class="filter-chips-container"></div>
+                        <input type="text" id="inline_branch_type_search" class="filter-search-input" placeholder="Search branch types..." autocomplete="off">
+                        <div id="inline_branch_type_dropdown" class="filter-dropdown"></div>
+                        <input type="hidden" name="branch_type" id="inline_branch_type_hidden" value="">
                     </div>
                 </div>
 
@@ -1463,6 +1488,7 @@
                                 <th>Payment Method</th>
                                 {# Scheduled Date column removed in frontend reports view #}
                                 <th>Branch Name</th>
+                                <th>Branch Type</th>
                                 <th>Person/Company</th>
                                 <th>Submitted</th>
                                 <th>Approved</th>
@@ -1522,6 +1548,13 @@
                                                 <div style="margin-bottom: 4px;">{{ branch_trimmed }}</div>
                                             {% endif %}
                                         {% endfor %}
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if req.branch_type %}
+                                        {% if req.branch_type == 'branch' %}Branch{% elif req.branch_type == 'flats' %}Flats{% else %}{{ req.branch_type }}{% endif %}
                                     {% else %}
                                         <span style="color: #999;">-</span>
                                     {% endif %}
@@ -2654,6 +2687,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { name: 'request_type', chipsId: 'request_type_chips_container' },
         { name: 'company', chipsId: 'company_chips_container' },
         { name: 'branch', chipsId: 'branch_chips_container' },
+        { name: 'branch_type', chipsId: 'branch_type_chips_container' },
         { name: 'payment_type', chipsId: 'payment_type_chips_container' },
         { name: 'payment_method', chipsId: 'payment_method_chips_container' },
         { name: 'status', chipsId: 'status_chips_container' }
@@ -2890,6 +2924,22 @@ document.addEventListener('DOMContentLoaded', function() {
         placeholder: 'Search statuses...'
     });
     
+    const branchTypes = [
+        { value: 'branch', text: 'Branch' },
+        { value: 'flats', text: 'Flats' }
+    ];
+    const selectedBranchTypes = {{ request.args.getlist('branch_type') | tojson }};
+    initializeFilterDropdown({
+        searchInputId: 'inline_branch_type_search',
+        dropdownId: 'inline_branch_type_dropdown',
+        chipsContainerId: 'inline_branch_type_chips_container',
+        hiddenInputId: 'inline_branch_type_hidden',
+        options: branchTypes,
+        selectedValues: selectedBranchTypes,
+        filterName: 'branch_type',
+        placeholder: 'Search branch types...'
+    });
+    
     const paymentTypes = [
         { value: 'One-Time', text: 'One-Time' },
         { value: 'Scheduled One-Time', text: 'Scheduled One-Time' },
@@ -3031,7 +3081,7 @@ function applyInlineFilters() {
         const formData = new FormData(form);
         
         // Handle multiple values for multi-select fields (from hidden inputs)
-        const multiSelectFields = ['department', 'request_type', 'company', 'branch', 'status', 'payment_type', 'payment_method'];
+        const multiSelectFields = ['department', 'request_type', 'company', 'branch', 'branch_type', 'status', 'payment_type', 'payment_method'];
         const processedKeys = new Set();
         
         for (const [key, value] of formData.entries()) {
