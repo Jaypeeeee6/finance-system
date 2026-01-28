@@ -5,31 +5,10 @@
 {% block content %}
 <div class="dashboard-container">
     <div class="dashboard-header">
-        <h1><i class="fas fa-file-alt"></i> My Drafts</h1>
-        {% if current_user.department == 'Branch' %}
-        <p>Manage your saved item request drafts</p>
-        {% else %}
-        <p>Manage your saved payment and item request drafts</p>
-        {% endif %}
+        <h2 class="dashboard-title" style="margin:0;"><i class="fas fa-file-alt"></i> My Drafts</h2>
     </div>
 
     <div class="dashboard-actions">
-        {% if current_user.department != 'Branch' %}
-        <div class="new-request-dropdown">
-            <button type="button" class="btn btn-primary new-request-toggle">
-                <i class="fas fa-plus-circle"></i> New Request
-                <i class="fas fa-caret-down dropdown-caret"></i>
-            </button>
-            <div class="new-request-menu">
-                <a href="{{ url_for('new_request') }}">
-                    <i class="fas fa-credit-card"></i> Payment Request for Finance
-                </a>
-                <a href="{{ url_for('procurement_request_item') }}">
-                    <i class="fas fa-boxes"></i> Item Request for Procurement
-                </a>
-            </div>
-        </div>
-        {% endif %}
         <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Back to Dashboard
         </a>
@@ -106,7 +85,7 @@
                     </div>
                 {% else %}
                     <div style="text-align: center; padding: 40px;">
-                        <i class="fas fa-file-invoice-dollar" style="font-size: 4rem; color: #ccc; margin-bottom: 20px;"></i>
+                        <i class="fas fa-file-invoice-dollar" style="font-size: 3rem; color: #ccc; margin-bottom: 20px;"></i>
                         <h3 style="color: #666;">No payment request drafts found</h3>
                         <p style="color: #999;">You haven't saved any payment request drafts yet.</p>
                         <a href="{{ url_for('new_request') }}" class="btn btn-primary" style="margin-top: 20px;">
@@ -161,7 +140,7 @@
                     </div>
                 {% else %}
                     <div style="text-align: center; padding: 40px;">
-                        <i class="fas fa-shopping-cart" style="font-size: 4rem; color: #ccc; margin-bottom: 20px;"></i>
+                        <i class="fas fa-shopping-cart" style="font-size: 3rem; color: #ccc; margin-bottom: 20px;"></i>
                         <h3 style="color: #666;">No item request drafts found</h3>
                         <p style="color: #999;">You haven't saved any item request drafts yet.</p>
                         <a href="{{ url_for('procurement_request_item') }}" class="btn btn-primary" style="margin-top: 20px;">
@@ -175,6 +154,59 @@
 </div>
 
 <style>
+/* Page-specific header adjustments to match Reports pages */
+.dashboard-header {
+    padding-left: 16px;
+}
+.dashboard-header .dashboard-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Secondary buttons (Back to Dashboard): gold - matching Item Requests page */
+.dashboard-actions .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    border-radius: 6px !important;
+    background: #D9BD7D !important;
+    border-color: #D9BD7D !important;
+    color: #ffffff !important;
+    text-decoration: none;
+}
+.dashboard-actions .btn-secondary:hover {
+    background: #c8ac65 !important;
+    border-color: #c8ac65 !important;
+    color: #ffffff !important;
+}
+
+/* Create New Payment Request and Create New Item Request buttons - matching Back to Dashboard style */
+.tab-content .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    border-radius: 6px !important;
+    background: #D9BD7D !important;
+    border-color: #D9BD7D !important;
+    color: #ffffff !important;
+    text-decoration: none;
+}
+.tab-content .btn-primary:hover {
+    background: #c8ac65 !important;
+    border-color: #c8ac65 !important;
+    color: #ffffff !important;
+}
+
+/* Add external spacing above the action buttons container */
+.dashboard-actions {
+    margin-top: 16px !important;
+}
+
 /* Tab Styles */
 .draft-tabs {
     display: flex;
@@ -207,8 +239,8 @@
 }
 
 .tab-button.active {
-    color: #007bff;
-    border-bottom-color: #007bff;
+    color: #D9BD7D;
+    border-bottom-color: #D9BD7D;
     background-color: transparent;
 }
 
@@ -231,11 +263,13 @@
     padding: 12px;
     text-align: left;
     border-bottom: 2px solid #dee2e6;
+    font-size: 14px;
 }
 
 .table td {
     padding: 12px;
     border-bottom: 1px solid #dee2e6;
+    font-size: 14px;
 }
 
 .table tbody tr:hover {
