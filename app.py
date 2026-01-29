@@ -3823,6 +3823,20 @@ def department_dashboard():
         )
     else:
         # For regular users, show their own requests (exclude archived and drafts)
+        # Also include requests where current user is an authorized manager approver (e.g. Finance Admin/Abdalaziz for Finance department On Hold / Pending Manager Approval)
+        authorized_approver_request_ids = set()
+        try:
+            all_non_archived = PaymentRequest.query.filter(
+                PaymentRequest.is_archived == False,
+                PaymentRequest.is_draft == False
+            ).all()
+            for req in all_non_archived:
+                approvers = get_authorized_manager_approvers(req)
+                if current_user in approvers:
+                    authorized_approver_request_ids.add(req.request_id)
+        except Exception as e:
+            app.logger.warning(f"Error computing authorized approver request IDs for dashboard: {e}")
+
         # If the user is currently assigned as a department-level temporary manager,
         # include requests for the departments they temporarily manage (only when assignment exists).
         if is_temp_manager_any:
@@ -3863,7 +3877,8 @@ def department_dashboard():
                         db.or_(
                             dept_filter,  # All requests from assigned departments
                             PaymentRequest.temporary_manager_id == current_user.user_id,  # Per-request temp manager
-                            PaymentRequest.user_id == current_user.user_id  # Own requests
+                            PaymentRequest.user_id == current_user.user_id,  # Own requests
+                            PaymentRequest.request_id.in_(authorized_approver_request_ids) if authorized_approver_request_ids else db.false()
                         ),
                         PaymentRequest.is_archived == False,
                         PaymentRequest.is_draft == False
@@ -3871,17 +3886,37 @@ def department_dashboard():
                 )
                 print(f"DEBUG: base_query built with {len(temp_departments)} temp_departments - will show ALL requests from these departments")
             else:
+                if authorized_approver_request_ids:
+                    base_query = PaymentRequest.query.filter(
+                        db.or_(
+                            PaymentRequest.user_id == current_user.user_id,
+                            PaymentRequest.request_id.in_(authorized_approver_request_ids)
+                        ),
+                        PaymentRequest.is_archived == False,
+                        PaymentRequest.is_draft == False
+                    )
+                else:
+                    base_query = PaymentRequest.query.filter(
+                        PaymentRequest.user_id == current_user.user_id,
+                        PaymentRequest.is_archived == False,
+                        PaymentRequest.is_draft == False
+                    )
+        else:
+            if authorized_approver_request_ids:
+                base_query = PaymentRequest.query.filter(
+                    db.or_(
+                        PaymentRequest.user_id == current_user.user_id,
+                        PaymentRequest.request_id.in_(authorized_approver_request_ids)
+                    ),
+                    PaymentRequest.is_archived == False,
+                    PaymentRequest.is_draft == False
+                )
+            else:
                 base_query = PaymentRequest.query.filter(
                     PaymentRequest.user_id == current_user.user_id,
                     PaymentRequest.is_archived == False,
                     PaymentRequest.is_draft == False
                 )
-        else:
-            base_query = PaymentRequest.query.filter(
-                PaymentRequest.user_id == current_user.user_id,
-                PaymentRequest.is_archived == False,
-                PaymentRequest.is_draft == False
-            )
     
     # Exclude CEO-submitted requests for non-authorized roles (visibility hardening)
     if current_user.role not in ['Finance Admin', 'GM', 'Operation Manager']:
@@ -9877,7 +9912,7 @@ def admin_dashboard():
     # Finance Admin can see finance-related statuses + Pending Manager Approval from Finance department only (or their own requests)
     finance_statuses = ['Pending Finance Approval', 'Returned to Manager', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
 
-    # For Abdalaziz, also include Pending Manager Approval and Rejected by Manager
+    # For Abdalaziz, also include Pending Manager Approval, Rejected by Manager, and On Hold
     # for Finance department, his own requests, temporary manager assignments,
     # and requests submitted by Finance Staff, GM, Operation Manager, and CEO
     if current_user.name == 'Abdalaziz Al-Brashdi':
@@ -9894,6 +9929,16 @@ def admin_dashboard():
                 db.and_(
                     PaymentRequest.status == 'Rejected by Manager',
                     PaymentRequest.department == 'Finance'
+                ),
+                # On Hold from Finance department (Abdalaziz is assigned manager for Finance Staff)
+                db.and_(
+                    PaymentRequest.status == 'On Hold',
+                    PaymentRequest.department == 'Finance'
+                ),
+                # On Hold for GM/CEO/OM submitters (Abdalaziz handles these)
+                db.and_(
+                    PaymentRequest.status == 'On Hold',
+                    PaymentRequest.user.has(User.role.in_(special_submitter_roles))
                 ),
                 # Returned to Requestor from Finance department (Abdalaziz can view and track)
                 db.and_(
@@ -9912,9 +9957,9 @@ def admin_dashboard():
                     PaymentRequest.status == 'Pending Manager Approval',
                     PaymentRequest.temporary_manager_id == current_user.user_id
                 ),
-                # Include PMA/Rejected-by-Manager for specific submitter roles (GM/CEO/etc.)
+                # Include PMA/Rejected-by-Manager/On Hold for specific submitter roles (GM/CEO/etc.)
                 db.and_(
-                    PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager']),
+                    PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager', 'On Hold']),
                     PaymentRequest.user.has(User.role.in_(special_submitter_roles))
                 )
             ),
@@ -10079,12 +10124,12 @@ def finance_dashboard():
     if current_user.role == 'Finance Staff':
         query = query.filter(~PaymentRequest.user.has(User.role == 'CEO'))
     
-    # Add Finance Staff's own requests with Pending Manager Approval, Rejected by Manager, and Returned to Requestor (exclude archived and drafts)
+    # Add Finance Staff's own requests with Pending Manager Approval, Rejected by Manager, Returned to Requestor, and On Hold (exclude archived and drafts)
     if current_user.role == 'Finance Staff':
         own_pending_requests = PaymentRequest.query.filter(
             db.and_(
                 PaymentRequest.user_id == current_user.user_id,
-                PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager', 'Returned to Requestor']),
+                PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager', 'Returned to Requestor', 'On Hold']),
                 PaymentRequest.is_archived == False,
                 PaymentRequest.is_draft == False
             )
@@ -14703,6 +14748,13 @@ def view_request(request_id):
                     else:
                         flash('You do not have permission to view this request.', 'danger')
                         return redirect(url_for('dashboard'))
+                # For Abdalaziz, allow viewing On Hold for Finance department (he is the assigned manager for Finance Staff)
+                elif current_user.name == 'Abdalaziz Al-Brashdi' and req.status == 'On Hold':
+                    if (req.department == 'Finance' or req.user_id == current_user.user_id or getattr(req.user, 'role', None) in ['GM', 'CEO', 'Operation Manager']):
+                        pass  # Allow access
+                    else:
+                        flash('You do not have permission to view this request.', 'danger')
+                        return redirect(url_for('dashboard'))
                 elif req.status not in finance_statuses:
                     flash('You do not have permission to view this request.', 'danger')
                     return redirect(url_for('dashboard'))
@@ -14925,6 +14977,13 @@ def view_request(request_id):
             gm_user_fallback = User.query.filter_by(role='GM').first()
             if gm_user_fallback:
                 manager_name = gm_user_fallback.name
+    
+    # Finance department: Abdalaziz is the assigned manager for Finance Staff (and Finance Admin) requests.
+    # Ensure Assigned Manager display shows his name for all viewers, not only when requestor's manager_id is set.
+    if (req.department or '').strip() == 'Finance' and req.user.role in ['Finance Staff', 'Finance Admin']:
+        abdalaziz = User.query.filter_by(name='Abdalaziz Al-Brashdi').first()
+        if abdalaziz:
+            manager_name = abdalaziz.name
         
     # Also resolve GM and Operation Manager names (used for Department Manager submissions)
     gm_user = User.query.filter_by(role='GM').first()
@@ -15545,19 +15604,19 @@ def edit_request(request_id):
     # Manager/GM/Operation Manager/temporary manager restricted to Department only while
     # status is "Pending Manager Approval" so file handling is unaffected.
     if req.status in ['Returned to Manager', 'Returned to Requestor'] and not is_finance_admin_edit:
+        # Initialize existing_receipts from database - this will be updated as we process deletions and uploads
+        existing_receipts = []
+        if req.requestor_receipt_path:
+            try:
+                existing_receipts = json.loads(req.requestor_receipt_path)
+                if not isinstance(existing_receipts, list):
+                    existing_receipts = [req.requestor_receipt_path]
+            except (json.JSONDecodeError, TypeError):
+                existing_receipts = [req.requestor_receipt_path] if req.requestor_receipt_path else []
+        
         # Handle file deletions
         delete_files = request.form.getlist('delete_files')
         if delete_files:
-            # Get existing requestor receipts
-            existing_receipts = []
-            if req.requestor_receipt_path:
-                try:
-                    existing_receipts = json.loads(req.requestor_receipt_path)
-                    if not isinstance(existing_receipts, list):
-                        existing_receipts = [req.requestor_receipt_path]
-                except (json.JSONDecodeError, TypeError):
-                    existing_receipts = [req.requestor_receipt_path] if req.requestor_receipt_path else []
-            
             # Remove deleted files and log each deletion
             deleted_file_names = []
             for filename_to_delete in delete_files:
@@ -15581,12 +15640,6 @@ def edit_request(request_id):
                 log_action(
                     f"Deleted receipt file(s) from payment request #{request_id} ({requestor_name}): {files_list}"
                 )
-            
-            # Update database
-            if existing_receipts:
-                req.requestor_receipt_path = json.dumps(existing_receipts)
-            else:
-                req.requestor_receipt_path = None
         
         # Handle file uploads
         if 'receipt_files' in request.files:
@@ -15595,16 +15648,6 @@ def edit_request(request_id):
                 uploaded_files = []
                 allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
                 max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
-                
-                # Get existing requestor receipts (after deletions)
-                existing_receipts = []
-                if req.requestor_receipt_path:
-                    try:
-                        existing_receipts = json.loads(req.requestor_receipt_path)
-                        if not isinstance(existing_receipts, list):
-                            existing_receipts = [req.requestor_receipt_path]
-                    except (json.JSONDecodeError, TypeError):
-                        existing_receipts = [req.requestor_receipt_path] if req.requestor_receipt_path else []
                 
                 # Process new files
                 for receipt_file in receipt_files:
@@ -15639,6 +15682,18 @@ def edit_request(request_id):
                     all_receipts = existing_receipts + uploaded_files
                     req.requestor_receipt_path = json.dumps(all_receipts)
                     log_action(f"Manager added {len(uploaded_files)} file(s) to request #{request_id}")
+                elif delete_files:
+                    # If files were deleted but no new files uploaded, update with remaining files
+                    if existing_receipts:
+                        req.requestor_receipt_path = json.dumps(existing_receipts)
+                    else:
+                        req.requestor_receipt_path = None
+            elif delete_files:
+                # If files were deleted but no new files uploaded, update with remaining files
+                if existing_receipts:
+                    req.requestor_receipt_path = json.dumps(existing_receipts)
+                else:
+                    req.requestor_receipt_path = None
 
     # If requestor is editing a "Returned to Requestor" request, change status back to "Pending Manager Approval"
     if is_requestor_edit and req.status == 'Returned to Requestor':
@@ -17777,14 +17832,14 @@ def gm_return_to_requestor(request_id):
     # Determine which statuses are allowed based on role
     allowed_statuses = []
     if current_user.role == 'GM':
-        # GM can return for both manager and finance approval stages
-        allowed_statuses = ['Pending Manager Approval', 'Pending Finance Approval']
+        # GM can return for both manager and finance approval stages (including Returned to Manager)
+        allowed_statuses = ['Pending Manager Approval', 'Returned to Manager', 'Pending Finance Approval']
     elif current_user.role == 'Finance Admin':
         # Finance Admin (e.g. Abdalaziz) can return in both stages for GM/CEO/OM requests and Finance dept
-        allowed_statuses = ['Pending Manager Approval', 'Pending Finance Approval']
+        allowed_statuses = ['Pending Manager Approval', 'Returned to Manager', 'Pending Finance Approval']
     elif current_user.role in ['Department Manager', 'Operation Manager']:
-        # Department Managers and Operation Managers can only return during manager approval stage
-        allowed_statuses = ['Pending Manager Approval']
+        # Department Managers and Operation Managers can only return during manager approval stage (including Returned to Manager)
+        allowed_statuses = ['Pending Manager Approval', 'Returned to Manager']
     else:
         flash('You do not have permission to return this request.', 'error')
         return redirect(url_for('view_request', request_id=request_id))

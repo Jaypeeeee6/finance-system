@@ -1078,7 +1078,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                       or (user and user.role == 'Finance Admin' and request.status == 'Pending Finance Approval')
                       or (can_edit_department_only and request.status == 'Pending Manager Approval') %}
                 <div class="form-group" id="save-edits-container" style="display: none; margin-top: 15px;">
-                    <button type="submit" id="save-edits-btn" class="btn btn-primary">Save Edits</button>
+                    <button type="submit" id="save-edits-btn" class="btn btn-primary"><i class="fas fa-save"></i> Save Edits</button>
                 </div>
                 {% endif %}
             </form>
@@ -1393,7 +1393,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                     {% endif %}
 
                                     <div class="form-group">
-                                        <label for="manager_approval_status_returned">Set Status *</label>
+                                        <label for="manager_approval_status_returned">Set Status <span class="required-star">*</span></label>
                                         <select name="approval_status" id="manager_approval_status_returned" required onchange="toggleManagerApprovalFieldsReturned()">
                                             <option value="">-- Select Status --</option>
                                             <option value="approve">Approve</option>
@@ -1417,14 +1417,14 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                     
                                     <div id="manager_reject_fields_returned" style="display: none;">
                                         <div class="form-group">
-                                            <label for="manager_rejection_reason_returned">Reason for Rejection *</label>
+                                            <label for="manager_rejection_reason_returned">Reason for Rejection <span class="required-star">*</span></label>
                                             <textarea name="rejection_reason" id="manager_rejection_reason_returned" rows="3" placeholder="Please provide a clear reason for rejecting this request..." required></textarea>
                                         </div>
                                     </div>
                                     
                                     <div id="manager_on_hold_fields_returned" style="display: none;">
                                         <div class="form-group">
-                                            <label for="manager_on_hold_reason_returned">On Hold Reason *</label>
+                                            <label for="manager_on_hold_reason_returned">On Hold Reason <span class="required-star">*</span></label>
                                             <textarea name="on_hold_reason" id="manager_on_hold_reason_returned" rows="3" placeholder="Please provide a reason for putting this request on hold..." required></textarea>
                                         </div>
                                     </div>
@@ -1437,6 +1437,35 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                 </form>
                             </div>
                         </div>
+                    {% endif %}
+                    <!-- Return to Requestor section when status is Returned to Manager (same as below for Pending Manager Approval) -->
+                    {% set can_return_to_requestor_returned = False %}
+                    {% if (request.temporary_manager_id and user.user_id == request.temporary_manager_id) or (not request.temporary_manager_id and ((user.role == 'Department Manager' and user.department == request.user.department and user.user_id != request.user_id) or (user.role == 'Finance Admin' and request.user.department == 'Finance' and user.user_id != request.user_id) or ((user.role in ['GM', 'Operation Manager']) and user.user_id != request.user_id and request.user.role not in ['GM','CEO','Operation Manager']) or (user.name == 'Abdalaziz Al-Brashdi' and request.user.role in ['GM', 'CEO', 'Finance Staff', 'Operation Manager']))) %}
+                        {% set can_return_to_requestor_returned = True %}
+                    {% endif %}
+                    {% if can_return_to_requestor_returned %}
+                    <div class="card return-to-requestor-section" style="margin-top: 1.5rem; border-left: 4px solid #ff9800;">
+                        <div class="card-header">
+                            <h4><i class="fas fa-undo"></i> Return to Requestor</h4>
+                            <p style="margin: 0; font-size: 0.9rem; color: #6c757d;">Return this request to the requestor for editing if there is a mistake.</p>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('gm_return_to_requestor', request_id=request.request_id) }}">
+                                <div class="form-group">
+                                    <label for="gm_return_reason_returned">Reason for Returning to Requestor <span class="required-star">*</span></label>
+                                    <textarea name="return_reason" id="gm_return_reason_returned" rows="4" placeholder="Please provide a clear reason for returning this request to the requestor for editing..." required></textarea>
+                                    <small style="color: #666; margin-top: 0.5rem; display: block;">
+                                        <i class="fas fa-info-circle"></i> The requestor will be able to edit the request after it is returned.
+                                    </small>
+                                </div>
+                                <div class="step-actions">
+                                    <button type="submit" class="btn btn-warning">
+                                        <i class="fas fa-undo"></i> Return to Requestor
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                     {% endif %}
                 {% endif %}
             {% elif request.status in ['Pending Manager Approval', 'On Hold'] %}
@@ -1497,7 +1526,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                         </span>
                                     {% elif request.user.role == 'Department Manager' %}
                                         {{ gm_name }}, {{ op_manager_name }}
-                                    {% elif request.user.role in ['Finance Admin', 'Finance Staff', 'GM', 'Operation Manager'] and user.user_id == request.user_id %}
+                                    {% elif request.user.role in ['GM', 'Operation Manager'] and user.user_id == request.user_id %}
                                         {{ gm_name }}, {{ op_manager_name }}
                                     {% elif user.role == 'Operation Manager' and request.department == 'Operation' %}
                                         {{ user.name }} (You)
@@ -1583,7 +1612,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                 {% endif %}
 
                                 <div class="form-group">
-                                    <label for="manager_approval_status">Set Status *</label>
+                                    <label for="manager_approval_status">Set Status <span class="required-star">*</span></label>
                                     <select name="approval_status" id="manager_approval_status" required onchange="toggleManagerApprovalFields()">
                                         <option value="">-- Select Status --</option>
                                         <option value="approve">Approve</option>
@@ -1607,14 +1636,14 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                 
                                 <div id="manager_reject_fields" style="display: none;">
                                     <div class="form-group">
-                                        <label for="manager_rejection_reason">Reason for Rejection *</label>
+                                        <label for="manager_rejection_reason">Reason for Rejection <span class="required-star">*</span></label>
                                         <textarea name="rejection_reason" id="manager_rejection_reason" rows="3" placeholder="Please provide a clear reason for rejecting this request..." required></textarea>
                                     </div>
                                 </div>
                                 
                                 <div id="manager_on_hold_fields" style="display: none;">
                                     <div class="form-group">
-                                        <label for="manager_on_hold_reason">On Hold Reason *</label>
+                                        <label for="manager_on_hold_reason">On Hold Reason <span class="required-star">*</span></label>
                                         <textarea name="on_hold_reason" id="manager_on_hold_reason" rows="3" placeholder="Please provide a reason for putting this request on hold..." required></textarea>
                                     </div>
                                 </div>
@@ -1632,7 +1661,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 
                 <!-- Return to Requestor section (for GM, Department Managers, and Operation Managers) -->
                 {% set can_return_to_requestor = False %}
-                {% if request.status == 'Pending Manager Approval' %}
+                {% if request.status in ['Pending Manager Approval', 'Returned to Manager'] %}
                     {% if (request.temporary_manager_id and user.user_id == request.temporary_manager_id) or (not request.temporary_manager_id and ((user.role == 'Department Manager' and user.department == request.user.department and user.user_id != request.user_id) or (user.role == 'Finance Admin' and request.user.department == 'Finance' and user.user_id != request.user_id) or ((user.role in ['GM', 'Operation Manager']) and user.user_id != request.user_id and request.user.role not in ['GM','CEO','Operation Manager']) or (user.name == 'Abdalaziz Al-Brashdi' and request.user.role in ['GM', 'CEO', 'Finance Staff', 'Operation Manager']))) %}
                         {% set can_return_to_requestor = True %}
                     {% endif %}
@@ -1641,15 +1670,15 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                 {% endif %}
                 
                 {% if can_return_to_requestor %}
-                    <div class="card" style="margin-top: 1.5rem; border-left: 4px solid #ff9800;">
-                        <div class="card-header" style="background: #fff3e0; border-bottom: 1px solid #ffcc80;">
+                    <div class="card return-to-requestor-section" style="margin-top: 1.5rem; border-left: 4px solid #ff9800;">
+                        <div class="card-header">
                             <h4><i class="fas fa-undo"></i> Return to Requestor</h4>
                             <p style="margin: 0; font-size: 0.9rem; color: #6c757d;">Return this request to the requestor for editing if there is a mistake.</p>
                         </div>
                         <div class="card-body">
                             <form method="POST" action="{{ url_for('gm_return_to_requestor', request_id=request.request_id) }}">
                                 <div class="form-group">
-                                    <label for="gm_return_reason">Reason for Returning to Requestor *</label>
+                                    <label for="gm_return_reason">Reason for Returning to Requestor <span class="required-star">*</span></label>
                                     <textarea name="return_reason" id="gm_return_reason" rows="4" placeholder="Please provide a clear reason for returning this request to the requestor for editing..." required></textarea>
                                     <small style="color: #666; margin-top: 0.5rem; display: block;">
                                         <i class="fas fa-info-circle"></i> The requestor will be able to edit the request after it is returned.
@@ -2409,7 +2438,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                             <!-- Set Status Dropdown (similar to Manager Approval) -->
                             <form method="POST" action="{{ url_for('approve_request', request_id=request.request_id) }}" enctype="multipart/form-data" id="financeApprovalForm">
                                 <div class="form-group">
-                                    <label for="finance_approval_status">Set Status *</label>
+                                    <label for="finance_approval_status">Set Status <span class="required-star">*</span></label>
                                     <select name="approval_status" id="finance_approval_status" required onchange="toggleFinanceApprovalFields()">
                                         <option value="">-- Select Status --</option>
                                         <option value="approve">Approve</option>
@@ -2439,7 +2468,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                     </div>
                                     
                                     <div class="form-group">
-                                        <button type="button" class="btn btn-info" onclick="saveFinanceNote()">
+                                        <button type="button" id="save-finance-note-btn" class="btn btn-info" onclick="saveFinanceNote()">
                                             <i class="fas fa-save"></i> Save Note
                                         </button>
                                     </div>
@@ -2457,7 +2486,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                     
                                     <!-- Receipt Reference Number Field (moved after upload) -->
                                     <div class="form-group">
-                                        <label for="reference_number">Receipt Reference Number <span style="color: red;">*</span></label>
+                                        <label for="reference_number">Receipt Reference Number <span class="required-star">*</span></label>
                                         <input type="text" name="reference_number" id="reference_number" class="form-control" 
                                                placeholder="Enter receipt reference number (letters and numbers)" 
                                                pattern="[A-Za-z0-9]+" 
@@ -2469,7 +2498,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                     
                                     <!-- Cash Receiver Field (only visible when payment method is Cash) -->
                                     <div class="form-group" id="cash_receiver_group" style="display: none;">
-                                        <label for="cash_receiver">Cash Receiver <span style="color: red;">*</span></label>
+                                        <label for="cash_receiver">Cash Receiver <span class="required-star">*</span></label>
                                         <input type="text" name="cash_receiver" id="cash_receiver" class="form-control" 
                                                placeholder="Enter the name of the person receiving the cash" 
                                                value="{{ request.cash_receiver or '' }}">
@@ -2499,7 +2528,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                 <!-- Return to Manager Fields (shown when "Return to Manager" is selected) -->
                                 <div id="finance_return_fields" style="display: none;">
                                     <div class="form-group">
-                                        <label for="return_reason">Reason for Returning to Manager *</label>
+                                        <label for="return_reason">Reason for Returning to Manager <span class="required-star">*</span></label>
                                         <textarea name="return_reason" id="return_reason" rows="4" placeholder="Please provide a clear reason for returning this request to the manager..." required></textarea>
                                     </div>
                                     
@@ -2613,8 +2642,8 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
             
             <!-- Proof Upload Section for Requestors -->
             {% if request.status == 'Proof Pending' and request.user_id == user.user_id %}
-                <div class="card" style="margin-top: 1.5rem;">
-                    <div class="card-header" style="background: #28a745; color: white;">
+                <div class="card upload-proof-section" style="margin-top: 1.5rem;">
+                    <div class="card-header">
                         <h4><i class="fas fa-upload"></i> Upload Proof of Payment</h4>
                         <p style="margin: 0; opacity: 0.9;">Your request has been approved. Please upload proof of payment.</p>
                     </div>
@@ -2701,7 +2730,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6">
-                                <h5>Upload Additional Files</h5>
+                                <h5 class="upload-additional-files-heading">Upload Additional Files</h5>
                                 <form method="POST" action="{{ url_for('upload_additional_files', request_id=request.request_id) }}" enctype="multipart/form-data" id="additionalFilesForm">
                                     <div id="additional-files-upload-container" 
                                          data-multiple-file-upload
@@ -2875,10 +2904,11 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 
 {% block extra_js %}
 <style>
-/* Styling for Finance Admin Notes section to match other section headings */
+/* Styling for Finance Admin Notes section - heading size matches "Finance Admin Approval Required" (card-header h4) */
 .finance-admin-notes-section h5 {
     margin: 0 0 10px 0 !important;
     color: #495057 !important;
+    font-size: 1rem !important;
 }
 
 .finance-admin-notes-section h5 i {

@@ -4031,16 +4031,16 @@ input:checked + .toggle-slider:before {
 }
 
 .step-tab-content {
-    padding: 1rem 1.5rem;
+    padding: 0.5rem 1.5rem;
     display: flex;
     align-items: center;
     justify-content: center;
     text-align: center;
-    min-height: 60px;
+    min-height: 50px;
     background: #f8f9fa;
     color: #6c757d;
     font-weight: 500;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
 }
 
 .step-tab.completed .step-tab-content {
@@ -4083,6 +4083,28 @@ input:checked + .toggle-slider:before {
 }
 
 /* ==================== VIEW REQUEST PAGE SPECIFIC TAB STYLES ==================== */
+/* Match heading size to IT Dashboard (dashboard-title: 1.6rem) on payment and item request view pages */
+.view-request-page .dashboard-header h1 {
+    font-size: 1.6rem;
+}
+/* Back button: same size and color as "Back to Dashboard" on drafts page (gold) */
+.view-request-page .dashboard-header .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    border-radius: 6px !important;
+    background: #D9BD7D !important;
+    border-color: #D9BD7D !important;
+    color: #ffffff !important;
+    text-decoration: none;
+}
+.view-request-page .dashboard-header .btn-secondary:hover {
+    background: #c8ac65 !important;
+    border-color: #c8ac65 !important;
+    color: #ffffff !important;
+}
 /* These styles are specifically for the view request page tabs and override the general step tab styles */
 .view-request-page .step-tab.rejected .step-tab-content {
     background: #dc3545 !important;
@@ -4131,10 +4153,146 @@ input:checked + .toggle-slider:before {
     font-size: 1.1rem !important;
 }
 
+/* Return to Requestor section heading: light orange background (Manager Approval tab) */
+.view-request-page .return-to-requestor-section .card-header {
+    background: #ffe0b2 !important;
+    color: #212529 !important;
+    border-bottom: 1px solid #ffb74d !important;
+}
+.view-request-page .return-to-requestor-section .card-header h4,
+.view-request-page .return-to-requestor-section .card-header p {
+    color: #212529 !important;
+}
+
+/* Upload Proof of Payment section: same color and orange left border as Return to Requestor (Finance Admin Approval tab) */
+.view-request-page .upload-proof-section {
+    border-left: 4px solid #ff9800 !important;
+}
+.view-request-page .upload-proof-section .card-header {
+    background: #ffe0b2 !important;
+    color: #212529 !important;
+    border-bottom: 1px solid #ffb74d !important;
+}
+.view-request-page .upload-proof-section .card-header h4,
+.view-request-page .upload-proof-section .card-header p {
+    color: #212529 !important;
+}
+
+/* Post-Approval Actions: "Upload Additional Files" heading same size as "Upload Files" label in other tabs */
+.view-request-page .upload-additional-files-heading {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+/* Hide the "Select Files" label under Upload Additional Files (heading is enough) */
+#additional-files-upload-container .form-group > label {
+    display: none;
+}
+
+/* Post-Approval Actions: "Upload Files" and "Completed" same size as Submit Decision */
+.view-request-page .post-approval-actions .btn-info,
+.view-request-page .post-approval-actions .btn-success {
+    padding: 0.4rem 0.9rem !important;
+    font-size: 0.9rem !important;
+}
+
+/* Submit Decision button: green and same size as Save Quantity button */
+.view-request-page .step-actions .btn-success {
+    background: #28a745 !important;
+    border-color: #28a745 !important;
+    color: #ffffff !important;
+    padding: 0.4rem 0.9rem !important;
+    font-size: 0.9rem !important;
+}
+.view-request-page .step-actions .btn-success:hover {
+    background: #218838 !important;
+    border-color: #1e7e34 !important;
+    color: #ffffff !important;
+}
+
+/* Remove top border and reduce top padding on step-actions in "Your Approval Required" section */
+.view-request-page .your-approval-required .step-actions {
+    border-top: none !important;
+    padding-top: 0.75rem !important;
+}
+
+/* Required stars red in "Your Approval Required", "Return to Requestor", and Finance Admin Approval tab */
+.view-request-page .your-approval-required .required-star,
+.view-request-page .return-to-requestor-section .required-star,
+.view-request-page #step-finance .required-star {
+    color: #dc3545 !important;
+}
+
+/* Return to Requestor button: black and same size as Submit Decision button */
+.view-request-page .return-to-requestor-section .btn-warning {
+    background: #000000 !important;
+    border-color: #000000 !important;
+    color: #ffffff !important;
+    padding: 0.4rem 0.9rem !important;
+    font-size: 0.9rem !important;
+}
+.view-request-page .return-to-requestor-section .btn-warning:hover {
+    background: #1a1a1a !important;
+    border-color: #1a1a1a !important;
+    color: #ffffff !important;
+}
+
+/* Remove top border and reduce top padding on step-actions in "Return to Requestor" section */
+.view-request-page .return-to-requestor-section .step-actions {
+    border-top: none !important;
+    padding-top: 0.75rem !important;
+}
+
+/* Save Edits button: green and same size as Submit Decision button */
+.view-request-page #save-edits-btn {
+    background: #28a745 !important;
+    border-color: #28a745 !important;
+    color: #ffffff !important;
+    padding: 0.4rem 0.9rem !important;
+    font-size: 0.9rem !important;
+}
+.view-request-page #save-edits-btn:hover {
+    background: #218838 !important;
+    border-color: #1e7e34 !important;
+    color: #ffffff !important;
+}
+
+/* Save Note button (Finance Admin Approval tab): same size and color as Save Edits button */
+.view-request-page #save-finance-note-btn {
+    background: #28a745 !important;
+    border-color: #28a745 !important;
+    color: #ffffff !important;
+    padding: 0.4rem 0.9rem !important;
+    font-size: 0.9rem !important;
+}
+.view-request-page #save-finance-note-btn:hover {
+    background: #218838 !important;
+    border-color: #1e7e34 !important;
+    color: #ffffff !important;
+}
+
+/* View Requestor Receipt, View Finance Receipt, and View Proof buttons: same size as Save Edits button */
+.view-request-page a.btn-info[href*="uploaded_file"]:not(.btn-sm),
+.view-request-page a.btn-warning[href*="uploaded_file"]:not(.btn-sm),
+.view-request-page .proof-info a.btn-info,
+.view-request-page .proof-container a.btn-info[href*="uploaded_file"] {
+    padding: 0.4rem 0.9rem !important;
+    font-size: 0.9rem !important;
+}
+
+/* View payment request page: gold border on input/textarea/select focus */
+.view-request-page input:focus,
+.view-request-page textarea:focus,
+.view-request-page select:focus {
+    border-color: #D9BD7D !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(217, 189, 125, 0.3) !important;
+}
+
 .step-content {
     display: none;
     padding: 2rem;
     background: white;
+    font-size: 0.95rem;
 }
 
 .step-content.active {

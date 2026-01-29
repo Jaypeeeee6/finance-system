@@ -38,7 +38,7 @@ if (typeof MultipleFileUpload === 'undefined') {
         
         container.innerHTML = `
             <div class="form-group">
-                <label>${this.label}${this.required ? ' *' : ''}</label>
+                <label>${this.label}${this.required ? ' <span class="required-star">*</span>' : ''}</label>
                 <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
                     <button type="button" id="add-files-btn-${this.containerId}" class="btn btn-primary" style="white-space: nowrap;">
                         <i class="fas fa-plus"></i> Add Files
