@@ -5107,6 +5107,44 @@ def procurement_item_requests():
     elif current_user.department == 'Auditing':
         # Auditing department can see all completed item requests for auditing purposes
         base_item_requests = [r for r in all_requests if r.status == 'Completed']
+    elif current_user.role == 'Branch Inventory Officer':
+        # Branch Inventory Officer: fast path without per-request get_authorized_manager_approvers_for_item_request
+        # She sees: own requests, temp-manager departments, Branch (Manager/Supervisor) requestors, Operation requestors
+        temp_manager_item_depts = set()
+        try:
+            temp_item_assignments = DepartmentTemporaryManager.query.filter(
+                DepartmentTemporaryManager.temporary_manager_id == current_user.user_id,
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Procurement Item Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).all()
+            for ta in temp_item_assignments:
+                if ta.department:
+                    temp_manager_item_depts.add(ta.department.strip().lower())
+        except Exception:
+            pass
+        requestor_ids = {r.user_id for r in all_requests if r.user_id}
+        requestors_by_id = {}
+        if requestor_ids:
+            for u in User.query.filter(User.user_id.in_(requestor_ids)).all():
+                requestors_by_id[u.user_id] = u
+        visible_ids = set()
+        for req in all_requests:
+            if req.user_id == current_user.user_id:
+                visible_ids.add(req.id)
+                continue
+            req_dept_normalized = (req.department or '').strip().lower() if req.department else ''
+            if req_dept_normalized and req_dept_normalized in temp_manager_item_depts:
+                visible_ids.add(req.id)
+                continue
+            requestor = requestors_by_id.get(req.user_id) if req.user_id else None
+            if requestor:
+                if requestor.role in ['Branch Manager', 'Supervisor'] and (requestor.department or '').strip().lower() == 'branch':
+                    visible_ids.add(req.id)
+                elif (requestor.department or '').strip() == 'Operation':
+                    visible_ids.add(req.id)
+        base_item_requests = [r for r in all_requests if r.id in visible_ids]
     else:
         # Managers see requests from their department or requests they created
         # Also includes temporary managers assigned for "Procurement Item Request" or "Both Payment and Item Request"
@@ -5226,6 +5264,16 @@ def procurement_item_requests():
             item_requests = [r for r in base_for_audit if r.user_id == current_user.user_id]
         else:  # default/all completed
             item_requests = [r for r in base_for_audit if r.status == 'Completed']
+    elif current_user.role == 'Branch Inventory Officer':
+        # Branch Inventory Officer: tabs All Item Requests, My Item Requests (own only), Completed
+        if tab == 'my_requests':
+            # Only requests created by the current user (her actual own requests)
+            item_requests = [r for r in base_item_requests if r.user_id == current_user.user_id]
+        elif tab == 'completed':
+            item_requests = [r for r in base_item_requests if r.status == 'Completed']
+        else:
+            # all or default: show all visible requests
+            item_requests = base_item_requests
     else:
         # For Department Managers (non-Procurement), provide a "My Item Requests" tab that shows
         # all requests belonging to their department. This allows department managers who do not
