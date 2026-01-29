@@ -345,6 +345,8 @@
                                             <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
                                         {% elif req.status in ['Pending Manager Approval', 'Pending Finance Approval'] %}
                                             <span class="badge" style="background: #6c757d; color: white;">⏳ {{ req.status }}</span>
+                                        {% elif req.status == 'Returned to Manager' %}
+                                            <span class="badge" style="background: #2196F3; color: white;">↩ {{ req.status }}</span>
                                         {% elif req.status == 'Payment Pending' %}
                                             <span class="badge" style="background: #FF9800; color: white;">⏳ {{ req.status }}</span>
                                         {% elif req.status in ['Proof Pending', 'Proof Sent'] %}
