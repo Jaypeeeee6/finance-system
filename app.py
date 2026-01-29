@@ -1352,6 +1352,17 @@ def get_authorized_manager_approvers_for_item_request(item_request):
     except Exception as e:
         app.logger.warning(f"Error applying Branch Inventory Officer special case for item request approvers: {e}")
     
+    # Special rule: For item requests from Operation department, Branch Inventory Officer is the original assigned
+    # manager approval (not Operation Manager). Include Branch Inventory Officer(s) among authorized approvers.
+    try:
+        if (requestor.department or '').strip() == 'Operation':
+            branch_inventory_officers = User.query.filter_by(role='Branch Inventory Officer').all()
+            for bio in branch_inventory_officers:
+                if bio.user_id != requestor.user_id:
+                    authorized_users.append(bio)
+    except Exception as e:
+        app.logger.warning(f"Error applying Branch Inventory Officer for Operation department item request approvers: {e}")
+    
     # Hard rule: Requests submitted by GM/CEO/Operation Manager can ONLY be approved by Abdalaziz
     if requestor.role in ['GM', 'CEO', 'Operation Manager']:
         abdalaziz = User.query.filter_by(name='Abdalaziz Al-Brashdi').first()
@@ -6067,13 +6078,21 @@ def view_item_request_page(request_id):
                 # Do not continue to other fallbacks for Branch Manager/Supervisor
         except Exception as e:
             app.logger.warning(f"Error resolving Branch Inventory Officer for display: {e}")
+        # For Operation department item requests, Branch Inventory Officer is the original assigned manager (not Operation Manager)
+        if not manager_name and requestor_user and (requestor_user.department or '').strip() == 'Operation':
+            try:
+                bios = User.query.filter_by(role='Branch Inventory Officer').all()
+                if bios:
+                    manager_name = ', '.join([b.name for b in bios])
+            except Exception as e:
+                app.logger.warning(f"Error resolving Branch Inventory Officer for Operation department: {e}")
         # If no manager_id is set or Branch Inventory Officer not found, find the Department Manager for the requestor's department
         if not manager_name:
             dept_manager = User.query.filter_by(role='Department Manager', department=item_request.department).first()
             if dept_manager:
                 manager_name = dept_manager.name
             elif item_request.department in ['Operation', 'Project']:
-                # For Operation and Project, try Operation Manager as fallback
+                # For Operation and Project, try Operation Manager as fallback (e.g. when no Branch Inventory Officer)
                 operation_manager = User.query.filter_by(role='Operation Manager').first()
                 if operation_manager:
                     manager_name = operation_manager.name
@@ -6082,6 +6101,16 @@ def view_item_request_page(request_id):
                 gm_user_fallback = User.query.filter_by(role='GM').first()
                 if gm_user_fallback:
                     manager_name = gm_user_fallback.name
+    
+    # For Operation department item requests, always show Branch Inventory Officer as the assigned/original manager
+    # (overrides requestor's manager_id so "Assigned Manager" and "Original:" show BIO, not Operation Manager)
+    if requestor_user and (requestor_user.department or '').strip() == 'Operation':
+        try:
+            bios = User.query.filter_by(role='Branch Inventory Officer').all()
+            if bios:
+                manager_name = ', '.join([b.name for b in bios])
+        except Exception as e:
+            app.logger.warning(f"Error resolving Branch Inventory Officer for Operation department display: {e}")
     
     # Also resolve GM and Operation Manager names (used for Department Manager submissions)
     gm_user = User.query.filter_by(role='GM').first()
@@ -22171,6 +22200,8 @@ def settings():
     user_departments = [d[0] for d in db.session.query(User.department).distinct().all() if d[0]]
     request_departments = [d[0] for d in db.session.query(PaymentRequest.department).distinct().all() if d[0]]
     departments = sorted(set(user_departments + request_departments))
+    # Exclude Purchasing from temporary manager department dropdown
+    departments = [d for d in departments if d != 'Purchasing']
 
     # Load all users and group them by department in the template
     managers = User.query.order_by(User.department, User.name).all()
