@@ -9895,6 +9895,16 @@ def admin_dashboard():
                     PaymentRequest.status == 'Rejected by Manager',
                     PaymentRequest.department == 'Finance'
                 ),
+                # Returned to Requestor from Finance department (Abdalaziz can view and track)
+                db.and_(
+                    PaymentRequest.status == 'Returned to Requestor',
+                    PaymentRequest.department == 'Finance'
+                ),
+                # Returned to Requestor for GM/CEO/OM submitters (Abdalaziz handles these)
+                db.and_(
+                    PaymentRequest.status == 'Returned to Requestor',
+                    PaymentRequest.user.has(User.role.in_(special_submitter_roles))
+                ),
                 # Always include current user's own requests regardless of status
                 PaymentRequest.user_id == current_user.user_id,
                 # Include requests where the current user is temporarily assigned as manager
@@ -9912,10 +9922,15 @@ def admin_dashboard():
             PaymentRequest.is_draft == False
         )
     else:
-        # Other Finance Admins only see finance-related statuses plus temporary assignments awaiting manager approval
+        # Other Finance Admins only see finance-related statuses plus temporary assignments and Finance dept Returned to Requestor
         query = PaymentRequest.query.filter(
             db.or_(
                 PaymentRequest.status.in_(finance_statuses),
+                # Returned to Requestor from Finance department
+                db.and_(
+                    PaymentRequest.status == 'Returned to Requestor',
+                    PaymentRequest.department == 'Finance'
+                ),
                 # Always include current user's own requests regardless of status
                 PaymentRequest.user_id == current_user.user_id,
                 db.and_(
@@ -10064,12 +10079,12 @@ def finance_dashboard():
     if current_user.role == 'Finance Staff':
         query = query.filter(~PaymentRequest.user.has(User.role == 'CEO'))
     
-    # Add Finance Staff's own requests with Pending Manager Approval and Rejected by Manager (exclude archived and drafts)
+    # Add Finance Staff's own requests with Pending Manager Approval, Rejected by Manager, and Returned to Requestor (exclude archived and drafts)
     if current_user.role == 'Finance Staff':
         own_pending_requests = PaymentRequest.query.filter(
             db.and_(
                 PaymentRequest.user_id == current_user.user_id,
-                PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager']),
+                PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager', 'Returned to Requestor']),
                 PaymentRequest.is_archived == False,
                 PaymentRequest.is_draft == False
             )
@@ -14672,8 +14687,17 @@ def view_request(request_id):
                 # Finance users can only view requests in finance-related statuses
                 finance_statuses = ['Pending Finance Approval', 'Returned to Manager', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
                 
+                # Finance Admin can view "Returned to Requestor" for Finance department; Abdalaziz also for GM/CEO/OM submitters
+                if req.status == 'Returned to Requestor':
+                    if req.department == 'Finance':
+                        pass  # Allow any Finance Admin to view Finance dept requests in this status
+                    elif current_user.name == 'Abdalaziz Al-Brashdi' and getattr(req.user, 'role', None) in ['GM', 'CEO', 'Operation Manager']:
+                        pass  # Abdalaziz can view Returned to Requestor for GM/CEO/OM submissions
+                    else:
+                        flash('You do not have permission to view this request.', 'danger')
+                        return redirect(url_for('dashboard'))
                 # For Abdalaziz, also allow viewing PMA/Rejected-by-Manager for Finance dept, his own, and GM/CEO/Operation Manager submissions
-                if current_user.name == 'Abdalaziz Al-Brashdi' and req.status in ['Pending Manager Approval', 'Rejected by Manager']:
+                elif current_user.name == 'Abdalaziz Al-Brashdi' and req.status in ['Pending Manager Approval', 'Rejected by Manager']:
                     if (req.department == 'Finance' or req.user_id == current_user.user_id or getattr(req.user, 'role', None) in ['GM', 'CEO', 'Operation Manager']):
                         pass  # Allow access
                     else:
@@ -17740,9 +17764,9 @@ def manager_reject_request(request_id):
 
 @app.route('/request/<int:request_id>/gm_return_to_requestor', methods=['POST'])
 @login_required
-@role_required('GM', 'Department Manager', 'Operation Manager')
+@role_required('GM', 'Department Manager', 'Operation Manager', 'Finance Admin')
 def gm_return_to_requestor(request_id):
-    """GM, Department Managers, and Operation Managers can return a payment request to the requestor for editing"""
+    """GM, Department Managers, Operation Managers, and Finance Admin (e.g. Abdalaziz) can return a payment request to the requestor for editing"""
     req = PaymentRequest.query.get_or_404(request_id)
     
     # Never allow users to return their own requests
@@ -17754,6 +17778,9 @@ def gm_return_to_requestor(request_id):
     allowed_statuses = []
     if current_user.role == 'GM':
         # GM can return for both manager and finance approval stages
+        allowed_statuses = ['Pending Manager Approval', 'Pending Finance Approval']
+    elif current_user.role == 'Finance Admin':
+        # Finance Admin (e.g. Abdalaziz) can return in both stages for GM/CEO/OM requests and Finance dept
         allowed_statuses = ['Pending Manager Approval', 'Pending Finance Approval']
     elif current_user.role in ['Department Manager', 'Operation Manager']:
         # Department Managers and Operation Managers can only return during manager approval stage
@@ -17843,11 +17870,11 @@ def gm_return_to_requestor(request_id):
     
     log_action(f"{returned_by_text} returned payment request #{request_id} to requestor - Reason: {return_reason}")
     
-    # Notify the requestor
+    # Notify the requestor (use name only, not role)
     create_notification(
         user_id=req.user_id,
         title="Request Returned for Editing",
-        message=f"Your payment request #{request_id} has been returned by {returned_by_text} for editing. Reason: {return_reason}",
+        message=f"Your payment request #{request_id} has been returned by {current_user.name} for editing. Reason: {return_reason}",
         notification_type="request_returned",
         request_id=request_id
     )

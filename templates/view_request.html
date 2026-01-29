@@ -553,7 +553,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     Manager Approval
                 </div>
             </li>
-            <li class="step-tab {% if request.status == 'Rejected by Finance' %}rejected{% elif request.status in ['Pending Finance Approval', 'Returned to Manager', 'Returned to Requestor', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'] %}warning{% elif request.status in ['Paid', 'Completed', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="finance">
+            <li class="step-tab {% if request.status == 'Rejected by Finance' %}rejected{% elif request.status in ['Pending Finance Approval', 'Returned to Manager', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'] %}warning{% elif request.status in ['Paid', 'Completed', 'Recurring'] %}completed{% else %}disabled{% endif %}" data-step="finance">
                 <div class="step-tab-content">
                     Finance Admin Approval
                 </div>
@@ -1088,10 +1088,10 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
         <div class="step-content" id="step-manager">
             <h3><i class="fas fa-user-tie"></i> Manager Approval</h3>
             
-            {% if request.status in ['Pending Finance Approval', 'Returned to Manager', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Rejected by Manager', 'Completed', 'Recurring'] %}
-                <div class="admin-mode-warning" style="background: #28a745; color: white;">
-                    <i class="fas fa-check-circle"></i>
-                    <span>Manager Approval: Completed</span>
+            {% if request.status in ['Pending Finance Approval', 'Returned to Manager', 'Returned to Requestor', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Paid', 'Rejected by Manager', 'Completed', 'Recurring'] %}
+                <div class="admin-mode-warning" style="background: {% if request.status == 'Returned to Requestor' %}#ffc107; color: #856404;{% else %}#28a745; color: white;{% endif %}">
+                    <i class="fas {% if request.status == 'Returned to Requestor' %}fa-exclamation-triangle{% else %}fa-check-circle{% endif %}"></i>
+                    <span>Manager Approval: {% if request.status == 'Returned to Requestor' %}Returned to Requestor{% else %}Completed{% endif %}</span>
                 </div>
                 
                 <!-- Show manager approval details -->
@@ -1106,6 +1106,13 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                             {% if request.status == 'Rejected by Manager' %}
                                 <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 12px 20px; text-align: center;">
                                     <span style="color: #721c24; font-weight: bold; font-size: 1.1rem;">REJECTED</span>
+                                </div>
+                            {% elif request.status == 'Returned to Requestor' %}
+                                <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 12px 20px; text-align: center;">
+                                    <span style="color: #856404; font-weight: bold; font-size: 1.1rem;">RETURNED TO REQUESTOR</span>
+                                    {% if request.is_urgent %}
+                                        <span style="background-color: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; margin-left: 8px; font-size: 0.9rem;">URGENT</span>
+                                    {% endif %}
                                 </div>
                             {% elif request.status == 'Returned to Manager' %}
                                 <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 12px 20px; text-align: center;">
@@ -1137,6 +1144,15 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                     {% else %}
                                         {{ manager_name if manager_name else 'Manager' }}
                                     {% endif %}
+                                {% elif request.status == 'Returned to Requestor' %}
+                                    <div>
+                                        <strong>Returned by:</strong>
+                                        {% if return_reason_history and return_reason_history|length > 0 %}
+                                            {{ return_reason_history[0].returned_by_name }}
+                                        {% else %}
+                                            Manager / GM
+                                        {% endif %}
+                                    </div>
                                 {% elif request.status == 'Returned to Manager' %}
                                     <div>
                                         <strong>Approved by:</strong>
@@ -1214,6 +1230,31 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                 <label>Rejection Date</label>
                                 <input type="text" value="{{ request.manager_rejection_date.strftime('%Y-%m-%d') if request.manager_rejection_date else 'N/A' }}" readonly style="background: #f5f5f5;">
                             </div>
+                        {% elif request.status == 'Returned to Requestor' %}
+                            {% if request.rejection_reason %}
+                            <div class="form-group">
+                                <label style="color: #856404;"><i class="fas fa-undo"></i> Reason for Return to Requestor</label>
+                                <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 12px; margin-top: 5px;">
+                                    <p style="color: #856404; margin: 0; white-space: pre-wrap;">{{ request.rejection_reason }}</p>
+                                    {% if return_reason_history and return_reason_history|length > 0 %}
+                                    <p style="color: #856404; margin: 5px 0 0 0; font-size: 0.9rem; font-style: italic;">Returned by: {{ return_reason_history[0].returned_by_name }} on {{ return_reason_history[0].returned_at.strftime('%Y-%m-%d %H:%M:%S') if return_reason_history[0].returned_at else 'N/A' }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if return_reason_history and return_reason_history|length > 1 %}
+                            <div class="form-group">
+                                <label style="color: #856404;"><i class="fas fa-history"></i> Previous Return Reasons</label>
+                                <div style="max-height: 300px; overflow-y: auto;">
+                                    {% for history_item in return_reason_history[1:] %}
+                                    <div style="background: #fff9e6; border: 1px solid #ffc107; border-radius: 8px; padding: 12px; margin-top: 10px;">
+                                        <p style="color: #856404; margin: 0; white-space: pre-wrap;"><strong>Reason:</strong> {{ history_item.return_reason }}</p>
+                                        <p style="color: #856404; margin: 5px 0 0 0; font-size: 0.9rem; font-style: italic;">Returned by: {{ history_item.returned_by_name }} on {{ history_item.returned_at.strftime('%Y-%m-%d %H:%M:%S') if history_item.returned_at else 'N/A' }}</p>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
                         {% elif request.status == 'Returned to Manager' %}
                             {% if request.manager_approval_reason %}
                             <div class="form-group">
@@ -3400,7 +3441,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Set manager tab status classes
     if (managerTab) {
-        if (requestStatus === 'Pending Manager Approval' || requestStatus === 'Returned to Manager' || requestStatus === 'On Hold') {
+        if (requestStatus === 'Pending Manager Approval' || requestStatus === 'Returned to Manager' || requestStatus === 'Returned to Requestor' || requestStatus === 'On Hold') {
             managerTab.classList.add('warning');
         } else if (requestStatus === 'Rejected by Manager') {
             managerTab.classList.add('rejected');
@@ -3415,7 +3456,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (financeTab) {
         if (requestStatus === 'Rejected by Finance') {
             financeTab.classList.add('rejected');
-        } else if (['Pending Finance Approval', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'].includes(requestStatus)) {
+        } else if (['Pending Finance Approval', 'Returned to Manager', 'Payment Pending', 'Proof Pending', 'Proof Sent', 'Proof Rejected'].includes(requestStatus)) {
             financeTab.classList.add('warning');
         } else if (['Paid', 'Completed', 'Recurring'].includes(requestStatus)) {
             financeTab.classList.add('completed');
