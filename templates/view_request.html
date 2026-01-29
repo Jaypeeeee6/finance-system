@@ -942,7 +942,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
            {% else %}
                <p style="color: #666; font-style: italic;">No receipt files uploaded by requestor</p>
            {% endif %}
-           {% if can_edit_request and request.status == 'Returned to Manager' %}
+           {% if can_edit_request and request.status in ['Returned to Manager', 'Returned to Requestor'] %}
            <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">
                <label style="font-weight: 600; margin-bottom: 8px; display: block;">
                    <i class="fas fa-plus-circle"></i> Add Files
