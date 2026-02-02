@@ -9,19 +9,151 @@
         <p>Archived payment requests and item requests - IT Department Only</p>
     </div>
 
-    <!-- Tab: Payment Requests | Item Requests -->
-    <div class="tab-navigation" style="border-bottom: 1px solid #e9ecef; margin-bottom: 20px;">
-        <a href="{{ url_for('archives', tab='payment_requests', page=1, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="tab-button {% if archive_tab == 'payment_requests' %}active{% endif %}" style="display: inline-block; padding: 10px 20px; text-decoration: none; color: #333; border-bottom: 3px solid {% if archive_tab == 'payment_requests' %}#007bff{% else %}transparent{% endif %}; margin-bottom: -1px;">
+    <style>
+    /* Archives tab styles - exact same as drafts.html Payment Requests / Item Requests tabs */
+    .archives-tabs.draft-tabs {
+        display: flex;
+        border-bottom: 2px solid #dee2e6;
+        margin-bottom: 20px;
+        gap: 0;
+    }
+    .archives-tabs .tab-button {
+        flex: 1;
+        padding: 12px 20px;
+        background: none;
+        border: none;
+        border-bottom: 3px solid transparent;
+        cursor: pointer;
+        font-size: 15px;
+        font-weight: 500;
+        color: #666;
+        transition: all 0.3s ease;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        text-decoration: none;
+    }
+    .archives-tabs .tab-button:hover {
+        color: #333;
+        background-color: #f8f9fa;
+    }
+    .archives-tabs .tab-button.active {
+        color: #D9BD7D;
+        border-bottom-color: #D9BD7D;
+        background-color: transparent;
+    }
+    /* Filter/search container - same as IT dashboard */
+    .archives-filters .filters-container {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0 0 8px 0;
+        padding: 4px 0;
+    }
+    .archives-filters .filters-left {
+        flex: 0 0 auto;
+    }
+    .archives-filters .filters-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .archives-filters .filter-controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 0;
+    }
+    .archives-filters .assign-search-field {
+        position: relative;
+        width: 300px;
+        min-width: 280px;
+    }
+    .archives-filters .assign-search-input {
+        border-radius: 999px !important;
+        border: 1px solid #ced4da !important;
+        transition: border-color 0.12s ease, box-shadow 0.12s ease;
+        height: 38px;
+        padding-left: 44px !important;
+        width: 100%;
+        background: #ffffff !important;
+        color: #212529 !important;
+    }
+    .archives-filters .assign-search-input:focus {
+        outline: none !important;
+        border-color: #D9BD7D !important;
+        box-shadow: 0 0 0 0.18rem rgba(217,189,125,0.15) !important;
+    }
+    .archives-filters .assign-search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 20px !important;
+        height: 20px !important;
+        cursor: pointer;
+    }
+    .archives-filters .form-select {
+        background-color: #ffffff !important;
+        color: #212529 !important;
+        border: 1px solid #ced4da !important;
+        border-radius: 8px !important;
+        padding: 8px 12px !important;
+        padding-right: 40px !important;
+        -webkit-appearance: none !important;
+        -moz-appearance: none !important;
+        appearance: none !important;
+        background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M7%2010l5%205%205-5'%20fill='none'%20stroke='currentColor'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+        background-position: right 12px center !important;
+        background-repeat: no-repeat !important;
+        background-size: 16px !important;
+    }
+    .archives-filters .form-select::-ms-expand {
+        display: none !important;
+    }
+    @media (max-width: 768px) {
+        .archives-filters .filters-container {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+        }
+        .archives-filters .filters-right {
+            margin-left: 0;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+        }
+        .archives-filters .filters-left {
+            width: 100%;
+        }
+        .archives-filters .assign-search-field {
+            width: 100%;
+        }
+    }
+    </style>
+
+    <!-- Tab: Payment Requests | Item Requests (same style as drafts.html) -->
+    <div class="draft-tabs archives-tabs">
+        <a href="{{ url_for('archives', tab='payment_requests', page=1, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="tab-button {% if archive_tab == 'payment_requests' %}active{% endif %}">
             <i class="fas fa-file-invoice-dollar"></i> Payment Requests
         </a>
-        <a href="{{ url_for('archives', tab='item_requests', page=1, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="tab-button {% if archive_tab == 'item_requests' %}active{% endif %}" style="display: inline-block; padding: 10px 20px; text-decoration: none; color: #333; border-bottom: 3px solid {% if archive_tab == 'item_requests' %}#007bff{% else %}transparent{% endif %}; margin-bottom: -1px;">
+        <a href="{{ url_for('archives', tab='item_requests', page=1, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="tab-button {% if archive_tab == 'item_requests' %}active{% endif %}">
             <i class="fas fa-shopping-cart"></i> Item Requests
         </a>
     </div>
 
-    <div class="card">
-        <div class="card-header">
-            <div class="header-top">
+    <!-- Filters container - same structure as IT dashboard -->
+    <div class="archives-filters">
+        <div class="filters-container">
+            <div class="filters-left">
+                <div class="assign-search-field">
+                    <img src="{{ url_for('static', filename='css/icons/search.svg') }}" class="assign-search-icon" alt="Search" onclick="document.getElementById('searchInput').focus();">
+                    <input type="search" id="searchInput" class="form-control assign-search-input" placeholder="Search by request # or requestor name" aria-label="Search requests" value="{{ search_query or '' }}">
+                </div>
+            </div>
+            <div class="filters-right">
                 <div class="filter-controls">
                     <select id="departmentFilter" onchange="filterByDepartment()" class="form-select">
                         <option value="">All Departments</option>
@@ -60,12 +192,13 @@
                         <option value="urgent" {% if urgent_filter == 'urgent' %}selected{% endif %}>🔴 Urgent Only</option>
                         <option value="not_urgent" {% if urgent_filter == 'not_urgent' %}selected{% endif %}>⚪ Not Urgent</option>
                     </select>
-                    <input type="text" id="searchInput" placeholder="Search by request # or requestor name..." class="form-input" value="{{ search_query or '' }}">
-                    <button type="button" class="btn btn-primary" onclick="performSearch()">
-                        <i class="fas fa-search"></i> Search
-                    </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header" style="background: transparent !important; box-shadow: none !important; border-bottom: none !important;">
             <div class="card-header-actions">
                 {% if status_filter or department_filter or urgent_filter or search_query %}
                 <div class="filter-indicator">
