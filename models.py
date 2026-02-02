@@ -847,6 +847,12 @@ class ProcurementItemRequest(db.Model):
     # Flag indicating item came from in-house store and therefore no receipt/invoice is expected
     from_store_no_receipt = db.Column(db.Boolean, default=False)
     
+    # Archive fields (same as PaymentRequest - soft delete moves to archives)
+    is_archived = db.Column(db.Boolean, default=False)
+    archived_at = db.Column(db.DateTime, nullable=True)
+    archived_by = db.Column(db.String(100), nullable=True)
+    archived_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    
     # Relationships
     manager_approver_user = db.relationship('User', foreign_keys=[manager_approver_user_id], backref='approved_item_requests_as_manager')
     manager_rejector_user = db.relationship('User', foreign_keys=[manager_rejector_user_id], backref='rejected_item_requests_as_manager')
@@ -855,6 +861,7 @@ class ProcurementItemRequest(db.Model):
     assigned_to_user = db.relationship('User', foreign_keys=[assigned_to_user_id], backref='assigned_item_requests')
     assigned_by_user = db.relationship('User', foreign_keys=[assigned_by_user_id], backref='assigned_item_requests_by_me')
     completed_by_user = db.relationship('User', foreign_keys=[completed_by_user_id], backref='completed_item_requests')
+    archiver = db.relationship('User', foreign_keys=[archived_by_user_id], backref='archived_item_requests')
     
     def __repr__(self):
         return f'<ProcurementItemRequest {self.id} - {self.item_name} ({self.status})>'

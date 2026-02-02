@@ -4531,10 +4531,10 @@ def procurement_dashboard():
     snapshot_date = latest_snapshot.entry_date if latest_snapshot else None
     
     # Calculate NEW transactions (those completed AFTER the latest snapshot)
-    # Get completed item requests completed AFTER the snapshot
+    # Get completed item requests completed AFTER the snapshot (exclude archived)
     if snapshot_date:
         # Filter in Python to handle NULL completion_date (use updated_at as fallback)
-        all_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+        all_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed', is_archived=False).all()
         new_completed_item_requests = [
             r for r in all_completed_item_requests
             if (r.completion_date and r.completion_date > snapshot_date) or 
@@ -4542,13 +4542,13 @@ def procurement_dashboard():
         ]
     else:
         # If no snapshot, consider all completed item requests as "new"
-        new_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+        new_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed', is_archived=False).all()
     
     new_completed_item_requests_amount = sum(float(r.receipt_amount) for r in new_completed_item_requests if r.receipt_amount is not None)
     
     # Calculate total completed item requests amount (for snapshot recording)
-    # This is the total of ALL completed item requests, not just new ones
-    all_completed_item_requests_total = ProcurementItemRequest.query.filter_by(status='Completed').all()
+    # This is the total of ALL completed item requests, not just new ones (exclude archived)
+    all_completed_item_requests_total = ProcurementItemRequest.query.filter_by(status='Completed', is_archived=False).all()
     completed_item_requests_amount = sum(float(r.receipt_amount) for r in all_completed_item_requests_total if r.receipt_amount is not None)
     
     # Get NEW completed Bank money payment requests from Procurement Department Manager
@@ -4657,14 +4657,14 @@ def get_procurement_money_spent():
         # Calculate NEW transactions (those completed AFTER the latest snapshot)
         if snapshot_date:
             # Filter in Python to handle NULL completion_date (use updated_at as fallback)
-            all_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+            all_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed', is_archived=False).all()
             new_completed_item_requests = [
                 r for r in all_completed_item_requests
                 if (r.completion_date and r.completion_date > snapshot_date) or 
                    (not r.completion_date and r.updated_at and r.updated_at > snapshot_date)
             ]
         else:
-            new_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+            new_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed', is_archived=False).all()
         
         new_completed_item_requests_amount = sum(float(r.receipt_amount) for r in new_completed_item_requests if r.receipt_amount is not None)
         
@@ -4751,8 +4751,8 @@ def get_procurement_money_spent_history():
             
             last_money_spent = money_spent_value
         
-        # Calculate Total Money Spent (of All-Time): Sum of ALL receipt_amount from ALL completed item requests
-        all_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+        # Calculate Total Money Spent (of All-Time): Sum of ALL receipt_amount from ALL completed item requests (exclude archived)
+        all_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed', is_archived=False).all()
         total_all_time_money_spent = sum(float(r.receipt_amount) for r in all_completed_item_requests if r.receipt_amount is not None)
         
         return jsonify({
@@ -4976,6 +4976,23 @@ def procurement_item_requests():
             cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN requestor_evidence_upload_path TEXT")
             conn.commit()
             print("✓ Added 'requestor_evidence_upload_path' column to procurement_item_requests table")
+        # Add archive columns (same as payment requests - soft delete to archives)
+        if 'is_archived' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN is_archived INTEGER DEFAULT 0")
+            conn.commit()
+            print("✓ Added 'is_archived' column to procurement_item_requests table")
+        if 'archived_at' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN archived_at TEXT")
+            conn.commit()
+            print("✓ Added 'archived_at' column to procurement_item_requests table")
+        if 'archived_by' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN archived_by VARCHAR(100)")
+            conn.commit()
+            print("✓ Added 'archived_by' column to procurement_item_requests table")
+        if 'archived_by_user_id' not in existing_columns:
+            cursor.execute("ALTER TABLE procurement_item_requests ADD COLUMN archived_by_user_id INTEGER REFERENCES users(user_id)")
+            conn.commit()
+            print("✓ Added 'archived_by_user_id' column to procurement_item_requests table")
 
         conn.close()
     except Exception as e:
@@ -4994,6 +5011,8 @@ def procurement_item_requests():
     
     # Exclude draft items - only show submitted requests
     base_query = base_query.filter(ProcurementItemRequest.is_draft == False)
+    # Exclude archived item requests (they appear on the archives page)
+    base_query = base_query.filter(ProcurementItemRequest.is_archived == False)
     
     # Apply search filter at database level (same logic as dashboard)
     if search_query:
@@ -5562,20 +5581,20 @@ def procurement_item_requests():
         # Calculate NEW transactions (those completed AFTER the latest snapshot)
         if snapshot_date:
             # Filter in Python to handle NULL completion_date (use updated_at as fallback)
-            all_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+            all_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed', is_archived=False).all()
             new_completed_item_requests = [
                 r for r in all_completed_item_requests
                 if (r.completion_date and r.completion_date > snapshot_date) or 
                    (not r.completion_date and r.updated_at and r.updated_at > snapshot_date)
             ]
         else:
-            new_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+            new_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed', is_archived=False).all()
         
         new_completed_item_requests_amount = sum(float(r.receipt_amount) for r in new_completed_item_requests if r.receipt_amount is not None)
         
         # Calculate total completed item requests amount (for snapshot recording)
-        # This is the total of ALL completed item requests, not just new ones
-        all_completed_item_requests_total = ProcurementItemRequest.query.filter_by(status='Completed').all()
+        # This is the total of ALL completed item requests, not just new ones (exclude archived)
+        all_completed_item_requests_total = ProcurementItemRequest.query.filter_by(status='Completed', is_archived=False).all()
         completed_item_requests_amount = sum(float(r.receipt_amount) for r in all_completed_item_requests_total if r.receipt_amount is not None)
         
         # Get NEW completed Bank money payment requests from Procurement Department Manager
@@ -7143,14 +7162,14 @@ def item_request_procurement_manager_approve_handler(request_id, item_request):
         completed_requests_bm = [r for r in bank_money_requests if r.status == 'Completed']
         completed_amount_bm = sum(float(r.amount) for r in completed_requests_bm)
         
-        # Get item requests with status "Assigned to Procurement" (excluding current request if it's already assigned)
-        assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement').all()
+        # Get item requests with status "Assigned to Procurement" (excluding current request if it's already assigned; exclude archived)
+        assigned_item_requests = ProcurementItemRequest.query.filter_by(status='Assigned to Procurement', is_archived=False).all()
         # Exclude current request if it's already in the assigned list
         assigned_item_requests = [r for r in assigned_item_requests if r.id != request_id]
         item_requests_amount = sum(float(r.invoice_amount) for r in assigned_item_requests if r.invoice_amount is not None)
         
-        # Get completed item requests
-        completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed').all()
+        # Get completed item requests (exclude archived so they are not included in Total Amount)
+        completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed', is_archived=False).all()
         completed_item_requests_amount = sum(float(r.receipt_amount) for r in completed_item_requests if r.receipt_amount is not None)
         
         # Calculate available balance
@@ -10803,12 +10822,13 @@ def it_dashboard():
 @login_required
 @role_required('IT Staff', 'Department Manager')
 def archives():
-    """Archives page for IT department - shows archived requests"""
+    """Archives page for IT department - shows archived payment requests and item requests"""
     # Restrict Department Managers to IT department only
     if current_user.role == 'Department Manager' and current_user.department != 'IT':
         session['permission_denied'] = 'You do not have permission to access this page.'
         return redirect(url_for('dashboard'))
     
+    tab = request.args.get('tab', 'payment_requests')
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     department_filter = request.args.get('department', None)
@@ -10820,50 +10840,80 @@ def archives():
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
     
-    # Build query for archived requests only
-    query = PaymentRequest.query.filter(PaymentRequest.is_archived == True)
+    requests_pagination = None
+    item_requests_pagination = None
+    departments = []
+    item_departments = []
     
-    # Apply filters
+    # Payment requests tab
+    query = PaymentRequest.query.filter(PaymentRequest.is_archived == True)
     if department_filter:
         query = query.filter(PaymentRequest.department == department_filter)
-    
     if search_query:
-        # Search by request ID or requestor name
         try:
             search_id = int(search_query)
             query = query.filter(PaymentRequest.request_id == search_id)
         except ValueError:
             search_term = f'%{search_query}%'
-            query = query.filter(
-                PaymentRequest.requestor_name.ilike(search_term)
-            )
-    
+            query = query.filter(PaymentRequest.requestor_name.ilike(search_term))
     if urgent_filter:
         if urgent_filter == 'urgent':
             query = query.filter(PaymentRequest.is_urgent == True)
         elif urgent_filter == 'not_urgent':
             query = query.filter(PaymentRequest.is_urgent == False)
-    
     if status_filter:
         query = query.filter(PaymentRequest.status == status_filter)
     
-    # Get paginated archived requests
-    requests_pagination = query.order_by(PaymentRequest.archived_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
-    
-    # Get all departments for the filter dropdown
     all_departments = db.session.query(RequestType.department).distinct().order_by(RequestType.department).all()
-    departments = []
     for dept in all_departments:
         d = dept[0]
         departments.append('Management' if d == 'General Manager' else d)
     
+    requests_pagination = query.order_by(PaymentRequest.archived_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    # Item requests tab - archived item requests
+    item_query = ProcurementItemRequest.query.filter(ProcurementItemRequest.is_archived == True)
+    if department_filter:
+        item_query = item_query.filter(ProcurementItemRequest.department == department_filter)
+    if search_query:
+        try:
+            search_id = int(search_query)
+            item_query = item_query.filter(ProcurementItemRequest.id == search_id)
+        except ValueError:
+            search_term = f'%{search_query}%'
+            item_query = item_query.filter(
+                db.or_(
+                    ProcurementItemRequest.requestor_name.ilike(search_term),
+                    ProcurementItemRequest.item_name.ilike(search_term)
+                )
+            )
+    if status_filter:
+        item_query = item_query.filter(ProcurementItemRequest.status == status_filter)
+    if urgent_filter:
+        if urgent_filter == 'urgent':
+            item_query = item_query.filter(ProcurementItemRequest.is_urgent == True)
+        elif urgent_filter == 'not_urgent':
+            item_query = item_query.filter(ProcurementItemRequest.is_urgent == False)
+    
+    item_departments = [r[0] for r in db.session.query(ProcurementItemRequest.department).filter(
+        ProcurementItemRequest.is_archived == True
+    ).distinct().order_by(ProcurementItemRequest.department).all() if r[0]]
+    
+    item_requests_pagination = item_query.order_by(ProcurementItemRequest.archived_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
     return render_template('archives.html',
                          requests=requests_pagination.items,
                          pagination=requests_pagination,
+                         item_requests=item_requests_pagination.items,
+                         item_pagination=item_requests_pagination,
                          departments=departments,
+                         item_departments=item_departments,
                          user=current_user,
+                         archive_tab=tab,
                          department_filter=department_filter,
                          status_filter=status_filter,
                          search_query=search_query,
@@ -10983,6 +11033,143 @@ def restore_request(request_id):
     
     flash(f'Payment request #{request_id} has been restored.', 'success')
     return redirect(url_for('archives'))
+
+
+@app.route('/item-request/<int:item_request_id>/restore', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def restore_item_request(item_request_id):
+    """Restore an archived item request (IT only)"""
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        session['permission_denied'] = 'You do not have permission to perform this action.'
+        return redirect(url_for('dashboard'))
+    
+    item_req = ProcurementItemRequest.query.get_or_404(item_request_id)
+    
+    if not item_req.is_archived:
+        flash(f'Item request #{item_request_id} is not archived.', 'warning')
+        return redirect(url_for('archives', tab='item_requests'))
+    
+    item_req.is_archived = False
+    item_req.archived_at = None
+    item_req.archived_by = None
+    item_req.archived_by_user_id = None
+    
+    db.session.commit()
+    
+    log_action(f"Restored item request #{item_request_id}")
+    
+    it_users = User.query.filter(
+        db.or_(
+            User.role == 'IT Staff',
+            db.and_(User.role == 'Department Manager', User.department == 'IT')
+        )
+    ).all()
+    it_users_to_notify = [user for user in it_users if user.user_id != current_user.user_id]
+    
+    notification_title = "Item Request Restored"
+    notification_message = f"Item request #{item_request_id} submitted by {item_req.requestor_name} has been restored by {current_user.name}."
+    
+    for it_user in it_users_to_notify:
+        create_notification(
+            user_id=it_user.user_id,
+            title=notification_title,
+            message=notification_message,
+            notification_type="item_request_restored",
+            request_id=None,
+            item_request_id=item_request_id
+        )
+    
+    if it_users_to_notify:
+        try:
+            socketio.emit('new_notification', {
+                'title': notification_title,
+                'message': notification_message,
+                'type': 'item_request_restored',
+                'item_request_id': item_request_id
+            }, room='all_users')
+            socketio.emit('notification_update', {'action': 'new_notification', 'type': 'item_request_restored'}, room='all_users')
+        except Exception as e:
+            print(f"Error emitting WebSocket notification: {e}")
+    
+    flash(f'Item request #{item_request_id} has been restored.', 'success')
+    return redirect(url_for('archives', tab='item_requests'))
+
+
+@app.route('/item-request/<int:item_request_id>/delete_permanently', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def delete_item_request_permanently(item_request_id):
+    """Permanently delete an archived item request from the database (IT only)"""
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to perform this action.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    item_req = ProcurementItemRequest.query.get_or_404(item_request_id)
+    
+    if not item_req.is_archived:
+        flash(f'Item request #{item_request_id} must be archived before it can be permanently deleted.', 'warning')
+        return redirect(url_for('archives', tab='item_requests'))
+    
+    try:
+        requestor_name = item_req.requestor_name
+        item_id_val = item_request_id
+        
+        it_users = User.query.filter(
+            db.or_(
+                User.role == 'IT Staff',
+                db.and_(User.role == 'Department Manager', User.department == 'IT')
+            )
+        ).all()
+        it_users_to_notify = [user for user in it_users if user.user_id != current_user.user_id]
+        
+        notification_title = "Item Request Permanently Deleted"
+        notification_message = f"Item request #{item_id_val} submitted by {requestor_name} has been permanently deleted from the database by {current_user.name}. This action cannot be undone."
+        
+        Notification.query.filter_by(item_request_id=item_request_id).delete()
+        
+        for it_user in it_users_to_notify:
+            create_notification(
+                user_id=it_user.user_id,
+                title=notification_title,
+                message=notification_message,
+                notification_type="item_request_permanently_deleted",
+                request_id=None,
+                item_request_id=item_id_val
+            )
+        
+        db.session.commit()
+        
+        ProcurementReceiptEntry.query.filter_by(item_request_id=item_request_id).delete()
+        ProcurementInvoiceEntry.query.filter_by(item_request_id=item_request_id).delete()
+        db.session.delete(item_req)
+        db.session.commit()
+        
+        log_action(f"Permanently deleted item request #{item_id_val} from database")
+        
+        if it_users_to_notify:
+            try:
+                socketio.emit('new_notification', {
+                    'title': notification_title,
+                    'message': notification_message,
+                    'type': 'item_request_permanently_deleted',
+                    'item_request_id': item_id_val
+                }, room='all_users')
+                socketio.emit('notification_update', {
+                    'action': 'new_notification',
+                    'type': 'item_request_permanently_deleted'
+                }, room='all_users')
+            except Exception as e:
+                print(f"Error emitting WebSocket notification: {e}")
+        
+        flash(f'Item request #{item_request_id} has been permanently deleted from the database.', 'success')
+        return redirect(url_for('archives', tab='item_requests'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting item request: {str(e)}', 'error')
+        app.logger.error(f"Error permanently deleting item request #{item_request_id}: {str(e)}")
+        return redirect(url_for('archives', tab='item_requests'))
 
 
 @app.route('/request/<int:request_id>/delete_permanently', methods=['POST'])
@@ -18142,6 +18329,75 @@ def delete_request(request_id):
     flash(f'Payment request #{request_id} has been archived.', 'success')
     return redirect(url_for('it_dashboard'))
 
+
+@app.route('/item-request/<int:item_request_id>/archive', methods=['POST'])
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def archive_item_request(item_request_id):
+    """Archive an item request (IT only) - soft delete, same behavior as payment request delete"""
+    # Restrict Department Managers to IT department only
+    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+        flash('You do not have permission to perform this action.', 'danger')
+        return redirect(url_for('procurement_item_requests'))
+    
+    item_req = ProcurementItemRequest.query.get_or_404(item_request_id)
+    
+    # Check if already archived
+    if item_req.is_archived:
+        flash(f'Item request #{item_request_id} is already archived.', 'warning')
+        return redirect(url_for('archives', tab='item_requests'))
+    
+    archive_time = datetime.utcnow()
+    item_req.is_archived = True
+    item_req.archived_at = archive_time
+    item_req.archived_by = current_user.name
+    item_req.archived_by_user_id = current_user.user_id
+    
+    db.session.commit()
+    
+    log_action(f"Archived item request #{item_request_id}")
+    
+    # Notify all IT department users about the archive (same as payment request archive)
+    it_users = User.query.filter(
+        db.or_(
+            User.role == 'IT Staff',
+            db.and_(User.role == 'Department Manager', User.department == 'IT')
+        )
+    ).all()
+    it_users_to_notify = [user for user in it_users if user.user_id != current_user.user_id]
+    
+    notification_title = "Item Request Archived"
+    notification_message = f"Item request #{item_request_id} submitted by {item_req.requestor_name} has been archived by {current_user.name}."
+    
+    for it_user in it_users_to_notify:
+        create_notification(
+            user_id=it_user.user_id,
+            title=notification_title,
+            message=notification_message,
+            notification_type="item_request_archived",
+            request_id=None,
+            item_request_id=item_request_id
+        )
+    
+    if it_users_to_notify:
+        try:
+            socketio.emit('new_notification', {
+                'title': notification_title,
+                'message': notification_message,
+                'type': 'item_request_archived',
+                'item_request_id': item_request_id
+            }, room='all_users')
+            socketio.emit('notification_update', {
+                'action': 'new_notification',
+                'type': 'item_request_archived'
+            }, room='all_users')
+        except Exception as e:
+            print(f"Error emitting WebSocket notification: {e}")
+    
+    flash(f'Item request #{item_request_id} has been archived.', 'success')
+    return redirect(url_for('archives', tab='item_requests'))
+
+
 @app.route('/bulk-delete-requests', methods=['POST'])
 @login_required
 @role_required('IT Staff', 'Department Manager')
@@ -18976,8 +19232,9 @@ def item_request_reports():
     if per_page not in [10, 20, 50, 100]:
         per_page = 10
     
-    # Build query
+    # Build query (exclude drafts and archived)
     query = ProcurementItemRequest.query.filter(ProcurementItemRequest.is_draft == False)
+    query = query.filter(ProcurementItemRequest.is_archived == False)
     
     # Auditing Staff: only Completed item requests in reports
     if current_user.role == 'Auditing Staff':
@@ -19121,6 +19378,7 @@ def item_request_reports():
             # IT Manager can see all departments
             departments = db.session.query(ProcurementItemRequest.department).filter(
                 ProcurementItemRequest.is_draft == False,
+                ProcurementItemRequest.is_archived == False,
                 ProcurementItemRequest.department.isnot(None),
                 ProcurementItemRequest.department != ''
             ).distinct().all()
@@ -19128,6 +19386,7 @@ def item_request_reports():
             # Procurement Manager can only see departments with requests in visible statuses
             departments = db.session.query(ProcurementItemRequest.department).filter(
                 ProcurementItemRequest.is_draft == False,
+                ProcurementItemRequest.is_archived == False,
                 ProcurementItemRequest.department.isnot(None),
                 ProcurementItemRequest.department != '',
                 ProcurementItemRequest.status.in_([
@@ -19140,6 +19399,7 @@ def item_request_reports():
             # Auditing Manager can only see departments with completed requests
             departments = db.session.query(ProcurementItemRequest.department).filter(
                 ProcurementItemRequest.is_draft == False,
+                ProcurementItemRequest.is_archived == False,
                 ProcurementItemRequest.department.isnot(None),
                 ProcurementItemRequest.department != '',
                 ProcurementItemRequest.status == 'Completed'
@@ -19156,6 +19416,7 @@ def item_request_reports():
         # GM, CEO, IT Staff, Operation Manager, and Procurement Staff can see all departments
         departments = db.session.query(ProcurementItemRequest.department).filter(
             ProcurementItemRequest.is_draft == False,
+            ProcurementItemRequest.is_archived == False,
             ProcurementItemRequest.department.isnot(None),
             ProcurementItemRequest.department != ''
         ).distinct().all()
@@ -19165,6 +19426,7 @@ def item_request_reports():
     # Get unique categories for filter (only those visible to current user)
     categories_query = db.session.query(ProcurementItemRequest.category).filter(
         ProcurementItemRequest.is_draft == False,
+        ProcurementItemRequest.is_archived == False,
         ProcurementItemRequest.category.isnot(None),
         ProcurementItemRequest.category != ''
     )
@@ -19254,8 +19516,9 @@ def export_item_request_reports_excel():
     date_to = request.args.get('date_to', '')
     status_filter = request.args.getlist('status')
     
-    # Build query (same logic as item_request_reports)
+    # Build query (same logic as item_request_reports - exclude archived)
     query = ProcurementItemRequest.query.filter(ProcurementItemRequest.is_draft == False)
+    query = query.filter(ProcurementItemRequest.is_archived == False)
     
     if current_user.role == 'Department Manager':
         if current_user.department == 'IT':
@@ -19578,8 +19841,9 @@ def export_item_request_reports_pdf():
     date_to = request.args.get('date_to', '')
     status_filter = request.args.getlist('status')
     
-    # Build query (same logic as item_request_reports)
+    # Build query (same logic as item_request_reports - exclude archived)
     query = ProcurementItemRequest.query.filter(ProcurementItemRequest.is_draft == False)
+    query = query.filter(ProcurementItemRequest.is_archived == False)
     
     if current_user.role == 'Department Manager':
         if current_user.department == 'IT':

@@ -6,7 +6,17 @@
 <div class="dashboard-container">
     <div class="dashboard-header">
         <h1><i class="fas fa-archive"></i> Archives</h1>
-        <p>Archived payment requests - IT Department Only</p>
+        <p>Archived payment requests and item requests - IT Department Only</p>
+    </div>
+
+    <!-- Tab: Payment Requests | Item Requests -->
+    <div class="tab-navigation" style="border-bottom: 1px solid #e9ecef; margin-bottom: 20px;">
+        <a href="{{ url_for('archives', tab='payment_requests', page=1, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="tab-button {% if archive_tab == 'payment_requests' %}active{% endif %}" style="display: inline-block; padding: 10px 20px; text-decoration: none; color: #333; border-bottom: 3px solid {% if archive_tab == 'payment_requests' %}#007bff{% else %}transparent{% endif %}; margin-bottom: -1px;">
+            <i class="fas fa-file-invoice-dollar"></i> Payment Requests
+        </a>
+        <a href="{{ url_for('archives', tab='item_requests', page=1, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="tab-button {% if archive_tab == 'item_requests' %}active{% endif %}" style="display: inline-block; padding: 10px 20px; text-decoration: none; color: #333; border-bottom: 3px solid {% if archive_tab == 'item_requests' %}#007bff{% else %}transparent{% endif %}; margin-bottom: -1px;">
+            <i class="fas fa-shopping-cart"></i> Item Requests
+        </a>
     </div>
 
     <div class="card">
@@ -15,12 +25,27 @@
                 <div class="filter-controls">
                     <select id="departmentFilter" onchange="filterByDepartment()" class="form-select">
                         <option value="">All Departments</option>
+                        {% if archive_tab == 'item_requests' %}
+                        {% for dept in item_departments %}
+                        <option value="{{ dept }}" {% if department_filter == dept %}selected{% endif %}>{{ dept }}</option>
+                        {% endfor %}
+                        {% else %}
                         {% for dept in departments %}
                         <option value="{{ dept }}" {% if department_filter == dept %}selected{% endif %}>{{ dept }}</option>
                         {% endfor %}
+                        {% endif %}
                     </select>
                     <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
                         <option value="">All Statuses</option>
+                        {% if archive_tab == 'item_requests' %}
+                        <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
+                        <option value="Pending Procurement Manager Approval" {% if status_filter == 'Pending Procurement Manager Approval' %}selected{% endif %}>Pending Procurement Manager Approval</option>
+                        <option value="Assigned to Procurement" {% if status_filter == 'Assigned to Procurement' %}selected{% endif %}>Assigned to Procurement</option>
+                        <option value="Completed" {% if status_filter == 'Completed' %}selected{% endif %}>Completed</option>
+                        <option value="On Hold" {% if status_filter == 'On Hold' %}selected{% endif %}>On Hold</option>
+                        <option value="Rejected by Manager" {% if status_filter == 'Rejected by Manager' %}selected{% endif %}>Rejected by Manager</option>
+                        <option value="Rejected by Procurement Manager" {% if status_filter == 'Rejected by Procurement Manager' %}selected{% endif %}>Rejected by Procurement Manager</option>
+                        {% else %}
                         <option value="Pending Manager Approval" {% if status_filter == 'Pending Manager Approval' %}selected{% endif %}>Pending Manager Approval</option>
                         <option value="Pending Finance Approval" {% if status_filter == 'Pending Finance Approval' %}selected{% endif %}>Pending Finance Approval</option>
                         <option value="Approved" {% if status_filter == 'Approved' %}selected{% endif %}>Approved</option>
@@ -28,6 +53,7 @@
                         <option value="Rejected by Manager" {% if status_filter == 'Rejected by Manager' %}selected{% endif %}>Rejected by Manager</option>
                         <option value="Rejected by Finance" {% if status_filter == 'Rejected by Finance' %}selected{% endif %}>Rejected by Finance</option>
                         <option value="Recurring" {% if status_filter == 'Recurring' %}selected{% endif %}>Recurring</option>
+                        {% endif %}
                     </select>
                     <select id="urgentFilter" onchange="filterByUrgent()" class="form-select">
                         <option value="">All Requests</option>
@@ -52,7 +78,7 @@
                         {% if search_query %}{{ filters.append('Search: ' + search_query) or '' }}{% endif %}
                         {{ filters|join(' | ') }}
                     </span>
-                    <a href="{{ url_for('archives') }}" class="btn btn-sm btn-outline">
+                    <a href="{{ url_for('archives', tab=archive_tab) }}" class="btn btn-sm btn-outline">
                         <i class="fas fa-times"></i> Clear All
                     </a>
                 </div>
@@ -62,10 +88,10 @@
         <div class="card-body">
             <div class="alert alert-info" style="margin-bottom: 20px;">
                 <i class="fas fa-info-circle"></i> 
-                <strong>Note:</strong> These are archived (deleted) payment requests. You can restore them if needed.
+                <strong>Note:</strong> These are archived (deleted) {% if archive_tab == 'item_requests' %}item requests{% else %}payment requests{% endif %}. You can restore them if needed.
             </div>
             
-            {% if requests %}
+            {% if archive_tab == 'payment_requests' and requests %}
                 <div class="table-responsive">
                     <table class="data-table">
                         <thead>
@@ -167,7 +193,7 @@
                 {% if pagination.pages > 1 %}
                 <div class="pagination">
                     {% if pagination.has_prev %}
-                        <a href="{{ url_for('archives', page=pagination.prev_num, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm">
+                        <a href="{{ url_for('archives', tab='payment_requests', page=pagination.prev_num, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm">
                             <i class="fas fa-chevron-left"></i> Previous
                         </a>
                     {% endif %}
@@ -177,16 +203,68 @@
                     </span>
                     
                     {% if pagination.has_next %}
-                        <a href="{{ url_for('archives', page=pagination.next_num, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm">
+                        <a href="{{ url_for('archives', tab='payment_requests', page=pagination.next_num, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm">
                             Next <i class="fas fa-chevron-right"></i>
                         </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            {% elif archive_tab == 'item_requests' and item_requests %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Requestor</th>
+                                <th>Department</th>
+                                <th>Item Name</th>
+                                <th>Status</th>
+                                <th>Archived By</th>
+                                <th>Archived At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in item_requests %}
+                            <tr {% if req.is_urgent %}style="border-left: 4px solid #dc3545;"{% endif %}>
+                                <td>#{{ req.id }}{% if req.is_urgent %} <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em;">URGENT</span>{% endif %}</td>
+                                <td>{{ req.requestor_name }}</td>
+                                <td>{{ req.department }}</td>
+                                <td>{{ (req.item_name or '-')[:50] }}{% if (req.item_name or '')|length > 50 %}...{% endif %}</td>
+                                <td><span class="badge badge-secondary">{{ req.status }}</span></td>
+                                <td>{{ req.archived_by or '-' }}</td>
+                                <td>{{ req.archived_at.strftime('%Y-%m-%d %H:%M') if req.archived_at else '-' }}</td>
+                                <td>
+                                    <a href="/procurement/item-request/{{ req.id }}/view" class="btn btn-sm btn-info" title="View"><i class="fas fa-eye"></i></a>
+                                    <form method="POST" action="{{ url_for('restore_item_request', item_request_id=req.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to restore this item request? It will be moved back to Item Requests.')">
+                                        <button type="submit" class="btn btn-sm btn-success" title="Restore"><i class="fas fa-undo"></i> Restore</button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('delete_item_request_permanently', item_request_id=req.id) }}" style="display: inline;" onsubmit="return confirm('⚠️ WARNING: This will permanently delete item request #{{ req.id }} from the database. This action CANNOT be undone. The request will be removed from reports, dashboards, and everywhere else. Are you absolutely sure?')">
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete Permanently">
+                                            <i class="fas fa-trash-alt"></i> Delete Permanently
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if item_pagination.pages > 1 %}
+                <div class="pagination" style="margin-top: 20px;">
+                    {% if item_pagination.has_prev %}
+                        <a href="{{ url_for('archives', tab='item_requests', page=item_pagination.prev_num, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm"><i class="fas fa-chevron-left"></i> Previous</a>
+                    {% endif %}
+                    <span class="pagination-info">Page {{ item_pagination.page }} of {{ item_pagination.pages }} ({{ item_pagination.total }} total)</span>
+                    {% if item_pagination.has_next %}
+                        <a href="{{ url_for('archives', tab='item_requests', page=item_pagination.next_num, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm">Next <i class="fas fa-chevron-right"></i></a>
                     {% endif %}
                 </div>
                 {% endif %}
             {% else %}
                 <div class="empty-state">
                     <i class="fas fa-archive"></i>
-                    <p>No archived requests found.</p>
+                    <p>No archived {% if archive_tab == 'item_requests' %}item requests{% else %}requests{% endif %} found.</p>
                 </div>
             {% endif %}
         </div>
@@ -194,6 +272,7 @@
 </div>
 
 <script>
+const archiveTab = '{{ archive_tab }}';
 function filterByDepartment() {
     const department = document.getElementById('departmentFilter').value;
     const status = document.getElementById('statusFilter').value;
@@ -201,6 +280,7 @@ function filterByDepartment() {
     const search = document.getElementById('searchInput').value;
     
     const params = new URLSearchParams();
+    params.append('tab', archiveTab);
     if (department) params.append('department', department);
     if (status) params.append('status', status);
     if (urgent) params.append('urgent', urgent);
