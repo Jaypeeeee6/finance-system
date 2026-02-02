@@ -335,6 +335,49 @@ class Notification(db.Model):
         return f'<Notification {self.notification_id} - {self.title}>'
 
 
+class UserPermissionToggle(db.Model):
+    """Per-user permission toggles for the Edit Permissions panel.
+    Stores which permission keys are enabled for each user.
+    Used together with RoleDepartmentPermissionDefault for defaults by department/role.
+    These permissions do not affect system behavior yet; they only drive the panel toggles.
+    """
+    __tablename__ = 'user_permission_toggles'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    permission_key = db.Column(db.String(120), nullable=False)
+    enabled = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'permission_key', name='unique_user_permission_key'),)
+
+    user = db.relationship('User', backref=db.backref('permission_toggles', lazy='dynamic', cascade='all, delete-orphan'))
+
+    def __repr__(self):
+        return f'<UserPermissionToggle user_id={self.user_id} permission_key={self.permission_key} enabled={self.enabled}>'
+
+
+class RoleDepartmentPermissionDefault(db.Model):
+    """Default permission toggles by department and role.
+    When opening Edit Permissions for a user, toggles are pre-set based on their
+    department and role using this table. If a user has no UserPermissionToggle row
+    for a permission, the default (from this table) is used.
+    """
+    __tablename__ = 'role_department_permission_defaults'
+
+    id = db.Column(db.Integer, primary_key=True)
+    department = db.Column(db.String(100), nullable=False)
+    role = db.Column(db.String(100), nullable=False)
+    permission_key = db.Column(db.String(120), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('department', 'role', 'permission_key', name='unique_dept_role_perm'),)
+
+    def __repr__(self):
+        return f'<RoleDepartmentPermissionDefault dept={self.department} role={self.role} perm={self.permission_key}>'
+
+
 class DepartmentTemporaryManager(db.Model):
     """Department-level temporary manager assignment.
     When set, only the assigned temporary manager may perform manager approvals

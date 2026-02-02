@@ -12,7 +12,7 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, UserPermission, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, ProcurementReceiptEntry, ProcurementInvoiceEntry, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry, DepartmentTemporaryManager
+from models import db, User, UserPermission, UserPermissionToggle, RoleDepartmentPermissionDefault, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, ProcurementReceiptEntry, ProcurementInvoiceEntry, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry, DepartmentTemporaryManager
 from config import Config
 import json
 from playwright.sync_api import sync_playwright
@@ -21106,30 +21106,163 @@ def manage_users():
 
 
 # ----------------- User permissions API -----------------
+# Permission keys used in the Edit Permissions panel (scope toggles). Must match template keys.
+PERMISSION_KEYS = [
+    'view_requests', 'create_requests', 'edit_own_requests', 'approve_as_manager', 'approve_as_procurement',
+    'approve_as_finance', 'assign_temporary_manager',
+    'schedule_payment', 'mark_payment_completed', 'upload_payment_proof', 'issue_refunds', 'access_financial_reports',
+    'create_item_request', 'assign_to_procurement', 'finalize_procurement', 'manage_supplier_records',
+    'view_users', 'create_users', 'edit_users', 'delete_users', 'manage_roles', 'manage_department_assignments',
+    'view_notifications', 'manage_notification_settings', 'send_system_announcements', 'subscribe_to_alerts',
+    'edit_own_profile', 'edit_other_profiles', 'reset_user_password', 'unlock_user_account',
+    'manage_system_settings', 'manage_api_keys', 'manage_integrations', 'configure_email/smtp',
+    'view_reports', 'export_data_(csv/xls)', 'access_audit_logs'
+]
+
+
+def _seed_role_department_permission_defaults():
+    """Seed default permission toggles by department and role so Edit Permissions panel shows toggles on by default."""
+    if RoleDepartmentPermissionDefault.query.first() is not None:
+        return
+    defaults = [
+        # (department, role, permission_key) - toggles that are ON by default for this dept/role
+        ('Finance', 'Finance Admin', 'view_requests'), ('Finance', 'Finance Admin', 'create_requests'),
+        ('Finance', 'Finance Admin', 'approve_as_finance'), ('Finance', 'Finance Admin', 'schedule_payment'),
+        ('Finance', 'Finance Admin', 'mark_payment_completed'), ('Finance', 'Finance Admin', 'upload_payment_proof'),
+        ('Finance', 'Finance Admin', 'view_reports'), ('Finance', 'Finance Admin', 'access_financial_reports'),
+        ('Finance', 'Finance Admin', 'view_notifications'), ('Finance', 'Finance Admin', 'edit_own_profile'),
+        ('Finance', 'Finance Staff', 'view_requests'), ('Finance', 'Finance Staff', 'create_requests'),
+        ('Finance', 'Finance Staff', 'edit_own_requests'), ('Finance', 'Finance Staff', 'view_notifications'),
+        ('Finance', 'Finance Staff', 'edit_own_profile'),
+        ('IT', 'IT Department Manager', 'view_requests'), ('IT', 'IT Department Manager', 'create_requests'),
+        ('IT', 'IT Department Manager', 'approve_as_manager'), ('IT', 'IT Department Manager', 'assign_temporary_manager'),
+        ('IT', 'IT Department Manager', 'view_users'), ('IT', 'IT Department Manager', 'create_users'),
+        ('IT', 'IT Department Manager', 'edit_users'), ('IT', 'IT Department Manager', 'delete_users'),
+        ('IT', 'IT Department Manager', 'manage_system_settings'), ('IT', 'IT Department Manager', 'view_notifications'),
+        ('IT', 'IT Department Manager', 'reset_user_password'), ('IT', 'IT Department Manager', 'unlock_user_account'),
+        ('IT', 'IT Department Manager', 'access_audit_logs'), ('IT', 'IT Department Manager', 'edit_own_profile'),
+        ('IT', 'IT Staff', 'view_requests'), ('IT', 'IT Staff', 'create_requests'), ('IT', 'IT Staff', 'edit_own_requests'),
+        ('IT', 'IT Staff', 'view_users'), ('IT', 'IT Staff', 'view_notifications'), ('IT', 'IT Staff', 'edit_own_profile'),
+        ('Procurement', 'Procurement Manager', 'view_requests'), ('Procurement', 'Procurement Manager', 'create_requests'),
+        ('Procurement', 'Procurement Manager', 'approve_as_manager'), ('Procurement', 'Procurement Manager', 'approve_as_procurement'),
+        ('Procurement', 'Procurement Manager', 'assign_to_procurement'), ('Procurement', 'Procurement Manager', 'finalize_procurement'),
+        ('Procurement', 'Procurement Manager', 'manage_supplier_records'), ('Procurement', 'Procurement Manager', 'view_notifications'),
+        ('Procurement', 'Procurement Manager', 'edit_own_profile'),
+        ('Procurement', 'Procurement Staff', 'view_requests'), ('Procurement', 'Procurement Staff', 'create_requests'),
+        ('Procurement', 'Procurement Staff', 'edit_own_requests'), ('Procurement', 'Procurement Staff', 'view_notifications'),
+        ('Procurement', 'Procurement Staff', 'edit_own_profile'),
+    ]
+    for dept, role, perm in defaults:
+        r = RoleDepartmentPermissionDefault(department=dept, role=role, permission_key=perm)
+        db.session.add(r)
+    # Add defaults for Department Manager (any department)
+    dept_manager_perms = [
+        'view_requests', 'create_requests', 'approve_as_manager', 'assign_temporary_manager',
+        'view_notifications', 'edit_own_profile'
+    ]
+    for dept in ('PR', 'Maintenance', 'Marketing', 'Logistic', 'HR', 'Quality Control', 'Procurement', 'Customer Service', 'Operation', 'Project'):
+        for perm in dept_manager_perms:
+            r = RoleDepartmentPermissionDefault(department=dept, role='Department Manager', permission_key=perm)
+            db.session.add(r)
+    for dept in ('Branch',):
+        for perm in dept_manager_perms:
+            r = RoleDepartmentPermissionDefault(department=dept, role='Department Manager', permission_key=perm)
+            db.session.add(r)
+    # GM, CEO, Operation Manager (Management)
+    for role in ('GM', 'Operation Manager'):
+        for perm in ['view_requests', 'create_requests', 'approve_as_manager', 'assign_temporary_manager', 'view_reports',
+                     'view_notifications', 'edit_own_profile', 'access_audit_logs']:
+            r = RoleDepartmentPermissionDefault(department='Management', role=role, permission_key=perm)
+            db.session.add(r)
+    for perm in ['view_requests', 'create_requests', 'view_notifications', 'edit_own_profile']:
+        r = RoleDepartmentPermissionDefault(department='Management', role='CEO', permission_key=perm)
+        db.session.add(r)
+    # Department Staff (all departments that have staff)
+    staff_perms = ['view_requests', 'create_requests', 'edit_own_requests', 'view_notifications', 'edit_own_profile']
+    for dept in ('PR', 'Maintenance', 'Marketing', 'Logistic', 'HR', 'Quality Control', 'Procurement', 'Customer Service', 'Finance', 'IT', 'Operation', 'Project'):
+        for perm in staff_perms:
+            r = RoleDepartmentPermissionDefault(department=dept, role='Department Staff', permission_key=perm)
+            db.session.add(r)
+    # Branch roles
+    for role in ('Branch Manager', 'Supervisor', 'Branch Inventory Officer'):
+        for perm in ['view_requests', 'create_requests', 'view_notifications', 'edit_own_profile']:
+            r = RoleDepartmentPermissionDefault(department='Branch', role=role, permission_key=perm)
+            db.session.add(r)
+    # Project Staff
+    for perm in staff_perms:
+        r = RoleDepartmentPermissionDefault(department='Project', role='Project Staff', permission_key=perm)
+        db.session.add(r)
+    # Auditing
+    for perm in ['view_requests', 'view_reports', 'access_audit_logs', 'view_notifications', 'edit_own_profile']:
+        r = RoleDepartmentPermissionDefault(department='Auditing', role='Auditing Staff', permission_key=perm)
+        db.session.add(r)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
 @app.route('/api/users/<int:user_id>/permissions', methods=['GET', 'POST'])
 @login_required
-@role_required('IT Staff', 'Department Manager')
+@role_required('IT Staff', 'IT Department Manager', 'Department Manager')
 def api_user_permissions(user_id):
-    """Get or set per-user permissions, overrides and status scopes"""
+    """Get or set per-user permissions. Toggles are stored in user_permission_toggles and defaulted by department/role."""
     import json
     user = User.query.get_or_404(user_id)
     if request.method == 'GET':
+        _seed_role_department_permission_defaults()
+        # Build permissions: user's toggles override defaults by (department, role)
+        user_toggles = {t.permission_key: t.enabled for t in UserPermissionToggle.query.filter_by(user_id=user_id).all()}
+        default_keys = set(
+            p.permission_key for p in RoleDepartmentPermissionDefault.query.filter_by(
+                department=user.department or '', role=user.role or ''
+            ).all()
+        )
+        permissions = {}
+        for key in PERMISSION_KEYS:
+            if key in user_toggles:
+                permissions[key] = user_toggles[key]
+            else:
+                permissions[key] = key in default_keys
+        # Keep overrides and status_scopes from UserPermission for backward compatibility
         up = UserPermission.query.filter_by(user_id=user_id).first()
-        if not up:
-            return jsonify({'permissions': {}, 'overrides': {}, 'status_scopes': {}})
-        return jsonify(up.to_dict())
+        overrides = {}
+        status_scopes = {}
+        status_permissions = {}
+        if up:
+            try:
+                overrides = json.loads(up.overrides) if up.overrides else {}
+            except Exception:
+                pass
+            try:
+                status_scopes = json.loads(up.status_scopes) if up.status_scopes else {}
+                status_permissions = status_scopes
+            except Exception:
+                pass
+        return jsonify({
+            'permissions': permissions,
+            'status_permissions': status_permissions,
+            'status_scopes': status_scopes,
+            'overrides': overrides
+        })
 
     data = request.get_json(force=True, silent=True) or {}
     permissions = data.get('permissions') or {}
     overrides = data.get('overrides') or {}
-    status_scopes = data.get('status_scopes') or {}
-
-    up = UserPermission.query.filter_by(user_id=user_id).first()
-    if not up:
-        up = UserPermission(user_id=user_id)
-        db.session.add(up)
+    status_scopes = data.get('status_scopes') or data.get('status_permissions') or {}
 
     try:
+        # Save main permission toggles to user_permission_toggles
+        UserPermissionToggle.query.filter_by(user_id=user_id).delete()
+        for key in PERMISSION_KEYS:
+            enabled = permissions.get(key, False)
+            t = UserPermissionToggle(user_id=user_id, permission_key=key, enabled=bool(enabled))
+            db.session.add(t)
+        # Keep overrides and status_scopes in UserPermission
+        up = UserPermission.query.filter_by(user_id=user_id).first()
+        if not up:
+            up = UserPermission(user_id=user_id)
+            db.session.add(up)
         up.permissions = json.dumps(permissions)
         up.overrides = json.dumps(overrides)
         up.status_scopes = json.dumps(status_scopes)
@@ -21144,9 +21277,9 @@ def api_user_permissions(user_id):
 
 @app.route('/api/users/apply_permissions', methods=['POST'])
 @login_required
-@role_required('IT Staff', 'Department Manager')
+@role_required('IT Staff', 'IT Department Manager', 'Department Manager')
 def api_apply_permissions():
-    """Copy permissions from a source user to a list of target users"""
+    """Copy permissions from a source user to a list of target users (UserPermission + UserPermissionToggle)."""
     import json
     data = request.get_json(force=True, silent=True) or {}
     source_id = data.get('source_user_id') or data.get('sourceId') or data.get('source')
@@ -21154,24 +21287,35 @@ def api_apply_permissions():
     if not source_id or not isinstance(targets, list) or len(targets) == 0:
         return jsonify({'success': False, 'error': 'Invalid payload'}), 400
 
-    src = UserPermission.query.filter_by(user_id=source_id).first()
-    if not src:
-        return jsonify({'success': False, 'error': 'Source has no custom permissions'}), 404
+    source_id = int(source_id)
+    src_up = UserPermission.query.filter_by(user_id=source_id).first()
+    src_toggles = list(UserPermissionToggle.query.filter_by(user_id=source_id).all())
+    # Allow apply even if source has no UserPermission (copy toggles only)
+    if not src_up and not src_toggles:
+        return jsonify({'success': False, 'error': 'Source has no custom permissions or toggles'}), 404
 
     try:
+        applied = 0
         for tid in targets:
-            if int(tid) == int(source_id):
+            tid = int(tid)
+            if tid == source_id:
                 continue
-            up = UserPermission.query.filter_by(user_id=tid).first()
-            if not up:
-                up = UserPermission(user_id=tid)
-                db.session.add(up)
-            up.permissions = src.permissions
-            up.overrides = src.overrides
-            up.status_scopes = src.status_scopes
+            if src_up:
+                up = UserPermission.query.filter_by(user_id=tid).first()
+                if not up:
+                    up = UserPermission(user_id=tid)
+                    db.session.add(up)
+                up.permissions = src_up.permissions
+                up.overrides = src_up.overrides
+                up.status_scopes = src_up.status_scopes
+            # Copy UserPermissionToggle rows from source to target
+            UserPermissionToggle.query.filter_by(user_id=tid).delete()
+            for t in src_toggles:
+                db.session.add(UserPermissionToggle(user_id=tid, permission_key=t.permission_key, enabled=t.enabled))
+            applied += 1
         db.session.commit()
-        log_action(f"Applied permissions from user {source_id} to {len(targets)} users by {current_user.username}")
-        return jsonify({'success': True, 'applied_to': len(targets)})
+        log_action(f"Applied permissions from user {source_id} to {applied} users by {current_user.username}")
+        return jsonify({'success': True, 'applied_to': applied})
     except Exception as e:
         app.logger.exception("Failed to apply permissions")
         db.session.rollback()
@@ -22340,6 +22484,11 @@ def settings():
     for a in DepartmentTemporaryManager.query.all():
         key = f"{a.department}|{a.request_type}" if a.request_type else a.department
         assignments[key] = a
+    # Ensure role/department permission defaults are seeded (for Edit Permissions panel toggles)
+    try:
+        _seed_role_department_permission_defaults()
+    except Exception as e:
+        app.logger.warning("Could not seed role/department permission defaults: %s", e)
     return render_template('settings.html', departments=departments, managers=managers, assignments=assignments)
 
 
