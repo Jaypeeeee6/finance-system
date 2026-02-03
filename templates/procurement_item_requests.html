@@ -153,6 +153,33 @@
     </div>
     {% endif %}
 
+    <!-- Filters for Branch Manager/Supervisor (search, status, urgent) -->
+    {% if user.department == 'Branch' and user.role in ['Branch Manager', 'Supervisor'] %}
+    <div class="filters-container" style="margin: 0 0 8px 0;">
+        <div class="filters-left">
+            <div class="assign-search-field" style="position:relative; min-width:280px;">
+                <img src="{{ url_for('static', filename='css/icons/search.svg') }}" class="assign-search-icon" alt="Search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%);" onclick="document.getElementById('tabSearchInput').focus();" >
+                <input type="search" id="tabSearchInput" class="form-control assign-search-input" placeholder="Search by request #, requestor, item, purpose..." aria-label="Search requests" style="padding-left:44px; width:100%;" value="{{ search_query or '' }}">
+            </div>
+        </div>
+        <div class="filters-right" style="margin-left:auto;">
+            <div class="filter-controls">
+                <select id="statusFilter" onchange="applyStatusFilter()" class="form-select">
+                    <option value="">All Statuses</option>
+                    {% for status in status_options %}
+                    <option value="{{ status }}" {% if status_filter == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                </select>
+                <select id="urgentFilter" onchange="applyUrgentFilter()" class="form-select">
+                    <option value="">All Requests</option>
+                    <option value="urgent" {% if urgent_filter == 'urgent' %}selected{% endif %}>🔴 Urgent Only</option>
+                    <option value="not_urgent" {% if urgent_filter == 'not_urgent' %}selected{% endif %}>⚪ Not Urgent</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Filters placed immediately below the tabs (search moved into filters) -->
     {% if user.department in ['Procurement', 'IT', 'Auditing'] or user.role in ['GM', 'CEO', 'Operation Manager', 'Department Manager', 'Finance Admin', 'Branch Inventory Officer'] %}
     <div class="filters-container" style="margin: 0 0 8px 0;">
@@ -209,7 +236,7 @@
                         {% if search_query %}{{ filters.append('Search: ' + search_query) or '' }}{% endif %}
                         {{ filters|join(' | ') }}
                     </span>
-                    <a href="{{ url_for('procurement_item_requests', tab=active_tab if (user.department in ['Procurement','IT','Auditing'] or user.role in ['Finance Admin', 'Branch Inventory Officer']) else 'all') }}" class="btn btn-sm btn-outline">
+                    <a href="{{ url_for('procurement_item_requests', tab=(active_tab if (user.department in ['Procurement','IT','Auditing'] or user.role in ['Finance Admin', 'Branch Inventory Officer']) else 'all')) }}" class="btn btn-sm btn-outline">
                         <i class="fas fa-times"></i> Clear All
                     </a>
                 </div>
