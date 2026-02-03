@@ -14,7 +14,7 @@
             <form method="POST" action="{% if draft %}{{ url_for('edit_draft', draft_id=draft.request_id) }}{% else %}{{ url_for('new_request') }}{% endif %}" id="requestForm" enctype="multipart/form-data">
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="request_type">Request Type *</label>
+                        <label for="request_type">Request Type <span class="required-star">*</span></label>
                         <select name="request_type" id="request_type" required onchange="handleRequestTypeChange()">
                             <option value="">-- Select Type --</option>
                             {% if available_request_types %}
@@ -40,13 +40,13 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="requestor_name">Requestor Name *</label>
+                        <label for="requestor_name">Requestor Name <span class="required-star">*</span></label>
                         <input type="text" name="requestor_name" id="requestor_name" value="{{ user.name if user else '' }}" required>
                     </div>
 
                     <div class="form-group">
                         <div class="branch-label-container">
-                            <label for="branch_name">Branch Name *</label>
+                            <label for="branch_name">Branch Name <span class="required-star">*</span></label>
                             <div class="branch-checkbox-container">
                                 <label class="branch-checkbox-label">
                                     <input type="radio" id="branch_type_branch" name="branch_type" value="branch">
@@ -400,6 +400,10 @@
         margin-left: 0px; /* moved slightly more left */
     }
 
+    .required-star {
+        color: #dc3545 !important;
+    }
+
     /* Request Validation Error Modal (same styles as item request) */
     .item-request-error-modal {
         position: fixed !important;
@@ -504,13 +508,13 @@
                 </div>
 
                 <div id="othersDescriptionGroup" class="form-group" style="display: none;">
-                    <label for="others_description">Please specify the type of request *</label>
+                    <label for="others_description">Please specify the type of request <span class="required-star">*</span></label>
                     <input type="text" name="others_description" id="others_description" placeholder="Enter the specific type of request">
                     <small class="form-text text-muted">Please provide a brief description of what this request is for.</small>
                 </div>
 
                 <div id="personCompanyGroup" class="form-group">
-                    <label for="person_company">Person/Company Name *</label>
+                    <label for="person_company">Person/Company Name <span class="required-star">*</span></label>
                     <!-- Text input for non-supplier request types -->
                     <input type="text" name="person_company" id="person_company" required>
                     
@@ -529,7 +533,7 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="department">Department *</label>
+                        <label for="department">Department <span class="required-star">*</span></label>
                         <input type="text" name="department" id="department" value="{{ user.department }}" readonly>
                     </div>
 
@@ -541,12 +545,12 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="purpose">Purpose/Description *</label>
+                    <label for="purpose">Purpose/Description <span class="required-star">*</span></label>
                     <textarea name="purpose" id="purpose" rows="4" required></textarea>
                 </div>
 
                 <div class="form-group">
-                    <label for="payment_method">Payment Method *</label>
+                    <label for="payment_method">Payment Method <span class="required-star">*</span></label>
                     <select name="payment_method" id="payment_method" required onchange="handlePaymentMethodChange()">
                         <option value="Card" selected>Card</option>
                         <option value="Cheque">Cheque</option>
@@ -555,7 +559,7 @@
                 </div>
 
                 <div class="form-group" id="bank_name_group">
-                    <label for="bank_name">Bank Name *</label>
+                    <label for="bank_name">Bank Name <span class="required-star">*</span></label>
                     <select name="bank_name" id="bank_name" required onchange="showSwiftCode()">
                         <option value="">-- Select Bank --</option>
                         <option value="Bank Dhofar">Bank Dhofar</option>
@@ -594,7 +598,7 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="account_name">Account Name *</label>
+                        <label for="account_name">Account Name <span class="required-star">*</span></label>
                         <input type="text" name="account_name" id="account_name" required>
                         <small id="account_name_auto_note" class="auto-populated-note" style="display: none; color: #28a745; font-style: italic; margin-top: 4px;">
                             <i class="fas fa-info-circle"></i> Automatically populated based on chosen Person/Company Name
@@ -602,7 +606,7 @@
                     </div>
 
                     <div class="form-group" id="account_number_group">
-                        <label for="account_number">Account Number *</label>
+                        <label for="account_number">Account Number <span class="required-star">*</span></label>
                         <input type="text" name="account_number" id="account_number" pattern="[0-9]+" title="Please enter numbers only (maximum 16 digits)" required maxlength="16">
                         <small id="account_number_auto_note" class="auto-populated-note" style="display: none; color: #28a745; font-style: italic; margin-top: 4px;">
                             <i class="fas fa-info-circle"></i> Automatically populated based on chosen Person/Company Name
@@ -612,7 +616,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="amount">Amount (OMR) *</label>
+                    <label for="amount">Amount (OMR) <span class="required-star">*</span></label>
                     <div style="position: relative;">
                         <span style="position: absolute; left: 12px; top: 12px; color: #666; font-weight: 600;">OMR</span>
                         <input type="text" name="amount" id="amount" required style="padding-left: 55px;" placeholder="0.000">
