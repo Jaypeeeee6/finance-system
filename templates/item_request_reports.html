@@ -851,6 +851,10 @@
                             <label for="status_assigned">Assigned to Procurement</label>
                         </div>
                         <div class="checkbox-option">
+                            <input type="checkbox" name="status" id="status_returnedassigned" value="Returned to Assigned Procurement Staff" {% if 'Returned to Assigned Procurement Staff' in request.args.getlist('status') %}checked{% endif %}>
+                            <label for="status_returnedassigned">Returned to Assigned Procurement Staff</label>
+                        </div>
+                        <div class="checkbox-option">
                             <input type="checkbox" name="status" id="status_rejectedmgr" value="Rejected by Manager" {% if 'Rejected by Manager' in request.args.getlist('status') %}checked{% endif %}>
                             <label for="status_rejectedmgr">Rejected by Manager</label>
                         </div>
@@ -1222,6 +1226,8 @@
                                         <span class="badge" style="background: #6c757d; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">⏳ {{ req.status }}</span>
                                     {% elif req.status == 'Assigned to Procurement' %}
                                         <span class="badge" style="background: #2196F3; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">⏳ {{ req.status }}</span>
+                                    {% elif req.status == 'Returned to Assigned Procurement Staff' %}
+                                        <span class="badge" style="background: #2196F3; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">↩ {{ req.status }}</span>
                                     {% elif req.status in ['Rejected by Manager', 'Rejected by Procurement Manager'] %}
                                         <span class="badge" style="background: #dc3545; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">✗ {{ req.status }}</span>
                                     {% else %}
@@ -1566,6 +1572,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { value: 'Pending Manager Approval', text: 'Pending Manager Approval' },
         { value: 'Pending Procurement Manager Approval', text: 'Pending Procurement Manager Approval' },
         { value: 'Assigned to Procurement', text: 'Assigned to Procurement' },
+        { value: 'Returned to Assigned Procurement Staff', text: 'Returned to Assigned Procurement Staff' },
         { value: 'Rejected by Manager', text: 'Rejected by Manager' },
         { value: 'Rejected by Procurement Manager', text: 'Rejected by Procurement Manager' },
         { value: 'Completed', text: 'Completed' }

@@ -333,6 +333,8 @@
                                     <span class="badge" style="background: #6c757d; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">⏳ {{ req.status }}</span>
                                 {% elif req.status == 'Assigned to Procurement' %}
                                     <span class="badge" style="background: #2196F3; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">⏳ {{ req.status }}</span>
+                                {% elif req.status == 'Returned to Assigned Procurement Staff' %}
+                                    <span class="badge" style="background: #2196F3; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">↩ {{ req.status }}</span>
                                 {% elif req.status in ['Rejected by Manager', 'Rejected by Procurement Manager'] %}
                                     <span class="badge" style="background: #dc3545; color: white; display: inline-block; max-width: 180px; margin-right: 20px; padding: 6px 10px;">✗ {{ req.status }}</span>
                                 {% else %}
@@ -737,8 +739,8 @@ function updateBulkActions() {
             const status = checkbox.getAttribute('data-status');
             const assignedTo = checkbox.getAttribute('data-assigned-to');
             
-            // For "Assigned to Procurement" status, check if assigned to current user
-            if (status === 'Assigned to Procurement') {
+            // For "Assigned to Procurement" or "Returned to Assigned Procurement Staff", check if assigned to current user
+            if (status === 'Assigned to Procurement' || status === 'Returned to Assigned Procurement Staff') {
                 if (assignedTo === '' || assignedTo === null || parseInt(assignedTo) !== currentUserId) {
                     allAssignedToUser = false;
                     break;
@@ -864,7 +866,7 @@ function openBulkUploadModal() {
         const status = checkbox.getAttribute('data-status');
         const assignedTo = checkbox.getAttribute('data-assigned-to');
         
-        if (status === 'Assigned to Procurement' && (assignedTo === '' || assignedTo === null || parseInt(assignedTo) !== currentUserId)) {
+        if ((status === 'Assigned to Procurement' || status === 'Returned to Assigned Procurement Staff') && (assignedTo === '' || assignedTo === null || parseInt(assignedTo) !== currentUserId)) {
             alert('You can only bulk upload requests assigned to you.');
             return;
         }

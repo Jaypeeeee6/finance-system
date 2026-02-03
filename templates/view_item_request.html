@@ -882,17 +882,17 @@ body.flash-success-open {
                     Submit Request
                 </div>
             </li>
-            <li class="step-tab {% if item_request.status == 'Rejected by Manager' %}rejected{% elif item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id %}completed{% elif item_request.status == 'Pending Manager Approval' or (item_request.status == 'On Hold' and item_request.manager_on_hold_by_user_id) %}warning{% elif item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed', 'Final Approval'] or (item_request.manager_approver_user_id and item_request.manager_approver_user_id == item_request.user_id) %}completed{% else %}disabled{% endif %}" data-step="manager">
+            <li class="step-tab {% if item_request.status == 'Rejected by Manager' %}rejected{% elif item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id %}completed{% elif item_request.status == 'Pending Manager Approval' or (item_request.status == 'On Hold' and item_request.manager_on_hold_by_user_id) %}warning{% elif item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Returned to Assigned Procurement Staff', 'Completed', 'Final Approval'] or (item_request.manager_approver_user_id and item_request.manager_approver_user_id == item_request.user_id) %}completed{% else %}disabled{% endif %}" data-step="manager">
                 <div class="step-tab-content">
                     Manager Approval
                 </div>
             </li>
-            <li class="step-tab {% if item_request.status == 'Rejected by Procurement Manager' %}rejected{% elif item_request.status == 'Pending Procurement Manager Approval' or (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) %}warning{% elif item_request.status in ['Assigned to Procurement', 'Completed', 'Final Approval'] %}completed{% else %}disabled{% endif %}" data-step="procurement">
+            <li class="step-tab {% if item_request.status == 'Rejected by Procurement Manager' %}rejected{% elif item_request.status == 'Pending Procurement Manager Approval' or (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) %}warning{% elif item_request.status in ['Assigned to Procurement', 'Returned to Assigned Procurement Staff', 'Completed', 'Final Approval'] %}completed{% else %}disabled{% endif %}" data-step="procurement">
                 <div class="step-tab-content">
                     Procurement Manager Approval
                 </div>
             </li>
-            <li class="step-tab {% if item_request.status == 'Assigned to Procurement' %}warning{% elif item_request.status in ['Completed', 'Final Approval'] %}completed{% else %}disabled{% endif %}" data-step="assigned">
+            <li class="step-tab {% if item_request.status in ['Assigned to Procurement', 'Returned to Assigned Procurement Staff'] %}warning{% elif item_request.status in ['Completed', 'Final Approval'] %}completed{% else %}disabled{% endif %}" data-step="assigned">
                 <div class="step-tab-content">
                     Assigned to Procurement
                 </div>
@@ -1154,7 +1154,7 @@ body.flash-success-open {
                         <span class="badge" style="background: #28a745; color: white; padding: 8px 16px; font-size: 0.9rem;">✓ {{ item_request.status }}</span>
                     {% elif item_request.status == 'On Hold' %}
                         <span class="badge" style="background: #ffc107; color: #212529; padding: 8px 16px; font-size: 0.9rem;">⏸ On Hold Until Further Notice</span>
-                    {% elif item_request.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval', 'Assigned to Procurement'] %}
+                    {% elif item_request.status in ['Pending Manager Approval', 'Pending Procurement Manager Approval', 'Assigned to Procurement', 'Returned to Assigned Procurement Staff'] %}
                         <span class="badge" style="background: #2196F3; color: white; padding: 8px 16px; font-size: 0.9rem;">⏳ {{ item_request.status }}</span>
                     {% elif item_request.status in ['Rejected by Manager', 'Rejected by Procurement Manager'] %}
                         <span class="badge" style="background: #dc3545; color: white; padding: 8px 16px; font-size: 0.9rem;">✗ {{ item_request.status }}</span>
@@ -1174,7 +1174,7 @@ body.flash-success-open {
         <div class="step-content" id="step-manager">
             <h3><i class="fas fa-user-tie"></i> Manager Approval</h3>
             
-            {% if item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Completed', 'Final Approval', 'Rejected by Manager'] or (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) or (item_request.manager_approver_user_id and item_request.manager_approver_user_id == item_request.user_id) %}
+            {% if item_request.status in ['Pending Procurement Manager Approval', 'Assigned to Procurement', 'Returned to Assigned Procurement Staff', 'Completed', 'Final Approval', 'Rejected by Manager'] or (item_request.status == 'On Hold' and item_request.procurement_manager_on_hold_by_user_id) or (item_request.manager_approver_user_id and item_request.manager_approver_user_id == item_request.user_id) %}
                 <div class="admin-mode-warning" style="background: #28a745; color: white;">
                     <i class="fas fa-check-circle"></i>
                     <span>Manager Approval: {% if item_request.status == 'Rejected by Manager' %}Rejected{% else %}Completed{% endif %}</span>
@@ -1969,7 +1969,7 @@ body.flash-success-open {
         <div class="step-content" id="step-procurement">
             <h3><i class="fas fa-shopping-cart"></i> Procurement Manager Approval</h3>
             
-            {% if item_request.status in ['Assigned to Procurement', 'Completed', 'Final Approval', 'Rejected by Procurement Manager'] and item_request.status != 'On Hold' %}
+            {% if item_request.status in ['Assigned to Procurement', 'Returned to Assigned Procurement Staff', 'Completed', 'Final Approval', 'Rejected by Procurement Manager'] and item_request.status != 'On Hold' %}
                 <div class="admin-mode-warning" style="background: #28a745; color: white;">
                     <i class="fas fa-check-circle"></i>
                     <span>Procurement Manager Approval: {% if item_request.status == 'Rejected by Procurement Manager' %}Rejected{% else %}Completed{% endif %}</span>
@@ -2918,10 +2918,10 @@ body.flash-success-open {
         <div class="step-content" id="step-assigned">
             <h3><i class="fas fa-user-check"></i> Assigned to Procurement</h3>
             
-            {% if item_request.status in ['Assigned to Procurement', 'Final Approval', 'Completed'] %}
-                <div class="admin-mode-warning" style="background: {% if item_request.status == 'Completed' %}#28a745{% elif item_request.status == 'Final Approval' %}#17a2b8{% else %}#17a2b8{% endif %}; color: white;">
+            {% if item_request.status in ['Assigned to Procurement', 'Returned to Assigned Procurement Staff', 'Final Approval', 'Completed'] %}
+                <div class="admin-mode-warning" style="background: {% if item_request.status == 'Completed' %}#28a745{% elif item_request.status == 'Final Approval' %}#17a2b8{% elif item_request.status == 'Returned to Assigned Procurement Staff' %}#ffc107{% else %}#17a2b8{% endif %}; color: {% if item_request.status == 'Returned to Assigned Procurement Staff' %}#856404{% else %}white{% endif %};">
                     <i class="fas fa-user-check"></i>
-                    <span>{% if item_request.status == 'Completed' %}Request has been completed{% elif item_request.status == 'Final Approval' %}Request has been assigned to a procurement member for processing{% else %}Request has been assigned to a procurement member for processing{% endif %}</span>
+                    <span>{% if item_request.status == 'Completed' %}Request has been completed{% elif item_request.status == 'Final Approval' %}Request has been assigned to a procurement member for processing{% elif item_request.status == 'Returned to Assigned Procurement Staff' %}Request was returned to the assigned procurement staff for edits.{% else %}Request has been assigned to a procurement member for processing{% endif %}</span>
                 </div>
                 
                 <div class="card assigned-section" style="margin-bottom: 1.5rem;">
@@ -2981,6 +2981,9 @@ body.flash-success-open {
                         <h4>Uploaded Files</h4>
                     </div>
                     <div class="card-body">
+                        {% if can_complete %}
+                        <form method="POST" action="{{ url_for('delete_item_request_uploaded_files', request_id=item_request.id) }}" id="delete-uploaded-files-form">
+                        {% endif %}
                         {% if receipt_files %}
                         <div class="form-group" id="uploaded-receipts-list">
                             <label><i class="fas fa-check-circle"></i> Receipt (Proof of transfer made by the Procurement Manager)</label>
@@ -2998,20 +3001,30 @@ body.flash-success-open {
                                     {% endif %}
                                 {% endif %}
                             {% endfor %}
-                            {% for file in receipt_files %}
-                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
-                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
+                            {% for rec in receipt_entries or [] %}
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <a href="{{ url_for('uploaded_file', filename=rec.filename) }}" target="_blank" class="btn btn-warning">
                                     <i class="fas fa-download"></i> View Receipt {{ loop.index }}
                                 </a>
-                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
-                                {% set file_amount = receipt_amount_lookup.get(file) %}
-                                {% set file_ref = receipt_ref_lookup.get(file) %}
+                                <small style="color: #666;">{{ rec.filename.split('_', 1)[1] if '_' in rec.filename else rec.filename }}</small>
+                                {% if can_complete and rec.get('id') %}
+                                <label style="margin-left: auto; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                    <input type="checkbox" name="delete_receipt_entry_ids" value="{{ rec.id }}" style="width: auto; margin: 0;">
+                                    <span style="color: #dc3545; font-size: 0.9rem;">Delete</span>
+                                </label>
+                                {% endif %}
+                                {% set file_amount = rec.get('amount') %}
+                                {% set file_ref = rec.get('reference_number') %}
+                                {% if file_amount is not none or file_ref %}
+                                <div style="flex-basis: 100%; margin-top: 4px; margin-left: 0;">
                                 {% if file_amount is not none %}
-                                <div style="margin-top: 6px; font-weight: 600; color: #1f2937;">Amount: OMR {{ '%.3f'|format(file_amount|float) }}</div>
+                                <div style="font-weight: 600; color: #1f2937;">Amount: OMR {{ '%.3f'|format(file_amount|float) }}</div>
                                 {% endif %}
                                 {% if file_ref %}
-                                <div style="margin-top: 4px; color: #374151;">
+                                <div style="color: #374151;">
                                     <strong>Reference Number:</strong> {{ file_ref }}
+                                </div>
+                                {% endif %}
                                 </div>
                                 {% endif %}
                             </div>
@@ -3049,20 +3062,26 @@ body.flash-success-open {
                                     {% endif %}
                                 {% endif %}
                             {% endfor %}
-                            {% for file in invoice_files %}
-                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
-                                <a href="{{ url_for('uploaded_file', filename=file) }}" target="_blank" class="btn btn-warning">
+                            {% for inv in invoice_entries or [] %}
+                            <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <a href="{{ url_for('uploaded_file', filename=inv.filename) }}" target="_blank" class="btn btn-warning">
                                     <i class="fas fa-download"></i> View Invoice {{ loop.index }}
                                 </a>
-                                <small style="color: #666; margin-left: 10px;">{{ file.split('_', 1)[1] if '_' in file else file }}</small>
-                                {% if invoice_amount_lookup.get(file) %}
-                                <div style="margin-top: 6px; font-weight: 600; color: #1f2937;">Amount: OMR {{ '%.3f'|format(invoice_amount_lookup.get(file)|float) }}</div>
+                                <small style="color: #666;">{{ inv.filename.split('_', 1)[1] if '_' in inv.filename else inv.filename }}</small>
+                                {% if can_complete and inv.get('id') %}
+                                <label style="margin-left: auto; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                    <input type="checkbox" name="delete_invoice_entry_ids" value="{{ inv.id }}" style="width: auto; margin: 0;">
+                                    <span style="color: #dc3545; font-size: 0.9rem;">Delete</span>
+                                </label>
                                 {% endif %}
-                                {% if invoice_items_lookup.get(file) %}
-                                <div style="margin-top: 4px; color: #374151;">
+                                {% if inv.get('amount') is not none %}
+                                <div style="flex-basis: 100%; margin-top: 4px; margin-left: 0; font-weight: 600; color: #1f2937;">Amount: OMR {{ '%.3f'|format(inv.amount|float) }}</div>
+                                {% endif %}
+                                {% if inv.get('items') %}
+                                <div style="flex-basis: 100%; margin-top: 4px; margin-left: 0; color: #374151;">
                                     <strong>Items:</strong>
                                     <ul style="margin: 4px 0 0 18px; padding: 0;">
-                                        {% for itm in invoice_items_lookup.get(file) %}
+                                        {% for itm in inv.get('items') or [] %}
                                         <li>{{ itm }}</li>
                                         {% endfor %}
                                     </ul>
@@ -3084,6 +3103,27 @@ body.flash-success-open {
                             </div>
                             {% endif %}
                         </div>
+                        {% endif %}
+                        {% if can_complete %}
+                        <div class="form-group" style="margin-top: 15px; display: none;" id="delete-selected-files-wrap">
+                            <button type="submit" form="delete-uploaded-files-form" id="delete-selected-files-btn" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete the selected file(s)?');">
+                                <i class="fas fa-trash-alt"></i> Delete selected files
+                            </button>
+                        </div>
+                        </form>
+                        <script>
+                        (function() {
+                            var form = document.getElementById('delete-uploaded-files-form');
+                            var wrap = document.getElementById('delete-selected-files-wrap');
+                            if (!form || !wrap) return;
+                            function updateDeleteButton() {
+                                var checked = form.querySelectorAll('input[name=delete_receipt_entry_ids]:checked, input[name=delete_invoice_entry_ids]:checked');
+                                wrap.style.display = checked.length ? 'block' : 'none';
+                            }
+                            form.addEventListener('change', updateDeleteButton);
+                            updateDeleteButton();
+                        })();
+                        </script>
                         {% endif %}
                     </div>
                 </div>
@@ -4103,6 +4143,7 @@ body.flash-success-open {
                                         <option value="approve">Approve</option>
                                         <option value="reject">Reject</option>
                                         <option value="on_hold">On Hold</option>
+                                        <option value="return_to_assigned_procurement">Return to Assigned Procurement Staff</option>
                                     </select>
                                 </div>
                                 
@@ -4312,8 +4353,8 @@ document.addEventListener('DOMContentLoaded', function() {
         window.history.replaceState({}, '', url);
     }
     
-    // If no tab parameter and status is "Assigned to Procurement", default to assigned tab
-    if (!requestedTab && requestStatus === 'Assigned to Procurement') {
+    // If no tab parameter and status is "Assigned to Procurement" or "Returned to Assigned Procurement Staff", default to assigned tab
+    if (!requestedTab && (requestStatus === 'Assigned to Procurement' || requestStatus === 'Returned to Assigned Procurement Staff')) {
         requestedTab = 'assigned';
         // Update URL to include the tab parameter
         const url = new URL(window.location);
