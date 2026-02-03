@@ -40,7 +40,7 @@
                             <label for="branch_name">Branch Name <span class="required-star">*</span></label>
                             <div class="branch-checkbox-container">
                                 <label class="branch-checkbox-label">
-                                    <input type="radio" id="branch_type_branch" name="branch_type" value="branch" checked>
+                                    <input type="radio" id="branch_type_branch" name="branch_type" value="branch">
                                     <span>Branch</span>
                                 </label>
                                 <label class="branch-checkbox-label">
@@ -772,6 +772,7 @@ function getItemRequestFieldDisplayName(fieldKey) {
         category: 'Category',
         item_name: 'Item Name/Description',
         purpose: 'Purpose/Description',
+        branch_type: 'Branch type (Branch or Flats)',
         branch_name: 'Branch Name'
         , item_quantity: 'Quantity'
         , upload_files: 'Upload Item / Sample / Reference'
@@ -1364,6 +1365,10 @@ function initializeItemSearch() {
             }
             if (!purpose) {
                 missingFields.push(getItemRequestFieldDisplayName('purpose'));
+            }
+            const branchTypeSelected = document.querySelector('input[name="branch_type"]:checked');
+            if (!branchTypeSelected) {
+                missingFields.push('Branch type (Branch or Flats)');
             }
             if (!branchNames) {
                 missingFields.push(getItemRequestFieldDisplayName('branch_name'));

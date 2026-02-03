@@ -9601,7 +9601,7 @@ def procurement_request_item():
         if branch_names:
             branch_name = branch_names
         # Branch type selection from radio buttons: 'branch' (Branch) or 'flats'
-        branch_type = request.form.get('branch_type', 'branch')
+        branch_type = request.form.get('branch_type', '').strip()
         # Date is automatically set to today's date (no longer required from form)
         request_date = datetime.utcnow().date()
         notes = request.form.get('notes', '').strip()
@@ -9613,6 +9613,8 @@ def procurement_request_item():
         if not is_save_draft:
             # Build missing fields list similar to client-side
             missing_fields = []
+            if not branch_type or branch_type not in ('branch', 'flats'):
+                missing_fields.append('branch_type')
             if not requestor_name:
                 missing_fields.append('requestor_name')
             if not category:
@@ -13672,13 +13674,19 @@ def new_request():
         if branch_names:
             branch_name = branch_names
         # Branch type selection from radio buttons: 'branch' (Branch) or 'flats'
-        branch_type = request.form.get('branch_type', 'branch')
+        branch_type = request.form.get('branch_type', '').strip()
         date = datetime.utcnow().date()  # Automatically use today's date
         purpose = request.form.get('purpose')
         payment_method = request.form.get('payment_method', 'Card')  # Default to Card
         
         # For drafts, skip validation - allow saving incomplete forms
         if not is_draft:
+            # Validate branch type - user must choose Branch or Flats
+            if not branch_type or branch_type not in ('branch', 'flats'):
+                flash('Please select whether the request is for branch restaurants or flats.', 'error')
+                available_request_types = get_available_request_types()
+                available_branches = get_branches_ordered_by_location()
+                return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
             # Validate required fields only for submitted requests
             if not branch_name:
                 flash('At least one branch name is required.', 'error')

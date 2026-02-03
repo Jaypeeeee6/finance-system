@@ -49,7 +49,7 @@
                             <label for="branch_name">Branch Name *</label>
                             <div class="branch-checkbox-container">
                                 <label class="branch-checkbox-label">
-                                    <input type="radio" id="branch_type_branch" name="branch_type" value="branch" checked>
+                                    <input type="radio" id="branch_type_branch" name="branch_type" value="branch">
                                     <span>Branch</span>
                                 </label>
                                 <label class="branch-checkbox-label">
@@ -398,6 +398,107 @@
         align-items: center;
         flex: 0 0 auto;
         margin-left: 0px; /* moved slightly more left */
+    }
+
+    /* Request Validation Error Modal (same styles as item request) */
+    .item-request-error-modal {
+        position: fixed !important;
+        inset: 0 !important;
+        display: none !important;
+        z-index: 9999 !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: transparent !important;
+    }
+    .item-request-error-modal[style*="flex"] {
+        display: flex !important;
+    }
+    .item-request-error-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+    }
+    .item-request-error-container {
+        position: relative;
+        background: white;
+        border-radius: 4px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        max-width: 450px;
+        width: 90%;
+        overflow: hidden;
+    }
+    .item-request-error-header {
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+    .item-request-error-icon {
+        width: 24px;
+        height: 24px;
+        background: #dc3545;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 16px;
+        font-weight: bold;
+        flex-shrink: 0;
+    }
+    .item-request-error-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin: 0;
+        color: #dc3545;
+    }
+    .item-request-error-body {
+        padding: 20px;
+        color: #212529;
+    }
+    .item-request-error-message {
+        font-size: 0.95rem;
+        line-height: 1.5;
+        margin-bottom: 12px;
+        color: #212529;
+        font-weight: 500;
+    }
+    .item-request-error-fields-list {
+        color: #212529;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        margin: 0;
+        padding-left: 20px;
+        list-style: disc;
+    }
+    .item-request-error-fields-list li {
+        margin-bottom: 6px;
+    }
+    .item-request-error-footer {
+        padding: 12px 20px;
+        background: #f8f9fa;
+        border-top: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: flex-end;
+    }
+    .item-request-error-btn {
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 8px 24px;
+        border-radius: 4px;
+        font-size: 0.95rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        text-transform: uppercase;
+    }
+    .item-request-error-btn:hover {
+        background: #c82333;
+    }
+    .item-request-error-btn:active {
+        background: #bd2130;
     }
                     </style>
                 </div>
@@ -823,6 +924,26 @@
                     </a>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Request Validation Error Modal (same as item request - shows all missing/validation errors) -->
+<div id="requestValidationErrorModal" class="item-request-error-modal" style="display: none;">
+    <div class="item-request-error-overlay" onclick="closeRequestValidationErrorModal()"></div>
+    <div class="item-request-error-container">
+        <div class="item-request-error-header">
+            <div class="item-request-error-icon">!</div>
+            <h3 class="item-request-error-title">Missing Required Fields</h3>
+        </div>
+        <div class="item-request-error-body">
+            <div class="item-request-error-message" id="requestValidationErrorMainMessage">
+                Please complete the following required fields:
+            </div>
+            <ul class="item-request-error-fields-list" id="requestValidationErrorFieldsList"></ul>
+        </div>
+        <div class="item-request-error-footer">
+            <button class="item-request-error-btn" onclick="closeRequestValidationErrorModal()">OK</button>
         </div>
     </div>
 </div>
@@ -4698,6 +4819,59 @@ document.getElementById('amount').addEventListener('keydown', function(e) {
     }
 });
 
+// Request validation error modal (same as item request page)
+function showRequestValidationErrorModal(errors) {
+    const modal = document.getElementById('requestValidationErrorModal');
+    const fieldsListEl = document.getElementById('requestValidationErrorFieldsList');
+    if (!modal || !fieldsListEl) return;
+    fieldsListEl.innerHTML = '';
+    errors.forEach(function(msg) {
+        const li = document.createElement('li');
+        li.textContent = msg;
+        fieldsListEl.appendChild(li);
+    });
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    // Reset submit button immediately so it doesn't stay stuck as "Processing"
+    const form = document.getElementById('requestForm');
+    if (form) {
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn && (submitBtn.disabled || submitBtn.innerHTML.includes('spinner'))) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Request';
+            submitBtn.style.opacity = '';
+            submitBtn.style.cursor = '';
+        }
+    }
+}
+function closeRequestValidationErrorModal() {
+    const modal = document.getElementById('requestValidationErrorModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+    // Reset the submit button if it was stuck in processing state
+    const form = document.getElementById('requestForm');
+    if (form) {
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn && (submitBtn.disabled || submitBtn.innerHTML.includes('spinner'))) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Request';
+            submitBtn.style.opacity = '';
+            submitBtn.style.cursor = '';
+        }
+    }
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('requestValidationErrorModal');
+        if (modal && modal.style.display === 'flex') closeRequestValidationErrorModal();
+    }
+});
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('item-request-error-overlay')) closeRequestValidationErrorModal();
+});
+
 // Comprehensive form validation function
 function validateRequestForm() {
     const errors = [];
@@ -4715,6 +4889,13 @@ function validateRequestForm() {
     if (!requestorName) {
         errors.push('Please enter your name.');
         if (!firstErrorField) firstErrorField = document.getElementById('requestor_name');
+    }
+    
+    // Validate Branch Type - user must choose Branch or Flats
+    const branchTypeSelected = document.querySelector('input[name="branch_type"]:checked');
+    if (!branchTypeSelected) {
+        errors.push('Please select whether the request is for branch restaurants or flats.');
+        if (!firstErrorField) firstErrorField = document.getElementById('branch_type_branch');
     }
     
     // Validate Branch Name - check for at least one branch selected
@@ -4838,13 +5019,7 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
     
     if (!validation.isValid) {
         e.preventDefault();
-        
-        // Show all errors in a single alert
-        let errorMessage = 'Please fix the following errors before submitting:\n\n';
-        errorMessage += validation.errors.map((error, index) => `${index + 1}. ${error}`).join('\n');
-        
-        alert(errorMessage);
-        
+        showRequestValidationErrorModal(validation.errors);
         // Focus on the first error field
         if (validation.firstErrorField) {
             validation.firstErrorField.focus();
@@ -5406,13 +5581,7 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
     
     if (!validation.isValid) {
         e.preventDefault();
-        
-        // Show all errors in a single alert
-        let errorMessage = 'Please fix the following errors before submitting:\n\n';
-        errorMessage += validation.errors.map((error, index) => `${index + 1}. ${error}`).join('\n');
-        
-        alert(errorMessage);
-        
+        showRequestValidationErrorModal(validation.errors);
         // Focus on the first error field
         if (validation.firstErrorField) {
             validation.firstErrorField.focus();
