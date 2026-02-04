@@ -5532,7 +5532,7 @@ def procurement_item_requests():
     
     # Get all unique departments for filter dropdown
     all_departments = db.session.query(ProcurementItemRequest.department).distinct().order_by(ProcurementItemRequest.department).all()
-    departments = [dept[0] for dept in all_departments]
+    departments = [dept[0] for dept in all_departments if dept[0]]
     
     # Get procurement members for assignment dropdown (only for Procurement Manager)
     # Convert to dictionaries for JSON serialization
@@ -11608,7 +11608,7 @@ def add_request_type():
     # Get all departments for dropdown
     departments = ['Management', 'Finance', 'Operation', 'PR', 'Maintenance', 'Marketing', 
                    'Logistic', 'HR', 'Quality Control', 'Procurement', 'IT', 'Customer Service', 
-                   'Project', 'Sales']
+                   'Project', 'Research and Development', 'Sales']
     
     return render_template('add_request_type.html', departments=departments, user=current_user)
 
@@ -11670,7 +11670,7 @@ def edit_request_type(request_type_id):
     # Get all departments for dropdown
     departments = ['Management', 'Finance', 'Operation', 'PR', 'Maintenance', 'Marketing', 
                    'Logistic', 'HR', 'Quality Control', 'Procurement', 'IT', 'Customer Service', 
-                   'Project', 'Sales']
+                   'Project', 'Research and Development', 'Sales']
     
     return render_template('edit_request_type.html', 
                          request_type=request_type, 
@@ -11911,7 +11911,7 @@ def add_person_company_option():
     # Get all departments and request types for dropdowns
     departments = ['Management', 'Finance', 'Operation', 'PR', 'Maintenance', 'Marketing', 
                    'Logistic', 'HR', 'Quality Control', 'Procurement', 'IT', 'Customer Service', 
-                   'Project', 'Sales']
+                   'Project', 'Research and Development', 'Sales']
     
     # Get all active request types grouped by department
     request_types_by_dept = {}
@@ -12004,7 +12004,7 @@ def edit_person_company_option(option_id):
     # Get all departments and request types for dropdowns
     departments = ['Management', 'Finance', 'Operation', 'PR', 'Maintenance', 'Marketing', 
                    'Logistic', 'HR', 'Quality Control', 'Procurement', 'IT', 'Customer Service', 
-                   'Project', 'Sales']
+                   'Project', 'Research and Development', 'Sales']
     
     # Get all active request types grouped by department
     request_types_by_dept = {}
@@ -12083,7 +12083,7 @@ def manage_procurement_categories_items():
     # Get all departments for filter dropdown
     departments = ['Operation', 'HR', 'IT', 'Finance', 'Maintenance', 'Marketing', 
                    'Logistic', 'Quality Control', 'Procurement', 'Customer Service', 
-                   'Project', 'PR', 'Sales']
+                   'Project', 'Research and Development', 'PR', 'Sales']
     
     if filter_type == 'categories':
         # Build query for categories
@@ -12187,7 +12187,7 @@ def add_procurement_category():
     # Get all departments for dropdown
     departments = ['Operation', 'HR', 'IT', 'Finance', 'Maintenance', 'Marketing', 
                    'Logistic', 'Quality Control', 'Procurement', 'Customer Service', 
-                   'Project', 'PR']
+                   'Project', 'Research and Development', 'PR']
     
     return render_template('add_procurement_category.html', 
                          departments=departments,
@@ -12251,7 +12251,7 @@ def edit_procurement_category(category_id):
     # Get all departments for dropdown
     departments = ['Operation', 'HR', 'IT', 'Finance', 'Maintenance', 'Marketing', 
                    'Logistic', 'Quality Control', 'Procurement', 'Customer Service', 
-                   'Project', 'PR']
+                   'Project', 'Research and Development', 'PR']
     
     return render_template('edit_procurement_category.html', 
                          category=category,
@@ -12348,7 +12348,7 @@ def add_procurement_item():
     # Get all departments for dropdown
     departments = ['Operation', 'HR', 'IT', 'Finance', 'Maintenance', 'Marketing', 
                    'Logistic', 'Quality Control', 'Procurement', 'Customer Service', 
-                   'Project', 'PR']
+                   'Project', 'Research and Development', 'PR']
     
     # Get all active categories for dropdown
     categories = ProcurementCategory.query.filter_by(is_active=True).order_by(ProcurementCategory.department, ProcurementCategory.name).all()
@@ -12421,7 +12421,7 @@ def edit_procurement_item(item_id):
     # Get all departments for dropdown
     departments = ['Operation', 'HR', 'IT', 'Finance', 'Maintenance', 'Marketing', 
                    'Logistic', 'Quality Control', 'Procurement', 'Customer Service', 
-                   'Project', 'PR']
+                   'Project', 'Research and Development', 'PR']
     
     # Get all active categories for dropdown
     categories = ProcurementCategory.query.filter_by(is_active=True).order_by(ProcurementCategory.department, ProcurementCategory.name).all()
@@ -15540,7 +15540,7 @@ def view_request(request_id):
     # Department options for manager/approver department changes
     departments = ['Management', 'Finance', 'Operation', 'PR', 'Maintenance', 'Marketing',
                    'Logistic', 'HR', 'Quality Control', 'Procurement', 'IT', 'Customer Service',
-                   'Project', 'Sales']
+                   'Project', 'Research and Development', 'Sales']
 
     was_just_edited = request.args.get('edited') == '1'
     edited_fields_param = request.args.get('edited_fields', '')
