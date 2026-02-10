@@ -33,8 +33,8 @@
         <a href="{{ url_for('drafts') }}" class="btn btn-secondary">
             <i class="fas fa-file-alt"></i> My Drafts
         </a>
-        <a href="{{ url_for('write_cheque') }}" class="btn btn-success">
-            <i class="fas fa-file-invoice"></i> Write Cheque
+        <a href="{{ url_for('cheque_register') }}" class="btn btn-success">
+            <i class="fas fa-book"></i> Cheque Registration
         </a>
 
     </div>
@@ -755,7 +755,7 @@
 .dashboard-actions .new-request-toggle,
 .dashboard-actions .btn-secondary { background:#000 !important; border-color:#000 !important; color:#fff !important; }
 .dashboard-actions { margin-top: 16px !important; }
-/* Make Write Cheque use the same warning style as Overdue Requests */
+/* Style Cheque Registration button (same as other action buttons) */
 .dashboard-actions .btn-success {
     background: #D9BD7D !important;
     border-color: #D9BD7D !important;

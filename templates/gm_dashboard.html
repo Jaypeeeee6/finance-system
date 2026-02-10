@@ -34,8 +34,8 @@
             <i class="fas fa-file-alt"></i> My Drafts
         </a>
         {% if current_user.role in ['GM','CEO'] %}
-        <a href="{{ url_for('write_cheque') }}" class="btn btn-success">
-            <i class="fas fa-file-invoice"></i> Write Cheque
+        <a href="{{ url_for('cheque_register') }}" class="btn btn-success">
+            <i class="fas fa-book"></i> Cheque Registration
         </a>
         {% endif %}
 
