@@ -2,10 +2,23 @@
 
 {% block title %}Add New Book{% endblock %}
 
+{% block extra_css %}
+<style>
+.new-book-note { margin-bottom: 1.5rem; }
+.form-preview-section { margin-top: 1.5rem; padding: 1rem; background-color: var(--light-bg, #f8f9fa); border-radius: 8px; }
+.preview-text { margin: 0.5rem 0; }
+.form-actions { margin-top: 2rem; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="dashboard-container">
     <div class="dashboard-header">
-        <h1><i class="fas fa-book"></i> Add New Book</h1>
+        <h2 class="dashboard-title" style="margin:0; display:inline-flex; align-items:center; gap:8px; font-size:1.6rem; font-weight:700;"><i class="fas fa-book"></i> Add New Book</h2>
+        <p>Create a new cheque book and serial number range</p>
+    </div>
+
+    <div class="dashboard-actions">
         <a href="{{ url_for('cheque_register') }}" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Back to Cheque Register
         </a>
@@ -13,10 +26,10 @@
 
     <div class="card">
         <div class="card-header">
-            <h2>Create New Cheque Book</h2>
+            <h2><i class="fas fa-plus-circle"></i> Create New Cheque Book</h2>
         </div>
         <div class="card-body">
-            <div class="alert alert-info" style="margin-bottom: 1.5rem;">
+            <div class="alert alert-info new-book-note">
                 <strong>Note:</strong> Enter the book number and serial number range. The system will automatically generate all serial numbers between the starting and ending serial numbers.
             </div>
 
@@ -41,12 +54,12 @@
                     </div>
                 </div>
 
-                <div class="form-group" id="previewSection" style="display: none; margin-top: 1.5rem; padding: 1rem; background-color: #f8f9fa; border-radius: 5px;">
+                <div class="form-group form-preview-section" id="previewSection" style="display: none;">
                     <label><strong>Preview:</strong></label>
-                    <p id="previewText" style="margin: 0.5rem 0;"></p>
+                    <p id="previewText" class="preview-text"></p>
                 </div>
 
-                <div class="form-actions" style="margin-top: 2rem;">
+                <div class="form-actions">
                     <button type="submit" class="btn btn-success">
                         <i class="fas fa-save"></i> Create Book
                     </button>

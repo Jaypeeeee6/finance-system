@@ -1187,3 +1187,8 @@
     }
 }
 
+/* Cheque register table: force rounded corners in all viewports (overrides .table-responsive in media queries) */
+.cheque-register-page .cheque-book-card .cheque-register-table-wrap {
+    border-radius: 8px !important;
+    overflow: hidden !important;
+}

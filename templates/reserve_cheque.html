@@ -2,10 +2,25 @@
 
 {% block title %}Reserve Cheque Serial Numbers{% endblock %}
 
+{% block extra_css %}
+<style>
+.reserve-cheque-page .book-section-title { margin-bottom: 1rem; }
+.reserve-cheque-page .reserve-select-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
+.reserve-cheque-page .reserve-select-label { margin: 0; font-weight: 600; }
+.reserve-cheque-page .reserve-select-label span { margin-left: 0.5rem; }
+.reserve-cheque-page .bulk-actions-bar { display: none; margin-bottom: 1rem; padding: 1rem; background-color: var(--light-bg, #f8f9fa); border-radius: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+.reserve-cheque-page .bulk-actions-bar.show { display: flex; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="dashboard-container">
+<div class="dashboard-container reserve-cheque-page">
     <div class="dashboard-header">
-        <h1><i class="fas fa-bookmark"></i> Reserve Cheque Serial Numbers</h1>
+        <h2 class="dashboard-title" style="margin:0; display:inline-flex; align-items:center; gap:8px; font-size:1.6rem; font-weight:700;"><i class="fas fa-bookmark"></i> Reserve Cheque Serial Numbers</h2>
+        <p>Select available serial numbers to reserve</p>
+    </div>
+
+    <div class="dashboard-actions">
         <a href="{{ url_for('cheque_register') }}" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Back to Cheque Register
         </a>
@@ -13,11 +28,11 @@
 
     <div class="card">
         <div class="card-header">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <div class="header-top" style="flex-wrap: wrap;">
                 <h2><i class="fas fa-list"></i> Available Serial Numbers</h2>
-                <div class="filter-controls" style="display: flex; gap: 1rem; align-items: center;">
-                    <label for="bookFilter" style="margin: 0; font-weight: 600;">Filter by Book:</label>
-                    <select id="bookFilter" onchange="filterByBook()" class="form-select" style="min-width: 150px;">
+                <div class="filter-controls">
+                    <label for="bookFilter" style="margin: 0;">Filter by Book:</label>
+                    <select id="bookFilter" onchange="filterByBook()" class="form-select">
                         <option value="">All Books</option>
                         {% for book_no in book_numbers %}
                         <option value="{{ book_no }}" {% if book_filter == book_no|string %}selected{% endif %}>Book {{ book_no }}</option>
@@ -28,27 +43,25 @@
         </div>
         <div class="card-body">
             {% if available_serials %}
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
-                    <label style="margin: 0;">
+                <div class="reserve-select-row">
+                    <label class="reserve-select-label">
                         <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()" title="Select All">
-                        <span style="margin-left: 0.5rem; font-weight: 600;">Select All Serial Numbers</span>
+                        <span>Select All Serial Numbers</span>
                     </label>
                 </div>
 
-                <div id="bulkActions" style="display: none; margin-bottom: 1rem; padding: 1rem; background-color: #f8f9fa; border-radius: 5px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <span>
-                            <strong id="selectedCount">0</strong> serial number(s) selected
-                        </span>
-                        <button type="button" class="btn btn-warning" id="reserveSelectedBtn" onclick="reserveSelected()">
-                            <i class="fas fa-bookmark"></i> Reserve Selected
-                        </button>
-                    </div>
+                <div id="bulkActions" class="bulk-actions-bar">
+                    <span>
+                        <strong id="selectedCount">0</strong> serial number(s) selected
+                    </span>
+                    <button type="button" class="btn btn-warning" id="reserveSelectedBtn" onclick="reserveSelected()">
+                        <i class="fas fa-bookmark"></i> Reserve Selected
+                    </button>
                 </div>
 
                 {% for group in available_serials | groupby('book.book_no') %}
                 <div class="book-section" style="margin-bottom: 2rem;">
-                    <h3 style="margin-bottom: 1rem;">Book No. {{ group.grouper }}</h3>
+                    <h3 class="book-section-title">Book No. {{ group.grouper }}</h3>
                     <div class="table-responsive">
                         <table class="data-table">
                             <thead>
@@ -117,10 +130,10 @@ function updateBulkActions() {
     // Show/hide bulk actions
     if (bulkActions) {
         if (selectedCount > 0) {
-            bulkActions.style.display = 'block';
+            bulkActions.classList.add('show');
             if (reserveBtn) reserveBtn.disabled = false;
         } else {
-            bulkActions.style.display = 'none';
+            bulkActions.classList.remove('show');
             if (reserveBtn) reserveBtn.disabled = true;
         }
     }

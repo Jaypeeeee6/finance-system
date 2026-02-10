@@ -375,6 +375,130 @@
     margin: 0;
 }
 
+/* Same size as dashboard action buttons (padding, font-size, shape) */
+.dashboard-container .dashboard-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    border-radius: 6px;
+}
+
+/* Same space between heading line and buttons as dashboard */
+.dashboard-container .dashboard-header {
+    margin-bottom: 4px !important;
+    padding-bottom: 2px !important;
+}
+.dashboard-container .dashboard-actions {
+    margin-top: 16px !important;
+}
+
+/* New Book button: same gold as Cheque Registration on dashboard */
+.dashboard-container .dashboard-actions a.btn-success:last-child {
+    background: #D9BD7D !important;
+    border: 1px solid #D9BD7D !important;
+    color: #ffffff !important;
+}
+.dashboard-container .dashboard-actions a.btn-success:last-child:hover {
+    background: #c8ac65 !important;
+    border-color: #c8ac65 !important;
+    color: #ffffff !important;
+}
+
+/* ==================== FILTERS CONTAINER (dashboard & cheque register – identical styles) ==================== */
+.filters-container,
+.filters-container .filter-controls {
+    background: transparent !important;
+    box-shadow: none !important;
+    border-bottom: none !important;
+    color: inherit !important;
+}
+.filters-container {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    flex-wrap: nowrap !important;
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+}
+.filters-container .filters-left {
+    flex-shrink: 0;
+}
+.filters-container .filter-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 0;
+}
+.filters-container .form-select,
+.filters-container .filter-select,
+.filters-container select,
+.filters-container .assign-search-input,
+.filters-container .tab-search-input {
+    background-color: #ffffff !important;
+    color: #212529 !important;
+    border: 1px solid #ced4da !important;
+    border-radius: 8px !important;
+    padding: 8px 12px !important;
+}
+.filters-container .form-select,
+.filters-container .filter-select,
+.filters-container select {
+    appearance: none !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236c757d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 12px center !important;
+    background-size: 16px !important;
+    padding-right: 36px !important;
+}
+.filters-container .assign-search-field {
+    position: relative;
+    width: 360px !important;
+    flex: 0 0 360px !important;
+    min-width: 320px;
+}
+.filters-container .assign-search-input {
+    border-radius: 999px !important;
+    border: 1px solid #ced4da !important;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+    height: 38px;
+    padding-left: 44px !important;
+    padding-right: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box;
+}
+.filters-container .assign-search-input:focus {
+    outline: none !important;
+    border-color: #D9BD7D !important;
+    box-shadow: 0 0 0 0.18rem rgba(217,189,125,0.15) !important;
+}
+.filters-container .assign-search-icon {
+    width: 20px !important;
+    height: 20px !important;
+    background: #ffffff;
+    border-radius: 50%;
+    padding: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    cursor: pointer;
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+.filters-right {
+    margin-left: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    flex-wrap: nowrap !important;
+}
+.filters-container .form-select {
+    min-width: 200px !important;
+}
+
 .new-request-dropdown {
     position: relative;
     display: flex;
@@ -1789,7 +1913,7 @@ body {
     background: var(--light-color);
 }
 
-/* Make payment requests table wider in dashboard tabs by reducing side spacing */
+/* Payment requests table & cheque register tables: same wider layout and styles */
 .dashboard-container .card-body .table-responsive {
     margin-left: -0.75rem;
     margin-right: -0.75rem;
@@ -1801,9 +1925,35 @@ body {
     width: 100%;
 }
 
-/* Make checkbox column narrower in dashboard tables */
-.dashboard-container .card-body .table-responsive .data-table th:first-child,
-.dashboard-container .card-body .table-responsive .data-table td:first-child {
+/* Same table cell style as payment requests (dashboard & cheque register) */
+.dashboard-container .card .data-table th,
+.dashboard-container .card .data-table td {
+    font-size: 14px;
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+.dashboard-container .card .data-table .badge,
+.dashboard-container .card .data-table .filter-pill,
+.dashboard-container .card .data-table .filter-chip {
+    display: inline-block !important;
+    margin: 0 auto !important;
+}
+.dashboard-container .card .data-table .badge,
+.dashboard-container .card .data-table .filter-pill,
+.dashboard-container .card .data-table .filter-chip,
+.dashboard-container .card .data-table .branch-chip,
+.dashboard-container .card .data-table .item-chip {
+    font-size: 13px;
+    padding: 6px 10px;
+    line-height: 1.25;
+}
+.dashboard-container .card .data-table {
+    margin-bottom: 0 !important;
+}
+
+/* Make checkbox column narrower in dashboard tables only (tab content has checkbox) */
+.dashboard-container .card-body .tab-content .table-responsive .data-table th:first-child,
+.dashboard-container .card-body .tab-content .table-responsive .data-table td:first-child {
     width: 40px;
     min-width: 40px;
     max-width: 40px;
@@ -1876,6 +2026,33 @@ body {
 .data-table td:nth-child(8) {
     padding-left: 0.75rem !important;
     margin-left: 0 !important;
+}
+
+/* Cheque register: card must not clip table corners (.card has overflow:hidden + border-radius bottom-left 0) */
+.cheque-register-page .cheque-book-card {
+    border-radius: 8px !important;
+    overflow: visible !important;
+}
+/* Rounded corners on table wrapper */
+.cheque-register-page .cheque-book-card .cheque-register-table-wrap {
+    border-radius: 8px !important;
+    overflow: hidden !important;
+}
+.cheque-register-page .cheque-book-card .cheque-register-table-wrap .data-table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+}
+.cheque-register-page .cheque-book-card .cheque-register-table-wrap .data-table thead tr:first-child th:first-child {
+    border-top-left-radius: 8px !important;
+}
+.cheque-register-page .cheque-book-card .cheque-register-table-wrap .data-table thead tr:first-child th:last-child {
+    border-top-right-radius: 8px !important;
+}
+.cheque-register-page .cheque-book-card .cheque-register-table-wrap .data-table tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 8px !important;
+}
+.cheque-register-page .cheque-book-card .cheque-register-table-wrap .data-table tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 8px !important;
 }
 
 /* ==================== BADGES ==================== */
@@ -2810,6 +2987,49 @@ body.flash-error-open {
     font-weight: bold;
 }
 
+/* Dashboard & cheque register: no background on pagination (match dashboard) */
+.dashboard-container .pagination-container {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+.dashboard-container .card-body .pagination-container {
+    margin-top: 8px !important;
+    padding-top: 0 !important;
+}
+
+/* Dashboard & cheque register: gold pagination buttons (match dashboard) */
+.dashboard-container .pagination .btn.btn-sm.btn-primary,
+.dashboard-container .pagination .btn.btn-sm.btn-primary[aria-current="page"] {
+    background: transparent !important;
+    border: 1px solid #D9BD7D !important;
+    color: #D9BD7D !important;
+}
+.dashboard-container .pagination .btn.btn-sm.btn-primary:hover {
+    background: transparent !important;
+    border-color: #c8ac65 !important;
+    color: #c8ac65 !important;
+}
+.dashboard-container .pagination .btn.btn-sm.btn-secondary {
+    background: transparent !important;
+    border: 1px solid #D9BD7D !important;
+    color: #D9BD7D !important;
+}
+.dashboard-container .pagination .btn.btn-sm.btn-secondary:hover:not(:disabled) {
+    background: transparent !important;
+    border-color: #c8ac65 !important;
+    color: #c8ac65 !important;
+}
+.dashboard-container .pagination .btn.btn-sm.btn-outline {
+    background: transparent !important;
+    border: 1px solid #D9BD7D !important;
+    color: #D9BD7D !important;
+}
+.dashboard-container .pagination .btn.btn-sm.btn-outline:hover {
+    background: transparent !important;
+    border-color: #c8ac65 !important;
+    color: #c8ac65 !important;
+}
 
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 1024px) {

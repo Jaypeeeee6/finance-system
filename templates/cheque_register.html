@@ -2,53 +2,107 @@
 
 {% block title %}Cheque Register{% endblock %}
 
+{% block extra_css %}
+<style>
+.cheque-register-page .book-section-title { margin-bottom: 1rem; }
+.cheque-register-page .book-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    user-select: none;
+    padding: 0.25rem 0;
+    margin-bottom: 0;
+}
+.cheque-register-page .book-section-header:hover { opacity: 0.85; }
+.cheque-register-page .book-section-header .book-section-chevron {
+    transition: transform 0.2s ease;
+    width: 1rem;
+    text-align: center;
+    color: var(--secondary-color, #6c757d);
+}
+.cheque-register-page .book-section.collapsed .book-section-header .book-section-chevron i { transform: rotate(-90deg); }
+.cheque-register-page .book-section:not(.collapsed) .book-section-header .book-section-chevron i { transform: rotate(0deg); }
+.cheque-register-page .book-section.collapsed .book-section-content { display: none !important; }
+.cheque-register-page .book-section .book-section-content { margin-top: 1rem; }
+.cheque-register-page .upload-cell-td { text-align: center; }
+.cheque-register-page .upload-cell { display: inline-block; }
+.cheque-register-page .book-section .pagination-container { margin-top: 8px; }
+.cheque-register-page .book-section .pagination-container .pagination { flex-wrap: wrap; gap: 6px; }
+/* Active page number: same element (button) as others = same size; gold color only */
+.cheque-register-page .pagination .btn.btn-sm.cheque-pagination-current {
+    background: #D9BD7D !important;
+    color: #1a1a1a !important;
+    border: 1px solid #D9BD7D !important;
+}
+.cheque-register-page .cheque-book-card { margin-bottom: 1.5rem; }
+.cheque-register-page .cheque-book-card:last-child { margin-bottom: 0; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="dashboard-container">
+<div class="dashboard-container cheque-register-page">
     <div class="dashboard-header">
-        <h1><i class="fas fa-book"></i> Cheque Register</h1>
-        <div>
-            <a href="{{ url_for('reserve_cheque') }}" class="btn btn-primary">
-                <i class="fas fa-bookmark"></i> Reserve
-            </a>
-            <a href="{{ url_for('write_cheque') }}" class="btn btn-success">
-                <i class="fas fa-file-invoice"></i> Write Cheque
-            </a>
-            <a href="{{ url_for('new_book') }}" class="btn btn-success">
-                <i class="fas fa-plus-circle"></i> New Book
-            </a>
+        <h2 class="dashboard-title" style="margin:0; display:inline-flex; align-items:center; gap:8px; font-size:1.6rem; font-weight:700;"><i class="fas fa-book"></i> Cheque Register</h2>
+        <p>View and manage cheque books and serial numbers</p>
+    </div>
+
+    <div class="dashboard-actions">
+        <a href="{{ url_for('reserve_cheque') }}" class="btn btn-primary">
+            <i class="fas fa-bookmark"></i> Reserve
+        </a>
+        <a href="{{ url_for('write_cheque') }}" class="btn btn-success">
+            <i class="fas fa-file-invoice"></i> Write Cheque
+        </a>
+        <a href="{{ url_for('new_book') }}" class="btn btn-success">
+            <i class="fas fa-plus-circle"></i> New Book
+        </a>
+    </div>
+
+    <!-- Search and filters (same structure and classes as dashboard – styles from style.css) -->
+    <div class="filters-container" style="margin: 0 0 8px 0;">
+        <div class="filters-left">
+            <div class="assign-search-field" style="position:relative; min-width:280px;">
+                <img src="{{ url_for('static', filename='css/icons/search.svg') }}" class="assign-search-icon" alt="Search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%);" onclick="document.getElementById('chequeSearchInput').focus();">
+                <input type="search" id="chequeSearchInput" class="form-control assign-search-input" placeholder="Search by serial #, payee, amount..." aria-label="Search cheque records" style="padding-left:44px; width:100%;">
+            </div>
+        </div>
+        <div class="filters-right" style="margin-left:auto;">
+            <div class="filter-controls">
+                <select id="bookFilter" onchange="applyFilters()" class="form-select">
+                    <option value="">All Books</option>
+                    {% for book_no in book_numbers %}
+                    <option value="{{ book_no }}" {% if book_filter == book_no|string %}selected{% endif %}>Book {{ book_no }}</option>
+                    {% endfor %}
+                </select>
+                <select id="statusFilter" onchange="applyFilters()" class="form-select">
+                    <option value="">All Statuses</option>
+                    <option value="Available" {% if status_filter == 'Available' %}selected{% endif %}>Available</option>
+                    <option value="Reserved" {% if status_filter == 'Reserved' %}selected{% endif %}>Reserved</option>
+                    <option value="Used" {% if status_filter == 'Used' %}selected{% endif %}>Used</option>
+                    <option value="Cancelled" {% if status_filter == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                </select>
+                {% if book_filter or status_filter %}
+                <a href="{{ url_for('cheque_register') }}" class="btn btn-sm btn-outline">
+                    <i class="fas fa-times"></i> Clear filters
+                </a>
+                {% endif %}
+            </div>
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-header">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-                <h2><i class="fas fa-table"></i> Cheque Records</h2>
-                <div class="filter-controls" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-                    <label for="bookFilter" style="margin: 0; font-weight: 600;">Filter by Book:</label>
-                    <select id="bookFilter" onchange="applyFilters()" class="form-select" style="min-width: 150px;">
-                        <option value="">All Books</option>
-                        {% for book_no in book_numbers %}
-                        <option value="{{ book_no }}" {% if book_filter == book_no|string %}selected{% endif %}>Book {{ book_no }}</option>
-                        {% endfor %}
-                    </select>
-                    <label for="statusFilter" style="margin: 0; font-weight: 600;">Filter by Status:</label>
-                    <select id="statusFilter" onchange="applyFilters()" class="form-select" style="min-width: 150px;">
-                        <option value="">All Statuses</option>
-                        <option value="Available" {% if status_filter == 'Available' %}selected{% endif %}>Available</option>
-                        <option value="Reserved" {% if status_filter == 'Reserved' %}selected{% endif %}>Reserved</option>
-                        <option value="Used" {% if status_filter == 'Used' %}selected{% endif %}>Used</option>
-                        <option value="Cancelled" {% if status_filter == 'Cancelled' %}selected{% endif %}>Cancelled</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-        <div class="card-body">
-            {% if cheque_serials %}
-                {% for group in cheque_serials | groupby('book.book_no') %}
-                <div class="book-section" style="margin-bottom: 2rem;">
-                    <h3 style="margin-bottom: 1rem;">Book No. {{ group.grouper }}</h3>
-                    <div class="table-responsive">
-                        <table class="data-table">
+    {% if cheque_serials %}
+        {% for group in cheque_serials | groupby('book.book_no') %}
+        <div class="card cheque-book-card" style="border: 1px solid #dee2e6; border-radius: 8px; background: #fff;">
+            <div class="card-body">
+                <div class="book-section collapsed" data-book-no="{{ group.grouper }}">
+                    <div class="book-section-header" role="button" tabindex="0" aria-expanded="false" aria-controls="book-content-{{ group.grouper }}" id="book-header-{{ group.grouper }}">
+                        <span class="book-section-chevron" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                        <h3 class="book-section-title" style="margin:0;">Book No. {{ group.grouper }}</h3>
+                    </div>
+                    <div class="book-section-content" id="book-content-{{ group.grouper }}">
+                    <div class="table-responsive cheque-register-table-wrap">
+                        <table class="data-table cheque-book-table">
                             <thead>
                                 <tr>
                                     <th>Book No.</th>
@@ -62,7 +116,7 @@
                             </thead>
                             <tbody>
                                 {% for serial in group.list %}
-                                <tr>
+                                <tr data-book-no="{{ group.grouper }}">
                                     <td>{{ serial.book.book_no }}</td>
                                     <td>{{ serial.serial_no }}</td>
                                     <td>
@@ -78,10 +132,10 @@
                                     <td>{{ serial.payee_name or '-' }}</td>
                                     <td>{{ serial.cheque_date.strftime('%Y-%m-%d') if serial.cheque_date else '-' }}</td>
                                     <td>{{ "%.3f"|format(serial.amount) if serial.amount else '-' }}</td>
-                                    <td style="text-align: center;">
-                                        <div class="upload-cell" data-serial-id="{{ serial.id }}" style="display: inline-block;">
+                                    <td class="upload-cell-td">
+                                        <div class="upload-cell" data-serial-id="{{ serial.id }}">
                                             {% if serial.upload_path %}
-                                                <a href="/uploads/cheque/{{ serial.upload_path.split('/')[-1] if '/' in serial.upload_path else serial.upload_path }}" target="_blank" class="btn btn-sm btn-info upload-view-btn" title="View uploaded file" style="text-decoration: none; border: none; padding: 0.25rem 0.5rem;">
+                                                <a href="/uploads/cheque/{{ serial.upload_path.split('/')[-1] if '/' in serial.upload_path else serial.upload_path }}" target="_blank" class="btn btn-sm btn-info upload-view-btn" title="View uploaded file">
                                                     <i class="fas fa-eye"></i>
                                                 </a>
                                             {% else %}
@@ -94,8 +148,7 @@
                                                 <button type="button" 
                                                         class="btn btn-sm btn-primary upload-btn" 
                                                         onclick="document.getElementById('upload_{{ serial.id }}').click()"
-                                                        title="Upload image"
-                                                        style="text-decoration: none; border: none; padding: 0.25rem 0.5rem;">
+                                                        title="Upload image">
                                                     <i class="fas fa-upload"></i>
                                                 </button>
                                             {% endif %}
@@ -106,20 +159,207 @@
                             </tbody>
                         </table>
                     </div>
+                    <div class="pagination-container cheque-book-pagination" data-book-no="{{ group.grouper }}">
+                        <div class="pagination-left">
+                            <div class="pagination-info">
+                                <span class="cheque-pagination-info-text">Showing 1 to 0 of 0 cheques</span>
+                            </div>
+                            <div class="items-per-page">
+                                <label>Show:</label>
+                                <select class="cheque-per-page-select" data-book-no="{{ group.grouper }}">
+                                    <option value="10" selected>10</option>
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                                <span>per page</span>
+                            </div>
+                        </div>
+                        <div class="pagination cheque-pagination-buttons" data-book-no="{{ group.grouper }}">
+                            <!-- Prev / page numbers / Next filled by JS -->
+                        </div>
+                    </div>
+                    </div>
                 </div>
-                {% endfor %}
-            {% else %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="card" style="border: 1px solid #dee2e6; border-radius: 8px; background: #fff;">
+            <div class="card-body">
                 <div class="empty-state">
                     <i class="fas fa-book"></i>
                     <p>No cheque records found. Create a new book to get started.</p>
                 </div>
-            {% endif %}
+            </div>
         </div>
-    </div>
+    {% endif %}
 </div>
 
 <script>
+var chequePaginationState = {};
+
+function getVisibleRowsForBook(bookNo) {
+    var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
+    if (!section) return [];
+    var rows = section.querySelectorAll('.data-table tbody tr[data-book-no="' + bookNo + '"]');
+    return Array.from(rows).filter(function(tr) { return tr.getAttribute('data-search-visible') !== 'false'; });
+}
+
+function renderBookPagination(bookNo) {
+    var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
+    if (!section) return;
+    var state = chequePaginationState[bookNo] || { page: 1, per_page: 10 };
+    chequePaginationState[bookNo] = state;
+    var visible = getVisibleRowsForBook(bookNo);
+    var total = visible.length;
+    var perPage = Math.max(1, parseInt(state.per_page, 10) || 10);
+    var pages = total === 0 ? 1 : Math.ceil(total / perPage);
+    var page = Math.max(1, Math.min(state.page, pages));
+
+    visible.forEach(function(tr, idx) {
+        var start = (page - 1) * perPage;
+        var end = start + perPage;
+        tr.style.display = (idx >= start && idx < end) ? '' : 'none';
+    });
+    var allRows = section.querySelectorAll('.data-table tbody tr[data-book-no="' + bookNo + '"]');
+    allRows.forEach(function(tr) {
+        if (tr.getAttribute('data-search-visible') === 'false') tr.style.display = 'none';
+    });
+
+    var startIdx = total === 0 ? 0 : (page - 1) * perPage + 1;
+    var endIdx = Math.min(page * perPage, total);
+    var infoEl = document.querySelector('.cheque-book-pagination[data-book-no="' + bookNo + '"] .cheque-pagination-info-text');
+    if (infoEl) infoEl.textContent = 'Showing ' + startIdx + ' to ' + endIdx + ' of ' + total + ' cheques';
+
+    var btnContainer = document.querySelector('.cheque-book-pagination[data-book-no="' + bookNo + '"] .cheque-pagination-buttons');
+    if (!btnContainer) return;
+    btnContainer.innerHTML = '';
+    btnContainer.style.display = pages <= 1 ? 'none' : 'flex';
+    if (pages <= 1) return;
+
+    if (page > 1) {
+        var prevBtn = document.createElement('button');
+        prevBtn.type = 'button';
+        prevBtn.className = 'btn btn-sm btn-secondary';
+        prevBtn.setAttribute('data-book-no', bookNo);
+        prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i> Previous';
+        prevBtn.addEventListener('click', function() { state.page = page - 1; renderBookPagination(bookNo); });
+        btnContainer.appendChild(prevBtn);
+    }
+
+    function iterPages(leftEdge, rightEdge, leftCurrent, rightCurrent) {
+        var result = [];
+        var last = 0;
+        for (var num = 1; num <= pages; num++) {
+            var show = num <= leftEdge ||
+                (num > page - leftCurrent - 1 && num < page + rightCurrent) ||
+                num > pages - rightEdge;
+            if (show) {
+                if (last + 1 !== num) result.push(null);
+                result.push(num);
+                last = num;
+            }
+        }
+        return result;
+    }
+    var pageNums = iterPages(2, 2, 2, 5);
+    pageNums.forEach(function(p) {
+        if (p === null) {
+            var ellipsis = document.createElement('span');
+            ellipsis.className = 'pagination-ellipsis';
+            ellipsis.textContent = '...';
+            btnContainer.appendChild(ellipsis);
+        } else {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = p === page ? 'btn btn-sm btn-primary cheque-pagination-current' : 'btn btn-sm btn-outline';
+            btn.setAttribute('data-book-no', bookNo);
+            btn.setAttribute('data-page', p);
+            btn.textContent = p;
+            if (p !== page) {
+                btn.addEventListener('click', function() {
+                    var b = this.getAttribute('data-book-no');
+                    var pg = parseInt(this.getAttribute('data-page'), 10);
+                    chequePaginationState[b].page = pg;
+                    renderBookPagination(b);
+                });
+            }
+            btnContainer.appendChild(btn);
+        }
+    });
+
+    if (page < pages) {
+        var nextBtn = document.createElement('button');
+        nextBtn.type = 'button';
+        nextBtn.className = 'btn btn-sm btn-secondary';
+        nextBtn.setAttribute('data-book-no', bookNo);
+        nextBtn.innerHTML = 'Next <i class="fas fa-chevron-right"></i>';
+        nextBtn.addEventListener('click', function() { state.page = page + 1; renderBookPagination(bookNo); });
+        btnContainer.appendChild(nextBtn);
+    }
+}
+
+function refreshAllChequePagination() {
+    document.querySelectorAll('.cheque-register-page .book-section[data-book-no]').forEach(function(section) {
+        var bookNo = section.getAttribute('data-book-no');
+        if (bookNo) renderBookPagination(bookNo);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Collapsible book section headers
+    document.querySelectorAll('.cheque-register-page .book-section-header').forEach(function(header) {
+        var section = header.closest('.book-section');
+        if (!section) return;
+        function toggleSection() {
+            section.classList.toggle('collapsed');
+            var expanded = !section.classList.contains('collapsed');
+            header.setAttribute('aria-expanded', expanded);
+        }
+        header.addEventListener('click', toggleSection);
+        header.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection(); }
+        });
+    });
+
+    // Per-book pagination state and render
+    document.querySelectorAll('.cheque-register-page .book-section[data-book-no]').forEach(function(section) {
+        var bookNo = section.getAttribute('data-book-no');
+        if (!chequePaginationState[bookNo]) chequePaginationState[bookNo] = { page: 1, per_page: 10 };
+        renderBookPagination(bookNo);
+    });
+    document.querySelectorAll('.cheque-per-page-select').forEach(function(sel) {
+        sel.addEventListener('change', function() {
+            var bookNo = this.getAttribute('data-book-no');
+            chequePaginationState[bookNo].per_page = parseInt(this.value, 10);
+            chequePaginationState[bookNo].page = 1;
+            renderBookPagination(bookNo);
+        });
+    });
+
+    // Client-side search: filter table rows by serial #, payee, amount, date, book
+    const searchInput = document.getElementById('chequeSearchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const q = (this.value || '').trim().toLowerCase();
+            document.querySelectorAll('.cheque-register-page .book-section').forEach(function(section) {
+                let visibleCount = 0;
+                section.querySelectorAll('.data-table tbody tr').forEach(function(tr) {
+                    const cells = tr.querySelectorAll('td');
+                    const rowText = Array.from(cells).map(function(c) { return (c.textContent || '').trim(); }).join(' ').toLowerCase();
+                    const show = !q || rowText.indexOf(q) !== -1;
+                    tr.setAttribute('data-search-visible', show ? 'true' : 'false');
+                    tr.style.display = show ? '' : 'none';
+                    if (show) visibleCount++;
+                });
+                var card = section.closest('.cheque-book-card');
+                if (card) card.style.display = visibleCount > 0 ? '' : 'none';
+            });
+            refreshAllChequePagination();
+        });
+    }
+
     // Handle file upload for cheque serials
     const uploadInputs = document.querySelectorAll('.cheque-upload-input');
     
