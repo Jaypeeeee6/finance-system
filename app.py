@@ -20502,41 +20502,69 @@ def reserve_cheque():
             return jsonify({'success': False, 'error': str(e)}), 500
 
 
+# Bank names for cheque book and new request (same list)
+CHEQUE_BANK_NAMES = [
+    'Bank Dhofar', 'Bank Muscat', 'National Bank of Oman', 'Oman Arab Bank',
+    'Bank Sohar', 'HSBC Bank Oman', 'Ahli Bank', 'Oman Development Bank', 'Oman Housing Bank',
+    'Meethaq Islamic Banking (Bank Dhofar)', 'Meethaq Islamic Banking (Bank Muscat)',
+    'Muzn Islamic Banking (National Bank of Oman)', 'Al Hilal Islamic Banking (Ahli Bank)',
+    'National Bank of Abu Dhabi', 'Qatar National Bank', 'Standard Chartered Bank',
+    'Bank of Baroda', 'Bank of Beirut', 'State Bank of India', 'Habib Bank AG Zurich',
+    'Alizz Islamic Bank', 'Sohar Islamic (Sohar Bank)',
+    'Al Yusr Islamic Banking Services (Oman Arab Bank)', 'Bank Nizwa', 'Mashreq Bank',
+]
+
+
 @app.route('/cheque-register/new-book', methods=['GET', 'POST'])
 @login_required
 def new_book():
     """Add new cheque book"""
+    book_holders = User.query.filter(
+        User.role.in_(['CEO', 'GM', 'Operation Manager'])
+    ).order_by(User.name).all()
+    bank_names = CHEQUE_BANK_NAMES
+
     if request.method == 'POST':
         book_no = request.form.get('book_no')
         start_serial_no = request.form.get('start_serial_no')
         last_serial_no = request.form.get('last_serial_no')
-        
+        book_holder_user_id = request.form.get('book_holder_user_id')
+        bank_name = request.form.get('bank_name', '').strip() or None
+
         # Validation
         try:
             book_no = int(book_no)
             start_serial_no = int(start_serial_no)
             last_serial_no = int(last_serial_no)
-            
+            book_holder_user_id = int(book_holder_user_id) if book_holder_user_id else None
+
             if start_serial_no > last_serial_no:
                 flash('Starting serial number must be less than or equal to last serial number', 'error')
-                return render_template('new_book.html')
-            
+                return render_template('new_book.html', book_holders=book_holders, bank_names=bank_names)
+
+            serial_count = last_serial_no - start_serial_no + 1
+            if serial_count > 50:
+                flash('Maximum 50 serial numbers (cheques) per book allowed. This range would generate more.', 'error')
+                return render_template('new_book.html', book_holders=book_holders, bank_names=bank_names)
+
             # Check if book number already exists
             existing_book = ChequeBook.query.filter_by(book_no=book_no).first()
             if existing_book:
                 flash(f'Book number {book_no} already exists. Please use a different book number.', 'error')
-                return render_template('new_book.html')
-            
+                return render_template('new_book.html', book_holders=book_holders, bank_names=bank_names)
+
             # Create the cheque book
             cheque_book = ChequeBook(
                 book_no=book_no,
                 start_serial_no=start_serial_no,
                 last_serial_no=last_serial_no,
+                book_holder_user_id=book_holder_user_id,
+                bank_name=bank_name,
                 created_by_user_id=current_user.user_id
             )
             db.session.add(cheque_book)
             db.session.flush()  # Get the book ID
-            
+
             # Generate all serial numbers from start to last (inclusive)
             serial_numbers = []
             for serial_no in range(start_serial_no, last_serial_no + 1):
@@ -20546,21 +20574,21 @@ def new_book():
                     status='Available'
                 )
                 serial_numbers.append(cheque_serial)
-            
+
             db.session.add_all(serial_numbers)
             db.session.commit()
-            
+
             flash(f'Book {book_no} created successfully with {len(serial_numbers)} serial numbers ({start_serial_no} to {last_serial_no})', 'success')
             return redirect(url_for('cheque_register'))
         except ValueError:
             flash('Please enter valid numbers for all fields', 'error')
-            return render_template('new_book.html')
+            return render_template('new_book.html', book_holders=book_holders, bank_names=bank_names)
         except Exception as e:
             db.session.rollback()
             flash(f'Error creating book: {str(e)}', 'error')
-            return render_template('new_book.html')
-    
-    return render_template('new_book.html')
+            return render_template('new_book.html', book_holders=book_holders, bank_names=bank_names)
+
+    return render_template('new_book.html', book_holders=book_holders, bank_names=bank_names)
 
 
 @app.route('/api/request-types')
@@ -23945,6 +23973,21 @@ if __name__ == '__main__':
                 print("✓ Added 'is_draft' column to payment_requests table")
             else:
                 print("✓ 'is_draft' column already exists in payment_requests table")
+
+            # Migrate: Add book_holder_user_id and bank_name to cheque_books table if they don't exist
+            try:
+                cursor.execute("PRAGMA table_info(cheque_books)")
+                cheque_book_columns = [row[1] for row in cursor.fetchall()]
+                if 'book_holder_user_id' not in cheque_book_columns:
+                    cursor.execute("ALTER TABLE cheque_books ADD COLUMN book_holder_user_id INTEGER REFERENCES users(user_id)")
+                    conn.commit()
+                    print("✓ Added 'book_holder_user_id' column to cheque_books table")
+                if 'bank_name' not in cheque_book_columns:
+                    cursor.execute("ALTER TABLE cheque_books ADD COLUMN bank_name VARCHAR(200)")
+                    conn.commit()
+                    print("✓ Added 'bank_name' column to cheque_books table")
+            except Exception as e_cheque:
+                print(f"Note: cheque_books migration skipped or already applied: {e_cheque}")
             
             conn.close()
         except Exception as e:

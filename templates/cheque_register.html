@@ -5,6 +5,7 @@
 {% block extra_css %}
 <style>
 .cheque-register-page .book-section-title { margin-bottom: 1rem; }
+.cheque-register-page .book-heading-meta { color: #6c757d; font-size: 0.85em; font-weight: normal; }
 .cheque-register-page .book-section-header {
     display: flex;
     align-items: center;
@@ -14,6 +15,7 @@
     padding: 0.25rem 0;
     margin-bottom: 0;
 }
+.cheque-register-page .book-heading-serial-range { margin-left: auto; color: #6c757d; font-size: 0.98em; font-weight: normal; }
 .cheque-register-page .book-section-header:hover { opacity: 0.85; }
 .cheque-register-page .book-section-header .book-section-chevron {
     transition: transform 0.2s ease;
@@ -153,7 +155,8 @@
                 <div class="book-section collapsed" data-book-no="{{ group.grouper }}">
                     <div class="book-section-header" role="button" tabindex="0" aria-expanded="false" aria-controls="book-content-{{ group.grouper }}" id="book-header-{{ group.grouper }}">
                         <span class="book-section-chevron" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
-                        <h3 class="book-section-title" style="margin:0;">Book No. {{ group.grouper }}</h3>
+                        <h3 class="book-section-title" style="margin:0;">Book No. {{ group.grouper }}{% if group.list %}{% set book = group.list[0].book %}{% if book and (book.book_holder or book.bank_name) %}<span class="book-heading-meta"> — {{ book.book_holder.name if book.book_holder else '' }}{% if book.book_holder and book.bank_name %}, {% endif %}{{ book.bank_name or '' }}</span>{% endif %}{% endif %}</h3>
+                        {% if group.list %}<span class="book-heading-serial-range">Serial No: {{ group.list[0].serial_no }} - {{ group.list[-1].serial_no }}</span>{% endif %}
                     </div>
                     <div class="book-section-content" id="book-content-{{ group.grouper }}">
                     {% if current_user.department == 'IT' %}

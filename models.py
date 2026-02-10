@@ -724,11 +724,15 @@ class ChequeBook(db.Model):
     book_no = db.Column(db.Integer, nullable=False, unique=True)
     start_serial_no = db.Column(db.Integer, nullable=False)
     last_serial_no = db.Column(db.Integer, nullable=False)
+    book_holder_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    bank_name = db.Column(db.String(200), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
     
     # Relationship to User who created this book
-    created_by = db.relationship('User', backref='created_cheque_books')
+    created_by = db.relationship('User', backref='created_cheque_books', foreign_keys=[created_by_user_id])
+    # Relationship to User who holds the book (CEO, GM, Operation Manager)
+    book_holder = db.relationship('User', backref='cheque_books_held', foreign_keys=[book_holder_user_id])
     
     # Relationship to serial numbers
     serials = db.relationship('ChequeSerial', backref='book', cascade='all, delete-orphan', lazy='dynamic')
