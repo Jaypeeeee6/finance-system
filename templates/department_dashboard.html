@@ -33,6 +33,11 @@
         <a href="{{ url_for('drafts') }}" class="btn btn-secondary">
             <i class="fas fa-file-alt"></i> My Drafts
         </a>
+        {% if user.department == 'Auditing' %}
+        <a href="{{ url_for('cheque_register') }}" class="btn btn-success">
+            <i class="fas fa-book"></i> Cheque Registration
+        </a>
+        {% endif %}
     </div>
 
     <!-- Tab Navigation -->

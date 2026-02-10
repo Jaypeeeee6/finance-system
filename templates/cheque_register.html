@@ -68,6 +68,28 @@
 .cheque-register-page .upload-btn:disabled i {
     color: #9ca3af !important;
 }
+.cheque-register-page .cheque-book-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+.cheque-register-page .cheque-book-toolbar .btn-delete-selected {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.875rem;
+    background-color: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: #fff !important;
+}
+.cheque-register-page .cheque-book-toolbar .btn-delete-selected:hover {
+    background-color: transparent !important;
+    border-color: #dc3545 !important;
+    color: #dc3545 !important;
+}
+.cheque-register-page .cheque-book-toolbar .btn-delete-selected:hover i {
+    color: #dc3545 !important;
+}
 </style>
 {% endblock %}
 
@@ -79,12 +101,14 @@
     </div>
 
     <div class="dashboard-actions">
+        {% if current_user.department != 'Auditing' %}
         <a href="{{ url_for('reserve_cheque') }}" class="btn btn-primary">
             <i class="fas fa-bookmark"></i> Reserve
         </a>
         <a href="{{ url_for('write_cheque') }}" class="btn btn-success">
             <i class="fas fa-file-invoice"></i> Write Cheque
         </a>
+        {% endif %}
         <a href="{{ url_for('new_book') }}" class="btn btn-success">
             <i class="fas fa-plus-circle"></i> New Book
         </a>
@@ -132,10 +156,22 @@
                         <h3 class="book-section-title" style="margin:0;">Book No. {{ group.grouper }}</h3>
                     </div>
                     <div class="book-section-content" id="book-content-{{ group.grouper }}">
+                    {% if current_user.department == 'IT' %}
+                    <div class="cheque-book-toolbar" data-book-no="{{ group.grouper }}" style="display: none;">
+                        <button type="button" class="btn btn-danger btn-sm btn-delete-selected" data-book-no="{{ group.grouper }}">
+                            <i class="fas fa-trash-alt"></i> Delete
+                        </button>
+                    </div>
+                    {% endif %}
                     <div class="table-responsive cheque-register-table-wrap">
                         <table class="data-table cheque-book-table">
                             <thead>
                                 <tr>
+                                    {% if current_user.department == 'IT' %}
+                                    <th class="cheque-th-select">
+                                        <input type="checkbox" class="cheque-select-all" data-book-no="{{ group.grouper }}" aria-label="Select all">
+                                    </th>
+                                    {% endif %}
                                     <th>Book No.</th>
                                     <th>Serial No.</th>
                                     <th>Status</th>
@@ -147,7 +183,12 @@
                             </thead>
                             <tbody>
                                 {% for serial in group.list %}
-                                <tr data-book-no="{{ group.grouper }}">
+                                <tr data-book-no="{{ group.grouper }}" data-serial-id="{{ serial.id }}">
+                                    {% if current_user.department == 'IT' %}
+                                    <td class="cheque-td-select">
+                                        <input type="checkbox" class="cheque-row-select" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" aria-label="Select serial {{ serial.serial_no }}">
+                                    </td>
+                                    {% endif %}
                                     <td>{{ serial.book.book_no }}</td>
                                     <td>{{ serial.serial_no }}</td>
                                     <td>
@@ -463,6 +504,82 @@ document.addEventListener('DOMContentLoaded', function() {
                 uploadBtn.innerHTML = '<i class="fas fa-upload"></i>';
                 this.value = '';
             });
+        });
+    });
+
+    // IT only: checkbox column and Delete button
+    function updateDeleteToolbarForBook(bookNo) {
+        var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
+        if (!section) return;
+        var toolbar = section.querySelector('.cheque-book-toolbar');
+        if (!toolbar) return;
+        var checked = section.querySelectorAll('.cheque-row-select:checked');
+        toolbar.style.display = checked.length > 0 ? 'flex' : 'none';
+        var selectAll = section.querySelector('.cheque-select-all');
+        if (selectAll) {
+            var allRows = section.querySelectorAll('.cheque-row-select');
+            selectAll.checked = allRows.length > 0 && checked.length === allRows.length;
+            selectAll.indeterminate = checked.length > 0 && checked.length < allRows.length;
+        }
+    }
+    document.querySelectorAll('.cheque-row-select').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            updateDeleteToolbarForBook(this.getAttribute('data-book-no'));
+        });
+    });
+    document.querySelectorAll('.cheque-select-all').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            var bookNo = this.getAttribute('data-book-no');
+            var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
+            if (!section) return;
+            section.querySelectorAll('.cheque-row-select').forEach(function(rowCb) {
+                rowCb.checked = cb.checked;
+            });
+            updateDeleteToolbarForBook(bookNo);
+        });
+    });
+    document.querySelectorAll('.btn-delete-selected').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var bookNo = this.getAttribute('data-book-no');
+            var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
+            if (!section) return;
+            var checked = section.querySelectorAll('.cheque-row-select:checked');
+            if (checked.length === 0) return;
+            var serialIds = Array.from(checked).map(function(c) { return parseInt(c.getAttribute('data-serial-id'), 10); });
+            var totalInBook = section.querySelectorAll('.cheque-row-select').length;
+            var msg = totalInBook === checked.length
+                ? 'Delete all ' + totalInBook + ' cheque(s) in this book? The entire book will be removed.'
+                : 'Delete ' + checked.length + ' selected cheque(s)?';
+            if (!confirm(msg)) return;
+            btn.disabled = true;
+            fetch('{{ url_for("delete_cheque_serials") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ serial_ids: serialIds })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    if (data.deleted_books && data.deleted_books.indexOf(parseInt(bookNo, 10)) !== -1) {
+                        var card = section.closest('.cheque-book-card');
+                        if (card) card.remove();
+                    } else {
+                        (data.deleted_serial_ids || []).forEach(function(id) {
+                            var row = section.querySelector('tr[data-serial-id="' + id + '"]');
+                            if (row) row.remove();
+                        });
+                        updateDeleteToolbarForBook(bookNo);
+                        renderBookPagination(bookNo);
+                    }
+                } else {
+                    alert(data.error || 'Delete failed.');
+                }
+            })
+            .catch(function(err) {
+                console.error(err);
+                alert('An error occurred. Please try again.');
+            })
+            .finally(function() { btn.disabled = false; });
         });
     });
 });

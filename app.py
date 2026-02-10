@@ -22681,6 +22681,48 @@ def upload_cheque_file():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/cheque-register/delete', methods=['POST'])
+@login_required
+def delete_cheque_serials():
+    """Delete selected cheque serials (IT only). If all serials of a book are selected, delete the book too."""
+    if current_user.department != 'IT':
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+    try:
+        data = request.get_json()
+        serial_ids = data.get('serial_ids', [])
+        if not serial_ids:
+            return jsonify({'success': False, 'error': 'No serials selected'}), 400
+        serials = ChequeSerial.query.filter(ChequeSerial.id.in_(serial_ids)).all()
+        if not serials:
+            return jsonify({'success': False, 'error': 'No valid serials found'}), 404
+        # Collect book_ids that are affected
+        affected_book_ids = list({s.book_id for s in serials})
+        deleted_serial_ids = [s.id for s in serials]
+        # Delete serials
+        for s in serials:
+            db.session.delete(s)
+        db.session.flush()
+        # For any book that has no serials left, delete the book
+        deleted_books = []
+        for book_id in affected_book_ids:
+            remaining = ChequeSerial.query.filter_by(book_id=book_id).count()
+            if remaining == 0:
+                book = ChequeBook.query.get(book_id)
+                if book:
+                    deleted_books.append(book.book_no)
+                    db.session.delete(book)
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'deleted_serial_ids': deleted_serial_ids,
+            'deleted_books': deleted_books,
+            'message': f'Deleted {len(deleted_serial_ids)} cheque(s).'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 # ==================== ERROR HANDLERS ====================
 
 @app.errorhandler(404)
