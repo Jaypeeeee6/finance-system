@@ -20591,6 +20591,84 @@ def new_book():
     return render_template('new_book.html', book_holders=book_holders, bank_names=bank_names)
 
 
+@app.route('/cheque-register/edit-book/<int:book_no>', methods=['GET', 'POST'])
+@login_required
+def edit_book(book_no):
+    """Edit an existing cheque book"""
+    book = ChequeBook.query.filter_by(book_no=book_no).first()
+    if not book:
+        flash('Book not found.', 'error')
+        return redirect(url_for('cheque_register'))
+    book_holders = User.query.filter(
+        User.role.in_(['CEO', 'GM', 'Operation Manager'])
+    ).order_by(User.name).all()
+    bank_names = CHEQUE_BANK_NAMES
+
+    if request.method == 'POST':
+        new_book_no = request.form.get('book_no')
+        start_serial_no = request.form.get('start_serial_no')
+        last_serial_no = request.form.get('last_serial_no')
+        book_holder_user_id = request.form.get('book_holder_user_id')
+        bank_name = request.form.get('bank_name', '').strip() or None
+
+        try:
+            new_book_no = int(new_book_no)
+            start_serial_no = int(start_serial_no)
+            last_serial_no = int(last_serial_no)
+            book_holder_user_id = int(book_holder_user_id) if book_holder_user_id else None
+
+            if start_serial_no > last_serial_no:
+                flash('Starting serial number must be less than or equal to last serial number', 'error')
+                return render_template('edit_book.html', book=book, book_holders=book_holders, bank_names=bank_names)
+
+            serial_count = last_serial_no - start_serial_no + 1
+            if serial_count > 50:
+                flash('Maximum 50 serial numbers (cheques) per book allowed. This range would generate more.', 'error')
+                return render_template('edit_book.html', book=book, book_holders=book_holders, bank_names=bank_names)
+
+            if new_book_no != book_no:
+                existing = ChequeBook.query.filter_by(book_no=new_book_no).first()
+                if existing:
+                    flash(f'Book number {new_book_no} already exists. Please use a different book number.', 'error')
+                    return render_template('edit_book.html', book=book, book_holders=book_holders, bank_names=bank_names)
+
+            existing_serials = [s.serial_no for s in book.serials.all()]
+            if existing_serials:
+                min_serial = min(existing_serials)
+                max_serial = max(existing_serials)
+                if start_serial_no > min_serial or last_serial_no < max_serial:
+                    flash(f'Serial range must include all existing serials ({min_serial} to {max_serial}). You may only expand the range.', 'error')
+                    return render_template('edit_book.html', book=book, book_holders=book_holders, bank_names=bank_names)
+
+            book.book_no = new_book_no
+            book.start_serial_no = start_serial_no
+            book.last_serial_no = last_serial_no
+            book.book_holder_user_id = book_holder_user_id
+            book.bank_name = bank_name
+            db.session.flush()
+
+            existing_set = set(existing_serials)
+            for serial_no in range(start_serial_no, last_serial_no + 1):
+                if serial_no not in existing_set:
+                    db.session.add(ChequeSerial(
+                        book_id=book.id,
+                        serial_no=serial_no,
+                        status='Available'
+                    ))
+            db.session.commit()
+            flash(f'Book {new_book_no} updated successfully.', 'success')
+            return redirect(url_for('cheque_register'))
+        except ValueError:
+            flash('Please enter valid numbers for all fields', 'error')
+            return render_template('edit_book.html', book=book, book_holders=book_holders, bank_names=bank_names)
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating book: {str(e)}', 'error')
+            return render_template('edit_book.html', book=book, book_holders=book_holders, bank_names=bank_names)
+
+    return render_template('edit_book.html', book=book, book_holders=book_holders, bank_names=bank_names)
+
+
 @app.route('/api/request-types')
 @login_required
 def api_request_types():

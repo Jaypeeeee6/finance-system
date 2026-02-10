@@ -16,6 +16,7 @@
     margin-bottom: 0;
 }
 .cheque-register-page .book-heading-serial-range { margin-left: auto; color: #6c757d; font-size: 0.98em; font-weight: normal; }
+.cheque-register-page .book-section-header .btn-edit-book { margin-left: 0.5rem; }
 .cheque-register-page .book-section-header:hover { opacity: 0.85; }
 .cheque-register-page .book-section-header .book-section-chevron {
     transition: transform 0.2s ease;
@@ -92,10 +93,38 @@
 .cheque-register-page .cheque-book-toolbar .btn-delete-selected:hover i {
     color: #dc3545 !important;
 }
+.cheque-register-page .cheque-book-toolbar .btn-reserve-only,
+.cheque-register-page .cheque-book-toolbar .btn-reserve-write {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.875rem;
+}
+.cheque-register-page .cheque-book-toolbar .btn-reserve-only {
+    background-color: #D9BD7D !important;
+    border-color: #D9BD7D !important;
+    color: #fff !important;
+}
+.cheque-register-page .cheque-book-toolbar .btn-reserve-only:hover {
+    background-color: transparent !important;
+    border-color: #D9BD7D !important;
+    color: #D9BD7D !important;
+}
+.cheque-register-page .cheque-book-toolbar .btn-reserve-write {
+    background-color: #28a745 !important;
+    border-color: #28a745 !important;
+    color: #fff !important;
+}
+.cheque-register-page .cheque-book-toolbar .btn-reserve-write:hover {
+    background-color: transparent !important;
+    border-color: #28a745 !important;
+    color: #28a745 !important;
+}
 </style>
 {% endblock %}
 
 {% block content %}
+{% set show_select_it = current_user.department == 'IT' %}
+{% set show_select_ceo_gm_op = current_user.role in ['CEO', 'GM', 'Operation Manager'] %}
+{% set show_cheque_select = show_select_it or show_select_ceo_gm_op %}
 <div class="dashboard-container cheque-register-page">
     <div class="dashboard-header">
         <h2 class="dashboard-title" style="margin:0; display:inline-flex; align-items:center; gap:8px; font-size:1.6rem; font-weight:700;"><i class="fas fa-book"></i> Cheque Register</h2>
@@ -140,7 +169,7 @@
                     <option value="Cancelled" {% if status_filter == 'Cancelled' %}selected{% endif %}>Cancelled</option>
                 </select>
                 {% if book_filter or status_filter %}
-                <a href="{{ url_for('cheque_register') }}" class="btn btn-sm btn-outline">
+                <a href="{{ url_for('cheque_register') }}" class="btn btn-sm btn-outline" onclick="saveChequeExpandedBooks();">
                     <i class="fas fa-times"></i> Clear filters
                 </a>
                 {% endif %}
@@ -157,20 +186,38 @@
                         <span class="book-section-chevron" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
                         <h3 class="book-section-title" style="margin:0;">Book No. {{ group.grouper }}{% if group.list %}{% set book = group.list[0].book %}{% if book and (book.book_holder or book.bank_name) %}<span class="book-heading-meta"> — {{ book.book_holder.name if book.book_holder else '' }}{% if book.book_holder and book.bank_name %}, {% endif %}{{ book.bank_name or '' }}</span>{% endif %}{% endif %}</h3>
                         {% if group.list %}<span class="book-heading-serial-range">Serial No: {{ group.list[0].serial_no }} - {{ group.list[-1].serial_no }}</span>{% endif %}
+                        <a href="{{ url_for('edit_book', book_no=group.grouper) }}" class="btn btn-sm btn-outline btn-edit-book" onclick="event.stopPropagation();" title="Edit book">Edit</a>
                     </div>
                     <div class="book-section-content" id="book-content-{{ group.grouper }}">
-                    {% if current_user.department == 'IT' %}
-                    <div class="cheque-book-toolbar" data-book-no="{{ group.grouper }}" style="display: none;">
+                    {% if show_select_it %}
+                    <div class="cheque-book-toolbar cheque-toolbar-it" data-book-no="{{ group.grouper }}" style="display: none;">
                         <button type="button" class="btn btn-danger btn-sm btn-delete-selected" data-book-no="{{ group.grouper }}">
                             <i class="fas fa-trash-alt"></i> Delete
                         </button>
+                    </div>
+                    {% endif %}
+                    {% if show_select_ceo_gm_op %}
+                    <div class="cheque-book-toolbar cheque-toolbar-reserve" data-book-no="{{ group.grouper }}" style="display: none;">
+                        <span class="toolbar-reserve-actions" style="display: none;">
+                            <button type="button" class="btn btn-sm btn-reserve-only" data-book-no="{{ group.grouper }}">
+                                <i class="fas fa-bookmark"></i> Reserve Only
+                            </button>
+                            <button type="button" class="btn btn-sm btn-reserve-write" data-book-no="{{ group.grouper }}">
+                                <i class="fas fa-file-invoice"></i> Reserve & Write
+                            </button>
+                        </span>
+                        <span class="toolbar-write-only" style="display: none;">
+                            <a href="{{ url_for('write_cheque') }}" class="btn btn-sm btn-reserve-write btn-write-cheque" data-book-no="{{ group.grouper }}" onclick="saveChequeExpandedBooks();">
+                                <i class="fas fa-file-invoice"></i> Write Cheque
+                            </a>
+                        </span>
                     </div>
                     {% endif %}
                     <div class="table-responsive cheque-register-table-wrap">
                         <table class="data-table cheque-book-table">
                             <thead>
                                 <tr>
-                                    {% if current_user.department == 'IT' %}
+                                    {% if show_cheque_select %}
                                     <th class="cheque-th-select">
                                         <input type="checkbox" class="cheque-select-all" data-book-no="{{ group.grouper }}" aria-label="Select all">
                                     </th>
@@ -186,10 +233,10 @@
                             </thead>
                             <tbody>
                                 {% for serial in group.list %}
-                                <tr data-book-no="{{ group.grouper }}" data-serial-id="{{ serial.id }}">
-                                    {% if current_user.department == 'IT' %}
+                                <tr data-book-no="{{ group.grouper }}" data-serial-id="{{ serial.id }}" data-status="{{ serial.status }}">
+                                    {% if show_cheque_select %}
                                     <td class="cheque-td-select">
-                                        <input type="checkbox" class="cheque-row-select" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" aria-label="Select serial {{ serial.serial_no }}">
+                                        <input type="checkbox" class="cheque-row-select" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" aria-label="Select serial {{ serial.serial_no }}" {% if show_select_ceo_gm_op and serial.status in ('Used', 'Cancelled') %}disabled{% endif %}>
                                     </td>
                                     {% endif %}
                                     <td>{{ serial.book.book_no }}</td>
@@ -384,6 +431,34 @@ function refreshAllChequePagination() {
     });
 }
 
+var CHEQUE_EXPANDED_STORAGE_KEY = 'cheque_register_expanded_books';
+function saveChequeExpandedBooks() {
+    var expanded = [];
+    document.querySelectorAll('.cheque-register-page .book-section[data-book-no]').forEach(function(section) {
+        if (!section.classList.contains('collapsed')) {
+            var bookNo = section.getAttribute('data-book-no');
+            if (bookNo) expanded.push(bookNo);
+        }
+    });
+    try { sessionStorage.setItem(CHEQUE_EXPANDED_STORAGE_KEY, JSON.stringify(expanded)); } catch (e) {}
+}
+function restoreChequeExpandedBooks() {
+    try {
+        var raw = sessionStorage.getItem(CHEQUE_EXPANDED_STORAGE_KEY);
+        if (!raw) return;
+        var expanded = JSON.parse(raw);
+        if (!Array.isArray(expanded) || expanded.length === 0) return;
+        expanded.forEach(function(bookNo) {
+            var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
+            if (section) {
+                section.classList.remove('collapsed');
+                var header = section.querySelector('.book-section-header');
+                if (header) header.setAttribute('aria-expanded', 'true');
+            }
+        });
+    } catch (e) {}
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Collapsible book section headers
     document.querySelectorAll('.cheque-register-page .book-section-header').forEach(function(header) {
@@ -399,6 +474,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection(); }
         });
     });
+    restoreChequeExpandedBooks();
 
     // Per-book pagination state and render
     document.querySelectorAll('.cheque-register-page .book-section[data-book-no]').forEach(function(section) {
@@ -511,24 +587,38 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // IT only: checkbox column and Delete button
-    function updateDeleteToolbarForBook(bookNo) {
+    // Checkbox column: IT (Delete) or CEO/GM/Operation Manager (Reserve toolbar)
+    function updateSelectToolbarForBook(bookNo) {
         var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
         if (!section) return;
-        var toolbar = section.querySelector('.cheque-book-toolbar');
-        if (!toolbar) return;
         var checked = section.querySelectorAll('.cheque-row-select:checked');
-        toolbar.style.display = checked.length > 0 ? 'flex' : 'none';
+        var toolbarIt = section.querySelector('.cheque-toolbar-it');
+        var toolbarReserve = section.querySelector('.cheque-toolbar-reserve');
+        if (toolbarIt) toolbarIt.style.display = checked.length > 0 ? 'flex' : 'none';
+        if (toolbarReserve) {
+            toolbarReserve.style.display = checked.length > 0 ? 'flex' : 'none';
+            if (checked.length > 0) {
+                var allReserved = true;
+                checked.forEach(function(cb) {
+                    var row = cb.closest('tr');
+                    if (row && row.getAttribute('data-status') !== 'Reserved') allReserved = false;
+                });
+                var reserveActions = toolbarReserve.querySelector('.toolbar-reserve-actions');
+                var writeOnly = toolbarReserve.querySelector('.toolbar-write-only');
+                if (reserveActions) reserveActions.style.display = allReserved ? 'none' : 'inline';
+                if (writeOnly) writeOnly.style.display = allReserved ? 'inline' : 'none';
+            }
+        }
         var selectAll = section.querySelector('.cheque-select-all');
         if (selectAll) {
-            var allRows = section.querySelectorAll('.cheque-row-select');
-            selectAll.checked = allRows.length > 0 && checked.length === allRows.length;
-            selectAll.indeterminate = checked.length > 0 && checked.length < allRows.length;
+            var allEnabled = section.querySelectorAll('.cheque-row-select:not([disabled])');
+            selectAll.checked = allEnabled.length > 0 && checked.length === allEnabled.length;
+            selectAll.indeterminate = checked.length > 0 && checked.length < allEnabled.length;
         }
     }
     document.querySelectorAll('.cheque-row-select').forEach(function(cb) {
         cb.addEventListener('change', function() {
-            updateDeleteToolbarForBook(this.getAttribute('data-book-no'));
+            updateSelectToolbarForBook(this.getAttribute('data-book-no'));
         });
     });
     document.querySelectorAll('.cheque-select-all').forEach(function(cb) {
@@ -536,10 +626,10 @@ document.addEventListener('DOMContentLoaded', function() {
             var bookNo = this.getAttribute('data-book-no');
             var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
             if (!section) return;
-            section.querySelectorAll('.cheque-row-select').forEach(function(rowCb) {
+            section.querySelectorAll('.cheque-row-select:not([disabled])').forEach(function(rowCb) {
                 rowCb.checked = cb.checked;
             });
-            updateDeleteToolbarForBook(bookNo);
+            updateSelectToolbarForBook(bookNo);
         });
     });
     document.querySelectorAll('.btn-delete-selected').forEach(function(btn) {
@@ -572,7 +662,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             var row = section.querySelector('tr[data-serial-id="' + id + '"]');
                             if (row) row.remove();
                         });
-                        updateDeleteToolbarForBook(bookNo);
+                        updateSelectToolbarForBook(bookNo);
                         renderBookPagination(bookNo);
                     }
                 } else {
@@ -584,6 +674,52 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('An error occurred. Please try again.');
             })
             .finally(function() { btn.disabled = false; });
+        });
+    });
+
+    // CEO/GM/Operation Manager: Reserve Only (only sets status to "Reserved") or Reserve & Write (reserve then go to write-cheque)
+    function doReserveSelected(bookNo, redirectToWrite) {
+        var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
+        if (!section) return;
+        var checked = section.querySelectorAll('.cheque-row-select:checked');
+        if (checked.length === 0) return;
+        var serialIds = Array.from(checked).map(function(c) { return parseInt(c.getAttribute('data-serial-id'), 10); });
+        var btn = section.querySelector(redirectToWrite ? '.btn-reserve-write' : '.btn-reserve-only');
+        if (btn) btn.disabled = true;
+        fetch('{{ url_for("reserve_cheque") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ serial_ids: serialIds })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                saveChequeExpandedBooks();
+                if (redirectToWrite) {
+                    window.location.href = '{{ url_for("write_cheque") }}';
+                } else {
+                    window.location.reload();
+                }
+            } else {
+                alert(data.error || 'Reserve failed.');
+            }
+        })
+        .catch(function(err) {
+            console.error(err);
+            alert('An error occurred. Please try again.');
+        })
+        .finally(function() {
+            if (btn) btn.disabled = false;
+        });
+    }
+    document.querySelectorAll('.btn-reserve-only').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            doReserveSelected(this.getAttribute('data-book-no'), false);
+        });
+    });
+    document.querySelectorAll('.btn-reserve-write').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            doReserveSelected(this.getAttribute('data-book-no'), true);
         });
     });
 });
@@ -610,6 +746,7 @@ function applyFilters() {
         url.searchParams.delete('status');
     }
     
+    saveChequeExpandedBooks();
     window.location.href = url.toString();
 }
 </script>
