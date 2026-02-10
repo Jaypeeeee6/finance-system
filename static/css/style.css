@@ -2085,6 +2085,11 @@ body {
     color: var(--white);
 }
 
+.badge-reserved {
+    background: #2563eb;
+    color: #fff;
+}
+
 .badge-info {
     background: var(--secondary-color);
     color: var(--white);
