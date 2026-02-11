@@ -14843,7 +14843,10 @@ def write_cheque():
 @login_required
 @role_required('GM', 'CEO', 'Operation Manager')
 def write_cheque_save():
-    """Save cheque data to one or more reserved serials (marks them Used)."""
+    """Save write-cheque form details to the selected cheque serials (book's cheque records).
+    Updates payee_name, cheque_date, amount on each serial and sets status to Used.
+    Data is stored in cheque_serials (linked to cheque_books via book_id) and appears in the cheque register.
+    """
     try:
         data = request.get_json() or {}
         serial_ids = data.get('serial_ids')
@@ -14862,7 +14865,7 @@ def write_cheque_save():
         payee_name = (data.get('payeeName') or '').strip()
         amount_raw = data.get('amount')
         amount = None
-        if amount_raw is not None and amount_raw != '':
+        if amount_raw is not None and str(amount_raw).strip() != '':
             try:
                 amount = float(amount_raw)
             except (TypeError, ValueError):
@@ -14872,13 +14875,13 @@ def write_cheque_save():
             s.cheque_date = None
             if cheque_date_str:
                 try:
-                    s.cheque_date = datetime.strptime(cheque_date_str, '%Y-%m-%d').date()
+                    s.cheque_date = datetime.strptime(str(cheque_date_str).strip(), '%Y-%m-%d').date()
                 except (ValueError, TypeError):
                     pass
             s.amount = amount
             s.status = 'Used'
         db.session.commit()
-        return jsonify({'success': True, 'updated_count': len(serials), 'message': f'Successfully saved {len(serials)} cheque(s).'})
+        return jsonify({'success': True, 'updated_count': len(serials), 'message': f'Successfully saved {len(serials)} cheque(s) to the book.'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500

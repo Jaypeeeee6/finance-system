@@ -118,6 +118,10 @@
     border-color: #28a745 !important;
     color: #28a745 !important;
 }
+.cheque-register-page .badge-used {
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+}
 </style>
 {% endblock %}
 
@@ -242,7 +246,7 @@
                                         <span class="badge 
                                             {% if serial.status == 'Available' %}badge-success
                                             {% elif serial.status == 'Reserved' %}badge-reserved
-                                            {% elif serial.status == 'Used' %}badge-info
+                                            {% elif serial.status == 'Used' %}badge-used
                                             {% elif serial.status == 'Cancelled' %}badge-danger
                                             {% else %}badge-secondary{% endif %}">
                                             {{ serial.status }}
