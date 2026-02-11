@@ -633,7 +633,16 @@ document.addEventListener('DOMContentLoaded', function() {
             selectAll.indeterminate = checked.length > 0 && checked.length < allEnabled.length;
         }
     }
-    // Enforce only one Used cheque selected per book; when checking a Used, uncheck other Used in same section
+    // Enforce only one status selected per book (no mixing Available / Reserved / Used)
+    function enforceSingleStatusPerBook(bookNo, allowedStatus) {
+        var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
+        if (!section || !allowedStatus) return;
+        section.querySelectorAll('.cheque-row-select:checked').forEach(function(cb) {
+            var row = cb.closest('tr');
+            if (row && row.getAttribute('data-status') !== allowedStatus) cb.checked = false;
+        });
+    }
+    // Enforce only one Used cheque selected per book
     function enforceSingleUsedPerBook(bookNo) {
         var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
         if (!section) return;
@@ -649,15 +658,10 @@ document.addEventListener('DOMContentLoaded', function() {
         cb.addEventListener('change', function() {
             var bookNo = this.getAttribute('data-book-no');
             var row = this.closest('tr');
-            var changedCb = this;
-            if (this.checked && row && row.getAttribute('data-status') === 'Used') {
-                var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
-                if (section) {
-                    section.querySelectorAll('.cheque-row-select').forEach(function(other) {
-                        var otherRow = other.closest('tr');
-                        if (other !== changedCb && otherRow && otherRow.getAttribute('data-status') === 'Used') other.checked = false;
-                    });
-                }
+            var status = row ? row.getAttribute('data-status') : null;
+            if (this.checked && status) {
+                enforceSingleStatusPerBook(bookNo, status);
+                if (status === 'Used') enforceSingleUsedPerBook(bookNo);
             }
             updateSelectToolbarForBook(bookNo);
         });
@@ -667,10 +671,19 @@ document.addEventListener('DOMContentLoaded', function() {
             var bookNo = this.getAttribute('data-book-no');
             var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
             if (!section) return;
-            section.querySelectorAll('.cheque-row-select:not([disabled])').forEach(function(rowCb) {
-                rowCb.checked = cb.checked;
-            });
-            enforceSingleUsedPerBook(bookNo);
+            if (cb.checked) {
+                var firstCb = section.querySelector('.cheque-row-select:not([disabled])');
+                var firstStatus = firstCb && firstCb.closest('tr') ? firstCb.closest('tr').getAttribute('data-status') : null;
+                section.querySelectorAll('.cheque-row-select:not([disabled])').forEach(function(rowCb) {
+                    var r = rowCb.closest('tr');
+                    rowCb.checked = r && r.getAttribute('data-status') === firstStatus;
+                });
+                if (firstStatus === 'Used') enforceSingleUsedPerBook(bookNo);
+            } else {
+                section.querySelectorAll('.cheque-row-select:not([disabled])').forEach(function(rowCb) {
+                    rowCb.checked = false;
+                });
+            }
             updateSelectToolbarForBook(bookNo);
         });
     });
