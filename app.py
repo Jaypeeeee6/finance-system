@@ -20535,7 +20535,7 @@ def reserve_cheque():
                              book_filter=book_filter)
     
     elif request.method == 'POST':
-        # Handle reservation
+        # Handle reservation: change Available -> Reserved (e.g. for "Reserve & Write")
         try:
             data = request.get_json()
             serial_ids = data.get('serial_ids', [])
@@ -20543,16 +20543,12 @@ def reserve_cheque():
             if not serial_ids:
                 return jsonify({'success': False, 'error': 'No serial numbers selected'}), 400
             
-            # Validate that all serials exist and are available
+            # Find selected serials that are currently Available and reserve only those
             serials = ChequeSerial.query.filter(
                 ChequeSerial.id.in_(serial_ids),
                 ChequeSerial.status == 'Available'
             ).all()
             
-            if len(serials) != len(serial_ids):
-                return jsonify({'success': False, 'error': 'Some selected serial numbers are not available'}), 400
-            
-            # Update status to Reserved
             reserved_count = 0
             for serial in serials:
                 serial.status = 'Reserved'
