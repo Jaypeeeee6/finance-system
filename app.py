@@ -14801,18 +14801,87 @@ def favicon():
 @login_required
 @role_required('GM', 'CEO', 'Operation Manager')
 def write_cheque():
-    """Write a cheque for approved payment requests"""
-    if request.method == 'POST':
-        # Handle cheque writing logic here
-        flash('Cheque written successfully!', 'success')
-        return redirect(url_for('dashboard'))
-    
+    """Write a cheque for approved payment requests. Supports multiple reserved serials via ?serial_ids=1,2,3."""
     # Get approved payment requests that need cheques
     approved_requests = PaymentRequest.query.filter_by(status='Approved').all()
-    
-    return render_template('write_cheque.html', 
-                         user=current_user, 
-                         approved_requests=approved_requests)
+    selected_serials = []
+    book_bank_name = None
+    book_bank_key = 'dhofar_islamic'  # default for template image/positions
+    serial_ids_param = request.args.get('serial_ids', '').strip()
+    if serial_ids_param:
+        try:
+            ids = [int(x) for x in serial_ids_param.split(',') if x.strip()]
+            if ids:
+                serials = ChequeSerial.query.filter(
+                    ChequeSerial.id.in_(ids),
+                    ChequeSerial.status == 'Reserved'
+                ).order_by(ChequeSerial.id).all()
+                selected_serials = [
+                    {'id': s.id, 'serial_no': s.serial_no, 'book_no': s.book.book_no if s.book else None}
+                    for s in serials
+                ]
+                if serials and serials[0].book and serials[0].book.bank_name:
+                    book_bank_name = serials[0].book.bank_name
+                    bn_lower = book_bank_name.lower()
+                    if 'oman arab' in bn_lower or 'oman arab bank' in bn_lower:
+                        book_bank_key = 'oman_arab'
+                    elif 'sohar' in bn_lower or 'sohar bank' in bn_lower:
+                        book_bank_key = 'sohar'
+                    else:
+                        book_bank_key = 'dhofar_islamic'
+        except (ValueError, TypeError):
+            pass
+    return render_template('write_cheque.html',
+                         user=current_user,
+                         approved_requests=approved_requests,
+                         selected_serials=selected_serials,
+                         book_bank_name=book_bank_name,
+                         book_bank_key=book_bank_key)
+
+
+@app.route('/write-cheque/save', methods=['POST'])
+@login_required
+@role_required('GM', 'CEO', 'Operation Manager')
+def write_cheque_save():
+    """Save cheque data to one or more reserved serials (marks them Used)."""
+    try:
+        data = request.get_json() or {}
+        serial_ids = data.get('serial_ids')
+        if not serial_ids or not isinstance(serial_ids, list):
+            return jsonify({'success': False, 'error': 'serial_ids list required'}), 400
+        serial_ids = [int(x) for x in serial_ids if x is not None]
+        if not serial_ids:
+            return jsonify({'success': False, 'error': 'No serial IDs provided'}), 400
+        serials = ChequeSerial.query.filter(
+            ChequeSerial.id.in_(serial_ids),
+            ChequeSerial.status == 'Reserved'
+        ).all()
+        if len(serials) != len(serial_ids):
+            return jsonify({'success': False, 'error': 'One or more serials not found or not Reserved'}), 400
+        cheque_date_str = data.get('chequeDate', '')
+        payee_name = (data.get('payeeName') or '').strip()
+        amount_raw = data.get('amount')
+        amount = None
+        if amount_raw is not None and amount_raw != '':
+            try:
+                amount = float(amount_raw)
+            except (TypeError, ValueError):
+                pass
+        for s in serials:
+            s.payee_name = payee_name or None
+            s.cheque_date = None
+            if cheque_date_str:
+                try:
+                    s.cheque_date = datetime.strptime(cheque_date_str, '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    pass
+            s.amount = amount
+            s.status = 'Used'
+        db.session.commit()
+        return jsonify({'success': True, 'updated_count': len(serials), 'message': f'Successfully saved {len(serials)} cheque(s).'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/generate-cheque-pdf', methods=['POST'])

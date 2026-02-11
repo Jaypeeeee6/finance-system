@@ -207,9 +207,9 @@
                             </button>
                         </span>
                         <span class="toolbar-write-only" style="display: none;">
-                            <a href="{{ url_for('write_cheque') }}" class="btn btn-sm btn-reserve-write btn-write-cheque" data-book-no="{{ group.grouper }}" onclick="saveChequeExpandedBooks();">
+                            <button type="button" class="btn btn-sm btn-reserve-write btn-write-cheque" data-book-no="{{ group.grouper }}">
                                 <i class="fas fa-file-invoice"></i> Write Cheque
-                            </a>
+                            </button>
                         </span>
                     </div>
                     {% endif %}
@@ -696,7 +696,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success) {
                 saveChequeExpandedBooks();
                 if (redirectToWrite) {
-                    window.location.href = '{{ url_for("write_cheque") }}';
+                    window.location.href = '{{ url_for("write_cheque") }}?serial_ids=' + serialIds.join(',');
                 } else {
                     window.location.reload();
                 }
@@ -719,7 +719,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     document.querySelectorAll('.btn-reserve-write').forEach(function(btn) {
         btn.addEventListener('click', function() {
-            doReserveSelected(this.getAttribute('data-book-no'), true);
+            var bookNo = this.getAttribute('data-book-no');
+            if (this.classList.contains('btn-write-cheque')) {
+                saveChequeExpandedBooks();
+                var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
+                if (!section) return;
+                var checked = section.querySelectorAll('.cheque-row-select:checked');
+                if (checked.length === 0) return;
+                var serialIds = Array.from(checked).map(function(c) { return parseInt(c.getAttribute('data-serial-id'), 10); });
+                window.location.href = '{{ url_for("write_cheque") }}?serial_ids=' + serialIds.join(',');
+            } else {
+                doReserveSelected(bookNo, true);
+            }
         });
     });
 });

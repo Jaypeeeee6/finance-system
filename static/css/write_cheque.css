@@ -1,41 +1,67 @@
 /* ==================== WRITE CHEQUE PAGE STYLES ==================== */
 
-/* Main container */
+/* Main container - reduced left/right margin and padding */
 .cheque-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 1rem;
-    background: #f8f9fa;
+    max-width: 100%;
+    margin: 0 0.5rem;
+    padding: 0.75rem 0.5rem;
+    background: #fff;
     min-height: calc(100vh - 120px);
     overflow-x: hidden;
+    box-sizing: border-box;
 }
 
-.cheque-header {
-    text-align: center;
-    margin-bottom: 1rem;
-    padding: 1rem;
-    background: white;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+/* Hide real-time LIVE chip on this page */
+.cheque-container.dashboard-container .dashboard-header .refresh-indicator {
+    display: none !important;
 }
 
-.cheque-header h1 {
-    color: #2c3e50;
-    margin-bottom: 0.5rem;
+/* Match view payment request heading style; no line under heading, more space above content */
+.cheque-container.dashboard-container .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    border-bottom: none !important;
+    margin-bottom: 1.75rem !important;
+    padding-bottom: 0 !important;
+}
+.cheque-container.dashboard-container .dashboard-header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--dark-color, #2c3e50);
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+/* Back button: same style as "Back" on view request page (gold) */
+.cheque-container.dashboard-container .dashboard-header .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    border-radius: 6px !important;
+    background: #D9BD7D !important;
+    border-color: #D9BD7D !important;
+    color: #ffffff !important;
+    text-decoration: none;
+}
+.cheque-container.dashboard-container .dashboard-header .btn-secondary:hover {
+    background: #c8ac65 !important;
+    border-color: #c8ac65 !important;
+    color: #ffffff !important;
 }
 
-.cheque-header p {
-    color: #6c757d;
-    font-size: 1.1rem;
-}
-
-/* Two-panel layout */
+/* Two-panel layout - tall enough to avoid overflow; cheque image size/position unchanged */
 .cheque-layout {
     display: grid;
     grid-template-columns: 0.8fr 1.2fr; /* Make preview (right) a bit wider */
     gap: 1rem;
-    height: calc(100vh - 200px); /* Slightly taller to avoid image cut-off */
-    max-height: calc(100vh - 200px);
+    height: calc(100vh - 140px); /* Taller container to prevent overflow */
+    max-height: calc(100vh - 140px);
 }
 
 /* Left Panel: Form Fields */
@@ -65,29 +91,41 @@
     margin-bottom: 0.5rem;
     font-weight: 600;
     color: #495057;
+    font-size: 0.95rem;
 }
 
-.form-control {
+/* Inputs and selects: same style as new book page */
+.cheque-form-panel .form-control,
+.cheque-form-panel input[type="text"],
+.cheque-form-panel input[type="date"],
+.cheque-form-panel input[type="number"],
+.cheque-form-panel select {
     width: 100%;
-    padding: 0.75rem;
-    border: 2px solid #e9ecef;
-    border-radius: 5px;
+    padding: 0.5rem 0.75rem;
     font-size: 1rem;
-    transition: border-color 0.3s ease;
+    color: var(--dark-color, #333);
+    background: #fff;
+    border: 1px solid var(--border-color, #ced4da);
+    border-radius: 5px;
+    min-height: 38px;
+    box-sizing: border-box;
 }
-
-.form-control:focus {
+.cheque-form-panel .form-control:hover,
+.cheque-form-panel input:hover,
+.cheque-form-panel select:hover {
+    border-color: #868e96;
+}
+.cheque-form-panel .form-control:focus,
+.cheque-form-panel input:focus,
+.cheque-form-panel select:focus {
     outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 
-/* Payee field specific styling */
-#payeeName {
-    width: 100%;
-    min-width: 300px;
-    font-size: 1.1rem;
-    padding: 0.9rem;
+/* Payee field: same as other fields */
+.cheque-form-panel #payeeName {
+    min-width: 0;
 }
 
 .amount-input-group {
@@ -122,10 +160,10 @@
 }
 
 .bank-selection {
-    display: grid;
-    grid-template-columns: 1fr 1fr auto;
-    gap: 0.5rem;
-    align-items: end;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
     margin-bottom: 1rem;
     padding-bottom: 0.5rem;
     border-bottom: 2px solid #e9ecef;
@@ -135,13 +173,112 @@
     margin-bottom: 0;
 }
 
+.bank-selection-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+/* Print Cheque and Save Cheque: same size as Back button */
+.cheque-container .bank-selection-actions .bank-action-btn {
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    border-radius: 6px !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bank-label-inline {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.bank-label-inline .bank-label-text {
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.95rem;
+}
+.bank-display {
+    font-size: 1rem;
+    color: #2c3e50;
+}
+.bank-display-empty {
+    color: #6c757d;
+}
+
 .cheque-preview {
     flex: 1;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     margin: 1rem 0;
     overflow: hidden;
+}
+
+/* Multi-cheque carousel: only one slide visible at a time */
+.cheque-preview-carousel {
+    position: relative;
+    width: 100%;
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.cheque-preview-carousel .cheque-preview-slide {
+    display: none;
+    width: 100%;
+    justify-content: center;
+    align-items: center;
+}
+.cheque-preview-carousel .cheque-preview-slide.active {
+    display: flex;
+}
+.cheque-preview-carousel.cheque-preview-single .cheque-preview-slide {
+    display: flex;
+}
+
+/* Dot navigation below cheque image when multiple cheques */
+.cheque-dots-nav {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding-top: 0.5rem;
+    flex-shrink: 0;
+}
+.cheque-page-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #495057;
+}
+.cheque-dots {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.cheque-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid #6c757d;
+    background: #fff;
+    padding: 0;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+.cheque-dot:hover {
+    background: #dee2e6;
+    border-color: #495057;
+}
+.cheque-dot.active {
+    background: #007bff;
+    border-color: #007bff;
 }
 
 .cheque-image-container {
@@ -157,7 +294,6 @@
     height: auto;
     border: 1px solid #ddd;
     border-radius: 5px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     object-fit: contain;
 }
 
@@ -574,7 +710,7 @@
     footer,
     main,
     .cheque-container,
-    .cheque-header,
+    .dashboard-header,
     .cheque-form-panel,
     .cheque-preview-panel,
     .bank-selection,

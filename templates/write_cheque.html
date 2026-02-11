@@ -7,10 +7,12 @@
 {% endblock %}
 
 {% block content %}
-<div class="cheque-container">
-    <div class="cheque-header">
-        <h1><i class="fas fa-file-invoice"></i> Write Cheque</h1>
-        <p>Fill in the fields and preview the cheque</p>
+<div class="cheque-container dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-file-invoice"></i> {% if selected_serials and selected_serials|length > 0 %}Writing {{ selected_serials|length }} Cheque{% if selected_serials|length != 1 %}s{% endif %}{% else %}Write Cheque{% endif %}</h1>
+        <a href="{{ url_for('cheque_register') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Cheque Register
+        </a>
     </div>
 
     <div class="cheque-layout">
@@ -66,15 +68,6 @@
                             <option value="arabic">Arabic (العربية)</option>
                         </select>
                     </div>
-
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-success" id="printBtn">
-                            <i class="fas fa-print"></i> Print Cheque
-                        </button>
-                        <button type="button" class="btn btn-primary" id="saveChequeBtn">
-                            <i class="fas fa-save"></i> Save Cheque
-                        </button>
-                    </div>
                 </form>
             </div>
         </div>
@@ -83,39 +76,55 @@
         <div class="cheque-preview-panel">
             <div class="preview-section">
                 <div class="bank-selection">
-                    <div class="form-group">
-                        <label for="bankSelect">Bank</label>
-                        <select id="bankSelect" name="bankSelect" class="form-control">
-                            <option value="dhofar_islamic">Dhofar Islamic Bank</option>
-                            <option value="oman_arab">Oman Arab Bank</option>
-                            <option value="sohar">Sohar Bank</option>
-                        </select>
+                    <div class="form-group bank-label-inline">
+                        <span class="bank-label-text">Bank Name:</span>
+                        <span id="bankDisplay" class="bank-display{% if not book_bank_name %} bank-display-empty{% endif %}" data-bank-key="{{ book_bank_key|default('dhofar_islamic') if book_bank_name else 'dhofar_islamic' }}">{% if book_bank_name %}{{ book_bank_name }}{% else %}—{% endif %}</span>
+                        <input type="hidden" id="bankSelect" name="bankSelect" value="{{ book_bank_key|default('dhofar_islamic') if book_bank_name else 'dhofar_islamic' }}">
+                    </div>
+                    <div class="bank-selection-actions">
+                        <button type="button" class="btn btn-success bank-action-btn" id="printBtn" title="Print the cheque currently shown">
+                            <i class="fas fa-print"></i> Print Cheque
+                        </button>
+                        <button type="button" class="btn btn-primary bank-action-btn" id="saveChequeBtn">
+                            <i class="fas fa-save"></i> Save Cheque
+                        </button>
                     </div>
                 </div>
 
-                <div class="cheque-preview">
-                    <div class="cheque-image-container">
-                        <img id="chequeTemplate" src="{{ url_for('static', filename='cheque_templates/DHOFAR-ISLAMIC-BANK.png') }}" alt="Cheque Template" class="cheque-template">
-                        
-                        <!-- Overlay fields that will be positioned over the cheque -->
-                        <div class="cheque-overlay">
-                            <div class="field-overlay" id="dateOverlay" style="position: absolute; top: 53px; left: 363px; font-size: 17px;"></div>
-                            <div class="field-overlay" id="payeeOverlay" style="position: absolute; top: 127px; left: 250px; font-size: 16px; max-width: 400px; text-align: center;"></div>
-                            <div class="field-overlay" id="amountOverlay" style="position: absolute; top: 183px; left: 613px; font-size: 17px; text-align: center;"></div>
-                            <div class="field-overlay" id="amountWordsOverlay" style="position: absolute; top: 160px; left: 98px; font-size: 16px; max-width: 300px; line-height: 2.0; text-align: center;"></div>
-                            <div class="field-overlay" id="crossingOverlay" style="position: absolute; top: 20px; left: 60px; font-size: 18px; font-weight: 700; text-transform: uppercase; transform: rotate(-25deg); color: rgba(200, 0, 0, 0.6);"></div>
-                            <div class="field-overlay" id="purposeOverlay" style="position: absolute; top: 200px; left: 50px; font-size: 12px; max-width: 300px; line-height: 1.2;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="preview-actions">
-                    <button type="button" class="btn btn-primary btn-lg" id="printChequeBtn">
-                        <i class="fas fa-print"></i> Print the cheque
-                    </button>
-                    <div class="info-message">
-                        <i class="fas fa-info-circle"></i>
-                        Any field can be set and moved by double clicking on it
+                <div class="cheque-preview" id="chequePreviewWrapper">
+                    <!-- Multi-cheque carousel: multiple "pages" when multiple serials selected -->
+                    <div class="cheque-preview-carousel {% if not selected_serials or selected_serials|length <= 1 %}cheque-preview-single{% endif %}" id="chequePreviewCarousel">
+                        {% if selected_serials and selected_serials|length > 1 %}
+                            {% for s in selected_serials %}
+                            <div class="cheque-preview-slide {% if loop.index == 1 %}active{% endif %}" data-slide-index="{{ loop.index0 }}" data-serial-id="{{ s.id }}" data-serial-no="{{ s.serial_no }}">
+                                <div class="cheque-image-container">
+                                    <img class="cheque-template cheque-template-slide" src="{{ url_for('static', filename='cheque_templates/DHOFAR-ISLAMIC-BANK.png') }}" alt="Cheque Template">
+                                    <div class="cheque-overlay">
+                                        <div class="field-overlay field-date" data-field="date" style="position: absolute; top: 53px; left: 363px; font-size: 17px;"></div>
+                                        <div class="field-overlay field-payee" data-field="payee" style="position: absolute; top: 127px; left: 250px; font-size: 16px; max-width: 400px; text-align: center;"></div>
+                                        <div class="field-overlay field-amount" data-field="amount" style="position: absolute; top: 183px; left: 613px; font-size: 17px; text-align: center;"></div>
+                                        <div class="field-overlay field-amountWords" data-field="amountWords" style="position: absolute; top: 160px; left: 98px; font-size: 16px; max-width: 300px; line-height: 2.0; text-align: center;"></div>
+                                        <div class="field-overlay field-crossing" data-field="crossing" style="position: absolute; top: 20px; left: 60px; font-size: 18px; font-weight: 700; text-transform: uppercase; transform: rotate(-25deg); color: rgba(200, 0, 0, 0.6);"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <!-- Single cheque preview (default) -->
+                            <div class="cheque-preview-slide active" data-slide-index="0">
+                                <div class="cheque-image-container">
+                                    <img id="chequeTemplate" src="{{ url_for('static', filename='cheque_templates/DHOFAR-ISLAMIC-BANK.png') }}" alt="Cheque Template" class="cheque-template">
+                                    <div class="cheque-overlay">
+                                        <div class="field-overlay" id="dateOverlay" style="position: absolute; top: 53px; left: 363px; font-size: 17px;"></div>
+                                        <div class="field-overlay" id="payeeOverlay" style="position: absolute; top: 127px; left: 250px; font-size: 16px; max-width: 400px; text-align: center;"></div>
+                                        <div class="field-overlay" id="amountOverlay" style="position: absolute; top: 183px; left: 613px; font-size: 17px; text-align: center;"></div>
+                                        <div class="field-overlay" id="amountWordsOverlay" style="position: absolute; top: 160px; left: 98px; font-size: 16px; max-width: 300px; line-height: 2.0; text-align: center;"></div>
+                                        <div class="field-overlay" id="crossingOverlay" style="position: absolute; top: 20px; left: 60px; font-size: 18px; font-weight: 700; text-transform: uppercase; transform: rotate(-25deg); color: rgba(200, 0, 0, 0.6);"></div>
+                                        <div class="field-overlay" id="purposeOverlay" style="position: absolute; top: 200px; left: 50px; font-size: 12px; max-width: 300px; line-height: 1.2;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -171,6 +180,10 @@
 
 {% block extra_js %}
 <script>
+// Selected reserved serials when coming from Cheque Register (multiple cheques = same form applied to all)
+window.selectedSerials = {{ selected_serials|default([])|tojson|safe }};
+window.writeChequeSerialIds = (window.selectedSerials || []).map(function(s) { return s.id; });
+
 // Ensure on-screen amount overlay is never tilted
 (function() {
     const el = document.getElementById('amountOverlay');
@@ -213,12 +226,18 @@ function updateFieldPositions(bank) {
     const positions = bankFieldPositions[bank];
     if (!positions) return;
     
+    const fieldMap = { date: 'date', payee: 'payee', amount: 'amount', amountWords: 'amountWords', crossing: 'crossing', purpose: 'purpose' };
     Object.keys(positions).forEach(field => {
         const overlay = document.getElementById(field + 'Overlay');
         if (overlay) {
             overlay.style.top = positions[field].top;
             overlay.style.left = positions[field].left;
         }
+        // Multi-slide: update all overlays with this data-field
+        document.querySelectorAll('.field-overlay[data-field="' + field + '"]').forEach(function(el) {
+            el.style.top = positions[field].top;
+            el.style.left = positions[field].left;
+        });
     });
     
     // Set line-height for amount in words based on bank
@@ -275,19 +294,40 @@ function updateFieldPositions(bank) {
         }
     }
     
+    // Multi-slide amount words / payee / amount styling
+    document.querySelectorAll('.field-amountWords').forEach(function(el) {
+        el.style.display = 'block';
+        el.style.textAlign = 'center';
+        if (bank === 'oman_arab') el.style.lineHeight = '2.3'; else el.style.lineHeight = '2.0';
+        if (bank === 'dhofar_islamic') { el.style.maxWidth = '400px'; el.style.width = '400px'; }
+        else if (bank === 'oman_arab') { el.style.maxWidth = '420px'; el.style.width = '420px'; }
+        else if (bank === 'sohar') { el.style.maxWidth = '400px'; el.style.width = '400px'; }
+        else { el.style.maxWidth = '300px'; el.style.width = '300px'; }
+    });
+    document.querySelectorAll('.field-payee').forEach(function(el) {
+        el.style.fontSize = (bank === 'dhofar_islamic') ? '18px' : '16px';
+    });
+    document.querySelectorAll('.field-amount').forEach(function(el) {
+        el.style.textAlign = 'center';
+        el.style.display = 'block';
+        el.style.maxWidth = '120px';
+        el.style.width = '120px';
+    });
     // Print positions will be updated dynamically based on actual screen positions
     // when print is called or bank is changed
 }
 
 // Function to update cheque template image
 function updateChequeTemplate(bank) {
-    const templateImg = document.getElementById('chequeTemplate');
     const bankImageMap = {
         'dhofar_islamic': 'DHOFAR-ISLAMIC-BANK.png',
         'oman_arab': 'OMAN-ARAB-BANK.png',
         'sohar': 'SOHAR-BANK.png'
     };
-    templateImg.src = `{{ url_for('static', filename='cheque_templates/') }}${bankImageMap[bank]}`;
+    const src = `{{ url_for('static', filename='cheque_templates/') }}${bankImageMap[bank]}`;
+    const templateImg = document.getElementById('chequeTemplate');
+    if (templateImg) templateImg.src = src;
+    document.querySelectorAll('.cheque-template-slide').forEach(function(img) { img.src = src; });
 }
 
 // Function to format date for display
@@ -607,7 +647,7 @@ const SOHAR_AMOUNT_TOP_OFFSET_MM = -4.2; // Moved 3px higher (≈-0.8mm): -3.4 -
 // Update print field positions based on ACTUAL screen positions
 // This ensures print matches exactly what's shown on screen
 function updatePrintPositions() {
-    const templateImg = document.getElementById('chequeTemplate');
+    var templateImg = document.getElementById('chequeTemplate') || document.querySelector('.cheque-preview-slide.active .cheque-template-slide') || document.querySelector('.cheque-template-slide');
     if (!templateImg) return;
     
     // Get selected bank - needed to apply Dhofar-specific date offset
@@ -626,13 +666,13 @@ function updatePrintPositions() {
     const scaleX = displayedWidth / naturalWidth;
     const scaleY = displayedHeight / naturalHeight;
     
-    // Get screen overlay positions (actual positions on displayed image)
-    const screenOverlays = {
-        date: document.getElementById('dateOverlay'),
-        payee: document.getElementById('payeeOverlay'),
-        amount: document.getElementById('amountOverlay'),
-        amountWords: document.getElementById('amountWordsOverlay'),
-        crossing: document.getElementById('crossingOverlay')
+    // Get screen overlay positions (single-preview by id, or first of multi-slide by data-field)
+    var screenOverlays = {
+        date: document.getElementById('dateOverlay') || document.querySelector('.cheque-preview-slide.active .field-overlay[data-field="date"]'),
+        payee: document.getElementById('payeeOverlay') || document.querySelector('.cheque-preview-slide.active .field-overlay[data-field="payee"]'),
+        amount: document.getElementById('amountOverlay') || document.querySelector('.cheque-preview-slide.active .field-overlay[data-field="amount"]'),
+        amountWords: document.getElementById('amountWordsOverlay') || document.querySelector('.cheque-preview-slide.active .field-overlay[data-field="amountWords"]'),
+        crossing: document.getElementById('crossingOverlay') || document.querySelector('.cheque-preview-slide.active .field-overlay[data-field="crossing"]')
     };
     
     // Get print overlays
@@ -814,112 +854,94 @@ function updatePrintPositions() {
     });
 }
 
-// Real-time field updates
+// Real-time field updates (works for both single-preview and multi-slide; overlays by id or data-field)
 function updateChequePreview() {
-    // Update date
     const dateInput = document.getElementById('chequeDate');
     const showDateCheckbox = document.getElementById('showDate');
     const dateOverlay = document.getElementById('dateOverlay');
     const printDateOverlay = document.getElementById('printDateOverlay');
     const modalDateOverlay = document.getElementById('modalDateOverlay');
     const isDateVisible = showDateCheckbox ? showDateCheckbox.checked : true;
-    
-    if (dateInput && dateOverlay) {
-        if (isDateVisible) {
-            const dateText = formatDate(dateInput.value);
+    var dateText = '';
+    if (dateInput) {
+        dateText = isDateVisible ? formatDate(dateInput.value) : '';
+        if (dateOverlay) {
             dateOverlay.textContent = dateText;
-            dateOverlay.style.display = 'block';
-            if (printDateOverlay) {
-                printDateOverlay.textContent = dateText;
-                printDateOverlay.style.display = 'block';
-            }
-            if (modalDateOverlay) {
-                modalDateOverlay.textContent = dateText;
-                modalDateOverlay.style.display = 'block';
-            }
-        } else {
-            dateOverlay.textContent = '';
-            dateOverlay.style.display = 'none';
-            if (printDateOverlay) {
-                printDateOverlay.textContent = '';
-                printDateOverlay.style.display = 'none';
-            }
-            if (modalDateOverlay) {
-                modalDateOverlay.textContent = '';
-                modalDateOverlay.style.display = 'none';
-            }
+            dateOverlay.style.display = isDateVisible ? 'block' : 'none';
         }
+        if (printDateOverlay) {
+            printDateOverlay.textContent = dateText;
+            printDateOverlay.style.display = isDateVisible ? 'block' : 'none';
+        }
+        if (modalDateOverlay) {
+            modalDateOverlay.textContent = dateText;
+            modalDateOverlay.style.display = isDateVisible ? 'block' : 'none';
+        }
+        document.querySelectorAll('.field-overlay[data-field="date"]').forEach(function(el) {
+            el.textContent = dateText;
+            el.style.display = isDateVisible ? 'block' : 'none';
+        });
     }
-    
-    // Update payee
+
     const payeeInput = document.getElementById('payeeName');
     const payeeOverlay = document.getElementById('payeeOverlay');
     const printPayeeOverlay = document.getElementById('printPayeeOverlay');
-    if (payeeInput && payeeOverlay) {
-        const payeeText = payeeInput.value;
-        payeeOverlay.textContent = payeeText;
-        if (printPayeeOverlay) printPayeeOverlay.textContent = payeeText;
-    }
-    
-    // Update amount
+    var payeeText = payeeInput ? payeeInput.value : '';
+    if (payeeOverlay) payeeOverlay.textContent = payeeText;
+    if (printPayeeOverlay) printPayeeOverlay.textContent = payeeText;
+    document.querySelectorAll('.field-overlay[data-field="payee"]').forEach(function(el) { el.textContent = payeeText; });
+
     const amountInput = document.getElementById('amount');
     const currencySelect = document.getElementById('currency');
     const amountOverlay = document.getElementById('amountOverlay');
     const printAmountOverlay = document.getElementById('printAmountOverlay');
-    if (amountInput && currencySelect && amountOverlay) {
-        const amountText = formatAmount(amountInput.value, currencySelect.value);
-        amountOverlay.textContent = amountText;
+    var amountText = '';
+    if (amountInput && currencySelect) {
+        amountText = formatAmount(amountInput.value, currencySelect.value);
+        if (amountOverlay) amountOverlay.textContent = amountText;
         if (printAmountOverlay) printAmountOverlay.textContent = amountText;
+        document.querySelectorAll('.field-overlay[data-field="amount"]').forEach(function(el) { el.textContent = amountText; });
     }
-    
-    // Update amount in words (overlay only)
+
     const amountWordsOverlay = document.getElementById('amountWordsOverlay');
     const printAmountWordsOverlay = document.getElementById('printAmountWordsOverlay');
     const languageSelect = document.getElementById('amountWordsLanguage');
-    if (amountInput && amountWordsOverlay) {
+    if (amountInput && currencySelect) {
         const language = languageSelect ? languageSelect.value : 'english';
-        const currency = currencySelect ? currencySelect.value : 'OMR';
+        const currency = currencySelect.value || 'OMR';
         const words = amountToWords(amountInput.value, language, currency);
-        amountWordsOverlay.textContent = words;
+        if (amountWordsOverlay) {
+            amountWordsOverlay.textContent = words;
+            amountWordsOverlay.style.direction = language === 'arabic' ? 'rtl' : 'ltr';
+            amountWordsOverlay.style.textAlign = 'center';
+            if (language === 'arabic') amountWordsOverlay.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
+        }
+        document.querySelectorAll('.field-overlay[data-field="amountWords"]').forEach(function(el) {
+            el.textContent = words;
+            el.style.direction = language === 'arabic' ? 'rtl' : 'ltr';
+            el.style.textAlign = 'center';
+            if (language === 'arabic') el.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
+        });
         if (printAmountWordsOverlay) {
             printAmountWordsOverlay.textContent = words;
-            // Set RTL for Arabic
-            if (language === 'arabic') {
-                printAmountWordsOverlay.setAttribute('dir', 'rtl');
-                printAmountWordsOverlay.style.direction = 'rtl';
-                printAmountWordsOverlay.style.textAlign = 'center';
-                printAmountWordsOverlay.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
-            } else {
-                printAmountWordsOverlay.setAttribute('dir', 'ltr');
-                printAmountWordsOverlay.style.direction = 'ltr';
-                printAmountWordsOverlay.style.textAlign = 'center';
-            }
-        }
-        // Set RTL for Arabic in overlay
-        // Container stays centered (via absolute positioning), text flows RTL but is centered
-        if (language === 'arabic') {
-            amountWordsOverlay.style.direction = 'rtl';
-            amountWordsOverlay.style.textAlign = 'center';
-            amountWordsOverlay.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
-        } else {
-            amountWordsOverlay.style.direction = 'ltr';
-            amountWordsOverlay.style.textAlign = 'center';
+            printAmountWordsOverlay.setAttribute('dir', language === 'arabic' ? 'rtl' : 'ltr');
+            printAmountWordsOverlay.style.direction = language === 'arabic' ? 'rtl' : 'ltr';
+            printAmountWordsOverlay.style.textAlign = 'center';
+            if (language === 'arabic') printAmountWordsOverlay.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
         }
     }
 
-    // Update crossing (slanted stamp on upper-left)
     const crossingSelect = document.getElementById('crossing');
     const crossingOverlay = document.getElementById('crossingOverlay');
     const printCrossingOverlay = document.getElementById('printCrossingOverlay');
-    if (crossingSelect && crossingOverlay) {
-        const text = crossingSelect.value ? crossingSelect.value.toUpperCase() : '';
-        crossingOverlay.textContent = text;
-        if (printCrossingOverlay) {
-            printCrossingOverlay.textContent = text;
-            printCrossingOverlay.style.transform = 'rotate(-25deg)';
-            printCrossingOverlay.style.fontWeight = '700';
-            printCrossingOverlay.style.color = 'rgba(200, 0, 0, 0.6)';
-        }
+    var crossingText = (crossingSelect && crossingSelect.value) ? crossingSelect.value.toUpperCase() : '';
+    if (crossingOverlay) crossingOverlay.textContent = crossingText;
+    document.querySelectorAll('.field-overlay[data-field="crossing"]').forEach(function(el) { el.textContent = crossingText; });
+    if (printCrossingOverlay) {
+        printCrossingOverlay.textContent = crossingText;
+        printCrossingOverlay.style.transform = 'rotate(-25deg)';
+        printCrossingOverlay.style.fontWeight = '700';
+        printCrossingOverlay.style.color = 'rgba(200, 0, 0, 0.6)';
     }
     
     // Purpose input removed; overlay is static for now
@@ -997,6 +1019,32 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 updatePrintPositions();
             }, 100);
+        });
+    }
+    
+    // Multi-cheque dot navigation
+    var dotsNav = document.getElementById('chequeDotsNav');
+    if (dotsNav) {
+        var dots = document.querySelectorAll('.cheque-dot');
+        var slides = document.querySelectorAll('#chequePreviewCarousel .cheque-preview-slide');
+        var labelEl = document.getElementById('chequePageLabel');
+        var totalSlides = slides.length;
+        dots.forEach(function(dot, i) {
+            dot.addEventListener('click', function() {
+                var idx = parseInt(this.getAttribute('data-index'), 10);
+                slides.forEach(function(s, j) {
+                    s.classList.toggle('active', j === idx);
+                });
+                dots.forEach(function(d) { d.classList.remove('active'); });
+                dot.classList.add('active');
+                if (labelEl) {
+                    labelEl.textContent = 'Cheque ' + (idx + 1) + ' of ' + totalSlides;
+                    var slide = slides[idx];
+                    if (slide && slide.getAttribute('data-serial-no')) {
+                        labelEl.textContent += ' (Serial No: ' + slide.getAttribute('data-serial-no') + ')';
+                    }
+                }
+            });
         });
     }
     
@@ -1365,7 +1413,50 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (saveChequeBtn) {
         saveChequeBtn.addEventListener('click', function() {
-            alert('Save functionality will be implemented later.');
+            var serialIds = window.writeChequeSerialIds || [];
+            if (serialIds.length === 0) {
+                alert('No cheques selected to save. Go to Cheque Register, select Reserved cheque(s), and click Write Cheque.');
+                return;
+            }
+            var chequeDate = document.getElementById('chequeDate') && document.getElementById('chequeDate').value;
+            var payeeName = document.getElementById('payeeName') && document.getElementById('payeeName').value.trim();
+            var amount = document.getElementById('amount') && document.getElementById('amount').value;
+            if (!payeeName || !amount) {
+                alert('Please fill in Payee Name and Amount before saving.');
+                return;
+            }
+            saveChequeBtn.disabled = true;
+            var originalHtml = saveChequeBtn.innerHTML;
+            saveChequeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            fetch('{{ url_for("write_cheque_save") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({
+                    serial_ids: serialIds,
+                    chequeDate: chequeDate,
+                    payeeName: payeeName,
+                    amount: amount,
+                    currency: document.getElementById('currency') && document.getElementById('currency').value,
+                    crossing: document.getElementById('crossing') && document.getElementById('crossing').value
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    alert(data.message || 'Cheque(s) saved successfully.');
+                    window.location.href = '{{ url_for("cheque_register") }}';
+                } else {
+                    alert(data.error || 'Save failed.');
+                    saveChequeBtn.disabled = false;
+                    saveChequeBtn.innerHTML = originalHtml;
+                }
+            })
+            .catch(function(err) {
+                console.error(err);
+                alert('An error occurred while saving.');
+                saveChequeBtn.disabled = false;
+                saveChequeBtn.innerHTML = originalHtml;
+            });
         });
     }
     
