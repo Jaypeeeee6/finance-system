@@ -1619,6 +1619,24 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => updatePrintPositions(), 100);
         });
     }
+    
+    // Pre-fill form from first selected serial when opening for Used cheques (e.g. Print from register)
+    const firstSerial = (window.selectedSerials && window.selectedSerials.length) ? window.selectedSerials[0] : null;
+    if (firstSerial && (firstSerial.payee_name != null || firstSerial.cheque_date != null || firstSerial.amount != null)) {
+        const payeeEl = document.getElementById('payeeName');
+        const dateEl = document.getElementById('chequeDate');
+        const amountEl = document.getElementById('amount');
+        if (payeeEl && firstSerial.payee_name != null) payeeEl.value = firstSerial.payee_name;
+        if (dateEl && firstSerial.cheque_date) dateEl.value = firstSerial.cheque_date;
+        if (amountEl && firstSerial.amount != null) amountEl.value = String(firstSerial.amount);
+        updateChequePreview();
+    }
+    
+    // Auto-trigger print when opened with ?print=1 (e.g. from register "Print Cheque")
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('print') === '1') {
+        setTimeout(printCheque, 500);
+    }
 });
 </script>
 {% endblock %}

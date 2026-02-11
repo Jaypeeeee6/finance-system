@@ -212,6 +212,11 @@
                                 <i class="fas fa-file-invoice"></i> Write Cheque
                             </button>
                         </span>
+                        <span class="toolbar-print-only" style="display: none;">
+                            <button type="button" class="btn btn-sm btn-reserve-write btn-print-cheque" data-book-no="{{ group.grouper }}">
+                                <i class="fas fa-print"></i> Print Cheque
+                            </button>
+                        </span>
                     </div>
                     {% endif %}
                     <div class="table-responsive cheque-register-table-wrap">
@@ -237,7 +242,7 @@
                                 <tr data-book-no="{{ group.grouper }}" data-serial-id="{{ serial.id }}" data-status="{{ serial.status }}">
                                     {% if show_cheque_select %}
                                     <td class="cheque-td-select">
-                                        <input type="checkbox" class="cheque-row-select" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" aria-label="Select serial {{ serial.serial_no }}" {% if show_select_ceo_gm_op and serial.status in ('Used', 'Cancelled') %}disabled{% endif %}>
+                                        <input type="checkbox" class="cheque-row-select" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" aria-label="Select serial {{ serial.serial_no }}" {% if show_select_ceo_gm_op and serial.status == 'Cancelled' %}disabled{% endif %}>
                                     </td>
                                     {% endif %}
                                     <td>{{ serial.book.book_no }}</td>
@@ -600,14 +605,25 @@ document.addEventListener('DOMContentLoaded', function() {
             toolbarReserve.style.display = checked.length > 0 ? 'flex' : 'none';
             if (checked.length > 0) {
                 var allReserved = true;
+                var allUsed = true;
                 checked.forEach(function(cb) {
                     var row = cb.closest('tr');
-                    if (row && row.getAttribute('data-status') !== 'Reserved') allReserved = false;
+                    var status = row ? row.getAttribute('data-status') : '';
+                    if (status !== 'Reserved') allReserved = false;
+                    if (status !== 'Used') allUsed = false;
                 });
                 var reserveActions = toolbarReserve.querySelector('.toolbar-reserve-actions');
                 var writeOnly = toolbarReserve.querySelector('.toolbar-write-only');
-                if (reserveActions) reserveActions.style.display = allReserved ? 'none' : 'inline';
-                if (writeOnly) writeOnly.style.display = allReserved ? 'inline' : 'none';
+                var printOnly = toolbarReserve.querySelector('.toolbar-print-only');
+                if (allUsed) {
+                    if (reserveActions) reserveActions.style.display = 'none';
+                    if (writeOnly) writeOnly.style.display = 'none';
+                    if (printOnly) printOnly.style.display = 'inline';
+                } else {
+                    if (printOnly) printOnly.style.display = 'none';
+                    if (reserveActions) reserveActions.style.display = allReserved ? 'none' : 'inline';
+                    if (writeOnly) writeOnly.style.display = allReserved ? 'inline' : 'none';
+                }
             }
         }
         var selectAll = section.querySelector('.cheque-select-all');
@@ -617,9 +633,33 @@ document.addEventListener('DOMContentLoaded', function() {
             selectAll.indeterminate = checked.length > 0 && checked.length < allEnabled.length;
         }
     }
+    // Enforce only one Used cheque selected per book; when checking a Used, uncheck other Used in same section
+    function enforceSingleUsedPerBook(bookNo) {
+        var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
+        if (!section) return;
+        var usedChecked = [];
+        section.querySelectorAll('.cheque-row-select:checked').forEach(function(cb) {
+            var row = cb.closest('tr');
+            if (row && row.getAttribute('data-status') === 'Used') usedChecked.push(cb);
+        });
+        if (usedChecked.length <= 1) return;
+        usedChecked.slice(1).forEach(function(cb) { cb.checked = false; });
+    }
     document.querySelectorAll('.cheque-row-select').forEach(function(cb) {
         cb.addEventListener('change', function() {
-            updateSelectToolbarForBook(this.getAttribute('data-book-no'));
+            var bookNo = this.getAttribute('data-book-no');
+            var row = this.closest('tr');
+            var changedCb = this;
+            if (this.checked && row && row.getAttribute('data-status') === 'Used') {
+                var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
+                if (section) {
+                    section.querySelectorAll('.cheque-row-select').forEach(function(other) {
+                        var otherRow = other.closest('tr');
+                        if (other !== changedCb && otherRow && otherRow.getAttribute('data-status') === 'Used') other.checked = false;
+                    });
+                }
+            }
+            updateSelectToolbarForBook(bookNo);
         });
     });
     document.querySelectorAll('.cheque-select-all').forEach(function(cb) {
@@ -630,6 +670,7 @@ document.addEventListener('DOMContentLoaded', function() {
             section.querySelectorAll('.cheque-row-select:not([disabled])').forEach(function(rowCb) {
                 rowCb.checked = cb.checked;
             });
+            enforceSingleUsedPerBook(bookNo);
             updateSelectToolbarForBook(bookNo);
         });
     });
@@ -732,6 +773,19 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 doReserveSelected(bookNo, true);
             }
+        });
+    });
+    document.querySelectorAll('.btn-print-cheque').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var bookNo = this.getAttribute('data-book-no');
+            saveChequeExpandedBooks();
+            var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
+            if (!section) return;
+            var checked = section.querySelectorAll('.cheque-row-select:checked');
+            if (checked.length === 0) return;
+            var serialIds = Array.from(checked).map(function(c) { return parseInt(c.getAttribute('data-serial-id'), 10); });
+            window.location.href = '{{ url_for("write_cheque") }}?serial_ids=' + serialIds.join(',') + '&print=1';
         });
     });
 });

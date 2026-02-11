@@ -14814,12 +14814,18 @@ def write_cheque():
             if ids:
                 serials = ChequeSerial.query.filter(
                     ChequeSerial.id.in_(ids),
-                    ChequeSerial.status == 'Reserved'
+                    ChequeSerial.status.in_(['Reserved', 'Used'])
                 ).order_by(ChequeSerial.id).all()
-                selected_serials = [
-                    {'id': s.id, 'serial_no': s.serial_no, 'book_no': s.book.book_no if s.book else None}
-                    for s in serials
-                ]
+                selected_serials = []
+                for s in serials:
+                    item = {'id': s.id, 'serial_no': s.serial_no, 'book_no': s.book.book_no if s.book else None}
+                    if s.payee_name is not None:
+                        item['payee_name'] = s.payee_name
+                    if s.cheque_date is not None:
+                        item['cheque_date'] = s.cheque_date.isoformat()
+                    if s.amount is not None:
+                        item['amount'] = float(s.amount)
+                    selected_serials.append(item)
                 if serials and serials[0].book and serials[0].book.bank_name:
                     book_bank_name = serials[0].book.bank_name
                     bn_lower = book_bank_name.lower()
