@@ -133,9 +133,6 @@
 
     <div class="dashboard-actions">
         {% if current_user.department != 'Auditing' %}
-        <a href="{{ url_for('reserve_cheque') }}" class="btn btn-primary">
-            <i class="fas fa-bookmark"></i> Reserve
-        </a>
         <a href="{{ url_for('write_cheque') }}" class="btn btn-success">
             <i class="fas fa-file-invoice"></i> Write Cheque
         </a>

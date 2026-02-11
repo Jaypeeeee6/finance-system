@@ -20499,72 +20499,38 @@ def cheque_register():
                           status_filter=status_filter)
 
 
-@app.route('/cheque-register/reserve', methods=['GET', 'POST'])
+@app.route('/cheque-register/reserve', methods=['POST'])
 @login_required
 def reserve_cheque():
-    """Reserve cheque serial numbers"""
-    if request.method == 'GET':
-        # Get book filter from query parameters
-        book_filter = request.args.get('book', '')
+    """Reserve cheque serial numbers (Available -> Reserved). Used by Reserve & Write from cheque register."""
+    try:
+        data = request.get_json()
+        serial_ids = data.get('serial_ids', [])
         
-        # Get all unique book numbers for the filter dropdown
-        book_numbers = db.session.query(ChequeBook.book_no).distinct().order_by(ChequeBook.book_no).all()
-        book_numbers = [book[0] for book in book_numbers]
+        if not serial_ids:
+            return jsonify({'success': False, 'error': 'No serial numbers selected'}), 400
         
-        # Build query for available serials
-        query = db.session.query(ChequeSerial).join(ChequeBook).filter(
+        # Find selected serials that are currently Available and reserve only those
+        serials = ChequeSerial.query.filter(
+            ChequeSerial.id.in_(serial_ids),
             ChequeSerial.status == 'Available'
-        )
-        
-        # Apply book filter if provided
-        if book_filter:
-            try:
-                book_no = int(book_filter)
-                query = query.filter(ChequeBook.book_no == book_no)
-            except ValueError:
-                pass  # Invalid book number, ignore filter
-        
-        # Fetch all available serial numbers
-        available_serials = query.order_by(
-            ChequeBook.book_no, ChequeSerial.serial_no
         ).all()
         
-        return render_template('reserve_cheque.html', 
-                             available_serials=available_serials,
-                             book_numbers=book_numbers,
-                             book_filter=book_filter)
-    
-    elif request.method == 'POST':
-        # Handle reservation: change Available -> Reserved (e.g. for "Reserve & Write")
-        try:
-            data = request.get_json()
-            serial_ids = data.get('serial_ids', [])
-            
-            if not serial_ids:
-                return jsonify({'success': False, 'error': 'No serial numbers selected'}), 400
-            
-            # Find selected serials that are currently Available and reserve only those
-            serials = ChequeSerial.query.filter(
-                ChequeSerial.id.in_(serial_ids),
-                ChequeSerial.status == 'Available'
-            ).all()
-            
-            reserved_count = 0
-            for serial in serials:
-                serial.status = 'Reserved'
-                reserved_count += 1
-            
-            db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'reserved_count': reserved_count,
-                'message': f'Successfully reserved {reserved_count} serial number(s)'
-            })
-            
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'success': False, 'error': str(e)}), 500
+        reserved_count = 0
+        for serial in serials:
+            serial.status = 'Reserved'
+            reserved_count += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'reserved_count': reserved_count,
+            'message': f'Successfully reserved {reserved_count} serial number(s)'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # Bank names for cheque book and new request (same list)
