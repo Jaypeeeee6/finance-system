@@ -20474,10 +20474,24 @@ def cheque_register():
     # Get filters from query parameters
     book_filter = request.args.get('book', '')
     status_filter = request.args.get('status', '')
+    book_holder_filter = request.args.get('book_holder', '')
+    bank_filter = request.args.get('bank', '')
     
     # Get all unique book numbers for the filter dropdown
     book_numbers = db.session.query(ChequeBook.book_no).distinct().order_by(ChequeBook.book_no).all()
     book_numbers = [book[0] for book in book_numbers]
+    
+    # Get distinct book holders (users who hold at least one book) for filter dropdown
+    book_holders_query = db.session.query(User.user_id, User.name).join(
+        ChequeBook, ChequeBook.book_holder_user_id == User.user_id
+    ).filter(ChequeBook.book_holder_user_id.isnot(None)).distinct().order_by(User.name).all()
+    book_holders = [{'user_id': u[0], 'name': u[1]} for u in book_holders_query]
+    
+    # Get distinct bank names for filter dropdown
+    bank_names = db.session.query(ChequeBook.bank_name).filter(
+        ChequeBook.bank_name.isnot(None), ChequeBook.bank_name != ''
+    ).distinct().order_by(ChequeBook.bank_name).all()
+    bank_names = [b[0] for b in bank_names]
     
     # Build query
     query = db.session.query(ChequeSerial).join(ChequeBook)
@@ -20496,6 +20510,18 @@ def cheque_register():
         if status_filter in valid_statuses:
             query = query.filter(ChequeSerial.status == status_filter)
     
+    # Apply book holder filter if provided
+    if book_holder_filter:
+        try:
+            holder_id = int(book_holder_filter)
+            query = query.filter(ChequeBook.book_holder_user_id == holder_id)
+        except ValueError:
+            pass
+    
+    # Apply bank name filter if provided
+    if bank_filter:
+        query = query.filter(ChequeBook.bank_name == bank_filter)
+    
     # Fetch all cheque serials with their book information, ordered by book_no and serial_no
     cheque_serials = query.order_by(
         ChequeBook.book_no, ChequeSerial.serial_no
@@ -20504,8 +20530,12 @@ def cheque_register():
     return render_template('cheque_register.html', 
                           cheque_serials=cheque_serials, 
                           book_numbers=book_numbers,
+                          book_holders=book_holders,
+                          bank_names=bank_names,
                           book_filter=book_filter,
-                          status_filter=status_filter)
+                          status_filter=status_filter,
+                          book_holder_filter=book_holder_filter,
+                          bank_filter=bank_filter)
 
 
 @app.route('/cheque-register/reserve', methods=['POST'])

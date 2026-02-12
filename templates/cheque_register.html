@@ -221,7 +221,19 @@
                     <option value="Used" {% if status_filter == 'Used' %}selected{% endif %}>Used</option>
                     <option value="Cancelled" {% if status_filter == 'Cancelled' %}selected{% endif %}>Cancelled</option>
                 </select>
-                {% if book_filter or status_filter %}
+                <select id="bookHolderFilter" onchange="applyFilters()" class="form-select">
+                    <option value="">All Book Holders</option>
+                    {% for holder in book_holders %}
+                    <option value="{{ holder.user_id }}" {% if book_holder_filter == holder.user_id|string %}selected{% endif %}>{{ holder.name }}</option>
+                    {% endfor %}
+                </select>
+                <select id="bankFilter" onchange="applyFilters()" class="form-select">
+                    <option value="">All Banks</option>
+                    {% for bank in bank_names %}
+                    <option value="{{ bank }}" {% if bank_filter == bank %}selected{% endif %}>{{ bank }}</option>
+                    {% endfor %}
+                </select>
+                {% if book_filter or status_filter or book_holder_filter or bank_filter %}
                 <a href="{{ url_for('cheque_register') }}" class="btn btn-sm btn-outline" onclick="saveChequeExpandedBooks();">
                     <i class="fas fa-times"></i> Clear filters
                 </a>
@@ -926,24 +938,26 @@ document.addEventListener('DOMContentLoaded', function() {
 function applyFilters() {
     const bookFilter = document.getElementById('bookFilter');
     const statusFilter = document.getElementById('statusFilter');
+    const bookHolderFilter = document.getElementById('bookHolderFilter');
+    const bankFilter = document.getElementById('bankFilter');
     const bookValue = bookFilter.value;
     const statusValue = statusFilter.value;
+    const bookHolderValue = bookHolderFilter ? bookHolderFilter.value : '';
+    const bankValue = bankFilter ? bankFilter.value : '';
     
     const url = new URL(window.location);
     
-    // Update book filter
-    if (bookValue) {
-        url.searchParams.set('book', bookValue);
-    } else {
-        url.searchParams.delete('book');
-    }
+    if (bookValue) url.searchParams.set('book', bookValue);
+    else url.searchParams.delete('book');
     
-    // Update status filter
-    if (statusValue) {
-        url.searchParams.set('status', statusValue);
-    } else {
-        url.searchParams.delete('status');
-    }
+    if (statusValue) url.searchParams.set('status', statusValue);
+    else url.searchParams.delete('status');
+    
+    if (bookHolderValue) url.searchParams.set('book_holder', bookHolderValue);
+    else url.searchParams.delete('book_holder');
+    
+    if (bankValue) url.searchParams.set('bank', bankValue);
+    else url.searchParams.delete('bank');
     
     saveChequeExpandedBooks();
     window.location.href = url.toString();
