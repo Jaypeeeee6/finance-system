@@ -172,8 +172,7 @@ function initRealTimeUpdates() {
         }
     });
     
-    // Add visual indicator
-    addRefreshIndicator();
+    // Real-time LIVE chip removed (indicator no longer shown)
 
     // Polling fallback each 5s to ensure clients react even if sockets fail
     // Track previous maintenance state to only reload when state actually changes

@@ -159,11 +159,30 @@
 .new-book-page .required-star { color: #dc3545; }
 .new-book-page .new-book-field.error { border-color: #dc3545 !important; }
 .new-book-page .serial-range-error { color: #dc3545; font-size: 0.875rem; margin-top: 0.25rem; display: block; }
+
+/* Back button: same style as write cheque page (gold) */
+.new-book-container .dashboard-actions .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    border-radius: 6px !important;
+    background: #D9BD7D !important;
+    border-color: #D9BD7D !important;
+    color: #ffffff !important;
+    text-decoration: none;
+}
+.new-book-container .dashboard-actions .btn-secondary:hover {
+    background: #c8ac65 !important;
+    border-color: #c8ac65 !important;
+    color: #ffffff !important;
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-container">
+<div class="dashboard-container new-book-container">
     <div class="dashboard-header">
         <h2 class="dashboard-title" style="margin:0; display:inline-flex; align-items:center; gap:8px; font-size:1.6rem; font-weight:700;"><i class="fas fa-book"></i> Add New Book</h2>
         <p>Create a new cheque book and serial number range</p>
