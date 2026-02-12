@@ -174,6 +174,64 @@
     background-color: #ffc107 !important;
     color: #212529 !important;
 }
+
+/* Multi-select filter dropdowns */
+.cheque-register-page .cheque-multi-filter {
+    position: relative;
+    display: inline-block;
+}
+.cheque-register-page .cheque-multi-filter .filter-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 0.875rem;
+    background: #fff;
+    border: 1px solid var(--border-color, #ced4da);
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--dark-color, #333);
+    white-space: nowrap;
+}
+.cheque-register-page .cheque-multi-filter .filter-toggle:hover {
+    border-color: #868e96;
+}
+.cheque-register-page .cheque-multi-filter .filter-toggle .filter-count {
+    color: #6c757d;
+    font-weight: normal;
+}
+.cheque-register-page .cheque-multi-filter .filter-panel {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    min-width: 180px;
+    max-height: 280px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid var(--border-color, #ced4da);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    padding: 8px 0;
+}
+.cheque-register-page .cheque-multi-filter.open .filter-panel { display: block; }
+.cheque-register-page .cheque-multi-filter .filter-panel label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    margin: 0;
+    cursor: pointer;
+    font-weight: normal;
+}
+.cheque-register-page .cheque-multi-filter .filter-panel label:hover {
+    background: #f8f9fa;
+}
+.cheque-register-page .cheque-multi-filter .filter-panel input[type="checkbox"] {
+    margin: 0;
+}
 </style>
 {% endblock %}
 
@@ -207,33 +265,53 @@
             </div>
         </div>
         <div class="filters-right" style="margin-left:auto;">
-            <div class="filter-controls">
-                <select id="bookFilter" onchange="applyFilters()" class="form-select">
-                    <option value="">All Books</option>
-                    {% for book_no in book_numbers %}
-                    <option value="{{ book_no }}" {% if book_filter == book_no|string %}selected{% endif %}>Book {{ book_no }}</option>
-                    {% endfor %}
-                </select>
-                <select id="statusFilter" onchange="applyFilters()" class="form-select">
-                    <option value="">All Statuses</option>
-                    <option value="Available" {% if status_filter == 'Available' %}selected{% endif %}>Available</option>
-                    <option value="Reserved" {% if status_filter == 'Reserved' %}selected{% endif %}>Reserved</option>
-                    <option value="Used" {% if status_filter == 'Used' %}selected{% endif %}>Used</option>
-                    <option value="Cancelled" {% if status_filter == 'Cancelled' %}selected{% endif %}>Cancelled</option>
-                </select>
-                <select id="bookHolderFilter" onchange="applyFilters()" class="form-select">
-                    <option value="">All Book Holders</option>
-                    {% for holder in book_holders %}
-                    <option value="{{ holder.user_id }}" {% if book_holder_filter == holder.user_id|string %}selected{% endif %}>{{ holder.name }}</option>
-                    {% endfor %}
-                </select>
-                <select id="bankFilter" onchange="applyFilters()" class="form-select">
-                    <option value="">All Banks</option>
-                    {% for bank in bank_names %}
-                    <option value="{{ bank }}" {% if bank_filter == bank %}selected{% endif %}>{{ bank }}</option>
-                    {% endfor %}
-                </select>
-                {% if book_filter or status_filter or book_holder_filter or bank_filter %}
+            <div class="filter-controls" style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                <div class="cheque-multi-filter" data-filter="book">
+                    <button type="button" class="filter-toggle" aria-haspopup="listbox" aria-expanded="false">
+                        Book <span class="filter-count">{% if book_filter_list %}({{ book_filter_list|length }}){% else %}(All){% endif %}</span>
+                        <i class="fas fa-chevron-down" style="font-size:0.7rem;"></i>
+                    </button>
+                    <div class="filter-panel" role="listbox">
+                        {% for book_no in book_numbers %}
+                        <label><input type="checkbox" class="filter-option filter-option-book" value="{{ book_no }}" {% if book_no|string in book_filter_list %}checked{% endif %}> Book {{ book_no }}</label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="cheque-multi-filter" data-filter="status">
+                    <button type="button" class="filter-toggle" aria-haspopup="listbox" aria-expanded="false">
+                        Status <span class="filter-count">{% if status_filter_list %}({{ status_filter_list|length }}){% else %}(All){% endif %}</span>
+                        <i class="fas fa-chevron-down" style="font-size:0.7rem;"></i>
+                    </button>
+                    <div class="filter-panel" role="listbox">
+                        <label><input type="checkbox" class="filter-option filter-option-status" value="Available" {% if 'Available' in status_filter_list %}checked{% endif %}> Available</label>
+                        <label><input type="checkbox" class="filter-option filter-option-status" value="Reserved" {% if 'Reserved' in status_filter_list %}checked{% endif %}> Reserved</label>
+                        <label><input type="checkbox" class="filter-option filter-option-status" value="Used" {% if 'Used' in status_filter_list %}checked{% endif %}> Used</label>
+                        <label><input type="checkbox" class="filter-option filter-option-status" value="Cancelled" {% if 'Cancelled' in status_filter_list %}checked{% endif %}> Cancelled</label>
+                    </div>
+                </div>
+                <div class="cheque-multi-filter" data-filter="book_holder">
+                    <button type="button" class="filter-toggle" aria-haspopup="listbox" aria-expanded="false">
+                        Book Holder <span class="filter-count">{% if book_holder_filter_list %}({{ book_holder_filter_list|length }}){% else %}(All){% endif %}</span>
+                        <i class="fas fa-chevron-down" style="font-size:0.7rem;"></i>
+                    </button>
+                    <div class="filter-panel" role="listbox">
+                        {% for holder in book_holders %}
+                        <label><input type="checkbox" class="filter-option filter-option-book_holder" value="{{ holder.user_id }}" {% if holder.user_id|string in book_holder_filter_list %}checked{% endif %}> {{ holder.name }}</label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="cheque-multi-filter" data-filter="bank">
+                    <button type="button" class="filter-toggle" aria-haspopup="listbox" aria-expanded="false">
+                        Bank <span class="filter-count">{% if bank_filter_list %}({{ bank_filter_list|length }}){% else %}(All){% endif %}</span>
+                        <i class="fas fa-chevron-down" style="font-size:0.7rem;"></i>
+                    </button>
+                    <div class="filter-panel" role="listbox">
+                        {% for bank in bank_names %}
+                        <label><input type="checkbox" class="filter-option filter-option-bank" value="{{ bank }}" {% if bank in bank_filter_list %}checked{% endif %}> {{ bank }}</label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% if book_filter_list or status_filter_list or book_holder_filter_list or bank_filter_list %}
                 <a href="{{ url_for('cheque_register') }}" class="btn btn-sm btn-outline" onclick="saveChequeExpandedBooks();">
                     <i class="fas fa-times"></i> Clear filters
                 </a>
@@ -936,32 +1014,51 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function applyFilters() {
-    const bookFilter = document.getElementById('bookFilter');
-    const statusFilter = document.getElementById('statusFilter');
-    const bookHolderFilter = document.getElementById('bookHolderFilter');
-    const bankFilter = document.getElementById('bankFilter');
-    const bookValue = bookFilter.value;
-    const statusValue = statusFilter.value;
-    const bookHolderValue = bookHolderFilter ? bookHolderFilter.value : '';
-    const bankValue = bankFilter ? bankFilter.value : '';
-    
     const url = new URL(window.location);
-    
-    if (bookValue) url.searchParams.set('book', bookValue);
-    else url.searchParams.delete('book');
-    
-    if (statusValue) url.searchParams.set('status', statusValue);
-    else url.searchParams.delete('status');
-    
-    if (bookHolderValue) url.searchParams.set('book_holder', bookHolderValue);
-    else url.searchParams.delete('book_holder');
-    
-    if (bankValue) url.searchParams.set('bank', bankValue);
-    else url.searchParams.delete('bank');
-    
+    ['book', 'status', 'book_holder', 'bank'].forEach(function(param) {
+        url.searchParams.delete(param);
+    });
+    document.querySelectorAll('.filter-option-book:checked').forEach(function(cb) {
+        url.searchParams.append('book', cb.value);
+    });
+    document.querySelectorAll('.filter-option-status:checked').forEach(function(cb) {
+        url.searchParams.append('status', cb.value);
+    });
+    document.querySelectorAll('.filter-option-book_holder:checked').forEach(function(cb) {
+        url.searchParams.append('book_holder', cb.value);
+    });
+    document.querySelectorAll('.filter-option-bank:checked').forEach(function(cb) {
+        url.searchParams.append('bank', cb.value);
+    });
     saveChequeExpandedBooks();
     window.location.href = url.toString();
 }
+
+document.querySelectorAll('.cheque-register-page .cheque-multi-filter').forEach(function(wrapper) {
+    var btn = wrapper.querySelector('.filter-toggle');
+    var panel = wrapper.querySelector('.filter-panel');
+    if (!btn || !panel) return;
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var isOpen = wrapper.classList.contains('open');
+        document.querySelectorAll('.cheque-register-page .cheque-multi-filter.open').forEach(function(o) {
+            if (o !== wrapper) o.classList.remove('open');
+        });
+        wrapper.classList.toggle('open', !isOpen);
+        btn.setAttribute('aria-expanded', !isOpen ? 'true' : 'false');
+    });
+    panel.addEventListener('click', function(e) { e.stopPropagation(); });
+    wrapper.querySelectorAll('.filter-option').forEach(function(cb) {
+        cb.addEventListener('change', function() { applyFilters(); });
+    });
+});
+document.addEventListener('click', function() {
+    document.querySelectorAll('.cheque-register-page .cheque-multi-filter.open').forEach(function(o) {
+        o.classList.remove('open');
+        var b = o.querySelector('.filter-toggle');
+        if (b) b.setAttribute('aria-expanded', 'false');
+    });
+});
 </script>
 {% endblock %}
 

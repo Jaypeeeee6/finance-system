@@ -20471,11 +20471,11 @@ def export_item_request_reports_pdf():
 @login_required
 def cheque_register():
     """View cheque register page"""
-    # Get filters from query parameters
-    book_filter = request.args.get('book', '')
-    status_filter = request.args.get('status', '')
-    book_holder_filter = request.args.get('book_holder', '')
-    bank_filter = request.args.get('bank', '')
+    # Get filters from query parameters (multiple values per filter)
+    book_filter_list = request.args.getlist('book')
+    status_filter_list = request.args.getlist('status')
+    book_holder_filter_list = request.args.getlist('book_holder')
+    bank_filter_list = request.args.getlist('bank')
     
     # Get all unique book numbers for the filter dropdown
     book_numbers = db.session.query(ChequeBook.book_no).distinct().order_by(ChequeBook.book_no).all()
@@ -20496,31 +20496,40 @@ def cheque_register():
     # Build query
     query = db.session.query(ChequeSerial).join(ChequeBook)
     
-    # Apply book filter if provided
-    if book_filter:
-        try:
-            book_no = int(book_filter)
-            query = query.filter(ChequeBook.book_no == book_no)
-        except ValueError:
-            pass  # Invalid book number, ignore filter
+    # Apply book filter(s) if provided
+    if book_filter_list:
+        book_nos = []
+        for b in book_filter_list:
+            try:
+                book_nos.append(int(b))
+            except ValueError:
+                pass
+        if book_nos:
+            query = query.filter(ChequeBook.book_no.in_(book_nos))
     
-    # Apply status filter if provided
-    if status_filter:
-        valid_statuses = ['Available', 'Reserved', 'Used', 'Cancelled']
-        if status_filter in valid_statuses:
-            query = query.filter(ChequeSerial.status == status_filter)
+    # Apply status filter(s) if provided
+    valid_statuses = {'Available', 'Reserved', 'Used', 'Cancelled'}
+    if status_filter_list:
+        statuses = [s for s in status_filter_list if s in valid_statuses]
+        if statuses:
+            query = query.filter(ChequeSerial.status.in_(statuses))
     
-    # Apply book holder filter if provided
-    if book_holder_filter:
-        try:
-            holder_id = int(book_holder_filter)
-            query = query.filter(ChequeBook.book_holder_user_id == holder_id)
-        except ValueError:
-            pass
+    # Apply book holder filter(s) if provided
+    if book_holder_filter_list:
+        holder_ids = []
+        for h in book_holder_filter_list:
+            try:
+                holder_ids.append(int(h))
+            except ValueError:
+                pass
+        if holder_ids:
+            query = query.filter(ChequeBook.book_holder_user_id.in_(holder_ids))
     
-    # Apply bank name filter if provided
-    if bank_filter:
-        query = query.filter(ChequeBook.bank_name == bank_filter)
+    # Apply bank name filter(s) if provided
+    if bank_filter_list:
+        banks = [b for b in bank_filter_list if b and b.strip()]
+        if banks:
+            query = query.filter(ChequeBook.bank_name.in_(banks))
     
     # Fetch all cheque serials with their book information, ordered by book_no and serial_no
     cheque_serials = query.order_by(
@@ -20532,10 +20541,10 @@ def cheque_register():
                           book_numbers=book_numbers,
                           book_holders=book_holders,
                           bank_names=bank_names,
-                          book_filter=book_filter,
-                          status_filter=status_filter,
-                          book_holder_filter=book_holder_filter,
-                          bank_filter=bank_filter)
+                          book_filter_list=book_filter_list,
+                          status_filter_list=status_filter_list,
+                          book_holder_filter_list=book_holder_filter_list,
+                          bank_filter_list=bank_filter_list)
 
 
 @app.route('/cheque-register/reserve', methods=['POST'])
