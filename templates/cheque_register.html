@@ -174,6 +174,40 @@
     background-color: #ffc107 !important;
     color: #212529 !important;
 }
+.cheque-register-page .badge-audited {
+    background-color: #28a745 !important;
+    color: #fff !important;
+}
+.cheque-register-page .badge-danger {
+    background-color: #dc3545 !important;
+    color: #fff !important;
+    border-color: #dc3545 !important;
+}
+.cheque-register-page .cheque-book-toolbar .btn-audit-audited,
+.cheque-register-page .cheque-book-toolbar .btn-audit-cancelled {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.875rem;
+}
+.cheque-register-page .cheque-book-toolbar .btn-audit-audited {
+    background-color: #28a745 !important;
+    border-color: #28a745 !important;
+    color: #fff !important;
+}
+.cheque-register-page .cheque-book-toolbar .btn-audit-audited:hover {
+    background-color: transparent !important;
+    border-color: #28a745 !important;
+    color: #28a745 !important;
+}
+.cheque-register-page .cheque-book-toolbar .btn-audit-cancelled {
+    background-color: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: #fff !important;
+}
+.cheque-register-page .cheque-book-toolbar .btn-audit-cancelled:hover {
+    background-color: transparent !important;
+    border-color: #dc3545 !important;
+    color: #dc3545 !important;
+}
 
 /* Multi-select filter dropdowns */
 .cheque-register-page .cheque-multi-filter {
@@ -238,8 +272,9 @@
 {% block content %}
 {% set show_select_it = current_user.department == 'IT' %}
 {% set show_select_ceo_gm_op = current_user.role in ['CEO', 'GM', 'Operation Manager'] %}
-{% set show_cheque_select = show_select_it or show_select_ceo_gm_op %}
-<div class="dashboard-container cheque-register-page">
+{% set show_select_auditing = current_user.department == 'Auditing' %}
+{% set show_cheque_select = show_select_it or show_select_ceo_gm_op or show_select_auditing %}
+<div class="dashboard-container cheque-register-page" data-show-auditing-select="{{ 'true' if show_select_auditing else 'false' }}">
     <div class="dashboard-header">
         <h2 class="dashboard-title" style="margin:0; display:inline-flex; align-items:center; gap:8px; font-size:1.6rem; font-weight:700;"><i class="fas fa-book"></i> Cheque Register</h2>
         <p>View and manage cheque books and serial numbers</p>
@@ -286,6 +321,7 @@
                         <label><input type="checkbox" class="filter-option filter-option-status" value="Available" {% if 'Available' in status_filter_list %}checked{% endif %}> Available</label>
                         <label><input type="checkbox" class="filter-option filter-option-status" value="Reserved" {% if 'Reserved' in status_filter_list %}checked{% endif %}> Reserved</label>
                         <label><input type="checkbox" class="filter-option filter-option-status" value="Used" {% if 'Used' in status_filter_list %}checked{% endif %}> Used</label>
+                        <label><input type="checkbox" class="filter-option filter-option-status" value="Audited" {% if 'Audited' in status_filter_list %}checked{% endif %}> Audited</label>
                         <label><input type="checkbox" class="filter-option filter-option-status" value="Cancelled" {% if 'Cancelled' in status_filter_list %}checked{% endif %}> Cancelled</label>
                     </div>
                 </div>
@@ -366,6 +402,16 @@
                         </span>
                     </div>
                     {% endif %}
+                    {% if show_select_auditing %}
+                    <div class="cheque-book-toolbar cheque-toolbar-auditing" data-book-no="{{ group.grouper }}" style="display: none;">
+                        <button type="button" class="btn btn-sm btn-audit-audited" data-book-no="{{ group.grouper }}">
+                            <i class="fas fa-check-circle"></i> Mark as Audited
+                        </button>
+                        <button type="button" class="btn btn-sm btn-audit-cancelled" data-book-no="{{ group.grouper }}">
+                            <i class="fas fa-times-circle"></i> Mark as Cancelled
+                        </button>
+                    </div>
+                    {% endif %}
                     <div class="table-responsive cheque-register-table-wrap">
                         <table class="data-table cheque-book-table">
                             <thead>
@@ -389,7 +435,7 @@
                                 <tr data-book-no="{{ group.grouper }}" data-serial-id="{{ serial.id }}" data-status="{{ serial.status }}">
                                     {% if show_cheque_select %}
                                     <td class="cheque-td-select">
-                                        <input type="checkbox" class="cheque-row-select" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" aria-label="Select serial {{ serial.serial_no }}" {% if show_select_ceo_gm_op and serial.status == 'Cancelled' %}disabled{% endif %}>
+                                        <input type="checkbox" class="cheque-row-select" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" aria-label="Select serial {{ serial.serial_no }}" {% if show_select_ceo_gm_op and serial.status == 'Cancelled' %}disabled{% endif %}{% if show_select_auditing and serial.status != 'Used' %} disabled{% endif %}>
                                     </td>
                                     {% endif %}
                                     <td>{{ serial.book.book_no }}</td>
@@ -399,6 +445,7 @@
                                             {% if serial.status == 'Available' %}badge-success
                                             {% elif serial.status == 'Reserved' %}badge-reserved
                                             {% elif serial.status == 'Used' %}badge-used
+                                            {% elif serial.status == 'Audited' %}badge-audited
                                             {% elif serial.status == 'Cancelled' %}badge-danger
                                             {% else %}badge-secondary{% endif %}">
                                             {{ serial.status }}
@@ -803,13 +850,15 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     });
 
-    // Checkbox column: IT (Delete) or CEO/GM/Operation Manager (Reserve toolbar)
+    // Checkbox column: IT (Delete), CEO/GM/Operation Manager (Reserve toolbar), or Auditing (Mark Audited/Cancelled)
+    var showAuditingSelect = document.querySelector('.cheque-register-page') && document.querySelector('.cheque-register-page').getAttribute('data-show-auditing-select') === 'true';
     function updateSelectToolbarForBook(bookNo) {
         var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
         if (!section) return;
         var checked = section.querySelectorAll('.cheque-row-select:checked');
         var toolbarIt = section.querySelector('.cheque-toolbar-it');
         var toolbarReserve = section.querySelector('.cheque-toolbar-reserve');
+        var toolbarAuditing = section.querySelector('.cheque-toolbar-auditing');
         if (toolbarIt) toolbarIt.style.display = checked.length > 0 ? 'flex' : 'none';
         if (toolbarReserve) {
             toolbarReserve.style.display = checked.length > 0 ? 'flex' : 'none';
@@ -836,6 +885,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
+        if (toolbarAuditing) toolbarAuditing.style.display = (showAuditingSelect && checked.length > 0) ? 'flex' : 'none';
         var selectAll = section.querySelector('.cheque-select-all');
         if (selectAll) {
             var allEnabled = section.querySelectorAll('.cheque-row-select:not([disabled])');
@@ -869,7 +919,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var bookNo = this.getAttribute('data-book-no');
             var row = this.closest('tr');
             var status = row ? row.getAttribute('data-status') : null;
-            if (this.checked && status) {
+            if (this.checked && status && !showAuditingSelect) {
                 enforceSingleStatusPerBook(bookNo, status);
                 if (status === 'Used') enforceSingleUsedPerBook(bookNo);
             }
@@ -882,13 +932,17 @@ document.addEventListener('DOMContentLoaded', function() {
             var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
             if (!section) return;
             if (cb.checked) {
-                var firstCb = section.querySelector('.cheque-row-select:not([disabled])');
-                var firstStatus = firstCb && firstCb.closest('tr') ? firstCb.closest('tr').getAttribute('data-status') : null;
-                section.querySelectorAll('.cheque-row-select:not([disabled])').forEach(function(rowCb) {
-                    var r = rowCb.closest('tr');
-                    rowCb.checked = r && r.getAttribute('data-status') === firstStatus;
-                });
-                if (firstStatus === 'Used') enforceSingleUsedPerBook(bookNo);
+                if (!showAuditingSelect) {
+                    var firstCb = section.querySelector('.cheque-row-select:not([disabled])');
+                    var firstStatus = firstCb && firstCb.closest('tr') ? firstCb.closest('tr').getAttribute('data-status') : null;
+                    section.querySelectorAll('.cheque-row-select:not([disabled])').forEach(function(rowCb) {
+                        var r = rowCb.closest('tr');
+                        rowCb.checked = r && r.getAttribute('data-status') === firstStatus;
+                    });
+                    if (firstStatus === 'Used') enforceSingleUsedPerBook(bookNo);
+                } else {
+                    section.querySelectorAll('.cheque-row-select:not([disabled])').forEach(function(rowCb) { rowCb.checked = true; });
+                }
             } else {
                 section.querySelectorAll('.cheque-row-select:not([disabled])').forEach(function(rowCb) {
                     rowCb.checked = false;
@@ -1009,6 +1063,45 @@ document.addEventListener('DOMContentLoaded', function() {
             if (checked.length === 0) return;
             var serialIds = Array.from(checked).map(function(c) { return parseInt(c.getAttribute('data-serial-id'), 10); });
             window.location.href = '{{ url_for("write_cheque") }}?serial_ids=' + serialIds.join(',') + '&print=1';
+        });
+    });
+
+    // Auditing: Mark as Audited or Mark as Cancelled (only Used cheques are selectable)
+    function doMarkChequeStatus(bookNo, action) {
+        var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
+        if (!section) return;
+        var checked = section.querySelectorAll('.cheque-row-select:checked');
+        if (checked.length === 0) return;
+        var serialIds = Array.from(checked).map(function(c) { return parseInt(c.getAttribute('data-serial-id'), 10); });
+        var btn = section.querySelector(action === 'audited' ? '.btn-audit-audited' : '.btn-audit-cancelled');
+        if (btn) btn.disabled = true;
+        fetch('{{ url_for("mark_cheque_status") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ serial_ids: serialIds, action: action })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                saveChequeExpandedBooks();
+                window.location.reload();
+            } else {
+                alert(data.error || 'Action failed.');
+            }
+        })
+        .catch(function(err) {
+            console.error(err);
+            alert('An error occurred. Please try again.');
+        })
+        .finally(function() { if (btn) btn.disabled = false; });
+    }
+    document.querySelectorAll('.btn-audit-audited').forEach(function(btn) {
+        btn.addEventListener('click', function() { doMarkChequeStatus(this.getAttribute('data-book-no'), 'audited'); });
+    });
+    document.querySelectorAll('.btn-audit-cancelled').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            if (!confirm('Mark the selected Used cheque(s) as Cancelled?')) return;
+            doMarkChequeStatus(this.getAttribute('data-book-no'), 'cancelled');
         });
     });
 });

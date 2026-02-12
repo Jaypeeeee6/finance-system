@@ -20508,7 +20508,7 @@ def cheque_register():
             query = query.filter(ChequeBook.book_no.in_(book_nos))
     
     # Apply status filter(s) if provided
-    valid_statuses = {'Available', 'Reserved', 'Used', 'Cancelled'}
+    valid_statuses = {'Available', 'Reserved', 'Used', 'Cancelled', 'Audited'}
     if status_filter_list:
         statuses = [s for s in status_filter_list if s in valid_statuses]
         if statuses:
@@ -22889,6 +22889,40 @@ def delete_cheque_upload():
         cheque_serial.upload_path = None
         db.session.commit()
         return jsonify({'success': True, 'message': 'Upload removed. You can upload a new image.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/cheque-register/mark-status', methods=['POST'])
+@login_required
+def mark_cheque_status():
+    """Mark selected Used cheques as Audited or Cancelled (Auditing department only)."""
+    if current_user.department != 'Auditing':
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+    try:
+        data = request.get_json()
+        serial_ids = data.get('serial_ids', [])
+        action = (data.get('action') or '').strip().lower()
+        if action not in ('audited', 'cancelled'):
+            return jsonify({'success': False, 'error': 'Invalid action. Use audited or cancelled.'}), 400
+        if not serial_ids:
+            return jsonify({'success': False, 'error': 'No serials selected'}), 400
+        new_status = 'Audited' if action == 'audited' else 'Cancelled'
+        serials = ChequeSerial.query.filter(
+            ChequeSerial.id.in_(serial_ids),
+            ChequeSerial.status == 'Used'
+        ).all()
+        if not serials:
+            return jsonify({'success': False, 'error': 'No Used cheques found with the selected IDs'}), 400
+        for s in serials:
+            s.status = new_status
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'updated_count': len(serials),
+            'message': f'Marked {len(serials)} cheque(s) as {new_status}.'
+        })
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
