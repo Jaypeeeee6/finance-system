@@ -17,6 +17,12 @@
 }
 .cheque-register-page .book-heading-serial-range { margin-left: auto; color: #6c757d; font-size: 0.98em; font-weight: normal; }
 .cheque-register-page .book-section-header .btn-edit-book { margin-left: 0.5rem; }
+.cheque-register-page .book-section-header .btn-edit-book:disabled,
+.cheque-register-page .book-section-header .btn-edit-book.btn-edit-book-disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    pointer-events: none;
+}
 .cheque-register-page .book-section-header:hover { opacity: 0.85; }
 .cheque-register-page .book-section-header .book-section-chevron {
     transition: transform 0.2s ease;
@@ -219,7 +225,12 @@
                         <span class="book-section-chevron" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
                         <h3 class="book-section-title" style="margin:0;">Book No. {{ group.grouper }}{% if group.list %}{% set book = group.list[0].book %}{% if book and (book.book_holder or book.bank_name) %}<span class="book-heading-meta"> — {{ book.book_holder.name if book.book_holder else '' }}{% if book.book_holder and book.bank_name %}, {% endif %}{{ book.bank_name or '' }}</span>{% endif %}{% endif %}</h3>
                         {% if group.list %}<span class="book-heading-serial-range">Serial No: {{ group.list[0].serial_no }} - {{ group.list[-1].serial_no }}</span>{% endif %}
+                        {% set has_non_available = group.list | selectattr('status', 'ne', 'Available') | list | length > 0 %}
+                        {% if has_non_available %}
+                        <span class="btn btn-sm btn-outline btn-edit-book btn-edit-book-disabled" title="Edit book (disabled: book has cheques that are not Available)">Edit</span>
+                        {% else %}
                         <a href="{{ url_for('edit_book', book_no=group.grouper) }}" class="btn btn-sm btn-outline btn-edit-book" onclick="event.stopPropagation();" title="Edit book">Edit</a>
+                        {% endif %}
                     </div>
                     <div class="book-section-content" id="book-content-{{ group.grouper }}">
                     {% if show_select_it %}
