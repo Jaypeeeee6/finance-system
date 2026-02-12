@@ -22827,6 +22827,34 @@ def upload_cheque_file():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/cheque-register/delete-upload', methods=['POST'])
+@login_required
+def delete_cheque_upload():
+    """Remove the uploaded file for a cheque serial so the user can upload a different image."""
+    try:
+        serial_id = request.form.get('serial_id') or (request.get_json() or {}).get('serial_id')
+        if not serial_id:
+            return jsonify({'success': False, 'error': 'Serial ID not provided'}), 400
+        cheque_serial = ChequeSerial.query.get(serial_id)
+        if not cheque_serial:
+            return jsonify({'success': False, 'error': 'Cheque serial not found'}), 404
+        if not cheque_serial.upload_path:
+            return jsonify({'success': True, 'message': 'No upload to remove'})
+        filename = cheque_serial.upload_path.split('/')[-1] if '/' in cheque_serial.upload_path else cheque_serial.upload_path
+        filepath = os.path.join(app.config['CHEQUE_UPLOAD_FOLDER'], filename)
+        if os.path.isfile(filepath):
+            try:
+                os.remove(filepath)
+            except OSError:
+                pass
+        cheque_serial.upload_path = None
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Upload removed. You can upload a new image.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/cheque-register/delete', methods=['POST'])
 @login_required
 def delete_cheque_serials():

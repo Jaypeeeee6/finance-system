@@ -369,26 +369,29 @@ document.addEventListener('DOMContentLoaded', function() {
     startSerialInput.addEventListener('input', updatePreview);
     lastSerialInput.addEventListener('input', updatePreview);
 
-    // Form validation
+    // Form validation — run in capture phase so we block submit before any processing
     document.getElementById('newBookForm').addEventListener('submit', function(e) {
-        const start = parseInt(startSerialInput.value);
-        const last = parseInt(lastSerialInput.value);
+        const start = parseInt(startSerialInput.value) || 0;
+        const last = parseInt(lastSerialInput.value) || 0;
         const count = start && last && start <= last ? last - start + 1 : 0;
 
         if (start > last) {
             e.preventDefault();
+            e.stopPropagation();
             alert('Starting serial number must be less than or equal to last serial number');
             return false;
         }
         if (count > MAX_SERIALS) {
             e.preventDefault();
+            e.stopPropagation();
+            alert('Serial numbers per book must be 50 or fewer, not more than 50. This range would generate ' + count + ' serial number(s). Please adjust the range and try again.');
             startSerialInput.classList.add('error');
             lastSerialInput.classList.add('error');
             if (serialRangeError) serialRangeError.style.display = 'block';
             lastSerialInput.focus();
             return false;
         }
-    });
+    }, true);
 });
 </script>
 {% endblock %}

@@ -71,6 +71,38 @@
 .cheque-register-page .upload-btn:disabled i {
     color: #9ca3af !important;
 }
+.cheque-register-page .upload-cell .cheque-remove-image-btn {
+    margin-left: 0.35rem;
+    font-size: 0.8rem;
+    color: #6c757d !important;
+    border-color: #6c757d !important;
+    background: transparent !important;
+}
+.cheque-register-page .upload-cell .cheque-remove-image-btn:hover {
+    color: #495057 !important;
+    border-color: #495057 !important;
+    background: #f8f9fa !important;
+}
+.cheque-register-page .upload-cell .remove-image-icon {
+    position: relative;
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    line-height: 14px;
+}
+.cheque-register-page .upload-cell .remove-image-icon .fa-image {
+    font-size: 14px;
+}
+.cheque-register-page .upload-cell .remove-image-icon .fa-times {
+    position: absolute;
+    right: -5px;
+    top: -6px;
+    font-size: 10px;
+    background: #fff;
+    border-radius: 50%;
+    line-height: 1;
+    padding: 1px;
+}
 .cheque-register-page .cheque-book-toolbar {
     display: flex;
     align-items: center;
@@ -261,11 +293,17 @@
                                     <td>{{ serial.cheque_date.strftime('%Y-%m-%d') if serial.cheque_date else '-' }}</td>
                                     <td>{{ "%.3f"|format(serial.amount) if serial.amount else '-' }}</td>
                                     <td class="upload-cell-td">
-                                        <div class="upload-cell" data-serial-id="{{ serial.id }}">
+                                        <div class="upload-cell" data-serial-id="{{ serial.id }}" data-status="{{ serial.status }}">
                                             {% if serial.upload_path %}
                                                 <a href="/uploads/cheque/{{ serial.upload_path.split('/')[-1] if '/' in serial.upload_path else serial.upload_path }}" target="_blank" class="btn btn-sm btn-view-outline upload-view-btn" title="View uploaded file">
                                                     <i class="fas fa-eye"></i>
                                                 </a>
+                                                <button type="button" class="btn btn-sm cheque-remove-image-btn cheque-delete-upload-btn" title="Remove this image only so you can upload a different one" aria-label="Remove uploaded image">
+                                                    <span class="remove-image-icon" aria-hidden="true">
+                                                        <i class="fas fa-image"></i>
+                                                        <i class="fas fa-times"></i>
+                                                    </span>
+                                                </button>
                                             {% else %}
                                                 <input type="file" 
                                                        id="upload_{{ serial.id }}" 
@@ -519,78 +557,118 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Handle file upload for cheque serials
-    const uploadInputs = document.querySelectorAll('.cheque-upload-input');
-    
-    uploadInputs.forEach(input => {
-        input.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            const serialId = this.getAttribute('data-serial-id');
-            const uploadCell = this.closest('.upload-cell');
-            const uploadBtn = uploadCell.querySelector('.upload-btn');
-            
-            // Validate file type
-            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
-            if (!allowedTypes.includes(file.type)) {
-                alert('Please upload an image file (JPG, PNG, GIF) or PDF.');
-                this.value = '';
-                return;
-            }
-            
-            // Validate file size (50MB max)
-            const maxSize = 50 * 1024 * 1024; // 50MB
-            if (file.size > maxSize) {
-                alert('File size exceeds 50MB limit. Please choose a smaller file.');
-                this.value = '';
-                return;
-            }
-            
-            // Show loading state
-            uploadBtn.disabled = true;
-            uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            
-            // Prepare form data
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('serial_id', serialId);
-            
-            // Upload file
-            fetch('/cheque-register/upload', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
+    // Delete existing upload so user can upload a different image
+    document.addEventListener('click', function(e) {
+        const deleteBtn = e.target.closest('.cheque-delete-upload-btn');
+        if (!deleteBtn) return;
+        const uploadCell = deleteBtn.closest('.upload-cell');
+        if (!uploadCell) return;
+        const serialId = uploadCell.getAttribute('data-serial-id');
+        const status = uploadCell.getAttribute('data-status') || '';
+        if (!confirm('Remove this uploaded image? You can then upload a different one.')) return;
+        deleteBtn.disabled = true;
+        const formData = new FormData();
+        formData.append('serial_id', serialId);
+        fetch('/cheque-register/delete-upload', { method: 'POST', body: formData })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
                 if (data.success) {
-                    // Replace upload button with view button
+                    uploadCell.innerHTML = '';
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.id = 'upload_' + serialId;
+                    input.className = 'cheque-upload-input';
+                    input.setAttribute('accept', 'image/*,.pdf');
+                    input.style.display = 'none';
+                    input.setAttribute('data-serial-id', serialId);
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'btn btn-sm btn-view-outline upload-btn';
+                    if (status === 'Available') btn.disabled = true;
+                    btn.title = status === 'Available' ? 'Upload available after reserving or using the cheque' : 'Upload image';
+                    btn.innerHTML = '<i class="fas fa-upload"></i>';
+                    btn.onclick = function() { if (status !== 'Available') input.click(); };
+                    uploadCell.appendChild(input);
+                    uploadCell.appendChild(btn);
+                } else {
+                    alert(data.error || 'Could not remove upload.');
+                    deleteBtn.disabled = false;
+                }
+            })
+            .catch(function(err) {
+                console.error('Delete upload error:', err);
+                alert('An error occurred. Please try again.');
+                deleteBtn.disabled = false;
+            });
+    });
+
+    // Handle file upload for cheque serials (delegated so dynamically added inputs work)
+    document.addEventListener('change', function(e) {
+        if (!e.target.matches('.cheque-upload-input')) return;
+        const input = e.target;
+        const file = input.files[0];
+        if (!file) return;
+        
+        const serialId = input.getAttribute('data-serial-id');
+        const uploadCell = input.closest('.upload-cell');
+        const uploadBtn = uploadCell.querySelector('.upload-btn');
+        
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Please upload an image file (JPG, PNG, GIF) or PDF.');
+            input.value = '';
+            return;
+        }
+        const maxSize = 50 * 1024 * 1024;
+        if (file.size > maxSize) {
+            alert('File size exceeds 50MB limit. Please choose a smaller file.');
+            input.value = '';
+            return;
+        }
+        if (!confirm('Are you sure you want to upload "' + file.name + '" for this cheque? This will replace any existing upload.')) {
+            input.value = '';
+            return;
+        }
+        
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('serial_id', serialId);
+        fetch('/cheque-register/upload', { method: 'POST', body: formData })
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if (data.success) {
                     uploadBtn.remove();
-                    this.remove();
-                    
+                    input.remove();
                     const viewBtn = document.createElement('a');
                     viewBtn.href = '/uploads/cheque/' + data.filename;
                     viewBtn.target = '_blank';
                     viewBtn.className = 'btn btn-sm btn-view-outline upload-view-btn';
                     viewBtn.title = 'View uploaded file';
                     viewBtn.innerHTML = '<i class="fas fa-eye"></i>';
-                    
                     uploadCell.appendChild(viewBtn);
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'btn btn-sm cheque-remove-image-btn cheque-delete-upload-btn';
+                    deleteBtn.title = 'Remove this image only so you can upload a different one';
+                    deleteBtn.setAttribute('aria-label', 'Remove uploaded image');
+                    deleteBtn.innerHTML = '<span class="remove-image-icon" aria-hidden="true"><i class="fas fa-image"></i><i class="fas fa-times"></i></span>';
+                    uploadCell.appendChild(deleteBtn);
                 } else {
                     alert(data.error || 'Upload failed. Please try again.');
                     uploadBtn.disabled = false;
                     uploadBtn.innerHTML = '<i class="fas fa-upload"></i>';
-                    this.value = '';
+                    input.value = '';
                 }
             })
-            .catch(error => {
+            .catch(function(error) {
                 console.error('Upload error:', error);
                 alert('An error occurred during upload. Please try again.');
                 uploadBtn.disabled = false;
                 uploadBtn.innerHTML = '<i class="fas fa-upload"></i>';
-                this.value = '';
+                input.value = '';
             });
-        });
     });
 
     // Checkbox column: IT (Delete) or CEO/GM/Operation Manager (Reserve toolbar)
