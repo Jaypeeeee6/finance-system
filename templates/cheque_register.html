@@ -35,7 +35,21 @@
 .cheque-register-page .book-section.collapsed .book-section-content { display: none !important; }
 .cheque-register-page .book-section .book-section-content { margin-top: 1rem; }
 .cheque-register-page .upload-cell-td { text-align: center; }
-.cheque-register-page .upload-cell { display: inline-block; }
+.cheque-register-page .upload-cell {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+.cheque-register-page .upload-cell .upload-cell-buttons { display: inline-flex; align-items: center; gap: 0.35rem; }
+.cheque-register-page .upload-cell .upload-path-text {
+    font-size: 0.75rem;
+    color: #6c757d;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .cheque-register-page .book-section .pagination-container { margin-top: 8px; }
 .cheque-register-page .book-section .pagination-container .pagination { flex-wrap: wrap; gap: 6px; }
 /* Active page number: same element (button) as others = same size; gold color only */
@@ -306,29 +320,35 @@
                                     <td class="upload-cell-td">
                                         <div class="upload-cell" data-serial-id="{{ serial.id }}" data-status="{{ serial.status }}">
                                             {% if serial.upload_path %}
-                                                <a href="/uploads/cheque/{{ serial.upload_path.split('/')[-1] if '/' in serial.upload_path else serial.upload_path }}" target="_blank" class="btn btn-sm btn-view-outline upload-view-btn" title="View uploaded file">
-                                                    <i class="fas fa-eye"></i>
-                                                </a>
-                                                <button type="button" class="btn btn-sm cheque-remove-image-btn cheque-delete-upload-btn" title="Remove this image only so you can upload a different one" aria-label="Remove uploaded image">
-                                                    <span class="remove-image-icon" aria-hidden="true">
-                                                        <i class="fas fa-image"></i>
-                                                        <i class="fas fa-times"></i>
-                                                    </span>
-                                                </button>
+                                                {% set filename = serial.upload_path.split('/')[-1] if '/' in serial.upload_path else serial.upload_path %}
+                                                <div class="upload-cell-buttons">
+                                                    <a href="/uploads/cheque/{{ filename }}" target="_blank" class="btn btn-sm btn-view-outline upload-view-btn" title="View uploaded file">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <button type="button" class="btn btn-sm cheque-remove-image-btn cheque-delete-upload-btn" title="Remove this image only so you can upload a different one" aria-label="Remove uploaded image">
+                                                        <span class="remove-image-icon" aria-hidden="true">
+                                                            <i class="fas fa-image"></i>
+                                                            <i class="fas fa-times"></i>
+                                                        </span>
+                                                    </button>
+                                                </div>
+                                                <span class="upload-path-text" title="{{ filename }}">{{ filename }}</span>
                                             {% else %}
-                                                <input type="file" 
-                                                       id="upload_{{ serial.id }}" 
-                                                       class="cheque-upload-input" 
-                                                       accept="image/*,.pdf" 
-                                                       style="display: none;"
-                                                       data-serial-id="{{ serial.id }}">
-                                                <button type="button" 
-                                                        class="btn btn-sm btn-view-outline upload-btn" 
-                                                        {% if serial.status == 'Available' %}disabled{% endif %}
-                                                        onclick="{% if serial.status != 'Available' %}document.getElementById('upload_{{ serial.id }}').click(){% endif %}"
-                                                        title="{% if serial.status == 'Available' %}Upload available after reserving or using the cheque{% else %}Upload image{% endif %}">
-                                                    <i class="fas fa-upload"></i>
-                                                </button>
+                                                <div class="upload-cell-buttons">
+                                                    <input type="file" 
+                                                           id="upload_{{ serial.id }}" 
+                                                           class="cheque-upload-input" 
+                                                           accept="image/*,.pdf" 
+                                                           style="display: none;"
+                                                           data-serial-id="{{ serial.id }}">
+                                                    <button type="button" 
+                                                            class="btn btn-sm btn-view-outline upload-btn" 
+                                                            {% if serial.status == 'Available' %}disabled{% endif %}
+                                                            onclick="{% if serial.status != 'Available' %}document.getElementById('upload_{{ serial.id }}').click(){% endif %}"
+                                                            title="{% if serial.status == 'Available' %}Upload available after reserving or using the cheque{% else %}Upload image{% endif %}">
+                                                        <i class="fas fa-upload"></i>
+                                                    </button>
+                                                </div>
                                             {% endif %}
                                         </div>
                                     </td>
@@ -585,6 +605,8 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(function(data) {
                 if (data.success) {
                     uploadCell.innerHTML = '';
+                    const buttonsDiv = document.createElement('div');
+                    buttonsDiv.className = 'upload-cell-buttons';
                     const input = document.createElement('input');
                     input.type = 'file';
                     input.id = 'upload_' + serialId;
@@ -599,8 +621,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     btn.title = status === 'Available' ? 'Upload available after reserving or using the cheque' : 'Upload image';
                     btn.innerHTML = '<i class="fas fa-upload"></i>';
                     btn.onclick = function() { if (status !== 'Available') input.click(); };
-                    uploadCell.appendChild(input);
-                    uploadCell.appendChild(btn);
+                    buttonsDiv.appendChild(input);
+                    buttonsDiv.appendChild(btn);
+                    uploadCell.appendChild(buttonsDiv);
                 } else {
                     alert(data.error || 'Could not remove upload.');
                     deleteBtn.disabled = false;
@@ -652,20 +675,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.success) {
                     uploadBtn.remove();
                     input.remove();
+                    const buttonsDiv = document.createElement('div');
+                    buttonsDiv.className = 'upload-cell-buttons';
                     const viewBtn = document.createElement('a');
                     viewBtn.href = '/uploads/cheque/' + data.filename;
                     viewBtn.target = '_blank';
                     viewBtn.className = 'btn btn-sm btn-view-outline upload-view-btn';
                     viewBtn.title = 'View uploaded file';
                     viewBtn.innerHTML = '<i class="fas fa-eye"></i>';
-                    uploadCell.appendChild(viewBtn);
+                    buttonsDiv.appendChild(viewBtn);
                     const deleteBtn = document.createElement('button');
                     deleteBtn.type = 'button';
                     deleteBtn.className = 'btn btn-sm cheque-remove-image-btn cheque-delete-upload-btn';
                     deleteBtn.title = 'Remove this image only so you can upload a different one';
                     deleteBtn.setAttribute('aria-label', 'Remove uploaded image');
                     deleteBtn.innerHTML = '<span class="remove-image-icon" aria-hidden="true"><i class="fas fa-image"></i><i class="fas fa-times"></i></span>';
-                    uploadCell.appendChild(deleteBtn);
+                    buttonsDiv.appendChild(deleteBtn);
+                    uploadCell.appendChild(buttonsDiv);
+                    const pathSpan = document.createElement('span');
+                    pathSpan.className = 'upload-path-text';
+                    pathSpan.title = data.filename;
+                    pathSpan.textContent = data.filename;
+                    uploadCell.appendChild(pathSpan);
                 } else {
                     alert(data.error || 'Upload failed. Please try again.');
                     uploadBtn.disabled = false;
