@@ -778,6 +778,293 @@ def get_rejected_datetime_order():
     ).desc()
 
 
+def get_dashboard_all_tab_base_query(user):
+    """
+    Build the same base query as the user's main dashboard "All Requests" tab (no filters).
+    Used for prev/next navigation so order matches dashboard.
+    Returns a query that can be ordered and listed, or None if not supported for this role.
+    """
+    # Finance Staff / Finance Admin
+    if user.role in ['Finance Staff', 'Finance Admin']:
+        finance_statuses = ['Pending Finance Approval', 'Returned to Manager', 'Proof Pending', 'Proof Sent', 'Proof Rejected', 'Recurring', 'Completed', 'Rejected by Finance']
+        query = PaymentRequest.query.filter(
+            PaymentRequest.status.in_(finance_statuses),
+            PaymentRequest.is_archived == False,
+            PaymentRequest.is_draft == False
+        )
+        if user.role == 'Finance Staff':
+            query = query.filter(~PaymentRequest.user.has(User.role == 'CEO'))
+            own_pending = PaymentRequest.query.filter(
+                db.and_(
+                    PaymentRequest.user_id == user.user_id,
+                    PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager', 'Returned to Requestor', 'On Hold']),
+                    PaymentRequest.is_archived == False,
+                    PaymentRequest.is_draft == False
+                )
+            )
+            query = query.union(own_pending)
+        elif user.name == 'Abdalaziz Al-Brashdi':
+            abdalaziz_special = PaymentRequest.query.filter(
+                db.and_(
+                    PaymentRequest.status.in_(['Pending Manager Approval', 'Rejected by Manager']),
+                    db.or_(
+                        PaymentRequest.department == 'Finance',
+                        PaymentRequest.user_id == user.user_id
+                    ),
+                    PaymentRequest.is_archived == False,
+                    PaymentRequest.is_draft == False
+                )
+            )
+            query = query.union(abdalaziz_special)
+        return query
+
+    # GM, CEO, Operation Manager - all non-archived, non-draft
+    if user.role in ['GM', 'CEO', 'Operation Manager']:
+        return PaymentRequest.query.filter(
+            PaymentRequest.is_archived == False,
+            PaymentRequest.is_draft == False
+        )
+
+    # IT Staff, IT Department Manager (IT) - all non-archived, non-draft
+    if (user.role == 'IT Staff') or (user.role == 'Department Manager' and user.department == 'IT'):
+        return PaymentRequest.query.filter(
+            PaymentRequest.is_archived == False,
+            PaymentRequest.is_draft == False
+        )
+
+    # Department Manager (non-IT, non-Procurement) and other staff: use visible request IDs from department_dashboard logic
+    # Exclude CEO-submitted for non-authorized roles
+    try:
+        from flask import has_request_context
+        if not has_request_context():
+            return None
+    except Exception:
+        return None
+
+    from flask_login import current_user
+    if user.user_id != getattr(current_user, 'user_id', None):
+        return None
+
+    # Reuse the same visibility as department_dashboard (Auditing, Dept Manager, temp manager, regular staff)
+    allowed_roles = {
+        'HR Staff', 'PR Staff', 'Auditing Staff',
+        'Customer Service Staff', 'Marketing Staff', 'Operation Staff', 'Branch Inventory Officer', 'Quality Control Staff',
+        'Research and Development Staff', 'Office Staff', 'Maintenance Staff', 'Logistic Staff',
+        'Department Manager', 'Operation Manager'
+    }
+    is_temp_manager_any = DepartmentTemporaryManager.query.filter(
+        DepartmentTemporaryManager.temporary_manager_id == user.user_id,
+        db.or_(
+            DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+            DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+        )
+    ).first() is not None
+
+    if user.role not in allowed_roles and not is_temp_manager_any:
+        return None
+
+    # Operation Manager: all non-archived, non-draft
+    if user.role == 'Operation Manager':
+        return PaymentRequest.query.filter(
+            PaymentRequest.is_archived == False,
+            PaymentRequest.is_draft == False
+        )
+
+    # Department Manager (Auditing) - build visible set
+    if user.role == 'Department Manager' and user.department == 'Auditing':
+        all_non_archived = PaymentRequest.query.filter(
+            PaymentRequest.is_archived == False,
+            PaymentRequest.is_draft == False
+        ).all()
+        visible_request_ids = set()
+        for req in all_non_archived:
+            if req.user_id == user.user_id:
+                visible_request_ids.add(req.request_id)
+            req_dept = (req.department or '').strip()
+            requestor_dept = (req.user.department or '').strip() if req.user else ''
+            if req_dept.lower() == 'auditing' and requestor_dept.lower() == 'auditing':
+                visible_request_ids.add(req.request_id)
+            if getattr(req, 'temporary_manager_id', None) == user.user_id:
+                visible_request_ids.add(req.request_id)
+            try:
+                dt = DepartmentTemporaryManager.query.filter(
+                    DepartmentTemporaryManager.department == (req.department or ''),
+                    db.or_(
+                        DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                        DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                    )
+                ).first()
+            except Exception:
+                dt = None
+            if dt and getattr(dt, 'temporary_manager_id', None) == user.user_id:
+                visible_request_ids.add(req.request_id)
+            if req_dept.lower() != 'auditing' and req.status in [
+                'Completed', 'Recurring', 'Proof Pending', 'Proof Sent', 'Proof Rejected'
+            ]:
+                visible_request_ids.add(req.request_id)
+            approvers = get_authorized_manager_approvers(req)
+            if user in approvers:
+                visible_request_ids.add(req.request_id)
+        if not visible_request_ids:
+            return PaymentRequest.query.filter(PaymentRequest.request_id == -1)
+        return PaymentRequest.query.filter(
+            PaymentRequest.request_id.in_(visible_request_ids),
+            PaymentRequest.is_archived == False,
+            PaymentRequest.is_draft == False
+        )
+
+    # Department Manager (other than Auditing, IT, Procurement)
+    if user.role == 'Department Manager':
+        user_dept = (user.department or '').strip()
+        if not user_dept:
+            return PaymentRequest.query.filter(
+                PaymentRequest.user_id == user.user_id,
+                PaymentRequest.is_archived == False,
+                PaymentRequest.is_draft == False
+            )
+        all_non_archived = PaymentRequest.query.filter(PaymentRequest.is_archived == False).all()
+        authorized_request_ids = set()
+        department_match_ids = set()
+        temp_manager_ids = set()
+        temp_manager_payment_depts = set()
+        try:
+            for ta in DepartmentTemporaryManager.query.filter(
+                DepartmentTemporaryManager.temporary_manager_id == user.user_id,
+                db.or_(
+                    DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                    DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                )
+            ).all():
+                if ta.department:
+                    temp_manager_payment_depts.add(ta.department.strip().lower())
+        except Exception:
+            pass
+        for req in all_non_archived:
+            requestor_dept = (req.user.department or '').strip() if req.user else ''
+            req_dept = (req.department or '').strip()
+            if req_dept.lower() == user_dept.lower() and requestor_dept.lower() == user_dept.lower():
+                department_match_ids.add(req.request_id)
+            if getattr(req, 'temporary_manager_id', None) == user.user_id:
+                temp_manager_ids.add(req.request_id)
+            req_dept_normalized = req_dept.lower().strip() if req_dept else ''
+            if req_dept_normalized and req_dept_normalized in temp_manager_payment_depts:
+                temp_manager_ids.add(req.request_id)
+            approvers = get_authorized_manager_approvers(req)
+            if user in approvers:
+                authorized_request_ids.add(req.request_id)
+        all_visible_ids = department_match_ids | temp_manager_ids | authorized_request_ids
+        if not all_visible_ids:
+            return PaymentRequest.query.filter(PaymentRequest.request_id == -1)
+        return PaymentRequest.query.filter(
+            PaymentRequest.request_id.in_(all_visible_ids),
+            PaymentRequest.is_archived == False,
+            PaymentRequest.is_draft == False
+        )
+
+    # Auditing Staff
+    if user.department == 'Auditing' and user.role == 'Auditing Staff':
+        return PaymentRequest.query.filter(
+            db.or_(
+                PaymentRequest.user_id == user.user_id,
+                db.and_(
+                    PaymentRequest.department != 'Auditing',
+                    PaymentRequest.status.in_(['Completed', 'Recurring', 'Proof Pending', 'Proof Sent', 'Proof Rejected'])
+                )
+            ),
+            PaymentRequest.is_archived == False,
+            PaymentRequest.is_draft == False
+        )
+
+    # Regular staff / temp manager
+    authorized_approver_request_ids = set()
+    try:
+        for req in PaymentRequest.query.filter(
+            PaymentRequest.is_archived == False,
+            PaymentRequest.is_draft == False
+        ).all():
+            approvers = get_authorized_manager_approvers(req)
+            if user in approvers:
+                authorized_approver_request_ids.add(req.request_id)
+    except Exception:
+        pass
+    if is_temp_manager_any:
+        try:
+            temp_departments = [
+                dt.department.strip()
+                for dt in DepartmentTemporaryManager.query.filter(
+                    DepartmentTemporaryManager.temporary_manager_id == user.user_id,
+                    db.or_(
+                        DepartmentTemporaryManager.request_type == 'Finance Payment Request',
+                        DepartmentTemporaryManager.request_type == 'Both Payment and Item Request'
+                    )
+                ).all()
+                if dt.department
+            ]
+        except Exception:
+            temp_departments = []
+        if temp_departments:
+            dept_conditions = [
+                db.func.lower(db.func.trim(PaymentRequest.department)) == d.strip().lower()
+                for d in temp_departments
+            ]
+            dept_filter = db.or_(*dept_conditions) if dept_conditions else db.false()
+            return PaymentRequest.query.outerjoin(User, PaymentRequest.user_id == User.user_id).filter(
+                db.and_(
+                    db.or_(
+                        dept_filter,
+                        PaymentRequest.temporary_manager_id == user.user_id,
+                        PaymentRequest.user_id == user.user_id,
+                        PaymentRequest.request_id.in_(authorized_approver_request_ids) if authorized_approver_request_ids else db.false()
+                    ),
+                    PaymentRequest.is_archived == False,
+                    PaymentRequest.is_draft == False
+                )
+            )
+    if authorized_approver_request_ids:
+        return PaymentRequest.query.filter(
+            db.or_(
+                PaymentRequest.user_id == user.user_id,
+                PaymentRequest.request_id.in_(authorized_approver_request_ids)
+            ),
+            PaymentRequest.is_archived == False,
+            PaymentRequest.is_draft == False
+        )
+    return PaymentRequest.query.filter(
+        PaymentRequest.user_id == user.user_id,
+        PaymentRequest.is_archived == False,
+        PaymentRequest.is_draft == False
+    )
+
+
+def get_prev_next_request_ids(user, request_id):
+    """
+    Return (prev_request_id, next_request_id) in the same order as the dashboard "All Requests" tab.
+    Order: get_status_priority_order(), get_all_tab_datetime_order() (same as dashboard).
+    """
+    base = get_dashboard_all_tab_base_query(user)
+    if base is None:
+        return (None, None)
+    # Exclude CEO-submitted for non-authorized roles
+    if user.role not in ['Finance Admin', 'GM', 'Operation Manager']:
+        base = base.filter(~PaymentRequest.user.has(User.role == 'CEO'))
+    try:
+        ordered = base.order_by(
+            get_status_priority_order(),
+            get_all_tab_datetime_order()
+        )
+        rows = ordered.all()
+        ids = [r.request_id for r in rows]
+    except Exception:
+        return (None, None)
+    try:
+        idx = ids.index(request_id)
+    except ValueError:
+        return (None, None)
+    prev_id = ids[idx - 1] if idx > 0 else None
+    next_id = ids[idx + 1] if idx + 1 < len(ids) else None
+    return (prev_id, next_id)
+
+
 def get_recurring_datetime_order():
     """Ordering for recurring requests: updated_at → created_at (desc)."""
     return db.func.coalesce(
@@ -15687,7 +15974,10 @@ def view_request(request_id):
         _dt_for_req = None
     is_dept_temp_for_req = bool(_dt_for_req and getattr(_dt_for_req, 'temporary_manager_id', None) == current_user.user_id)
 
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, departments=departments, was_just_edited=was_just_edited, edited_fields=edited_fields_all, can_schedule_one_time=can_schedule_one_time, one_time_scheduled_by=one_time_scheduled_by, can_edit_request=can_edit_request, return_reason_history=return_reason_history, can_edit_department_only=can_edit_department_only, is_dept_temp_for_req=is_dept_temp_for_req)
+    # Prev/next in same order as dashboard "All Requests" tab
+    prev_request_id, next_request_id = get_prev_next_request_ids(current_user, request_id)
+
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, departments=departments, was_just_edited=was_just_edited, edited_fields=edited_fields_all, can_schedule_one_time=can_schedule_one_time, one_time_scheduled_by=one_time_scheduled_by, can_edit_request=can_edit_request, return_reason_history=return_reason_history, can_edit_department_only=can_edit_department_only, is_dept_temp_for_req=is_dept_temp_for_req, prev_request_id=prev_request_id, next_request_id=next_request_id)
 
 
 @app.route('/request/<int:request_id>/schedule_one_time_payment', methods=['POST'])
