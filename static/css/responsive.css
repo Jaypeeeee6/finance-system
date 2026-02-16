@@ -1126,6 +1126,54 @@
     }
 }
 
+/* View Item Request page only: at 1265px down make step tabs scrollable (no text wrap, consistent tab size) */
+@media (max-width: 1265px) {
+    .view-request-page .step-tabs-container {
+        overflow: hidden;
+    }
+
+    .view-request-page .step-tabs {
+        display: flex;
+        width: 100%;
+        min-width: 100%;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 0.25rem;
+        align-items: stretch;
+    }
+
+    .view-request-page .step-tab {
+        flex: 1 1 0;
+        min-width: min-content;
+        white-space: nowrap;
+        display: flex;
+        align-items: stretch;
+    }
+
+    .view-request-page .step-tab-content {
+        white-space: nowrap;
+        min-height: 50px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem 1.5rem;
+    }
+
+    .view-request-page .step-tabs::-webkit-scrollbar {
+        height: 6px;
+    }
+    .view-request-page .step-tabs::-webkit-scrollbar-thumb {
+        background: #dee2e6;
+        border-radius: 3px;
+    }
+    .view-request-page .step-tabs::-webkit-scrollbar-track {
+        background: transparent;
+    }
+}
+
 /* Make step tabs same height on responsive screens */
 @media (max-width: 1024px) {
     /* Container should NOT scroll - only the tabs list */
