@@ -2,51 +2,42 @@
 
 This document centralizes the project's responsive breakpoints so layouts stay consistent across viewports. Use the same `max-width` values in media queries when adding or changing responsive styles.
 
-- File reference: `static/css/dashboard.css`, `static/css/inventory.css`
+- File reference: `static/css/style.css`, `static/css/write_cheque.css`, `static/css/responsive.css`
 
 ## Breakpoints
 
 | Breakpoint | Target | Where used |
 |------------|--------|------------|
-| **1390px** | Small desktop / laptop | `dashboard.css`: topbar/content padding, search width, stats grid (4 cols), panels |
-| **1190px** | iPad landscape / small laptop | `dashboard.css`: tighter padding, search 280px, page header wraps; `inventory.css`: table toolbar wraps, category dropdown 140px, card padding |
-| **900px** | Narrow laptop / iPad | `dashboard.css`: content 12px 14px, search 240px; `inventory.css`: table actions/footer padding, search 180px, category 130px |
-| **768px** | iPad portrait / tablet | `dashboard.css`: page header stacks (column), brand text hidden, search full width; `inventory.css`: request layout stacks, side panel full width, table toolbar/footer wrap, table wrapper 50vh |
-| **640px** | Small tablet / large phone | `dashboard.css`: hamburger menu, sidebar as drawer, main margin-left 0 |
-| **480px** | Phone | `dashboard.css`: stats 1 col; `inventory.css`: table column min-widths, category dropdown 120px, tighter padding |
+| **1200px** | Small desktop / laptop | `write_cheque.css`: cheque layout single column, preview panel order, bank selection 2 cols |
+| **1024px** | Tablet / small laptop | `style.css`: hamburger menu, nav as dropdown/collapsible; `responsive.css`: pagination (compact), dashboard tables (narrower checkbox/Actions), main content padding, IT dashboard full-bleed, step tabs overflow |
+| **768px** | iPad portrait / tablet | `style.css`: nav padding, dashboard header column, stats 1 col, form-row 1 col, recurring modal 95%; `write_cheque.css`: cheque container padding, form/preview panels, amount input 1 col, bank selection 1 col, form actions column, modal 95%; `responsive.css`: pagination, dashboard full-bleed, step tabs |
+| **420px** | Small phone | `responsive.css`: pagination (smaller buttons), dashboard full-bleed, step tabs, table Actions column min-width reduced |
 
 ## CSS files
 
-- **`static/css/dashboard.css`**: App shell (topbar, sidebar, main content), page headers, stats grid, panels.
-- **`static/css/inventory.css`**: Warehouse inventory, table actions, category filter, table wrapper, request layouts, side panel, grids.
+- **`static/css/style.css`**: App shell (nav, hamburger, dashboard header, stats grid), search input, form rows, recurring modal.
+- **`static/css/write_cheque.css`**: Write cheque page (cheque layout, form, preview, bank selection, modals).
+- **`static/css/responsive.css`**: Pagination, payment-requests/dashboard tables, IT dashboard full-bleed, step tabs.
 
 ## Usage
 
 When adding new responsive styles, use the same `max-width` values so behavior stays consistent:
 
 ```css
-@media (max-width: 1390px) {
-  /* Small desktop / laptop */
+@media (max-width: 1200px) {
+  /* Small desktop / cheque layout */
 }
 
-@media (max-width: 1190px) {
-  /* iPad / small laptop */
-}
-
-@media (max-width: 900px) {
-  /* Narrow laptop / iPad */
+@media (max-width: 1024px) {
+  /* Tablet / hamburger nav */
 }
 
 @media (max-width: 768px) {
   /* iPad portrait / tablet */
 }
 
-@media (max-width: 640px) {
-  /* Sidebar becomes drawer */
-}
-
-@media (max-width: 480px) {
-  /* Phone */
+@media (max-width: 420px) {
+  /* Small phone */
 }
 ```
 
