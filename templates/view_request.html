@@ -5310,98 +5310,99 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('DOMContentLoaded', function() {
     const currentUrl = new URL(window.location.href);
     const currentPathname = currentUrl.pathname; // e.g., '/request/561'
-    
+
+    // Back button should go to dashboard (or list), not to another view-request page.
+    // Path like /request/123 is the view-request page; we ignore it when storing or using return URL.
+    function isViewRequestPage(pathname) {
+        return /^\/request\/\d+$/.test(pathname || '');
+    }
+
     // Store the current page URL as the return URL if we don't have one stored yet
     // This helps track where we came from before POST actions
     const urlParams = new URLSearchParams(window.location.search);
     const returnUrl = urlParams.get('return_url');
-    
+
     if (returnUrl) {
-        // Store the return_url in sessionStorage for use after POST redirects
         try {
-            sessionStorage.setItem('view_request_return_url', decodeURIComponent(returnUrl));
+            const decoded = decodeURIComponent(returnUrl);
+            const decodedObj = new URL(decoded, window.location.origin);
+            // Only store if it's not another view-request page (Back should go to dashboard, not previous request)
+            if (!isViewRequestPage(decodedObj.pathname)) {
+                sessionStorage.setItem('view_request_return_url', decoded);
+            }
         } catch (e) {
             console.log('Could not store return_url in sessionStorage');
         }
     } else if (document.referrer) {
-        // Store referrer if it's from the same origin and not the same page (even with different query params)
+        // Store referrer only if it's the dashboard/list, not another view-request page (e.g. from Prev/Next)
         try {
             const referrerUrl = new URL(document.referrer);
             const referrerPathname = referrerUrl.pathname;
-            
-            // Only store if:
-            // 1. Same origin
-            // 2. Not a POST action endpoint
-            // 3. NOT the same page (compare pathnames, ignore query params)
-            if (referrerUrl.origin === currentUrl.origin && 
-                !referrerPathname.includes('/approve') && 
+
+            if (referrerUrl.origin === currentUrl.origin &&
+                !isViewRequestPage(referrerPathname) &&
+                !referrerPathname.includes('/approve') &&
                 !referrerPathname.includes('/reject') &&
                 !referrerPathname.includes('/complete') &&
                 !referrerPathname.includes('/return') &&
                 !referrerPathname.includes('/edit') &&
-                referrerPathname !== currentPathname) { // Critical: exclude same page
+                referrerPathname !== currentPathname) {
                 sessionStorage.setItem('view_request_return_url', document.referrer);
             }
         } catch (e) {
             console.log('Could not parse referrer URL');
         }
     }
-    
+
     // Update back button href
     const backButton = document.getElementById('back-to-dashboard-btn');
     if (backButton) {
-        // First check sessionStorage for stored return URL
         let storedReturnUrl = sessionStorage.getItem('view_request_return_url');
-        
-        // Validate stored URL - make sure it's not the same page
+
+        // Don't use stored URL if it's the same page or another view-request page
         if (storedReturnUrl) {
             try {
                 const storedUrl = new URL(storedReturnUrl);
-                if (storedUrl.pathname === currentPathname) {
-                    // Same page - clear it and don't use it
+                if (storedUrl.pathname === currentPathname || isViewRequestPage(storedUrl.pathname)) {
                     sessionStorage.removeItem('view_request_return_url');
                     storedReturnUrl = null;
                 }
             } catch (e) {
-                // Invalid URL - clear it
                 sessionStorage.removeItem('view_request_return_url');
                 storedReturnUrl = null;
             }
         }
-        
+
         if (storedReturnUrl) {
             backButton.href = storedReturnUrl;
         } else if (returnUrl) {
-            // Use return_url from URL parameter
             try {
                 const decodedUrl = decodeURIComponent(returnUrl);
                 const decodedUrlObj = new URL(decodedUrl, window.location.origin);
-                // Validate it's not the same page
-                if (decodedUrlObj.pathname !== currentPathname) {
+                if (decodedUrlObj.pathname !== currentPathname && !isViewRequestPage(decodedUrlObj.pathname)) {
                     backButton.href = decodedUrl;
                 }
             } catch (e) {
                 console.log('Could not decode return_url');
             }
         } else if (document.referrer) {
-            // Use referrer as fallback
             try {
                 const referrerUrl = new URL(document.referrer);
-                
                 if (referrerUrl.origin === currentUrl.origin &&
+                    !isViewRequestPage(referrerUrl.pathname) &&
                     !referrerUrl.pathname.includes('/approve') &&
                     !referrerUrl.pathname.includes('/reject') &&
                     !referrerUrl.pathname.includes('/complete') &&
                     !referrerUrl.pathname.includes('/return') &&
                     !referrerUrl.pathname.includes('/edit') &&
-                    referrerUrl.pathname !== currentPathname) { // Critical: exclude same page
+                    referrerUrl.pathname !== currentPathname) {
                     backButton.href = document.referrer;
                 }
             } catch (e) {
                 console.log('Could not parse referrer URL');
             }
         }
-        // If no return URL found, the button will use the default dashboard URL from href attribute
+        // If no valid return URL found, the button uses the default dashboard URL from href attribute
     }
 });
 
