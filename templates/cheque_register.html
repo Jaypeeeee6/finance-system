@@ -274,7 +274,7 @@
 {% set show_select_ceo_gm_op = current_user.role in ['CEO', 'GM', 'Operation Manager'] %}
 {% set show_select_auditing = current_user.department == 'Auditing' %}
 {% set show_cheque_select = show_select_it or show_select_ceo_gm_op or show_select_auditing %}
-<div class="dashboard-container cheque-register-page" data-show-auditing-select="{{ 'true' if show_select_auditing else 'false' }}">
+<div class="dashboard-container cheque-register-page" data-show-auditing-select="{{ 'true' if show_select_auditing else 'false' }}" data-show-it-select="{{ 'true' if show_select_it else 'false' }}">
     <div class="dashboard-header">
         <h2 class="dashboard-title" style="margin:0; display:inline-flex; align-items:center; gap:8px; font-size:1.6rem; font-weight:700;"><i class="fas fa-book"></i> Cheque Register</h2>
         <p>View and manage cheque books and serial numbers</p>
@@ -870,6 +870,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Checkbox column: IT (Delete), CEO/GM/Operation Manager (Reserve toolbar), or Auditing (Mark Audited/Cancelled)
     var showAuditingSelect = document.querySelector('.cheque-register-page') && document.querySelector('.cheque-register-page').getAttribute('data-show-auditing-select') === 'true';
+    var showItSelect = document.querySelector('.cheque-register-page') && document.querySelector('.cheque-register-page').getAttribute('data-show-it-select') === 'true';
     function updateSelectToolbarForBook(bookNo) {
         var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
         if (!section) return;
@@ -970,7 +971,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var bookNo = this.getAttribute('data-book-no');
             var row = this.closest('tr');
             var status = row ? row.getAttribute('data-status') : null;
-            if (this.checked && status && !showAuditingSelect) {
+            if (this.checked && status && !showAuditingSelect && !showItSelect) {
                 enforceSingleStatusPerBook(bookNo, status);
                 if (status === 'Used') enforceSingleUsedPerBook(bookNo);
             }
@@ -983,7 +984,9 @@ document.addEventListener('DOMContentLoaded', function() {
             var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
             if (!section) return;
             if (cb.checked) {
-                if (!showAuditingSelect) {
+                if (showAuditingSelect || showItSelect) {
+                    section.querySelectorAll('.cheque-row-select:not([disabled])').forEach(function(rowCb) { rowCb.checked = true; });
+                } else {
                     var firstCb = section.querySelector('.cheque-row-select:not([disabled])');
                     var firstStatus = firstCb && firstCb.closest('tr') ? firstCb.closest('tr').getAttribute('data-status') : null;
                     section.querySelectorAll('.cheque-row-select:not([disabled])').forEach(function(rowCb) {
@@ -991,8 +994,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         rowCb.checked = r && r.getAttribute('data-status') === firstStatus;
                     });
                     if (firstStatus === 'Used') enforceSingleUsedPerBook(bookNo);
-                } else {
-                    section.querySelectorAll('.cheque-row-select:not([disabled])').forEach(function(rowCb) { rowCb.checked = true; });
                 }
             } else {
                 section.querySelectorAll('.cheque-row-select:not([disabled])').forEach(function(rowCb) {
