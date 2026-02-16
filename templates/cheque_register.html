@@ -400,16 +400,34 @@
                                 <i class="fas fa-print"></i> Print Cheque
                             </button>
                         </span>
+                        <span class="toolbar-audited-only" style="display: none;">
+                            <button type="button" class="btn btn-sm btn-audit-cancelled btn-audit-cancelled-ceo-gm-op" data-book-no="{{ group.grouper }}">
+                                <i class="fas fa-times-circle"></i> Mark as Cancelled
+                            </button>
+                            <button type="button" class="btn btn-sm btn-reserve-write btn-print-cheque" data-book-no="{{ group.grouper }}">
+                                <i class="fas fa-print"></i> Print Cheque
+                            </button>
+                        </span>
                     </div>
                     {% endif %}
                     {% if show_select_auditing %}
                     <div class="cheque-book-toolbar cheque-toolbar-auditing" data-book-no="{{ group.grouper }}" style="display: none;">
-                        <button type="button" class="btn btn-sm btn-audit-audited" data-book-no="{{ group.grouper }}">
-                            <i class="fas fa-check-circle"></i> Mark as Audited
-                        </button>
-                        <button type="button" class="btn btn-sm btn-audit-cancelled" data-book-no="{{ group.grouper }}">
-                            <i class="fas fa-times-circle"></i> Mark as Cancelled
-                        </button>
+                        <span class="toolbar-auditing-used" style="display: none;">
+                            <button type="button" class="btn btn-sm btn-audit-audited" data-book-no="{{ group.grouper }}">
+                                <i class="fas fa-check-circle"></i> Mark as Audited
+                            </button>
+                            <button type="button" class="btn btn-sm btn-audit-cancelled" data-book-no="{{ group.grouper }}">
+                                <i class="fas fa-times-circle"></i> Mark as Cancelled
+                            </button>
+                        </span>
+                        <span class="toolbar-auditing-audited" style="display: none;">
+                            <button type="button" class="btn btn-sm btn-audit-cancelled" data-book-no="{{ group.grouper }}">
+                                <i class="fas fa-times-circle"></i> Mark as Cancelled
+                            </button>
+                            <button type="button" class="btn btn-sm btn-reserve-write btn-print-cheque" data-book-no="{{ group.grouper }}">
+                                <i class="fas fa-print"></i> Print Cheque
+                            </button>
+                        </span>
                     </div>
                     {% endif %}
                     <div class="table-responsive cheque-register-table-wrap">
@@ -435,7 +453,7 @@
                                 <tr data-book-no="{{ group.grouper }}" data-serial-id="{{ serial.id }}" data-status="{{ serial.status }}">
                                     {% if show_cheque_select %}
                                     <td class="cheque-td-select">
-                                        <input type="checkbox" class="cheque-row-select" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" aria-label="Select serial {{ serial.serial_no }}" {% if show_select_ceo_gm_op and serial.status == 'Cancelled' %}disabled{% endif %}{% if show_select_auditing and serial.status != 'Used' %} disabled{% endif %}>
+                                        <input type="checkbox" class="cheque-row-select" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" aria-label="Select serial {{ serial.serial_no }}" {% if show_select_ceo_gm_op and serial.status == 'Cancelled' %}disabled{% endif %}{% if show_select_auditing and serial.status not in ['Used', 'Audited'] %} disabled{% endif %}>
                                     </td>
                                     {% endif %}
                                     <td>{{ serial.book.book_no }}</td>
@@ -865,16 +883,25 @@ document.addEventListener('DOMContentLoaded', function() {
             if (checked.length > 0) {
                 var allReserved = true;
                 var allUsed = true;
+                var allAudited = true;
                 checked.forEach(function(cb) {
                     var row = cb.closest('tr');
                     var status = row ? row.getAttribute('data-status') : '';
                     if (status !== 'Reserved') allReserved = false;
                     if (status !== 'Used') allUsed = false;
+                    if (status !== 'Audited') allAudited = false;
                 });
                 var reserveActions = toolbarReserve.querySelector('.toolbar-reserve-actions');
                 var writeOnly = toolbarReserve.querySelector('.toolbar-write-only');
                 var printOnly = toolbarReserve.querySelector('.toolbar-print-only');
-                if (allUsed) {
+                var auditedOnly = toolbarReserve.querySelector('.toolbar-audited-only');
+                if (auditedOnly) auditedOnly.style.display = 'none';
+                if (allAudited) {
+                    if (reserveActions) reserveActions.style.display = 'none';
+                    if (writeOnly) writeOnly.style.display = 'none';
+                    if (printOnly) printOnly.style.display = 'none';
+                    if (auditedOnly) auditedOnly.style.display = 'inline';
+                } else if (allUsed) {
                     if (reserveActions) reserveActions.style.display = 'none';
                     if (writeOnly) writeOnly.style.display = 'none';
                     if (printOnly) printOnly.style.display = 'inline';
@@ -885,7 +912,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
-        if (toolbarAuditing) toolbarAuditing.style.display = (showAuditingSelect && checked.length > 0) ? 'flex' : 'none';
+        if (toolbarAuditing) {
+            toolbarAuditing.style.display = (showAuditingSelect && checked.length > 0) ? 'flex' : 'none';
+            if (checked.length > 0) {
+                var allUsedAuditing = true;
+                var anyAudited = false;
+                checked.forEach(function(cb) {
+                    var row = cb.closest('tr');
+                    var status = row ? row.getAttribute('data-status') : '';
+                    if (status !== 'Used') allUsedAuditing = false;
+                    if (status === 'Audited') anyAudited = true;
+                });
+                var auditingUsed = section.querySelector('.toolbar-auditing-used');
+                var auditingAudited = section.querySelector('.toolbar-auditing-audited');
+                if (anyAudited) {
+                    if (auditingUsed) auditingUsed.style.display = 'none';
+                    if (auditingAudited) auditingAudited.style.display = 'inline';
+                } else if (allUsedAuditing) {
+                    if (auditingUsed) auditingUsed.style.display = 'inline';
+                    if (auditingAudited) auditingAudited.style.display = 'none';
+                } else {
+                    if (auditingUsed) auditingUsed.style.display = 'none';
+                    if (auditingAudited) auditingAudited.style.display = 'none';
+                }
+            }
+        }
         var selectAll = section.querySelector('.cheque-select-all');
         if (selectAll) {
             var allEnabled = section.querySelectorAll('.cheque-row-select:not([disabled])');
@@ -1100,7 +1151,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     document.querySelectorAll('.btn-audit-cancelled').forEach(function(btn) {
         btn.addEventListener('click', function() {
-            if (!confirm('Mark the selected Used cheque(s) as Cancelled?')) return;
+            if (!confirm('Mark the selected cheque(s) as Cancelled?')) return;
             doMarkChequeStatus(this.getAttribute('data-book-no'), 'cancelled');
         });
     });

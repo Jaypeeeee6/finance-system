@@ -23191,9 +23191,7 @@ def delete_cheque_upload():
 @app.route('/cheque-register/mark-status', methods=['POST'])
 @login_required
 def mark_cheque_status():
-    """Mark selected Used cheques as Audited or Cancelled (Auditing department only)."""
-    if current_user.department != 'Auditing':
-        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+    """Mark cheques as Audited (Used only, Auditing only) or Cancelled (Used/Audited; Auditing, GM, CEO, Operation Manager)."""
     try:
         data = request.get_json()
         serial_ids = data.get('serial_ids', [])
@@ -23203,12 +23201,27 @@ def mark_cheque_status():
         if not serial_ids:
             return jsonify({'success': False, 'error': 'No serials selected'}), 400
         new_status = 'Audited' if action == 'audited' else 'Cancelled'
-        serials = ChequeSerial.query.filter(
-            ChequeSerial.id.in_(serial_ids),
-            ChequeSerial.status == 'Used'
-        ).all()
-        if not serials:
-            return jsonify({'success': False, 'error': 'No Used cheques found with the selected IDs'}), 400
+
+        if action == 'audited':
+            if current_user.department != 'Auditing':
+                return jsonify({'success': False, 'error': 'Forbidden'}), 403
+            serials = ChequeSerial.query.filter(
+                ChequeSerial.id.in_(serial_ids),
+                ChequeSerial.status == 'Used'
+            ).all()
+            if not serials:
+                return jsonify({'success': False, 'error': 'No Used cheques found with the selected IDs'}), 400
+        else:
+            # action == 'cancelled': allow Used or Audited; allow Auditing or GM/CEO/Operation Manager
+            if current_user.department != 'Auditing' and current_user.role not in ('GM', 'CEO', 'Operation Manager'):
+                return jsonify({'success': False, 'error': 'Forbidden'}), 403
+            serials = ChequeSerial.query.filter(
+                ChequeSerial.id.in_(serial_ids),
+                ChequeSerial.status.in_(['Used', 'Audited'])
+            ).all()
+            if not serials:
+                return jsonify({'success': False, 'error': 'No Used or Audited cheques found with the selected IDs'}), 400
+
         for s in serials:
             s.status = new_status
         db.session.commit()
