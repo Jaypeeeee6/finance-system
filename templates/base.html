@@ -320,6 +320,12 @@
                     <span>Archives</span>
                 </a>
                 {% endif %}
+                {% if (current_user.role == 'Operation Manager' or current_user.department == 'IT' or current_user.role in ['GM', 'CEO'] or current_user.department == 'Auditing') and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
+                <a href="{{ url_for('cheque_register') }}" class="desktop-sidebar-item {% if flask_request.path.startswith(url_for('cheque_register')) or flask_request.path.startswith('/cheque-register/') %}active{% endif %}">
+                    <i class="fas fa-book"></i>
+                    <span>Cheque Register</span>
+                </a>
+                {% endif %}
                 {% if current_user.role in ['GM', 'Operation Manager'] %}
                 {% endif %}
             </nav>

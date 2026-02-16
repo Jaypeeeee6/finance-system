@@ -33,12 +33,6 @@
         <a href="{{ url_for('drafts') }}" class="btn btn-secondary">
             <i class="fas fa-file-alt"></i> My Drafts
         </a>
-
-        {% if current_user.role == 'Operation Manager' %}
-        <a href="{{ url_for('cheque_register') }}" class="btn btn-success">
-            <i class="fas fa-book"></i> Cheque Registration
-        </a>
-        {% endif %}
     </div>
 
     <!-- Status Tab Navigation -->
