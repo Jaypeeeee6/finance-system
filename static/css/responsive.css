@@ -32,6 +32,32 @@
         padding-right: 20px !important;
         border-right: 1px solid #e9ecef;
     }
+    /* Item requests page: no border between Assigned To and Submitted */
+    .item-requests-page .data-table td:nth-last-child(3),
+    .item-requests-page .data-table th:nth-last-child(3) {
+        border-right: none !important;
+    }
+    /* Item requests page: same-size action column buttons from 1024px down */
+    .item-requests-page .data-table td:last-child .btn,
+    .item-requests-page .data-table td:last-child .btn-sm {
+        min-width: 34px !important;
+        width: 34px !important;
+        height: 34px !important;
+        padding: 0 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box !important;
+    }
+    .item-requests-page .data-table td:last-child form {
+        display: inline-flex !important;
+    }
+    .item-requests-page .data-table td:last-child form .btn {
+        min-width: 34px !important;
+        width: 34px !important;
+        height: 34px !important;
+        padding: 0 !important;
+    }
     /* Prevent action buttons from stretching full-width */
     .data-table td:last-child .btn-block { width: auto !important; }
     .data-table td:last-child .btn { width: auto !important; display: inline-flex !important; }
@@ -369,6 +395,10 @@
         padding-right: 20px !important;
         border-right: 1px solid #e9ecef;
     }
+    .item-requests-page .data-table td:nth-last-child(3),
+    .item-requests-page .data-table th:nth-last-child(3) {
+        border-right: none !important;
+    }
     .dashboard-container .card-body .table-responsive .data-table th:last-child,
     .dashboard-container .card-body .table-responsive .data-table td:last-child {
         min-width: 150px !important;
@@ -449,6 +479,47 @@
     .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-actions {
         padding-left: 0.875rem !important;
         padding-right: 0.875rem !important;
+    }
+    /* Item requests page only, 768px down: keep container and buttons within viewport, no overflow */
+    .main-content:has(.item-requests-page) {
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
+    }
+    .item-requests-page {
+        max-width: 100vw !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+    }
+    .item-requests-page .dashboard-actions {
+        width: 100% !important;
+        max-width: min(100%, calc(100vw - 2rem)) !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 0.5rem !important;
+        min-width: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    .item-requests-page .dashboard-actions .btn {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        width: 0 !important;
+        justify-content: center !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    /* Item requests page only, 768px down: add side padding to filters and search bar */
+    .item-requests-page .filters-container {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
     }
     .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation {
         padding-left: 0.875rem !important;
@@ -637,6 +708,10 @@
         padding-right: 20px !important;
         border-right: 1px solid #e9ecef;
     }
+    .item-requests-page .data-table td:nth-last-child(3),
+    .item-requests-page .data-table th:nth-last-child(3) {
+        border-right: none !important;
+    }
     .dashboard-container .card-body .table-responsive .data-table th:last-child,
     .dashboard-container .card-body .table-responsive .data-table td:last-child {
         min-width: 140px !important;
@@ -716,6 +791,47 @@
     .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .dashboard-actions {
         padding-left: 0.75rem !important;
         padding-right: 0.75rem !important;
+    }
+    /* Item requests page only, 768px down: keep container and buttons within viewport, no overflow */
+    .main-content:has(.item-requests-page) {
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
+    }
+    .item-requests-page {
+        max-width: 100vw !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+    }
+    .item-requests-page .dashboard-actions {
+        width: 100% !important;
+        max-width: min(100%, calc(100vw - 2rem)) !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 0.5rem !important;
+        min-width: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    .item-requests-page .dashboard-actions .btn {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        width: 0 !important;
+        justify-content: center !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    /* Item requests page only, 768px down: add side padding to filters and search bar */
+    .item-requests-page .filters-container {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
     }
     .dashboard-container:has(> .tab-navigation):not(:has(.dashboard-tabs)) .tab-navigation {
         padding-left: 0.75rem !important;
