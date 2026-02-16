@@ -1244,6 +1244,11 @@ body {
     display: none;
 }
 
+/* Sidebar-only links: hidden in top nav, shown in hamburger from 1024px down */
+.nav-menu-sidebar-only {
+    display: none;
+}
+
 .nav-link {
     padding: 0.6rem 1rem;
     text-decoration: none;

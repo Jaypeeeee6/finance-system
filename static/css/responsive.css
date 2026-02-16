@@ -98,6 +98,10 @@
     .nav-menu-desktop-hidden {
         display: list-item !important;
     }
+    /* Show sidebar links (Archives, Cheque Register, Settings) in hamburger menu from 1024px down */
+    .nav-menu-sidebar-only {
+        display: list-item !important;
+    }
 
     /* Reports dropdown styling for responsive (hamburger menu) */
     .reports-dropdown .reports-menu {

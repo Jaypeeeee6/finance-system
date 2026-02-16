@@ -202,6 +202,16 @@
                 {% if show_item_requests_flag or (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
                 <li class="nav-menu-desktop-hidden"><a href="{{ url_for('procurement_item_requests') }}" class="nav-link"><i class="fas fa-shopping-cart"></i> Item Requests</a></li>
                 {% endif %}
+                {# Sidebar-only links: visible in hamburger menu from 1024px down #}
+                {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT') or current_user.name == 'Super Admin') and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
+                <li class="nav-menu-sidebar-only"><a href="{{ url_for('archives') }}" class="nav-link"><i class="fas fa-archive"></i> Archives</a></li>
+                {% endif %}
+                {% if (current_user.role == 'Operation Manager' or current_user.department == 'IT' or current_user.role in ['GM', 'CEO'] or current_user.department == 'Auditing') and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
+                <li class="nav-menu-sidebar-only"><a href="{{ url_for('cheque_register') }}" class="nav-link"><i class="fas fa-book"></i> Cheque Register</a></li>
+                {% endif %}
+                {% if current_user.role in ['GM', 'Operation Manager'] or current_user.department == 'IT' %}
+                <li class="nav-menu-sidebar-only"><a href="{{ url_for('settings') }}" class="nav-link"><i class="fas fa-cog"></i> Settings</a></li>
+                {% endif %}
                 
                 {% if (current_user.role in ['Admin', 'Project Staff', 'Finance Admin', 'Finance Staff', 'GM', 'CEO', 'Operation Manager', 'IT Staff'] or (current_user.role == 'Department Manager' and current_user.department == 'IT')) and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
                 <li class="calendar-link-container">
