@@ -4330,6 +4330,22 @@ input:checked + .toggle-slider:before {
     border-color: #c8ac65 !important;
     color: #ffffff !important;
 }
+/* Previous and Next request buttons: gold outline to match Back button */
+.view-request-page .view-request-nav .btn-outline-secondary {
+    border-color: #D9BD7D !important;
+    color: #D9BD7D !important;
+    background: transparent !important;
+}
+.view-request-page .view-request-nav .btn-outline-secondary:hover:not(.disabled) {
+    background: #D9BD7D !important;
+    border-color: #D9BD7D !important;
+    color: #ffffff !important;
+}
+.view-request-page .view-request-nav .btn-outline-secondary.disabled {
+    border-color: #6c757d !important;
+    color: #6c757d !important;
+    background: transparent !important;
+}
 /* These styles are specifically for the view request page tabs and override the general step tab styles */
 .view-request-page .step-tab.rejected .step-tab-content {
     background: #dc3545 !important;
