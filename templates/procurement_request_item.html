@@ -14,7 +14,7 @@
         <strong>Note:</strong> This form is for requesting items/materials from Procurement. <strong>This is different from payment requests.</strong> For payment requests, please use the "New Payment Request" option.
     </div>
 
-    <div class="card">
+    <div class="card form-page-book-style">
         <div class="card-body">
             <form method="POST" action="{{ url_for('procurement_request_item') }}" id="itemRequestForm" enctype="multipart/form-data" novalidate>
                 <div class="form-row">
@@ -88,15 +88,22 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="category">Category <span class="required-star">*</span></label>
-                        <select name="category" id="category" required>
-                            <option value="">-- Select Category --</option>
-                            {% if procurement_categories %}
-                                {% for category in procurement_categories %}
-                                <option value="{{ category.name }}">{{ category.name }}</option>
-                                {% endfor %}
-                            {% endif %}
-                            <option value="Others">Others</option>
-                        </select>
+                        <div class="book-style-dropdown" id="category_dropdown">
+                            <input type="hidden" name="category" id="category" required value="">
+                            <button type="button" class="book-style-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Select category">
+                                <span class="book-style-dropdown-label placeholder">-- Select Category --</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <div class="book-style-dropdown-panel" role="listbox">
+                                <div class="book-style-dropdown-option" data-value="">-- Select Category --</div>
+                                {% if procurement_categories %}
+                                    {% for category in procurement_categories %}
+                                    <div class="book-style-dropdown-option" data-value="{{ category.name }}">{{ category.name }}</div>
+                                    {% endfor %}
+                                {% endif %}
+                                <div class="book-style-dropdown-option" data-value="Others">Others</div>
+                            </div>
+                        </div>
                         <small class="form-text text-muted">Select the category of the item</small>
                     </div>
 
@@ -829,7 +836,127 @@ function clearErrorMessages() {
     });
 }
 
+var bookStyleDropdownClickBoundItem = false;
+function initBookStyleDropdowns() {
+    if (!bookStyleDropdownClickBoundItem) {
+        bookStyleDropdownClickBoundItem = true;
+        document.addEventListener('click', function() {
+            document.querySelectorAll('.book-style-dropdown.open').forEach(function(w) {
+                w.classList.remove('open');
+                var t = w.querySelector('.book-style-dropdown-trigger');
+                if (t) t.setAttribute('aria-expanded', 'false');
+                w.querySelectorAll('.book-style-dropdown-option').forEach(function(o) { o.classList.remove('highlighted'); });
+            });
+        });
+    }
+    document.querySelectorAll('.book-style-dropdown').forEach(function(wrapper) {
+        if (wrapper.closest('.branch-select-container')) return;
+        const input = wrapper.querySelector('input[type="hidden"]');
+        const trigger = wrapper.querySelector('.book-style-dropdown-trigger');
+        const label = wrapper.querySelector('.book-style-dropdown-label');
+        const panel = wrapper.querySelector('.book-style-dropdown-panel');
+        if (!input || !trigger || !label || !panel) return;
+        var typeaheadBuffer = '';
+        var typeaheadTimeout = null;
+        function setHighlighted(opt) {
+            panel.querySelectorAll('.book-style-dropdown-option').forEach(function(o) { o.classList.remove('highlighted'); });
+            if (opt) opt.classList.add('highlighted');
+        }
+        function getOptions() { return Array.from(panel.querySelectorAll('.book-style-dropdown-option')).filter(function(o) { return o.dataset.disabled !== 'true'; }); }
+        function selectOption(opt) {
+            var val = opt.dataset.value !== undefined ? opt.dataset.value : opt.textContent.trim();
+            input.value = val;
+            label.textContent = opt.textContent.trim();
+            label.classList.remove('placeholder');
+            panel.querySelectorAll('.book-style-dropdown-option').forEach(function(o) { o.classList.remove('selected'); });
+            opt.classList.add('selected');
+            wrapper.classList.remove('open');
+            trigger.setAttribute('aria-expanded', 'false');
+            setHighlighted(null);
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        trigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const isOpen = wrapper.classList.toggle('open');
+            trigger.setAttribute('aria-expanded', isOpen);
+            if (isOpen) {
+                document.querySelectorAll('.book-style-dropdown.open').forEach(function(other) {
+                    if (other !== wrapper) { other.classList.remove('open'); other.querySelector('.book-style-dropdown-trigger').setAttribute('aria-expanded', 'false'); other.querySelectorAll('.book-style-dropdown-option').forEach(function(o) { o.classList.remove('highlighted'); }); }
+                });
+                var opts = getOptions();
+                var cur = panel.querySelector('.book-style-dropdown-option.selected');
+                setHighlighted(cur || opts[0] || null);
+                if (cur) cur.scrollIntoView({ block: 'nearest' });
+            } else setHighlighted(null);
+        });
+        trigger.addEventListener('keydown', function(e) {
+            var isOpen = wrapper.classList.contains('open');
+            if (e.key === 'Escape') {
+                wrapper.classList.remove('open');
+                trigger.setAttribute('aria-expanded', 'false');
+                setHighlighted(null);
+                trigger.blur();
+                e.preventDefault();
+                return;
+            }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (isOpen) {
+                    var hi = panel.querySelector('.book-style-dropdown-option.highlighted');
+                    if (hi && hi.dataset.disabled !== 'true') selectOption(hi);
+                } else {
+                    wrapper.classList.add('open');
+                    trigger.setAttribute('aria-expanded', 'true');
+                    var opts = getOptions();
+                    var cur = panel.querySelector('.book-style-dropdown-option.selected');
+                    setHighlighted(cur || opts[0] || null);
+                }
+                return;
+            }
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (!isOpen) { wrapper.classList.add('open'); trigger.setAttribute('aria-expanded', 'true'); }
+                var opts = getOptions();
+                var hi = panel.querySelector('.book-style-dropdown-option.highlighted');
+                var idx = hi ? opts.indexOf(hi) : -1;
+                var next = opts[idx + 1] || opts[0];
+                if (next) { setHighlighted(next); next.scrollIntoView({ block: 'nearest' }); }
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (!isOpen) { wrapper.classList.add('open'); trigger.setAttribute('aria-expanded', 'true'); }
+                var opts = getOptions();
+                var hi = panel.querySelector('.book-style-dropdown-option.highlighted');
+                var idx = hi ? opts.indexOf(hi) : 0;
+                var prev = opts[idx - 1] || opts[opts.length - 1];
+                if (prev) { setHighlighted(prev); prev.scrollIntoView({ block: 'nearest' }); }
+                return;
+            }
+            if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                if (!isOpen) { wrapper.classList.add('open'); trigger.setAttribute('aria-expanded', 'true'); document.querySelectorAll('.book-style-dropdown.open').forEach(function(other) { if (other !== wrapper) { other.classList.remove('open'); other.querySelector('.book-style-dropdown-trigger').setAttribute('aria-expanded', 'false'); } }); }
+                clearTimeout(typeaheadTimeout);
+                typeaheadBuffer += e.key.toLowerCase();
+                var opts = getOptions();
+                var match = opts.find(function(o) { return o.textContent.trim().toLowerCase().indexOf(typeaheadBuffer) >= 0; });
+                if (match) { setHighlighted(match); match.scrollIntoView({ block: 'nearest' }); }
+                typeaheadTimeout = setTimeout(function() { typeaheadBuffer = ''; }, 500);
+                e.preventDefault();
+            }
+        });
+        panel.querySelectorAll('.book-style-dropdown-option').forEach(function(opt) {
+            if (opt.dataset.disabled === 'true') return;
+            opt.addEventListener('click', function(e) {
+                e.stopPropagation();
+                selectOption(opt);
+            });
+            opt.addEventListener('mouseenter', function() { setHighlighted(opt); });
+        });
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    initBookStyleDropdowns();
     initializeItemSearch();
     initializeBranchSearch();
 });

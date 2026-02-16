@@ -1773,6 +1773,161 @@ body {
     gap: 1rem;
 }
 
+/* New Payment Request & New Item Request: match Add New Book field style */
+.form-page-book-style .form-group input[type="text"],
+.form-page-book-style .form-group input[type="password"],
+.form-page-book-style .form-group input[type="email"],
+.form-page-book-style .form-group input[type="date"],
+.form-page-book-style .form-group input[type="number"],
+.form-page-book-style .form-group input[type="file"],
+.form-page-book-style .form-group select,
+.form-page-book-style .form-group textarea,
+.form-page-book-style select,
+.form-page-book-style .form-control {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    color: var(--dark-color, #333);
+    background: #fff;
+    border: 1px solid var(--border-color, #ced4da);
+    border-radius: 5px;
+    min-height: 38px;
+    box-sizing: border-box;
+    transition: var(--transition);
+}
+.form-page-book-style .form-group textarea {
+    min-height: 0;
+    resize: vertical;
+}
+.form-page-book-style .form-group input:hover,
+.form-page-book-style .form-group select:hover,
+.form-page-book-style .form-group textarea:hover,
+.form-page-book-style select:hover,
+.form-page-book-style .form-control:hover {
+    border-color: #868e96;
+}
+.form-page-book-style .form-group input:focus,
+.form-page-book-style .form-group select:focus,
+.form-page-book-style .form-group textarea:focus,
+.form-page-book-style select:focus,
+.form-page-book-style .form-control:focus {
+    outline: none;
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+.form-page-book-style .required-star {
+    color: #dc3545;
+}
+.form-page-book-style .form-group input[readonly] {
+    background: #f5f5f5;
+    cursor: not-allowed;
+}
+
+/* Dropdown selects: match Add New Book look (custom chevron), exclude Branch Name field */
+.form-page-book-style select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236c757d' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 0.65rem;
+    padding-right: 2.25rem;
+    cursor: pointer;
+    text-align: left;
+}
+
+/* Exclude Branch Name: keep default appearance (field uses custom search/chips) */
+.form-page-book-style .branch-select-container select {
+    appearance: auto;
+    -webkit-appearance: menulist;
+    background-image: none;
+    padding-right: 0.75rem;
+}
+
+/* Custom dropdown: same trigger + panel + options as Add New Book (do not use in .branch-select-container) */
+.form-page-book-style .book-style-dropdown {
+    position: relative;
+    width: 100%;
+}
+.form-page-book-style .book-style-dropdown .book-style-dropdown-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    color: var(--dark-color, #333);
+    background: #fff;
+    border: 1px solid var(--border-color, #ced4da);
+    border-radius: 5px;
+    cursor: pointer;
+    min-height: 38px;
+    text-align: left;
+    box-sizing: border-box;
+}
+.form-page-book-style .book-style-dropdown .book-style-dropdown-trigger:hover {
+    border-color: #868e96;
+}
+.form-page-book-style .book-style-dropdown .book-style-dropdown-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+.form-page-book-style .book-style-dropdown .book-style-dropdown-label.placeholder {
+    color: #6c757d;
+}
+.form-page-book-style .book-style-dropdown .book-style-dropdown-trigger i {
+    margin-left: 8px;
+    transition: transform 0.2s;
+    color: #6c757d;
+}
+.form-page-book-style .book-style-dropdown.open .book-style-dropdown-trigger i {
+    transform: rotate(180deg);
+}
+.form-page-book-style .book-style-dropdown .book-style-dropdown-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    margin-top: 2px;
+    max-height: min(280px, 50vh);
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid var(--border-color, #ced4da);
+    border-radius: 5px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 9999;
+    display: none;
+}
+.form-page-book-style .book-style-dropdown.open .book-style-dropdown-panel {
+    display: block;
+}
+.form-page-book-style .book-style-dropdown .book-style-dropdown-option {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+    border-bottom: 1px solid #f0f0f0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.form-page-book-style .book-style-dropdown .book-style-dropdown-option:last-child {
+    border-bottom: none;
+}
+.form-page-book-style .book-style-dropdown .book-style-dropdown-option:hover {
+    background: #f8f9fa;
+}
+.form-page-book-style .book-style-dropdown .book-style-dropdown-option.selected {
+    background: #e7f1ff;
+    font-weight: 500;
+}
+.form-page-book-style .book-style-dropdown .book-style-dropdown-option.highlighted {
+    background: #e7f1ff;
+    font-weight: 500;
+}
+
 .form-group.checkbox-group {
     display: flex;
     align-items: center;
@@ -1794,6 +1949,34 @@ body {
     display: flex;
     gap: 1rem;
     margin-top: 2rem;
+}
+
+/* New Payment Request page: Submit, Save as Draft and Cancel same size and style */
+.form-actions-buttons {
+    display: flex;
+    gap: 0.625rem;
+    align-items: stretch;
+    flex-wrap: wrap;
+}
+
+.form-actions-buttons .btn {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.2;
+    min-height: 2.75rem;
+    box-sizing: border-box;
+}
+
+.new-request-draft-btn {
+    background-color: #6c757d !important;
+    border: none !important;
+    color: #ffffff !important;
+}
+
+.new-request-draft-btn:hover {
+    background-color: #545b62 !important;
+    color: #ffffff !important;
 }
 
 /* ==================== BUTTONS ==================== */
@@ -4071,6 +4254,25 @@ input:checked + .toggle-slider:before {
     color: #666;
 }
 
+/* Amount field: OMR prefix vertically centered */
+.amount-field-wrapper {
+    position: relative;
+}
+
+.amount-currency-prefix {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #666;
+    font-weight: 600;
+    z-index: 1;
+}
+
+.amount-input-with-prefix {
+    padding-left: 55px !important;
+}
+
 .amount-input-container {
     position: relative;
     display: flex;
@@ -4080,6 +4282,8 @@ input:checked + .toggle-slider:before {
 .currency-symbol {
     position: absolute;
     left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
     color: #666;
     font-weight: 600;
     z-index: 1;

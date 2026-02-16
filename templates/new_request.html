@@ -9,27 +9,32 @@
         <p>Submit a new payment request</p>
     </div>
 
-    <div class="card">
+    <div class="card form-page-book-style">
         <div class="card-body">
             <form method="POST" action="{% if draft %}{{ url_for('edit_draft', draft_id=draft.request_id) }}{% else %}{{ url_for('new_request') }}{% endif %}" id="requestForm" enctype="multipart/form-data">
                 <div class="form-row">
                     <div class="form-group">
                         <label for="request_type">Request Type <span class="required-star">*</span></label>
-                        <select name="request_type" id="request_type" required onchange="handleRequestTypeChange()">
-                            <option value="">-- Select Type --</option>
-                            {% if available_request_types %}
-                                {# Non-"Others" first #}
-                                {% for request_type in available_request_types | rejectattr('name', 'equalto', 'Others') %}
-                                <option value="{{ request_type.name }}">{{ request_type.name }}</option>
-                                {% endfor %}
-                                {# Ensure "Others" is always last if present #}
-                                {% for request_type in available_request_types | selectattr('name', 'equalto', 'Others') %}
-                                <option value="{{ request_type.name }}">{{ request_type.name }}</option>
-                                {% endfor %}
-                            {% else %}
-                                <option value="" disabled>No request types available for your department</option>
-                            {% endif %}
-                        </select>
+                        <div class="book-style-dropdown" id="request_type_dropdown">
+                            <input type="hidden" name="request_type" id="request_type" required value="">
+                            <button type="button" class="book-style-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Select request type">
+                                <span class="book-style-dropdown-label placeholder">-- Select Type --</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <div class="book-style-dropdown-panel" role="listbox">
+                                <div class="book-style-dropdown-option" data-value="">-- Select Type --</div>
+                                {% if available_request_types %}
+                                    {% for request_type in available_request_types | rejectattr('name', 'equalto', 'Others') %}
+                                    <div class="book-style-dropdown-option" data-value="{{ request_type.name }}">{{ request_type.name }}</div>
+                                    {% endfor %}
+                                    {% for request_type in available_request_types | selectattr('name', 'equalto', 'Others') %}
+                                    <div class="book-style-dropdown-option" data-value="{{ request_type.name }}">{{ request_type.name }}</div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="book-style-dropdown-option" data-value="" data-disabled="true">No request types available for your department</div>
+                                {% endif %}
+                            </div>
+                        </div>
                         <small class="form-text text-muted">
                             {% if available_request_types %}
                                 Available request types for {{ user.department }} department
@@ -551,43 +556,57 @@
 
                 <div class="form-group">
                     <label for="payment_method">Payment Method <span class="required-star">*</span></label>
-                    <select name="payment_method" id="payment_method" required onchange="handlePaymentMethodChange()">
-                        <option value="Card" selected>Card</option>
-                        <option value="Cheque">Cheque</option>
-                        <option value="Cash">Cash</option>
-                    </select>
+                    <div class="book-style-dropdown" id="payment_method_dropdown">
+                        <input type="hidden" name="payment_method" id="payment_method" required value="Card">
+                        <button type="button" class="book-style-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Select payment method">
+                            <span class="book-style-dropdown-label">Card</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="book-style-dropdown-panel" role="listbox">
+                            <div class="book-style-dropdown-option" data-value="Card">Card</div>
+                            <div class="book-style-dropdown-option" data-value="Cheque">Cheque</div>
+                            <div class="book-style-dropdown-option" data-value="Cash">Cash</div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group" id="bank_name_group">
                     <label for="bank_name">Bank Name <span class="required-star">*</span></label>
-                    <select name="bank_name" id="bank_name" required onchange="showSwiftCode()">
-                        <option value="">-- Select Bank --</option>
-                        <option value="Bank Dhofar">Bank Dhofar</option>
-                        <option value="Bank Muscat">Bank Muscat</option>
-                        <option value="National Bank of Oman">National Bank of Oman</option>
-                        <option value="Oman Arab Bank">Oman Arab Bank</option>
-                        <option value="Bank Sohar">Bank Sohar</option>
-                        <option value="HSBC Bank Oman">HSBC Bank Oman</option>
-                        <option value="Ahli Bank">Ahli Bank</option>
-                        <option value="Oman Development Bank">Oman Development Bank</option>
-                        <option value="Oman Housing Bank">Oman Housing Bank</option>
-                        <option value="Meethaq Islamic Banking (Bank Dhofar)">Meethaq Islamic Banking (Bank Dhofar)</option>
-                        <option value="Meethaq Islamic Banking (Bank Muscat)">Meethaq Islamic Banking (Bank Muscat)</option>
-                        <option value="Muzn Islamic Banking (National Bank of Oman)">Muzn Islamic Banking (National Bank of Oman)</option>
-                        <option value="Al Hilal Islamic Banking (Ahli Bank)">Al Hilal Islamic Banking (Ahli Bank)</option>
-                        <option value="National Bank of Abu Dhabi">National Bank of Abu Dhabi</option>
-                        <option value="Qatar National Bank">Qatar National Bank</option>
-                        <option value="Standard Chartered Bank">Standard Chartered Bank</option>
-                        <option value="Bank of Baroda">Bank of Baroda</option>
-                        <option value="Bank of Beirut">Bank of Beirut</option>
-                        <option value="State Bank of India">State Bank of India</option>
-                        <option value="Habib Bank AG Zurich">Habib Bank AG Zurich</option>
-                        <option value="Alizz Islamic Bank">Alizz Islamic Bank</option>
-                        <option value="Sohar Islamic (Sohar Bank)">Sohar Islamic (Sohar Bank)</option>
-                        <option value="Al Yusr Islamic Banking Services (Oman Arab Bank)">Al Yusr Islamic Banking Services (Oman Arab Bank)</option>
-                        <option value="Bank Nizwa">Bank Nizwa</option>
-                        <option value="Mashreq Bank">Mashreq Bank</option>
-                    </select>
+                    <div class="book-style-dropdown" id="bank_name_dropdown">
+                        <input type="hidden" name="bank_name" id="bank_name" required value="">
+                        <button type="button" class="book-style-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Select bank">
+                            <span class="book-style-dropdown-label placeholder">-- Select Bank --</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="book-style-dropdown-panel" role="listbox">
+                            <div class="book-style-dropdown-option" data-value="">-- Select Bank --</div>
+                            <div class="book-style-dropdown-option" data-value="Bank Dhofar">Bank Dhofar</div>
+                            <div class="book-style-dropdown-option" data-value="Bank Muscat">Bank Muscat</div>
+                            <div class="book-style-dropdown-option" data-value="National Bank of Oman">National Bank of Oman</div>
+                            <div class="book-style-dropdown-option" data-value="Oman Arab Bank">Oman Arab Bank</div>
+                            <div class="book-style-dropdown-option" data-value="Bank Sohar">Bank Sohar</div>
+                            <div class="book-style-dropdown-option" data-value="HSBC Bank Oman">HSBC Bank Oman</div>
+                            <div class="book-style-dropdown-option" data-value="Ahli Bank">Ahli Bank</div>
+                            <div class="book-style-dropdown-option" data-value="Oman Development Bank">Oman Development Bank</div>
+                            <div class="book-style-dropdown-option" data-value="Oman Housing Bank">Oman Housing Bank</div>
+                            <div class="book-style-dropdown-option" data-value="Meethaq Islamic Banking (Bank Dhofar)">Meethaq Islamic Banking (Bank Dhofar)</div>
+                            <div class="book-style-dropdown-option" data-value="Meethaq Islamic Banking (Bank Muscat)">Meethaq Islamic Banking (Bank Muscat)</div>
+                            <div class="book-style-dropdown-option" data-value="Muzn Islamic Banking (National Bank of Oman)">Muzn Islamic Banking (National Bank of Oman)</div>
+                            <div class="book-style-dropdown-option" data-value="Al Hilal Islamic Banking (Ahli Bank)">Al Hilal Islamic Banking (Ahli Bank)</div>
+                            <div class="book-style-dropdown-option" data-value="National Bank of Abu Dhabi">National Bank of Abu Dhabi</div>
+                            <div class="book-style-dropdown-option" data-value="Qatar National Bank">Qatar National Bank</div>
+                            <div class="book-style-dropdown-option" data-value="Standard Chartered Bank">Standard Chartered Bank</div>
+                            <div class="book-style-dropdown-option" data-value="Bank of Baroda">Bank of Baroda</div>
+                            <div class="book-style-dropdown-option" data-value="Bank of Beirut">Bank of Beirut</div>
+                            <div class="book-style-dropdown-option" data-value="State Bank of India">State Bank of India</div>
+                            <div class="book-style-dropdown-option" data-value="Habib Bank AG Zurich">Habib Bank AG Zurich</div>
+                            <div class="book-style-dropdown-option" data-value="Alizz Islamic Bank">Alizz Islamic Bank</div>
+                            <div class="book-style-dropdown-option" data-value="Sohar Islamic (Sohar Bank)">Sohar Islamic (Sohar Bank)</div>
+                            <div class="book-style-dropdown-option" data-value="Al Yusr Islamic Banking Services (Oman Arab Bank)">Al Yusr Islamic Banking Services (Oman Arab Bank)</div>
+                            <div class="book-style-dropdown-option" data-value="Bank Nizwa">Bank Nizwa</div>
+                            <div class="book-style-dropdown-option" data-value="Mashreq Bank">Mashreq Bank</div>
+                        </div>
+                    </div>
                     <small id="bank_name_auto_note" class="auto-populated-note" style="display: none; color: #28a745; font-style: italic; margin-top: 4px;">
                         <i class="fas fa-info-circle"></i> Automatically populated based on chosen Person/Company Name
                     </small>
@@ -617,9 +636,9 @@
 
                 <div class="form-group">
                     <label for="amount">Amount (OMR) <span class="required-star">*</span></label>
-                    <div style="position: relative;">
-                        <span style="position: absolute; left: 12px; top: 12px; color: #666; font-weight: 600;">OMR</span>
-                        <input type="text" name="amount" id="amount" required style="padding-left: 55px;" placeholder="0.000">
+                    <div class="amount-field-wrapper">
+                        <span class="amount-currency-prefix">OMR</span>
+                        <input type="text" name="amount" id="amount" required class="amount-input-with-prefix" placeholder="0.000">
                     </div>
                     <small>Omani Rials (OMR) - Numbers only (automatically formatted with commas)</small>
                     <small id="amount_auto_note" class="auto-populated-note" style="display: none; color: #28a745; font-style: italic; margin-top: 4px;">
@@ -650,10 +669,17 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label for="recurring">Payment Type</label>
-                            <select name="recurring" id="recurring" onchange="handleRecurringChange()">
-                                <option value="One-Time">One-Time</option>
-                                <option value="Recurring">Recurring</option>
-                            </select>
+                            <div class="book-style-dropdown" id="recurring_dropdown">
+                                <input type="hidden" name="recurring" id="recurring" value="One-Time">
+                                <button type="button" class="book-style-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Select payment type">
+                                    <span class="book-style-dropdown-label">One-Time</span>
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                                <div class="book-style-dropdown-panel" role="listbox">
+                                    <div class="book-style-dropdown-option selected" data-value="One-Time">One-Time</div>
+                                    <div class="book-style-dropdown-option" data-value="Recurring">Recurring</div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Hidden field to store the custom recurring interval -->
@@ -909,7 +935,7 @@
                 </div>
 
                 <div class="form-actions">
-                    <div style="display: flex; gap: 10px; align-items: center;">
+                    <div class="form-actions-buttons">
                         {% if draft %}
                         <button type="button" class="btn btn-success" onclick="saveConfigurationBeforeSubmit(); submitDraft(); return false;" style="background:#28a745;border-color:#28a745;color:#ffffff;">
                             <i class="fas fa-paper-plane"></i> Submit Draft
@@ -919,13 +945,13 @@
                             <i class="fas fa-paper-plane"></i> Submit Request
                         </button>
                         {% endif %}
-                        <button type="button" class="btn btn-secondary" onclick="saveAsDraft()" style="background-color: #6c757d; border-color: #6c757d;">
+                        <button type="button" class="btn btn-secondary new-request-draft-btn" onclick="saveAsDraft()">
                             <i class="fas fa-save"></i> Save as Draft
                         </button>
+                        <button type="button" class="btn btn-secondary new-request-draft-btn" onclick="window.location.href='{% if draft %}{{ url_for('drafts') }}{% else %}{{ url_for('dashboard') }}{% endif %}'">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
                     </div>
-                    <a href="{% if draft %}{{ url_for('drafts') }}{% else %}{{ url_for('dashboard') }}{% endif %}" class="btn btn-secondary">
-                        <i class="fas fa-times"></i> Cancel
-                    </a>
                 </div>
             </form>
         </div>
@@ -1055,8 +1081,156 @@ function handlePaymentMethodChange() {
     }
 }
 
-// New Recurring Modal JavaScript
+// Book-style custom dropdowns (trigger + panel + options, same as Add New Book). Typeahead + arrow keys. Do not use for .branch-select-container.
+var bookStyleDropdownClickBound;
+function initBookStyleDropdowns() {
+    if (!bookStyleDropdownClickBound) {
+        bookStyleDropdownClickBound = true;
+        document.addEventListener('click', function() {
+            document.querySelectorAll('.book-style-dropdown.open').forEach(function(w) {
+                w.classList.remove('open');
+                var t = w.querySelector('.book-style-dropdown-trigger');
+                if (t) t.setAttribute('aria-expanded', 'false');
+                w.querySelectorAll('.book-style-dropdown-option').forEach(function(o) { o.classList.remove('highlighted'); });
+            });
+        });
+    }
+    document.querySelectorAll('.book-style-dropdown').forEach(function(wrapper) {
+        if (wrapper.closest('.branch-select-container')) return;
+        const input = wrapper.querySelector('input[type="hidden"]');
+        const trigger = wrapper.querySelector('.book-style-dropdown-trigger');
+        const label = wrapper.querySelector('.book-style-dropdown-label');
+        const panel = wrapper.querySelector('.book-style-dropdown-panel');
+        if (!input || !trigger || !label || !panel) return;
+        var typeaheadBuffer = '';
+        var typeaheadTimeout = null;
+        function setHighlighted(opt) {
+            panel.querySelectorAll('.book-style-dropdown-option').forEach(function(o) { o.classList.remove('highlighted'); });
+            if (opt) opt.classList.add('highlighted');
+        }
+        function getOptions() { return Array.from(panel.querySelectorAll('.book-style-dropdown-option')).filter(function(o) { return o.dataset.disabled !== 'true'; }); }
+        function selectOption(opt) {
+            var val = opt.dataset.value !== undefined ? opt.dataset.value : opt.textContent.trim();
+            input.value = val;
+            label.textContent = opt.textContent.trim();
+            label.classList.remove('placeholder');
+            panel.querySelectorAll('.book-style-dropdown-option').forEach(function(o) { o.classList.remove('selected'); });
+            opt.classList.add('selected');
+            wrapper.classList.remove('open');
+            trigger.setAttribute('aria-expanded', 'false');
+            setHighlighted(null);
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        trigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const isOpen = wrapper.classList.toggle('open');
+            trigger.setAttribute('aria-expanded', isOpen);
+            if (isOpen) {
+                document.querySelectorAll('.book-style-dropdown.open').forEach(function(other) {
+                    if (other !== wrapper) { other.classList.remove('open'); other.querySelector('.book-style-dropdown-trigger').setAttribute('aria-expanded', 'false'); other.querySelectorAll('.book-style-dropdown-option').forEach(function(o) { o.classList.remove('highlighted'); }); }
+                });
+                var opts = getOptions();
+                var cur = panel.querySelector('.book-style-dropdown-option.selected');
+                setHighlighted(cur || opts[0] || null);
+                if (cur) cur.scrollIntoView({ block: 'nearest' });
+            } else setHighlighted(null);
+        });
+        trigger.addEventListener('keydown', function(e) {
+            var isOpen = wrapper.classList.contains('open');
+            if (e.key === 'Escape') {
+                wrapper.classList.remove('open');
+                trigger.setAttribute('aria-expanded', 'false');
+                setHighlighted(null);
+                trigger.blur();
+                e.preventDefault();
+                return;
+            }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (isOpen) {
+                    var hi = panel.querySelector('.book-style-dropdown-option.highlighted');
+                    if (hi && hi.dataset.disabled !== 'true') selectOption(hi);
+                } else {
+                    wrapper.classList.add('open');
+                    trigger.setAttribute('aria-expanded', 'true');
+                    var opts = getOptions();
+                    var cur = panel.querySelector('.book-style-dropdown-option.selected');
+                    setHighlighted(cur || opts[0] || null);
+                }
+                return;
+            }
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (!isOpen) { wrapper.classList.add('open'); trigger.setAttribute('aria-expanded', 'true'); }
+                var opts = getOptions();
+                var hi = panel.querySelector('.book-style-dropdown-option.highlighted');
+                var idx = hi ? opts.indexOf(hi) : -1;
+                var next = opts[idx + 1] || opts[0];
+                if (next) { setHighlighted(next); next.scrollIntoView({ block: 'nearest' }); }
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (!isOpen) { wrapper.classList.add('open'); trigger.setAttribute('aria-expanded', 'true'); }
+                var opts = getOptions();
+                var hi = panel.querySelector('.book-style-dropdown-option.highlighted');
+                var idx = hi ? opts.indexOf(hi) : 0;
+                var prev = opts[idx - 1] || opts[opts.length - 1];
+                if (prev) { setHighlighted(prev); prev.scrollIntoView({ block: 'nearest' }); }
+                return;
+            }
+            if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                if (!isOpen) { wrapper.classList.add('open'); trigger.setAttribute('aria-expanded', 'true'); document.querySelectorAll('.book-style-dropdown.open').forEach(function(other) { if (other !== wrapper) { other.classList.remove('open'); other.querySelector('.book-style-dropdown-trigger').setAttribute('aria-expanded', 'false'); } }); }
+                clearTimeout(typeaheadTimeout);
+                typeaheadBuffer += e.key.toLowerCase();
+                var opts = getOptions();
+                var match = opts.find(function(o) { return o.textContent.trim().toLowerCase().indexOf(typeaheadBuffer) >= 0; });
+                if (match) { setHighlighted(match); match.scrollIntoView({ block: 'nearest' }); }
+                typeaheadTimeout = setTimeout(function() { typeaheadBuffer = ''; }, 500);
+                e.preventDefault();
+            }
+        });
+        panel.querySelectorAll('.book-style-dropdown-option').forEach(function(opt) {
+            if (opt.dataset.disabled === 'true') return;
+            opt.addEventListener('click', function(e) {
+                e.stopPropagation();
+                selectOption(opt);
+            });
+            opt.addEventListener('mouseenter', function() { setHighlighted(opt); });
+        });
+        // Sync initial state from hidden input (e.g. after draft load)
+        var initialVal = input.value;
+        if (initialVal !== undefined && initialVal !== '') {
+            var initialOpt = Array.from(panel.querySelectorAll('.book-style-dropdown-option')).find(function(o) { return o.getAttribute('data-value') === initialVal; });
+            if (initialOpt) {
+                label.textContent = initialOpt.textContent.trim();
+                label.classList.remove('placeholder');
+                panel.querySelectorAll('.book-style-dropdown-option').forEach(function(o) { o.classList.remove('selected'); });
+                initialOpt.classList.add('selected');
+            }
+        }
+    });
+}
+function syncBookStyleDropdowns() {
+    document.querySelectorAll('.book-style-dropdown').forEach(function(wrapper) {
+        if (wrapper.closest('.branch-select-container')) return;
+        var input = wrapper.querySelector('input[type="hidden"]');
+        var label = wrapper.querySelector('.book-style-dropdown-label');
+        var panel = wrapper.querySelector('.book-style-dropdown-panel');
+        if (!input || !label || !panel) return;
+        var val = input.value;
+        var opt = Array.from(panel.querySelectorAll('.book-style-dropdown-option')).find(function(o) { return o.getAttribute('data-value') === val; });
+        if (opt) {
+            label.textContent = opt.textContent.trim();
+            label.classList.remove('placeholder');
+            panel.querySelectorAll('.book-style-dropdown-option').forEach(function(o) { o.classList.remove('selected'); });
+            opt.classList.add('selected');
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    initBookStyleDropdowns();
     // Initialize the modal
     initializeRecurringModal();
     
@@ -6062,6 +6236,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const recurringSelect = document.getElementById('recurring');
             if (recurringSelect) recurringSelect.value = draft.recurring;
         }
+        
+        if (typeof syncBookStyleDropdowns === 'function') syncBookStyleDropdowns();
         
         // Handle person_company - restore the saved value after handleRequestTypeChange completes
         if (savedPersonCompany) {
