@@ -189,6 +189,8 @@
 /* ==================== TAB NAVIGATION STYLES ==================== */
 .tab-navigation {
     display: flex;
+    width: 100%;
+    box-sizing: border-box;
     background: #ffffff;
     border-radius: 8px 8px 0 0;
     padding: 0;
@@ -215,10 +217,11 @@
     transition: var(--transition);
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     border-radius: 0;
-    flex: 1;
-    justify-content: center;
+    flex: 1 1 0;
+    min-width: 0;
     position: relative;
 }
 
@@ -2572,7 +2575,9 @@ body.flash-error-open {
 /* ==================== TABS ==================== */
 .dashboard-tabs {
     display: flex;
-    gap: 0.5rem;
+    width: 100%;
+    box-sizing: border-box;
+    gap: 0;
     margin-bottom: 2rem;
 }
 
@@ -2584,6 +2589,8 @@ body.flash-error-open {
 }
 
 .tab-btn {
+    flex: 1 1 0;
+    min-width: 0;
     padding: 0.75rem 1.5rem;
     background: var(--white);
     border: 2px solid var(--border-color);
@@ -2594,6 +2601,7 @@ body.flash-error-open {
     transition: var(--transition);
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
 }
 

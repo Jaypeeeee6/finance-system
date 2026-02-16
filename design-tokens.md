@@ -9,7 +9,8 @@ This document centralizes the project's responsive breakpoints so layouts stay c
 | Breakpoint | Target | Where used |
 |------------|--------|------------|
 | **1200px** | Small desktop / laptop | `write_cheque.css`: cheque layout single column, preview panel order, bank selection 2 cols |
-| **1024px** | Tablet / small laptop | `style.css`: hamburger menu, nav as dropdown/collapsible; `responsive.css`: pagination (compact), dashboard tables (narrower checkbox/Actions), main content padding, IT dashboard full-bleed, step tabs overflow |
+| **1072px** | Tablet / dashboard filters | `responsive.css`: dashboard only — filters (dropdowns) below search bar |
+| **1024px** | Tablet / small laptop | `style.css`: hamburger menu, nav as dropdown/collapsible; `responsive.css`: pagination (compact), main content padding, step tabs overflow (no dashboard-specific styles at this breakpoint) |
 | **768px** | iPad portrait / tablet | `style.css`: nav padding, dashboard header column, stats 1 col, form-row 1 col, recurring modal 95%; `write_cheque.css`: cheque container padding, form/preview panels, amount input 1 col, bank selection 1 col, form actions column, modal 95%; `responsive.css`: pagination, dashboard full-bleed, step tabs |
 | **420px** | Small phone | `responsive.css`: pagination (smaller buttons), dashboard full-bleed, step tabs, table Actions column min-width reduced |
 
@@ -26,6 +27,10 @@ When adding new responsive styles, use the same `max-width` values so behavior s
 ```css
 @media (max-width: 1200px) {
   /* Small desktop / cheque layout */
+}
+
+@media (max-width: 1072px) {
+  /* Dashboard: filters below search bar */
 }
 
 @media (max-width: 1024px) {
