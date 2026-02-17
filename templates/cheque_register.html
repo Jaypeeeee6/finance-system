@@ -15,6 +15,7 @@
     padding: 0.25rem 0;
     margin-bottom: 0;
 }
+.cheque-register-page .book-heading-result-count { margin-left: 0.5rem; color: #6c757d; font-size: 0.9em; font-weight: normal; }
 .cheque-register-page .book-heading-serial-range { margin-left: auto; color: #6c757d; font-size: 0.98em; font-weight: normal; }
 .cheque-register-page .book-section-header .btn-edit-book { margin-left: 0.5rem; }
 .cheque-register-page .book-section-header .btn-edit-book:disabled,
@@ -251,6 +252,11 @@
     padding: 8px 0;
 }
 .cheque-register-page .cheque-multi-filter.open .filter-panel { display: block; }
+/* Bank filter: align panel from the right so it doesn't go off-screen */
+.cheque-register-page .cheque-multi-filter[data-filter="bank"] .filter-panel {
+    left: auto;
+    right: 0;
+}
 .cheque-register-page .cheque-multi-filter .filter-panel label {
     display: flex;
     align-items: center;
@@ -274,7 +280,7 @@
 {% set show_select_ceo_gm_op = current_user.role in ['CEO', 'GM', 'Operation Manager'] %}
 {% set show_select_auditing = current_user.department == 'Auditing' %}
 {% set show_cheque_select = show_select_it or show_select_ceo_gm_op or show_select_auditing %}
-<div class="dashboard-container cheque-register-page" data-show-auditing-select="{{ 'true' if show_select_auditing else 'false' }}" data-show-it-select="{{ 'true' if show_select_it else 'false' }}">
+<div class="dashboard-container cheque-register-page" data-show-auditing-select="{{ 'true' if show_select_auditing else 'false' }}" data-show-it-select="{{ 'true' if show_select_it else 'false' }}" data-filter-active="{{ 'true' if (book_filter_list or status_filter_list or book_holder_filter_list or bank_filter_list) else 'false' }}">
     <div class="dashboard-header">
         <h2 class="dashboard-title" style="margin:0; display:inline-flex; align-items:center; gap:8px; font-size:1.6rem; font-weight:700;"><i class="fas fa-book"></i> Cheque Register</h2>
         <p>View and manage cheque books and serial numbers</p>
@@ -364,6 +370,7 @@
                     <div class="book-section-header" role="button" tabindex="0" aria-expanded="false" aria-controls="book-content-{{ group.grouper }}" id="book-header-{{ group.grouper }}">
                         <span class="book-section-chevron" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
                         <h3 class="book-section-title" style="margin:0;">Book No. {{ group.grouper }}{% if group.list %}{% set book = group.list[0].book %}{% if book and (book.book_holder or book.bank_name) %}<span class="book-heading-meta"> — {{ book.book_holder.name if book.book_holder else '' }}{% if book.book_holder and book.bank_name %}, {% endif %}{{ book.bank_name or '' }}</span>{% endif %}{% endif %}</h3>
+                        <span class="book-heading-result-count" data-book-no="{{ group.grouper }}">{% if book_filter_list or status_filter_list or book_holder_filter_list or bank_filter_list %}({{ group.list|length }} results){% endif %}</span>
                         {% if group.list %}<span class="book-heading-serial-range">Serial No: {{ group.list[0].serial_no }} - {{ group.list[-1].serial_no }}</span>{% endif %}
                         {% set has_non_available = group.list | selectattr('status', 'ne', 'Available') | list | length > 0 %}
                         {% if has_non_available %}
@@ -661,6 +668,29 @@ function refreshAllChequePagination() {
     });
 }
 
+function updateBookHeadingCounts() {
+    var container = document.querySelector('.cheque-register-page');
+    if (!container) return;
+    var hasFilter = container.getAttribute('data-filter-active') === 'true';
+    var searchInput = document.getElementById('chequeSearchInput');
+    var searchVal = (searchInput && searchInput.value) ? searchInput.value.trim() : '';
+    var hasSearch = searchVal.length > 0;
+    var showCounts = hasFilter || hasSearch;
+    document.querySelectorAll('.cheque-register-page .book-section[data-book-no]').forEach(function(section) {
+        var span = section.querySelector('.book-heading-result-count');
+        if (!span) return;
+        if (!showCounts) {
+            span.textContent = '';
+            return;
+        }
+        var bookNo = section.getAttribute('data-book-no');
+        if (!bookNo) return;
+        var visible = getVisibleRowsForBook(bookNo);
+        var count = visible.length;
+        span.textContent = count > 0 ? '(' + count + ' results)' : '';
+    });
+}
+
 var CHEQUE_EXPANDED_STORAGE_KEY = 'cheque_register_expanded_books';
 function saveChequeExpandedBooks() {
     var expanded = [];
@@ -740,6 +770,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (card) card.style.display = visibleCount > 0 ? '' : 'none';
             });
             refreshAllChequePagination();
+            updateBookHeadingCounts();
         });
     }
 
