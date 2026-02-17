@@ -5339,3 +5339,169 @@ input:checked + .toggle-slider:before {
     font-weight: 700;
 }
 
+/* ==================== SUPPORT FAB BUTTON ==================== */
+.support-fab {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #007bff;
+    color: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    z-index: 1000;
+    transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.support-fab:hover {
+    background: #0056b3;
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(0, 123, 255, 0.5);
+}
+
+.support-fab:active {
+    transform: scale(0.98);
+}
+
+@media (max-width: 768px) {
+    .support-fab {
+        bottom: 16px;
+        right: 16px;
+        width: 52px;
+        height: 52px;
+        font-size: 1.25rem;
+    }
+}
+
+/* Support Modal - same style as item-request-error-modal (new request page) */
+.support-help-modal {
+    position: fixed !important;
+    inset: 0 !important;
+    display: none !important;
+    z-index: 9999 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: transparent !important;
+}
+
+.support-help-modal[style*="flex"] {
+    display: flex !important;
+}
+
+.support-help-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.support-help-container {
+    position: relative;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    max-width: 450px;
+    width: 90%;
+    overflow: hidden;
+}
+
+.support-help-header {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.support-help-icon {
+    width: 24px;
+    height: 24px;
+    background: #D9BD7D;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.support-help-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+    color: #D9BD7D;
+}
+
+.support-help-body {
+    padding: 20px;
+    color: #212529;
+}
+
+.support-help-message {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 12px;
+    color: #212529;
+    font-weight: 500;
+}
+
+.support-help-arabic {
+    margin-bottom: 0;
+    margin-top: 8px;
+}
+
+.support-help-footer {
+    padding: 12px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.support-help-btn {
+    background: #D9BD7D;
+    color: white;
+    border: none;
+    padding: 8px 24px;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    text-transform: uppercase;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.support-help-btn:hover {
+    background: #c8ac65;
+    color: white;
+}
+
+.support-help-btn:active {
+    background: #b89b58;
+}
+
+.support-help-btn-close {
+    background: #6c757d;
+}
+
+.support-help-btn-close:hover {
+    background: #5a6268;
+}
+
+.support-help-btn-close:active {
+    background: #545b62;
+}
+

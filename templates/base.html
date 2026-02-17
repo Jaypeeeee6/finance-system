@@ -480,6 +480,66 @@
         {% block content %}{% endblock %}
     </main>
 
+    {% if current_user.is_authenticated %}
+    <!-- Support FAB and Modal -->
+    <button type="button" class="support-fab" id="support-fab" aria-label="Get support">
+        <i class="fas fa-headset"></i>
+    </button>
+    <div id="supportHelpModal" class="support-help-modal" style="display: none;">
+        <div class="support-help-overlay" onclick="closeSupportHelpModal()"></div>
+        <div class="support-help-container">
+            <div class="support-help-header">
+                <div class="support-help-icon"><i class="fas fa-headset"></i></div>
+                <h3 class="support-help-title">Get Help from IT</h3>
+            </div>
+            <div class="support-help-body">
+                <div class="support-help-message">
+                    Contact the IT department for support. Use the ticketing system to submit a support request.
+                </div>
+                <div class="support-help-message support-help-arabic" dir="rtl">
+                    للحصول على الدعم، تواصل مع قسم الـ IT وقدّم طلبك من خلال نظام التذاكر.
+                </div>
+            </div>
+            <div class="support-help-footer">
+                <button type="button" class="support-help-btn support-help-btn-close" onclick="closeSupportHelpModal()">Cancel</button>
+                <a href="https://ticketing.maagroup.om" target="_blank" rel="noopener noreferrer" class="support-help-btn">
+                    <i class="fas fa-external-link-alt"></i> Ask IT Support
+                </a>
+            </div>
+        </div>
+    </div>
+    <script>
+    (function() {
+        function openSupportHelpModal() {
+            var modal = document.getElementById('supportHelpModal');
+            if (modal) {
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            }
+        }
+        function closeSupportHelpModal() {
+            var modal = document.getElementById('supportHelpModal');
+            if (modal) {
+                modal.style.display = 'none';
+                document.body.style.overflow = '';
+            }
+        }
+        window.openSupportHelpModal = openSupportHelpModal;
+        window.closeSupportHelpModal = closeSupportHelpModal;
+        document.addEventListener('DOMContentLoaded', function() {
+            var fab = document.getElementById('support-fab');
+            if (fab) fab.addEventListener('click', openSupportHelpModal);
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                var modal = document.getElementById('supportHelpModal');
+                if (modal && modal.style.display === 'flex') closeSupportHelpModal();
+            }
+        });
+    })();
+    </script>
+    {% endif %}
+
     <footer class="footer">
         <p>&copy; 2024 Payment Request Management System. All rights reserved.</p>
     </footer>
