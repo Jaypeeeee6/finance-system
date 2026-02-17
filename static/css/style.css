@@ -2629,6 +2629,36 @@ body.flash-error-open {
     display: block;
 }
 
+/* Dashboard tabs only: fixed-width tabs, no wrap, horizontal scroll when needed */
+.dashboard-container .tab-navigation {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+.dashboard-container .tab-navigation .tab-button {
+    flex: 1 1 0;
+    min-width: max-content;
+    white-space: nowrap;
+}
+.dashboard-container .dashboard-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+.dashboard-container .dashboard-tabs .tab-btn {
+    flex: 1 1 0;
+    min-width: max-content;
+    white-space: nowrap;
+}
+.dashboard-container .tab-navigation::-webkit-scrollbar,
+.dashboard-container .dashboard-tabs::-webkit-scrollbar { height: 6px; }
+.dashboard-container .tab-navigation::-webkit-scrollbar-thumb,
+.dashboard-container .dashboard-tabs::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+.dashboard-container .tab-navigation::-webkit-scrollbar-track,
+.dashboard-container .dashboard-tabs::-webkit-scrollbar-track { background: transparent; }
+
 /* ==================== EMPTY STATE ==================== */
 .empty-state {
     text-align: center;
