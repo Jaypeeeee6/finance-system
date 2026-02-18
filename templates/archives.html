@@ -136,10 +136,10 @@
 
     <!-- Tab: Payment Requests | Item Requests (same style as drafts.html) -->
     <div class="draft-tabs archives-tabs">
-        <a href="{{ url_for('archives', tab='payment_requests', page=1, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="tab-button {% if archive_tab == 'payment_requests' %}active{% endif %}">
+        <a href="{{ url_for('archives', tab='payment_requests', page=1, per_page=pagination.per_page, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="tab-button {% if archive_tab == 'payment_requests' %}active{% endif %}">
             <i class="fas fa-file-invoice-dollar"></i> Payment Requests
         </a>
-        <a href="{{ url_for('archives', tab='item_requests', page=1, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="tab-button {% if archive_tab == 'item_requests' %}active{% endif %}">
+        <a href="{{ url_for('archives', tab='item_requests', page=1, per_page=item_pagination.per_page, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="tab-button {% if archive_tab == 'item_requests' %}active{% endif %}">
             <i class="fas fa-shopping-cart"></i> Item Requests
         </a>
     </div>
@@ -212,7 +212,7 @@
                         {% if search_query %}{{ filters.append('Search: ' + search_query) or '' }}{% endif %}
                         {{ filters|join(' | ') }}
                     </span>
-                    <a href="{{ url_for('archives', tab=archive_tab) }}" class="btn btn-sm btn-outline">
+                    <a href="{{ url_for('archives', tab=archive_tab, per_page=pagination.per_page if archive_tab == 'payment_requests' else item_pagination.per_page) }}" class="btn btn-sm btn-outline">
                         <i class="fas fa-times"></i> Clear All
                     </a>
                 </div>
@@ -307,11 +307,25 @@
                                         <i class="fas fa-eye"></i>
                                     </a>
                                     <form method="POST" action="{{ url_for('restore_request', request_id=req.request_id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to restore this request? It will be moved back to active requests.')">
+                                        <input type="hidden" name="archives_tab" value="{{ archive_tab }}">
+                                        <input type="hidden" name="archives_page" value="{{ pagination.page }}">
+                                        <input type="hidden" name="archives_per_page" value="{{ pagination.per_page }}">
+                                        <input type="hidden" name="archives_department" value="{{ department_filter or '' }}">
+                                        <input type="hidden" name="archives_status" value="{{ status_filter or '' }}">
+                                        <input type="hidden" name="archives_search" value="{{ search_query or '' }}">
+                                        <input type="hidden" name="archives_urgent" value="{{ urgent_filter or '' }}">
                                         <button type="submit" class="btn btn-sm btn-success" title="Restore Request">
                                             <i class="fas fa-undo"></i> Restore
                                         </button>
                                     </form>
                                     <form method="POST" action="{{ url_for('delete_request_permanently', request_id=req.request_id) }}" style="display: inline;" onsubmit="return confirm('⚠️ WARNING: This will permanently delete request #{{ req.request_id }} from the database. This action CANNOT be undone. The request will be removed from reports, calendar, dashboards, and everywhere else. Are you absolutely sure?')">
+                                        <input type="hidden" name="archives_tab" value="{{ archive_tab }}">
+                                        <input type="hidden" name="archives_page" value="{{ pagination.page }}">
+                                        <input type="hidden" name="archives_per_page" value="{{ pagination.per_page }}">
+                                        <input type="hidden" name="archives_department" value="{{ department_filter or '' }}">
+                                        <input type="hidden" name="archives_status" value="{{ status_filter or '' }}">
+                                        <input type="hidden" name="archives_search" value="{{ search_query or '' }}">
+                                        <input type="hidden" name="archives_urgent" value="{{ urgent_filter or '' }}">
                                         <button type="submit" class="btn btn-sm btn-danger" title="Delete Permanently">
                                             <i class="fas fa-trash-alt"></i> Delete Permanently
                                         </button>
@@ -324,25 +338,50 @@
                 </div>
                 
                 <!-- Pagination -->
-                {% if pagination.pages > 1 %}
-                <div class="pagination">
-                    {% if pagination.has_prev %}
-                        <a href="{{ url_for('archives', tab='payment_requests', page=pagination.prev_num, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm">
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </a>
-                    {% endif %}
-                    
-                    <span class="pagination-info">
-                        Page {{ pagination.page }} of {{ pagination.pages }} ({{ pagination.total }} total)
-                    </span>
-                    
-                    {% if pagination.has_next %}
-                        <a href="{{ url_for('archives', tab='payment_requests', page=pagination.next_num, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm">
-                            Next <i class="fas fa-chevron-right"></i>
-                        </a>
+                <div class="pagination-container">
+                    <div class="pagination-left">
+                        <div class="pagination-info">
+                            Showing {{ pagination.per_page * (pagination.page - 1) + 1 }} to
+                            {{ pagination.per_page * (pagination.page - 1) + pagination.items|length }}
+                            of {{ pagination.total }} requests
+                        </div>
+                        <div class="items-per-page">
+                            <label for="per_page_payment">Show:</label>
+                            <select id="per_page_payment" onchange="changeArchivesPerPage(this.value, 'payment_requests')">
+                                <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10</option>
+                                <option value="20" {% if pagination.per_page == 20 %}selected{% endif %}>20</option>
+                                <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50</option>
+                                <option value="100" {% if pagination.per_page == 100 %}selected{% endif %}>100</option>
+                            </select>
+                            <span>per page</span>
+                        </div>
+                    </div>
+                    {% if pagination.pages > 1 %}
+                    <div class="pagination">
+                        {% if pagination.has_prev %}
+                            <a href="{{ url_for('archives', tab='payment_requests', page=pagination.prev_num, per_page=pagination.per_page, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm btn-secondary">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        {% endif %}
+                        {% for page_num in pagination.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != pagination.page %}
+                                    <a href="{{ url_for('archives', tab='payment_requests', page=page_num, per_page=pagination.per_page, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
+                                {% else %}
+                                    <span class="btn btn-sm btn-primary">{{ page_num }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="pagination-ellipsis">...</span>
+                            {% endif %}
+                        {% endfor %}
+                        {% if pagination.has_next %}
+                            <a href="{{ url_for('archives', tab='payment_requests', page=pagination.next_num, per_page=pagination.per_page, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm btn-secondary">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </a>
+                        {% endif %}
+                    </div>
                     {% endif %}
                 </div>
-                {% endif %}
             {% elif archive_tab == 'item_requests' and item_requests %}
                 <div class="table-responsive">
                     <table class="data-table">
@@ -371,9 +410,23 @@
                                 <td>
                                     <a href="/procurement/item-request/{{ req.id }}/view" class="btn btn-sm btn-info" title="View"><i class="fas fa-eye"></i></a>
                                     <form method="POST" action="{{ url_for('restore_item_request', item_request_id=req.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to restore this item request? It will be moved back to Item Requests.')">
+                                        <input type="hidden" name="archives_tab" value="{{ archive_tab }}">
+                                        <input type="hidden" name="archives_page" value="{{ item_pagination.page }}">
+                                        <input type="hidden" name="archives_per_page" value="{{ item_pagination.per_page }}">
+                                        <input type="hidden" name="archives_department" value="{{ department_filter or '' }}">
+                                        <input type="hidden" name="archives_status" value="{{ status_filter or '' }}">
+                                        <input type="hidden" name="archives_search" value="{{ search_query or '' }}">
+                                        <input type="hidden" name="archives_urgent" value="{{ urgent_filter or '' }}">
                                         <button type="submit" class="btn btn-sm btn-success" title="Restore"><i class="fas fa-undo"></i> Restore</button>
                                     </form>
                                     <form method="POST" action="{{ url_for('delete_item_request_permanently', item_request_id=req.id) }}" style="display: inline;" onsubmit="return confirm('⚠️ WARNING: This will permanently delete item request #{{ req.id }} from the database. This action CANNOT be undone. The request will be removed from reports, dashboards, and everywhere else. Are you absolutely sure?')">
+                                        <input type="hidden" name="archives_tab" value="{{ archive_tab }}">
+                                        <input type="hidden" name="archives_page" value="{{ item_pagination.page }}">
+                                        <input type="hidden" name="archives_per_page" value="{{ item_pagination.per_page }}">
+                                        <input type="hidden" name="archives_department" value="{{ department_filter or '' }}">
+                                        <input type="hidden" name="archives_status" value="{{ status_filter or '' }}">
+                                        <input type="hidden" name="archives_search" value="{{ search_query or '' }}">
+                                        <input type="hidden" name="archives_urgent" value="{{ urgent_filter or '' }}">
                                         <button type="submit" class="btn btn-sm btn-danger" title="Delete Permanently">
                                             <i class="fas fa-trash-alt"></i> Delete Permanently
                                         </button>
@@ -384,17 +437,51 @@
                         </tbody>
                     </table>
                 </div>
-                {% if item_pagination.pages > 1 %}
-                <div class="pagination" style="margin-top: 20px;">
-                    {% if item_pagination.has_prev %}
-                        <a href="{{ url_for('archives', tab='item_requests', page=item_pagination.prev_num, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm"><i class="fas fa-chevron-left"></i> Previous</a>
-                    {% endif %}
-                    <span class="pagination-info">Page {{ item_pagination.page }} of {{ item_pagination.pages }} ({{ item_pagination.total }} total)</span>
-                    {% if item_pagination.has_next %}
-                        <a href="{{ url_for('archives', tab='item_requests', page=item_pagination.next_num, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm">Next <i class="fas fa-chevron-right"></i></a>
+                <!-- Pagination -->
+                <div class="pagination-container">
+                    <div class="pagination-left">
+                        <div class="pagination-info">
+                            Showing {{ item_pagination.per_page * (item_pagination.page - 1) + 1 }} to
+                            {{ item_pagination.per_page * (item_pagination.page - 1) + item_pagination.items|length }}
+                            of {{ item_pagination.total }} requests
+                        </div>
+                        <div class="items-per-page">
+                            <label for="per_page_item">Show:</label>
+                            <select id="per_page_item" onchange="changeArchivesPerPage(this.value, 'item_requests')">
+                                <option value="10" {% if item_pagination.per_page == 10 %}selected{% endif %}>10</option>
+                                <option value="20" {% if item_pagination.per_page == 20 %}selected{% endif %}>20</option>
+                                <option value="50" {% if item_pagination.per_page == 50 %}selected{% endif %}>50</option>
+                                <option value="100" {% if item_pagination.per_page == 100 %}selected{% endif %}>100</option>
+                            </select>
+                            <span>per page</span>
+                        </div>
+                    </div>
+                    {% if item_pagination.pages > 1 %}
+                    <div class="pagination">
+                        {% if item_pagination.has_prev %}
+                            <a href="{{ url_for('archives', tab='item_requests', page=item_pagination.prev_num, per_page=item_pagination.per_page, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm btn-secondary">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        {% endif %}
+                        {% for page_num in item_pagination.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != item_pagination.page %}
+                                    <a href="{{ url_for('archives', tab='item_requests', page=page_num, per_page=item_pagination.per_page, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
+                                {% else %}
+                                    <span class="btn btn-sm btn-primary">{{ page_num }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="pagination-ellipsis">...</span>
+                            {% endif %}
+                        {% endfor %}
+                        {% if item_pagination.has_next %}
+                            <a href="{{ url_for('archives', tab='item_requests', page=item_pagination.next_num, per_page=item_pagination.per_page, department=department_filter, status=status_filter, search=search_query, urgent=urgent_filter) }}" class="btn btn-sm btn-secondary">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </a>
+                        {% endif %}
+                    </div>
                     {% endif %}
                 </div>
-                {% endif %}
             {% else %}
                 <div class="empty-state">
                     <i class="fas fa-archive"></i>
@@ -407,6 +494,24 @@
 
 <script>
 const archiveTab = '{{ archive_tab }}';
+const archivePerPage = {{ pagination.per_page if archive_tab == 'payment_requests' else item_pagination.per_page }};
+
+function changeArchivesPerPage(perPage, tab) {
+    const department = document.getElementById('departmentFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    const urgent = document.getElementById('urgentFilter').value;
+    const search = document.getElementById('searchInput').value;
+    const params = new URLSearchParams();
+    params.append('tab', tab);
+    params.append('page', '1');
+    params.append('per_page', perPage);
+    if (department) params.append('department', department);
+    if (status) params.append('status', status);
+    if (urgent) params.append('urgent', urgent);
+    if (search) params.append('search', search);
+    window.location.href = '{{ url_for("archives") }}?' + params.toString();
+}
+
 function filterByDepartment() {
     const department = document.getElementById('departmentFilter').value;
     const status = document.getElementById('statusFilter').value;
@@ -415,6 +520,8 @@ function filterByDepartment() {
     
     const params = new URLSearchParams();
     params.append('tab', archiveTab);
+    params.append('page', '1');
+    params.append('per_page', archivePerPage);
     if (department) params.append('department', department);
     if (status) params.append('status', status);
     if (urgent) params.append('urgent', urgent);

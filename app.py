@@ -11323,6 +11323,31 @@ def it_dashboard():
                          active_tab=tab)
 
 
+def _redirect_to_archives(tab=None, page=1, per_page=10):
+    """Build redirect to archives preserving page and filters from request.form (e.g. after restore/delete)."""
+    if request.form:
+        tab = request.form.get('archives_tab', tab or 'payment_requests')
+        try:
+            page = int(request.form.get('archives_page', page))
+        except (TypeError, ValueError):
+            page = 1
+        try:
+            per_page = int(request.form.get('archives_per_page', per_page))
+        except (TypeError, ValueError):
+            per_page = 10
+        if per_page not in (10, 20, 50, 100):
+            per_page = 10
+        department = request.form.get('archives_department') or None
+        status = request.form.get('archives_status') or None
+        search = request.form.get('archives_search') or None
+        urgent = request.form.get('archives_urgent') or None
+    else:
+        department = status = search = urgent = None
+        tab = tab or 'payment_requests'
+    return redirect(url_for('archives', tab=tab, page=page, per_page=per_page,
+                           department=department, status=status, search=search, urgent=urgent))
+
+
 @app.route('/it/archives')
 @login_required
 @role_required('IT Staff', 'Department Manager')
@@ -11440,7 +11465,7 @@ def restore_request(request_id):
     # Check if request is archived
     if not req.is_archived:
         flash(f'Payment request #{request_id} is not archived.', 'warning')
-        return redirect(url_for('archives'))
+        return _redirect_to_archives()
     
     # Resume any paused approval timing when restoring
     # If timing was paused (end_time was set during archiving), resume it from where it left off
@@ -11537,7 +11562,7 @@ def restore_request(request_id):
             print(f"Error emitting WebSocket notification: {e}")
     
     flash(f'Payment request #{request_id} has been restored.', 'success')
-    return redirect(url_for('archives'))
+    return _redirect_to_archives()
 
 
 @app.route('/item-request/<int:item_request_id>/restore', methods=['POST'])
@@ -11553,7 +11578,7 @@ def restore_item_request(item_request_id):
     
     if not item_req.is_archived:
         flash(f'Item request #{item_request_id} is not archived.', 'warning')
-        return redirect(url_for('archives', tab='item_requests'))
+        return _redirect_to_archives(tab='item_requests')
     
     item_req.is_archived = False
     item_req.archived_at = None
@@ -11598,7 +11623,7 @@ def restore_item_request(item_request_id):
             print(f"Error emitting WebSocket notification: {e}")
     
     flash(f'Item request #{item_request_id} has been restored.', 'success')
-    return redirect(url_for('archives', tab='item_requests'))
+    return _redirect_to_archives(tab='item_requests')
 
 
 @app.route('/item-request/<int:item_request_id>/delete_permanently', methods=['POST'])
@@ -11614,7 +11639,7 @@ def delete_item_request_permanently(item_request_id):
     
     if not item_req.is_archived:
         flash(f'Item request #{item_request_id} must be archived before it can be permanently deleted.', 'warning')
-        return redirect(url_for('archives', tab='item_requests'))
+        return _redirect_to_archives(tab='item_requests')
     
     try:
         requestor_name = item_req.requestor_name
@@ -11668,13 +11693,13 @@ def delete_item_request_permanently(item_request_id):
                 print(f"Error emitting WebSocket notification: {e}")
         
         flash(f'Item request #{item_request_id} has been permanently deleted from the database.', 'success')
-        return redirect(url_for('archives', tab='item_requests'))
+        return _redirect_to_archives(tab='item_requests')
         
     except Exception as e:
         db.session.rollback()
         flash(f'Error deleting item request: {str(e)}', 'error')
         app.logger.error(f"Error permanently deleting item request #{item_request_id}: {str(e)}")
-        return redirect(url_for('archives', tab='item_requests'))
+        return _redirect_to_archives(tab='item_requests')
 
 
 @app.route('/request/<int:request_id>/delete_permanently', methods=['POST'])
@@ -11692,7 +11717,7 @@ def delete_request_permanently(request_id):
     # Check if request is archived
     if not req.is_archived:
         flash(f'Payment request #{request_id} must be archived before it can be permanently deleted.', 'warning')
-        return redirect(url_for('archives'))
+        return _redirect_to_archives()
     
     try:
         # Store request info for notifications before deletion
@@ -11785,13 +11810,13 @@ def delete_request_permanently(request_id):
             print(f"DEBUG: Error emitting request_deleted event: {e}")
         
         flash(f'Payment request #{request_id_val} has been permanently deleted from the database.', 'success')
-        return redirect(url_for('archives'))
+        return _redirect_to_archives()
         
     except Exception as e:
         db.session.rollback()
         flash(f'Error deleting request: {str(e)}', 'error')
         app.logger.error(f"Error permanently deleting request #{request_id}: {str(e)}")
-        return redirect(url_for('archives'))
+        return _redirect_to_archives()
 
 
 # ==================== REQUEST TYPES MANAGEMENT ROUTES ====================
