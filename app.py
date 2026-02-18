@@ -20898,16 +20898,11 @@ def reserve_cheque():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-# Bank names for cheque book and new request (same list)
+# Bank names for cheque book (new book / edit book) — these three only
 CHEQUE_BANK_NAMES = [
-    'Bank Dhofar', 'Bank Muscat', 'National Bank of Oman', 'Oman Arab Bank',
-    'Bank Sohar', 'HSBC Bank Oman', 'Ahli Bank', 'Oman Development Bank', 'Oman Housing Bank',
-    'Meethaq Islamic Banking (Bank Dhofar)', 'Meethaq Islamic Banking (Bank Muscat)',
-    'Muzn Islamic Banking (National Bank of Oman)', 'Al Hilal Islamic Banking (Ahli Bank)',
-    'National Bank of Abu Dhabi', 'Qatar National Bank', 'Standard Chartered Bank',
-    'Bank of Baroda', 'Bank of Beirut', 'State Bank of India', 'Habib Bank AG Zurich',
-    'Alizz Islamic Bank', 'Sohar Islamic (Sohar Bank)',
-    'Al Yusr Islamic Banking Services (Oman Arab Bank)', 'Bank Nizwa', 'Mashreq Bank',
+    'Dhofar Islamic Bank',
+    'Oman Arab Bank',
+    'Sohar Islamic Bank',
 ]
 
 
