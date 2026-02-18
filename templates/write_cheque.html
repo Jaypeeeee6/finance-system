@@ -306,6 +306,14 @@ function getFinalPos(basePct, template, offsets, bankKey, field, mode) {
             topPct += (28 / template.imgSizePx.h) * 100;
         }
 
+        // Sohar Islamic Bank: preview-only positions (date right, payee lower, amount right, amountWords a little right)
+        if (bankKey === 'sohar' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
+            if (field === 'date') { leftPct += (116 / template.imgSizePx.w) * 100; topPct += (10 / template.imgSizePx.h) * 100; }
+            if (field === 'payee') { topPct += (23 / template.imgSizePx.h) * 100; }
+            if (field === 'amount') { leftPct += (70 / template.imgSizePx.w) * 100; topPct += (27 / template.imgSizePx.h) * 100; }
+            if (field === 'amountWords') { leftPct += (15 / template.imgSizePx.w) * 100; topPct += (30 / template.imgSizePx.h) * 100; }
+        }
+
         return { leftPct, topPct };
     }
     // print
@@ -333,10 +341,19 @@ function getFinalPos(basePct, template, offsets, bankKey, field, mode) {
         topPct += (28 / template.imgSizePx.h) * 100;
     }
 
-    // Dhofar Islamic Bank: print-only amount in words (left + lower)
+    // Dhofar Islamic Bank: print-only amount in words
     if (bankKey === 'dhofar_islamic' && field === 'amountWords' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
         leftPct -= (400 / template.imgSizePx.w) * 100;
         topPct += (20 / template.imgSizePx.h) * 100;
+    }
+
+    // Sohar Islamic Bank: print-only positions (each field shifted left individually)
+    if (bankKey === 'sohar' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
+        if (field === 'date') { leftPct -= (347 / template.imgSizePx.w) * 100; topPct -= (18 / template.imgSizePx.h) * 100; }
+        if (field === 'payee') { leftPct -= (315 / template.imgSizePx.w) * 100; topPct += (10 / template.imgSizePx.h) * 100; }
+        if (field === 'amount') { leftPct -= (368 / template.imgSizePx.w) * 100; topPct += (25 / template.imgSizePx.h) * 100; }
+        if (field === 'amountWords') { leftPct -= (500 / template.imgSizePx.w) * 100; topPct += (20 / template.imgSizePx.h) * 100; }
+        if (field === 'crossing') { leftPct -= (80 / template.imgSizePx.w) * 100; }
     }
 
     return { leftPct, topPct };
@@ -780,7 +797,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return s;
         })();
         var w = template.chequeSizeMm.w, h = template.chequeSizeMm.h;
-        var printLeftOffsetMm = 50;
+        var printLeftOffsetMm = 70;
         var pageW = w + printLeftOffsetMm;
         styleTag.textContent = '@media print { @page { size: ' + pageW + 'mm ' + h + 'mm; margin: 0; } .cheque-print-container { left: ' + printLeftOffsetMm + 'mm !important; } .chequePrint { width: ' + w + 'mm !important; height: ' + h + 'mm !important; } }';
         var printContainer = document.getElementById('chequePrintRoot');

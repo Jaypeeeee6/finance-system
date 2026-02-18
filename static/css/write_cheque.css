@@ -692,7 +692,7 @@
 @media print {
     /* Larger page + big left offset so amount-in-words stays inside browser's printable area */
     @page {
-        size: 210mm 75mm;
+        size: 230mm 75mm;
         margin: 0 !important;
         padding: 0 !important;
     }
@@ -701,7 +701,7 @@
     html, body {
         margin: 0 !important;
         padding: 0 !important;
-        width: 210mm !important;
+        width: 230mm !important;
         height: 75mm !important;
         overflow: visible !important;
     }
@@ -715,10 +715,10 @@
         display: block !important;
     }
     
-    /* 50mm left offset so content is well inside printable area and not clipped */
+    /* 70mm left offset so content is well inside printable area and not clipped */
     .cheque-print-container {
         position: fixed !important;
-        left: 50mm !important;
+        left: 70mm !important;
         top: 0 !important;
         width: 160mm !important;
         height: 75mm !important;
@@ -804,6 +804,13 @@
 
     /* Dhofar Islamic Bank: amount in words same size as payee (12pt), wider box for longer text */
     .cheque-print-container[data-print-bank="dhofar_islamic"] .print-amount-words-overlay {
+        font-size: 12pt !important;
+        max-width: 90mm !important;
+        width: 90mm !important;
+    }
+
+    /* Sohar Islamic Bank: amount in words same size as payee (12pt), wider box in print */
+    .cheque-print-container[data-print-bank="sohar"] .print-amount-words-overlay {
         font-size: 12pt !important;
         max-width: 90mm !important;
         width: 90mm !important;
