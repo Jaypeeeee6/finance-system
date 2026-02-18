@@ -7,6 +7,8 @@
 {% endblock %}
 
 {% block content %}
+{% set bank_cheque_images = {'dhofar_islamic': 'DHOFAR-ISLAMIC-BANK.png', 'oman_arab': 'OMAN-ARAB-BANK.png', 'sohar': 'SOHAR-BANK.png'} %}
+{% set initial_cheque_img = bank_cheque_images.get(book_bank_key|default('dhofar_islamic'), 'DHOFAR-ISLAMIC-BANK.png') %}
 <div class="cheque-container dashboard-container">
     <div class="dashboard-header">
         <h1><i class="fas fa-file-invoice"></i> {% if selected_serials and selected_serials|length > 0 %}Writing {{ selected_serials|length }} Cheque{% if selected_serials|length != 1 %}s{% endif %}{% else %}Write Cheque{% endif %}</h1>
@@ -98,7 +100,7 @@
                             {% for s in selected_serials %}
                             <div class="cheque-preview-slide {% if loop.index == 1 %}active{% endif %}" data-slide-index="{{ loop.index0 }}" data-serial-id="{{ s.id }}" data-serial-no="{{ s.serial_no }}">
                                 <div class="cheque-image-container cheque-canvas">
-                                    <img class="cheque-template cheque-template-slide" src="{{ url_for('static', filename='cheque_templates/DHOFAR-ISLAMIC-BANK.png') }}" alt="Cheque Template">
+                                    <img class="cheque-template cheque-template-slide" src="{{ url_for('static', filename='cheque_templates/' ~ initial_cheque_img) }}" alt="Cheque Template">
                                     <div class="cheque-overlay">
                                         <div class="field-overlay field-date" data-field="date"></div>
                                         <div class="field-overlay field-payee" data-field="payee"></div>
@@ -113,7 +115,7 @@
                             <!-- Single cheque preview (default): same % positions as print -->
                             <div class="cheque-preview-slide active" data-slide-index="0">
                                 <div class="cheque-image-container cheque-canvas">
-                                    <img id="chequeTemplate" src="{{ url_for('static', filename='cheque_templates/DHOFAR-ISLAMIC-BANK.png') }}" alt="Cheque Template" class="cheque-template">
+                                    <img id="chequeTemplate" src="{{ url_for('static', filename='cheque_templates/' ~ initial_cheque_img) }}" alt="Cheque Template" class="cheque-template">
                                     <div class="cheque-overlay">
                                         <div class="field-overlay" id="dateOverlay" data-field="date"></div>
                                         <div class="field-overlay" id="payeeOverlay" data-field="payee"></div>
@@ -153,7 +155,7 @@
         <div class="modal-body">
             <div class="cheque-modal-container">
                 <div class="cheque-modal-image-container">
-                    <img id="modalChequeTemplate" src="{{ url_for('static', filename='cheque_templates/DHOFAR-ISLAMIC-BANK.png') }}" alt="Cheque Template" class="modal-cheque-template">
+                    <img id="modalChequeTemplate" src="{{ url_for('static', filename='cheque_templates/' ~ initial_cheque_img) }}" alt="Cheque Template" class="modal-cheque-template">
                     
                     <!-- Modal overlay fields -->
                     <div class="modal-cheque-overlay">
