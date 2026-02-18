@@ -3251,15 +3251,16 @@ body.flash-error-open {
     border-color: #c8ac65 !important;
     color: #c8ac65 !important;
 }
+/* Page number buttons (non-active): gray, not gold — only active + Prev/Next are gold */
 .dashboard-container .pagination .btn.btn-sm.btn-outline {
     background: transparent !important;
-    border: 1px solid #D9BD7D !important;
-    color: #D9BD7D !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--dark-color) !important;
 }
 .dashboard-container .pagination .btn.btn-sm.btn-outline:hover {
-    background: transparent !important;
-    border-color: #c8ac65 !important;
-    color: #c8ac65 !important;
+    background: var(--light-color) !important;
+    border-color: var(--dark-color) !important;
+    color: var(--dark-color) !important;
 }
 
 /* ==================== RESPONSIVE ==================== */
@@ -5504,4 +5505,3 @@ input:checked + .toggle-slider:before {
 .support-help-btn-close:active {
     background: #545b62;
 }
-
