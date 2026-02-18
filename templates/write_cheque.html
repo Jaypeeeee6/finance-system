@@ -97,30 +97,30 @@
                         {% if selected_serials and selected_serials|length > 1 %}
                             {% for s in selected_serials %}
                             <div class="cheque-preview-slide {% if loop.index == 1 %}active{% endif %}" data-slide-index="{{ loop.index0 }}" data-serial-id="{{ s.id }}" data-serial-no="{{ s.serial_no }}">
-                                <div class="cheque-image-container">
+                                <div class="cheque-image-container cheque-canvas">
                                     <img class="cheque-template cheque-template-slide" src="{{ url_for('static', filename='cheque_templates/DHOFAR-ISLAMIC-BANK.png') }}" alt="Cheque Template">
                                     <div class="cheque-overlay">
-                                        <div class="field-overlay field-date" data-field="date" style="position: absolute; top: 53px; left: 363px; font-size: 17px;"></div>
-                                        <div class="field-overlay field-payee" data-field="payee" style="position: absolute; top: 127px; left: 250px; font-size: 16px; max-width: 400px; text-align: center;"></div>
-                                        <div class="field-overlay field-amount" data-field="amount" style="position: absolute; top: 183px; left: 613px; font-size: 17px; text-align: center;"></div>
-                                        <div class="field-overlay field-amountWords" data-field="amountWords" style="position: absolute; top: 160px; left: 98px; font-size: 16px; max-width: 300px; line-height: 2.0; text-align: center;"></div>
-                                        <div class="field-overlay field-crossing" data-field="crossing" style="position: absolute; top: 20px; left: 60px; font-size: 18px; font-weight: 700; text-transform: uppercase; transform: rotate(-25deg); color: rgba(200, 0, 0, 0.6);"></div>
+                                        <div class="field-overlay field-date" data-field="date"></div>
+                                        <div class="field-overlay field-payee" data-field="payee"></div>
+                                        <div class="field-overlay field-amount" data-field="amount"></div>
+                                        <div class="field-overlay field-amountWords" data-field="amountWords"></div>
+                                        <div class="field-overlay field-crossing" data-field="crossing"></div>
                                     </div>
                                 </div>
                             </div>
                             {% endfor %}
                         {% else %}
-                            <!-- Single cheque preview (default) -->
+                            <!-- Single cheque preview (default): same % positions as print -->
                             <div class="cheque-preview-slide active" data-slide-index="0">
-                                <div class="cheque-image-container">
+                                <div class="cheque-image-container cheque-canvas">
                                     <img id="chequeTemplate" src="{{ url_for('static', filename='cheque_templates/DHOFAR-ISLAMIC-BANK.png') }}" alt="Cheque Template" class="cheque-template">
                                     <div class="cheque-overlay">
-                                        <div class="field-overlay" id="dateOverlay" style="position: absolute; top: 53px; left: 363px; font-size: 17px;"></div>
-                                        <div class="field-overlay" id="payeeOverlay" style="position: absolute; top: 127px; left: 250px; font-size: 16px; max-width: 400px; text-align: center;"></div>
-                                        <div class="field-overlay" id="amountOverlay" style="position: absolute; top: 183px; left: 613px; font-size: 17px; text-align: center;"></div>
-                                        <div class="field-overlay" id="amountWordsOverlay" style="position: absolute; top: 160px; left: 98px; font-size: 16px; max-width: 300px; line-height: 2.0; text-align: center;"></div>
-                                        <div class="field-overlay" id="crossingOverlay" style="position: absolute; top: 20px; left: 60px; font-size: 18px; font-weight: 700; text-transform: uppercase; transform: rotate(-25deg); color: rgba(200, 0, 0, 0.6);"></div>
-                                        <div class="field-overlay" id="purposeOverlay" style="position: absolute; top: 200px; left: 50px; font-size: 12px; max-width: 300px; line-height: 1.2;"></div>
+                                        <div class="field-overlay" id="dateOverlay" data-field="date"></div>
+                                        <div class="field-overlay" id="payeeOverlay" data-field="payee"></div>
+                                        <div class="field-overlay" id="amountOverlay" data-field="amount"></div>
+                                        <div class="field-overlay" id="amountWordsOverlay" data-field="amountWords"></div>
+                                        <div class="field-overlay" id="crossingOverlay" data-field="crossing"></div>
+                                        <div class="field-overlay" id="purposeOverlay" data-field="purpose"></div>
                                     </div>
                                 </div>
                             </div>
@@ -132,14 +132,14 @@
     </div>
 </div>
 
-<!-- Hidden print container - only visible when printing (outside cheque-container to avoid being hidden) -->
-<div class="cheque-print-container" style="display: none;">
-    <div class="cheque-print-overlay">
-        <div class="print-field-overlay print-date-overlay" id="printDateOverlay"></div>
-        <div class="print-field-overlay print-payee-overlay" id="printPayeeOverlay"></div>
-        <div class="print-field-overlay print-amount-overlay" id="printAmountOverlay"></div>
-            <div class="print-field-overlay print-amount-words-overlay" id="printAmountWordsOverlay"></div>
-            <div class="print-field-overlay print-crossing-overlay" id="printCrossingOverlay"></div>
+<!-- Hidden print container: same % positions as preview, mm-sized in @media print, no background image -->
+<div class="cheque-print-container" id="chequePrintRoot" style="display: none;">
+    <div class="chequePrint" id="chequePrintCanvas">
+        <div class="print-field-overlay print-date-overlay" id="printDateOverlay" data-field="date"></div>
+        <div class="print-field-overlay print-payee-overlay" id="printPayeeOverlay" data-field="payee"></div>
+        <div class="print-field-overlay print-amount-overlay" id="printAmountOverlay" data-field="amount"></div>
+        <div class="print-field-overlay print-amount-words-overlay" id="printAmountWordsOverlay" data-field="amountWords"></div>
+        <div class="print-field-overlay print-crossing-overlay" id="printCrossingOverlay" data-field="crossing"></div>
     </div>
 </div>
 
@@ -157,11 +157,11 @@
                     
                     <!-- Modal overlay fields -->
                     <div class="modal-cheque-overlay">
-                        <div class="modal-field-overlay" id="modalDateOverlay"></div>
-                        <div class="modal-field-overlay" id="modalPayeeOverlay"></div>
-                        <div class="modal-field-overlay" id="modalAmountOverlay"></div>
-                        <div class="modal-field-overlay" id="modalAmountWordsOverlay"></div>
-                        <div class="modal-field-overlay" id="modalCrossingOverlay"></div>
+                        <div class="modal-field-overlay" id="modalDateOverlay" data-field="date"></div>
+                        <div class="modal-field-overlay" id="modalPayeeOverlay" data-field="payee"></div>
+                        <div class="modal-field-overlay" id="modalAmountOverlay" data-field="amount"></div>
+                        <div class="modal-field-overlay" id="modalAmountWordsOverlay" data-field="amountWords"></div>
+                        <div class="modal-field-overlay" id="modalCrossingOverlay" data-field="crossing"></div>
                     </div>
                 </div>
             </div>
@@ -193,128 +193,228 @@ window.writeChequeSerialIds = (window.selectedSerials || []).map(function(s) { r
         el.style.fontStyle = 'normal';
     }
 })();
-// Cheque field mapping for different banks
-const bankFieldPositions = {
-    'dhofar_islamic': {
-        date: { top: '53px', left: '363px' }, // Moved slightly more to the right
-        payee: { top: '127px', left: '185px' }, // Moved 15px to the left (200->185)
-        amount: { top: '183px', left: '613px' }, // Moved 3px lower and 3px right
-        amountWords: { top: '160px', left: '95px' }, // Moved 3px left (98->95)
-        crossing: { top: '20px', left: '60px' },
-        purpose: { top: '200px', left: '50px' }
+// Master coordinate space per bank: one set of positions for both preview and print
+const TEMPLATES = {
+    dhofar_islamic: {
+        imgSizePx: { w: 893, h: 418 },
+        chequeSizeMm: { w: 160, h: 75 },
+        fieldsPx: {
+            date: { top: 53, left: 363 },
+            payee: { top: 127, left: 185 },
+            amount: { top: 183, left: 613 },
+            amountWords: { top: 160, left: 95 },
+            crossing: { top: 20, left: 60 },
+            purpose: { top: 200, left: 50 }
+        }
     },
-    'oman_arab': {
-        date: { top: '13px', left: '610px' },  // Moved 10px to the right (580->590)
-        payee: { top: '125px', left: '90px' },  // Moved 5px lower (120->125) and 30px to the right (150->180)
-        amount: { top: '135px', left: '645px' },  // Moved 10px to the right (617->627)
-        amountWords: { top: '165px', left: '82px' },  // Moved 7px to the right (95->102)
-        crossing: { top: '15px', left: '40px' },
-        purpose: { top: '210px', left: '60px' }
+    oman_arab: {
+        imgSizePx: { w: 893, h: 418 },
+        chequeSizeMm: { w: 160, h: 75 },
+        fieldsPx: {
+            date: { top: 13, left: 610 },
+            payee: { top: 125, left: 90 },
+            amount: { top: 135, left: 645 },
+            amountWords: { top: 165, left: 82 },
+            crossing: { top: 15, left: 40 },
+            purpose: { top: 210, left: 60 }
+        }
     },
-    'sohar': {
-        date: { top: '52px', left: '560px' },
-        payee: { top: '116px', left: '115px' },
-        amount: { top: '172px', left: '605px' },
-        amountWords: { top: '153px', left: '80px' },
-        crossing: { top: '25px', left: '70px' },
-        purpose: { top: '205px', left: '55px' }
+    sohar: {
+        imgSizePx: { w: 893, h: 418 },
+        chequeSizeMm: { w: 160, h: 75 },
+        fieldsPx: {
+            date: { top: 52, left: 560 },
+            payee: { top: 116, left: 115 },
+            amount: { top: 172, left: 605 },
+            amountWords: { top: 153, left: 80 },
+            crossing: { top: 25, left: 70 },
+            purpose: { top: 205, left: 55 }
+        }
     }
 };
 
-// Function to update field positions based on selected bank
-function updateFieldPositions(bank) {
-    const positions = bankFieldPositions[bank];
-    if (!positions) return;
-    
-    const fieldMap = { date: 'date', payee: 'payee', amount: 'amount', amountWords: 'amountWords', crossing: 'crossing', purpose: 'purpose' };
-    Object.keys(positions).forEach(field => {
-        const overlay = document.getElementById(field + 'Overlay');
-        if (overlay) {
-            overlay.style.top = positions[field].top;
-            overlay.style.left = positions[field].left;
+// Mode-specific offsets + calibration (preview % vs print mm; compensates for printer/feed, stock size, font metrics).
+// Stored shape: offsets[bankKey] = { preview: { globalPct: {x,y}, fieldsPct: { payee: {x,y}, ... } }, print: { globalMm: {x,y}, fieldsMm: { payee: {x,y}, ... } } }
+const CALIBRATION_KEY = 'cheque_print_calibration';
+function getOffsets() {
+    try {
+        return JSON.parse(localStorage.getItem(CALIBRATION_KEY) || '{}');
+    } catch (_) { return {}; }
+}
+function setOffsets(offsets) {
+    try { localStorage.setItem(CALIBRATION_KEY, JSON.stringify(offsets)); } catch (_) {}
+}
+// Backwards compatibility
+function getCalibration() { return getOffsets(); }
+function setCalibration(cal) { setOffsets(cal); }
+
+function pxToPctMap(template) {
+    const { w, h } = template.imgSizePx;
+    const out = {};
+    for (const [k, v] of Object.entries(template.fieldsPx)) {
+        out[k] = {
+            topPct: (v.top / h) * 100,
+            leftPct: (v.left / w) * 100
+        };
+    }
+    return out;
+}
+
+// Convert print mm offsets to % (print container is physical mm)
+function mmToPct(mm, chequeSizeMm) {
+    if (!mm || (mm.x == null && mm.y == null)) return { x: 0, y: 0 };
+    return {
+        x: ((mm.x || 0) / chequeSizeMm.w) * 100,
+        y: ((mm.y || 0) / chequeSizeMm.h) * 100
+    };
+}
+
+// Final position = base% + mode-specific offset (preview: %; print: mm → %)
+function getFinalPos(basePct, template, offsets, bankKey, field, mode) {
+    const base = basePct[field];
+    if (!base) return null;
+    const o = (offsets[bankKey] || {});
+
+    if (mode === 'preview') {
+        const g = o.preview?.globalPct ?? { x: 0, y: 0 };
+        const f = o.preview?.fieldsPct?.[field] ?? { x: 0, y: 0 };
+        let leftPct = base.leftPct + (g.x || 0) + (f.x || 0);
+        let topPct = base.topPct + (g.y || 0) + (f.y || 0);
+        // Dhofar Islamic Bank: preview-only payee position
+        if (bankKey === 'dhofar_islamic' && field === 'payee' && template.imgSizePx && template.imgSizePx.w) {
+            leftPct -= (40 / template.imgSizePx.w) * 100;
+            topPct += (20 / template.imgSizePx.h) * 100;
         }
-        // Multi-slide: update all overlays with this data-field
-        document.querySelectorAll('.field-overlay[data-field="' + field + '"]').forEach(function(el) {
-            el.style.top = positions[field].top;
-            el.style.left = positions[field].left;
-        });
+
+        // Dhofar Islamic Bank: preview-only date position
+        if (bankKey === 'dhofar_islamic' && field === 'date' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
+            leftPct += (65 / template.imgSizePx.w) * 100;
+            topPct += (5 / template.imgSizePx.h) * 100;
+        }
+        
+        // Dhofar Islamic Bank: preview-only amount position
+        if (bankKey === 'dhofar_islamic' && field === 'amount' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
+            leftPct += (87 / template.imgSizePx.w) * 100;
+            topPct += (28 / template.imgSizePx.h) * 100;
+        }
+
+        // Dhofar Islamic Bank: preview-only amountWords position
+        if (bankKey === 'dhofar_islamic' && field === 'amountWords' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
+            leftPct += (40 / template.imgSizePx.w) * 100;
+            topPct += (28 / template.imgSizePx.h) * 100;
+        }
+
+        return { leftPct, topPct };
+    }
+    // print
+    const gMm = o.print?.globalMm ?? { x: 0, y: 0 };
+    const fMm = o.print?.fieldsMm?.[field] ?? { x: 0, y: 0 };
+    const g = mmToPct(gMm, template.chequeSizeMm);
+    const f = mmToPct(fMm, template.chequeSizeMm);
+    let leftPct = base.leftPct + g.x + f.x;
+    let topPct = base.topPct + g.y + f.y;
+    // Dhofar Islamic Bank: print-only payee
+    if (bankKey === 'dhofar_islamic' && field === 'payee' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
+        leftPct -= (290 / template.imgSizePx.w) * 100;
+        topPct += (8 / template.imgSizePx.h) * 100;
+    }
+
+    // Dhofar Islamic Bank: print-only date
+    if (bankKey === 'dhofar_islamic' && field === 'date' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
+        leftPct -= (327 / template.imgSizePx.w) * 100;
+        topPct -= (12 / template.imgSizePx.h) * 100;
+    }
+
+    // Dhofar Islamic Bank: print-only amount
+    if (bankKey === 'dhofar_islamic' && field === 'amount' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
+        leftPct -= (239 / template.imgSizePx.w) * 100;
+        topPct += (28 / template.imgSizePx.h) * 100;
+    }
+
+    // Dhofar Islamic Bank: print-only amount in words (left + lower)
+    if (bankKey === 'dhofar_islamic' && field === 'amountWords' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
+        leftPct -= (400 / template.imgSizePx.w) * 100;
+        topPct += (20 / template.imgSizePx.h) * 100;
+    }
+
+    return { leftPct, topPct };
+}
+
+// Apply positions and values to a canvas. mode = 'preview' | 'print'.
+function applyPositions(canvasEl, pctMap, values, template, forPrint) {
+    if (!canvasEl || !pctMap || !template) return;
+    const mode = forPrint ? 'print' : 'preview';
+    const offsets = getOffsets();
+    const bankKey = (document.getElementById('bankSelect') && document.getElementById('bankSelect').value) || '';
+
+    for (const [field, basePos] of Object.entries(pctMap)) {
+        const node = canvasEl.querySelector('[data-field="' + field + '"]');
+        if (!node) continue;
+        const final = getFinalPos(pctMap, template, offsets, bankKey, field, mode);
+        if (final) {
+            node.style.left = final.leftPct + '%';
+            node.style.top = final.topPct + '%';
+        }
+        node.textContent = values[field] != null ? values[field] : '';
+    }
+}
+
+// Legacy bankFieldPositions for any code that still expects top/left in px (e.g. modal); derived from TEMPLATES
+const bankFieldPositions = {};
+Object.keys(TEMPLATES).forEach(function(bank) {
+    const t = TEMPLATES[bank];
+    bankFieldPositions[bank] = {};
+    Object.keys(t.fieldsPx).forEach(function(field) {
+        const p = t.fieldsPx[field];
+        bankFieldPositions[bank][field] = { top: p.top + 'px', left: p.left + 'px' };
     });
-    
-    // Set line-height for amount in words based on bank
-    const amountWordsOverlay = document.getElementById('amountWordsOverlay');
-    if (amountWordsOverlay) {
-        if (bank === 'oman_arab') {
-            amountWordsOverlay.style.lineHeight = '2.3'; // Bigger line height for Oman Arab Bank
-        } else {
-            amountWordsOverlay.style.lineHeight = '2.0'; // Default line height for other banks
-        }
-        // Bank-specific width for on-screen overlay (cheque overlay only)
-        amountWordsOverlay.style.display = 'block';
-        amountWordsOverlay.style.textAlign = 'center';
-        if (bank === 'dhofar_islamic') {
-            amountWordsOverlay.style.maxWidth = '400px';
-            amountWordsOverlay.style.width = '400px';
-        } else if (bank === 'oman_arab') {
-            amountWordsOverlay.style.maxWidth = '420px';
-            amountWordsOverlay.style.width = '420px';
-        } else if (bank === 'sohar') {
-            amountWordsOverlay.style.maxWidth = '400px';
-            amountWordsOverlay.style.width = '400px';
-        } else {
-            amountWordsOverlay.style.maxWidth = '300px';
-            amountWordsOverlay.style.width = '300px';
-        }
-    }
-    
-    // Set font size for payee name based on bank (Dhofar only - bigger)
-    const payeeOverlay = document.getElementById('payeeOverlay');
-    if (payeeOverlay) {
-        if (bank === 'dhofar_islamic') {
-            payeeOverlay.style.fontSize = '18px'; // Bigger font size for Dhofar
-        } else {
-            payeeOverlay.style.fontSize = '16px'; // Default font size for other banks
-        }
-    }
-    
-    // Set text alignment for amount field (centered for all banks)
-    const amountOverlay = document.getElementById('amountOverlay');
-    if (amountOverlay) {
-        amountOverlay.style.textAlign = 'center';
-        amountOverlay.style.display = 'block';
-        // Set width for proper centering
-        if (bank === 'dhofar_islamic') {
-            amountOverlay.style.maxWidth = '120px';
-            amountOverlay.style.width = '120px';
-        } else if (bank === 'oman_arab') {
-            amountOverlay.style.maxWidth = '120px';
-            amountOverlay.style.width = '120px';
-        } else {
-            amountOverlay.style.maxWidth = '120px';
-            amountOverlay.style.width = '120px';
-        }
-    }
-    
-    // Multi-slide amount words / payee / amount styling
-    document.querySelectorAll('.field-amountWords').forEach(function(el) {
+});
+
+function getValuesFromForm() {
+    const dateInput = document.getElementById('chequeDate');
+    const showDate = document.getElementById('showDate') ? document.getElementById('showDate').checked : true;
+    const date = dateInput && showDate ? formatDate(dateInput.value) : '';
+    const payee = (document.getElementById('payeeName') && document.getElementById('payeeName').value) || '';
+    const amountInput = document.getElementById('amount');
+    const currency = document.getElementById('currency');
+    const amount = (amountInput && currency) ? formatAmount(amountInput.value, currency.value) : '';
+    const language = document.getElementById('amountWordsLanguage') ? document.getElementById('amountWordsLanguage').value : 'english';
+    const amountWords = (amountInput && currency) ? amountToWords(amountInput.value, language, currency.value || 'OMR') : '';
+    const crossing = (document.getElementById('crossing') && document.getElementById('crossing').value) ? document.getElementById('crossing').value.toUpperCase() : '';
+    return { date, payee, amount, amountWords, crossing, purpose: '' };
+}
+
+// Update field positions using master % map (preview + bank-specific styling)
+function updateFieldPositions(bank) {
+    const template = TEMPLATES[bank];
+    if (!template) return;
+    const pctMap = pxToPctMap(template);
+    const values = getValuesFromForm();
+    document.querySelectorAll('.cheque-overlay').forEach(function(overlay) {
+        applyPositions(overlay, pctMap, values, template, false);
+    });
+    var modalOverlay = document.querySelector('.modal-cheque-overlay');
+    if (modalOverlay) applyPositions(modalOverlay, pctMap, values, template, false);
+    // Bank-specific styling (preview only)
+    var amountWordsSel = '.field-overlay[data-field="amountWords"], .field-amountWords';
+    document.querySelectorAll(amountWordsSel).forEach(function(el) {
         el.style.display = 'block';
         el.style.textAlign = 'center';
-        if (bank === 'oman_arab') el.style.lineHeight = '2.3'; else el.style.lineHeight = '2.0';
-        if (bank === 'dhofar_islamic') { el.style.maxWidth = '400px'; el.style.width = '400px'; }
-        else if (bank === 'oman_arab') { el.style.maxWidth = '420px'; el.style.width = '420px'; }
-        else if (bank === 'sohar') { el.style.maxWidth = '400px'; el.style.width = '400px'; }
-        else { el.style.maxWidth = '300px'; el.style.width = '300px'; }
+        el.style.lineHeight = bank === 'oman_arab' ? '2.3' : '2.0';
+        el.style.maxWidth = bank === 'dhofar_islamic' || bank === 'sohar' ? '400px' : (bank === 'oman_arab' ? '420px' : '300px');
+        el.style.width = el.style.maxWidth;
     });
-    document.querySelectorAll('.field-payee').forEach(function(el) {
-        el.style.fontSize = (bank === 'dhofar_islamic') ? '18px' : '16px';
+    document.querySelectorAll('.field-overlay[data-field="payee"], .field-payee').forEach(function(el) {
+        el.style.fontSize = bank === 'dhofar_islamic' ? '18px' : '16px';
+        el.style.maxWidth = bank === 'dhofar_islamic' || bank === 'sohar' ? '580px' : (bank === 'oman_arab' ? '600px' : '500px');
+        el.style.width = el.style.maxWidth;
     });
-    document.querySelectorAll('.field-amount').forEach(function(el) {
+    document.querySelectorAll('.field-overlay[data-field="amount"], .field-amount').forEach(function(el) {
         el.style.textAlign = 'center';
         el.style.display = 'block';
         el.style.maxWidth = '120px';
         el.style.width = '120px';
     });
-    // Print positions will be updated dynamically based on actual screen positions
-    // when print is called or bank is changed
 }
 
 // Function to update cheque template image
@@ -510,443 +610,36 @@ function amountToWords(amount, language = 'english', currency = 'OMR') {
 const CHEQUE_WIDTH_MM = 190.5;
 const CHEQUE_HEIGHT_MM = 88.9;
 
-// Offset to move all print text to the right (in mm)
-// This only affects print preview, not the on-screen preview
-const PRINT_RIGHT_OFFSET_MM = 5; // Adjust this value to move text more/less to the right
-
-// Offset to move DATE field to the LEFT for Dhofar Islamic Bank print preview only (in mm)
-// Negative value moves left, positive moves right
-// This ONLY affects the date field in print preview for Dhofar Islamic Bank
-// IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
-const DHOFAR_DATE_LEFT_OFFSET_MM = -188; // Adjusted to move date much more to the left (was -88, now -128 for additional 40mm left)
-
-// Offset to move DATE field LOWER (down) for Dhofar Islamic Bank print preview only (in mm)
-// Positive value moves down, negative moves up
-// This ONLY affects the date field in print preview for Dhofar Islamic Bank
-const DHOFAR_DATE_TOP_OFFSET_MM = 9.3; // Moved slightly higher (was 9.8mm)
-
-// Offset to move PAYEE NAME field to the LEFT for Dhofar Islamic Bank print preview only (in mm)
-// Negative value moves left, positive moves right
-// This ONLY affects the payee field in print preview for Dhofar Islamic Bank
-const DHOFAR_PAYEE_LEFT_OFFSET_MM = -205; // Adjust this value to move payee more/less to the left
-
-// Offset to move PAYEE NAME field LOWER (down) for Dhofar Islamic Bank print preview only (in mm)
-// Positive value moves down, negative moves up
-// This ONLY affects the payee field in print preview for Dhofar Islamic Bank
-const DHOFAR_PAYEE_TOP_OFFSET_MM = 1.3; // Move payee 5px (≈1.3mm) lower (down)
-
-// Offset to move AMOUNT IN WORDS field to the LEFT for Dhofar Islamic Bank print preview only (in mm)
-// Negative value moves left, positive moves right
-// This ONLY affects the amountWords field in print preview for Dhofar Islamic Bank
-// IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
-// ADDED 25mm SAFETY MARGIN to prevent printer from cutting off text on the left edge
-const DHOFAR_AMOUNT_WORDS_LEFT_OFFSET_MM = -61.2; // Shifted ~3px right (≈0.8mm): -62 -> -61.2
-
-// Offset to move AMOUNT IN WORDS field HIGHER (up) for Dhofar Islamic Bank print preview only (in mm)
-// Negative value moves up, positive moves down
-// This ONLY affects the amountWords field in print preview for Dhofar Islamic Bank
-const DHOFAR_AMOUNT_WORDS_TOP_OFFSET_MM = -0.8; // Adjusted to move amount in words 5px (≈1.3mm) lower (was -2.1mm, now -0.8mm)
-
-// Offset to move AMOUNT field to the LEFT for Dhofar Islamic Bank print preview only (in mm)
-// Negative value moves left, positive moves right
-// This ONLY affects the amount field in print preview for Dhofar Islamic Bank
-const DHOFAR_AMOUNT_LEFT_OFFSET_MM = -142.8; // Moved additional ~3px left (≈0.8mm): -142 -> -142.8
-
-// Offset to move AMOUNT field HIGHER (up) for Dhofar Islamic Bank print preview only (in mm)
-// Negative value moves up, positive moves down
-// This ONLY affects the amount field in print preview for Dhofar Islamic Bank
-const DHOFAR_AMOUNT_TOP_OFFSET_MM = -3.3; // Moved slightly higher (was -2.8mm)
-
-// ========== OMAN ARAB BANK OFFSETS (Same values as Dhofar for testing) ==========
-
-// Offset to move DATE field to the LEFT for Oman Arab Bank print preview only (in mm)
-// Negative value moves left, positive moves right
-// This ONLY affects the date field in print preview for Oman Arab Bank
-// IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
-const OMAN_ARAB_DATE_LEFT_OFFSET_MM = -149.6; // +20px right (≈+5.3mm): -154.9 + 5.3 = -149.6
-
-// Offset to move DATE field LOWER (down) for Oman Arab Bank print preview only (in mm)
-// Positive value moves down, negative moves up
-// This ONLY affects the date field in print preview for Oman Arab Bank
-const OMAN_ARAB_DATE_TOP_OFFSET_MM = 1.9; // Additional 10px up (≈-2.6mm): 4.5 - 2.6 = 1.9
-
-// Offset to move PAYEE NAME field to the LEFT for Oman Arab Bank print preview only (in mm)
-// Negative value moves left, positive moves right
-// This ONLY affects the payee field in print preview for Oman Arab Bank
-const OMAN_ARAB_PAYEE_LEFT_OFFSET_MM = -222.1; // Moved 5px more to the left (≈-1.3mm): -220.8 - 1.3 = -222.1
-
-// Offset to move PAYEE NAME field LOWER (down) for Oman Arab Bank print preview only (in mm)
-// Positive value moves down, negative moves up
-// This ONLY affects the payee field in print preview for Oman Arab Bank
-const OMAN_ARAB_PAYEE_TOP_OFFSET_MM = 0.8; // Slightly lower (~+0.3mm more)
-
-// Offset to move AMOUNT IN WORDS field to the LEFT for Oman Arab Bank print preview only (in mm)
-// Negative value moves left, positive moves right
-// This ONLY affects the amountWords field in print preview for Oman Arab Bank
-// IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
-// ADDED 25mm SAFETY MARGIN to prevent printer from cutting off text on the left edge
-const OMAN_ARAB_AMOUNT_WORDS_LEFT_OFFSET_MM = -57.2; // Move a little more right (~+3px ≈ +0.8mm)
-
-// Offset to move AMOUNT IN WORDS field HIGHER (up) for Oman Arab Bank print preview only (in mm)
-// Negative value moves up, positive moves down
-// This ONLY affects the amountWords field in print preview for Oman Arab Bank
-const OMAN_ARAB_AMOUNT_WORDS_TOP_OFFSET_MM = -0.2; // 5px up (≈-1.3mm): 1.1 - 1.3 = -0.2
-
-// Offset to move AMOUNT field to the LEFT for Oman Arab Bank print preview only (in mm)
-// Negative value moves left, positive moves right
-// This ONLY affects the amount field in print preview for Oman Arab Bank
-const OMAN_ARAB_AMOUNT_LEFT_OFFSET_MM = -138.6; // +3px right (≈+0.8mm): -139.4 + 0.8 = -138.6
-
-// Offset to move AMOUNT field HIGHER (up) for Oman Arab Bank print preview only (in mm)
-// Negative value moves up, positive moves down
-// This ONLY affects the amount field in print preview for Oman Arab Bank
-const OMAN_ARAB_AMOUNT_TOP_OFFSET_MM = -11.3; // 8px down (≈+2.1mm): -13.4 + 2.1 = -11.3
-
-// Offset to move DATE field to the LEFT for Sohar Bank print preview only (in mm)
-// Negative value moves left, positive moves right
-// This ONLY affects the date field in print preview for Sohar Bank
-const SOHAR_DATE_LEFT_OFFSET_MM = -208.2; // Moved 50px more left (≈-13.3mm): -194.9 - 13.3 = -208.2
-
-// Offset to move DATE field LOWER (down) for Sohar Bank print preview only (in mm)
-// Positive value moves down, negative moves up
-// This ONLY affects the date field in print preview for Sohar Bank
-const SOHAR_DATE_TOP_OFFSET_MM = 9.4; // Moved 28px lower (≈+7.5mm): 1.9 + 7.5 = 9.4
-
-// Offset to move PAYEE NAME field to the LEFT for Sohar Bank print preview only (in mm)
-// Negative value moves left, positive moves right
-// This ONLY affects the payee field in print preview for Sohar Bank
-const SOHAR_PAYEE_LEFT_OFFSET_MM = -238.0; // Moved 60px left (≈-15.9mm): -222.1 - 15.9 = -238.0
-
-// Offset to move PAYEE NAME field LOWER (down) for Sohar Bank print preview only (in mm)
-// Positive value moves down, negative moves up
-// This ONLY affects the payee field in print preview for Sohar Bank
-const SOHAR_PAYEE_TOP_OFFSET_MM = 0.8; // Same as Oman Arab Bank
-
-// Offset to move AMOUNT IN WORDS field to the LEFT for Sohar Bank print preview only (in mm)
-// Negative value moves left, positive moves right
-// This ONLY affects the amountWords field in print preview for Sohar Bank
-// IMPORTANT: This ONLY affects horizontal (left) position, NEVER vertical (top) position
-// ADDED 25mm SAFETY MARGIN to prevent printer from cutting off text on the left edge
-const SOHAR_AMOUNT_WORDS_LEFT_OFFSET_MM = -78.4; // Moved 60px left (≈-15.9mm): -62.5 - 15.9 = -78.4
-
-// Offset to move AMOUNT IN WORDS field HIGHER (up) for Sohar Bank print preview only (in mm)
-// Negative value moves up, positive moves down
-// This ONLY affects the amountWords field in print preview for Sohar Bank
-const SOHAR_AMOUNT_WORDS_TOP_OFFSET_MM = -1.4; // Moved 5px higher (≈-1.2mm): -0.2 - 1.2 = -1.4
-
-// Offset to move AMOUNT field to the LEFT for Sohar Bank print preview only (in mm)
-// Negative value moves left, positive moves right
-// This ONLY affects the amount field in print preview for Sohar Bank
-const SOHAR_AMOUNT_LEFT_OFFSET_MM = -201.7; // Moved 50px more left (≈-13.3mm): -188.4 - 13.3 = -201.7
-
-// Offset to move AMOUNT field HIGHER (up) for Sohar Bank print preview only (in mm)
-// Negative value moves up, positive moves down
-// This ONLY affects the amount field in print preview for Sohar Bank
-const SOHAR_AMOUNT_TOP_OFFSET_MM = -4.2; // Moved 3px higher (≈-0.8mm): -3.4 - 0.8 = -4.2
-
-// Update print field positions based on ACTUAL screen positions
-// This ensures print matches exactly what's shown on screen
-function updatePrintPositions() {
-    var templateImg = document.getElementById('chequeTemplate') || document.querySelector('.cheque-preview-slide.active .cheque-template-slide') || document.querySelector('.cheque-template-slide');
-    if (!templateImg) return;
-    
-    // Get selected bank - needed to apply Dhofar-specific date offset
-    const bankSelect = document.getElementById('bankSelect');
-    const selectedBank = bankSelect ? bankSelect.value : 'dhofar_islamic';
-    
-    // Get actual displayed image dimensions
-    const displayedWidth = templateImg.offsetWidth;
-    const displayedHeight = templateImg.offsetHeight;
-    
-    // Get natural image dimensions
-    const naturalWidth = templateImg.naturalWidth || 893;
-    const naturalHeight = templateImg.naturalHeight || 418;
-    
-    // Calculate scale factors (how much the image is scaled on screen)
-    const scaleX = displayedWidth / naturalWidth;
-    const scaleY = displayedHeight / naturalHeight;
-    
-    // Get screen overlay positions (single-preview by id, or first of multi-slide by data-field)
-    var screenOverlays = {
-        date: document.getElementById('dateOverlay') || document.querySelector('.cheque-preview-slide.active .field-overlay[data-field="date"]'),
-        payee: document.getElementById('payeeOverlay') || document.querySelector('.cheque-preview-slide.active .field-overlay[data-field="payee"]'),
-        amount: document.getElementById('amountOverlay') || document.querySelector('.cheque-preview-slide.active .field-overlay[data-field="amount"]'),
-        amountWords: document.getElementById('amountWordsOverlay') || document.querySelector('.cheque-preview-slide.active .field-overlay[data-field="amountWords"]'),
-        crossing: document.getElementById('crossingOverlay') || document.querySelector('.cheque-preview-slide.active .field-overlay[data-field="crossing"]')
-    };
-    
-    // Get print overlays
-    const printOverlays = {
-        date: document.getElementById('printDateOverlay'),
-        payee: document.getElementById('printPayeeOverlay'),
-        amount: document.getElementById('printAmountOverlay'),
-        amountWords: document.getElementById('printAmountWordsOverlay'),
-        crossing: document.getElementById('printCrossingOverlay')
-    };
-    
-    // Convert each screen position to print position
-    Object.keys(screenOverlays).forEach(field => {
-        const screenOverlay = screenOverlays[field];
-        const printOverlay = printOverlays[field];
-        
-        if (screenOverlay && printOverlay) {
-            // Get actual screen position relative to displayed image
-            const screenRect = screenOverlay.getBoundingClientRect();
-            const imageRect = templateImg.getBoundingClientRect();
-            
-            // Calculate position relative to image (0,0 is top-left of image)
-            const relativeLeft = screenRect.left - imageRect.left;
-            const relativeTop = screenRect.top - imageRect.top;
-            
-            // Convert to natural image coordinates (undo the scale)
-            const naturalLeft = relativeLeft / scaleX;
-            const naturalTop = relativeTop / scaleY;
-            
-            // Convert natural coordinates to mm for print
-            // Ratio: natural image size to cheque size
-            const printLeft = (naturalLeft / naturalWidth) * CHEQUE_WIDTH_MM;
-            const printTop = (naturalTop / naturalHeight) * CHEQUE_HEIGHT_MM;
-            
-            // Apply offsets based on field and bank
-            let adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM;
-            let finalPrintTop = printTop; // Start with calculated top position
-            
-            // SPECIAL CASE: Move date field to the LEFT and LOWER for Dhofar Islamic Bank print preview only
-            if (field === 'date' && selectedBank === 'dhofar_islamic') {
-                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + DHOFAR_DATE_LEFT_OFFSET_MM;
-                finalPrintTop = printTop + DHOFAR_DATE_TOP_OFFSET_MM; // Move date lower (down)
-            }
-            
-            // SPECIAL CASE: Move date field to the LEFT and LOWER for Oman Arab Bank print preview only
-            if (field === 'date' && selectedBank === 'oman_arab') {
-                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + OMAN_ARAB_DATE_LEFT_OFFSET_MM;
-                finalPrintTop = printTop + OMAN_ARAB_DATE_TOP_OFFSET_MM; // Move date lower (down)
-            }
-            
-            // SPECIAL CASE: Move date field to the LEFT and LOWER for Sohar Bank print preview only
-            if (field === 'date' && selectedBank === 'sohar') {
-                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + SOHAR_DATE_LEFT_OFFSET_MM;
-                finalPrintTop = printTop + SOHAR_DATE_TOP_OFFSET_MM; // Move date lower (down)
-            }
-            
-            // SPECIAL CASE: Move payee field to the LEFT and LOWER for Dhofar Islamic Bank print preview only
-            if (field === 'payee' && selectedBank === 'dhofar_islamic') {
-                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + DHOFAR_PAYEE_LEFT_OFFSET_MM;
-                finalPrintTop = printTop + DHOFAR_PAYEE_TOP_OFFSET_MM; // Move payee lower (down)
-            }
-            
-            // SPECIAL CASE: Move payee field to the LEFT and LOWER for Oman Arab Bank print preview only
-            if (field === 'payee' && selectedBank === 'oman_arab') {
-                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + OMAN_ARAB_PAYEE_LEFT_OFFSET_MM;
-                finalPrintTop = printTop + OMAN_ARAB_PAYEE_TOP_OFFSET_MM; // Move payee lower (down)
-            }
-            
-            // SPECIAL CASE: Move payee field to the LEFT and LOWER for Sohar Bank print preview only
-            if (field === 'payee' && selectedBank === 'sohar') {
-                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + SOHAR_PAYEE_LEFT_OFFSET_MM;
-                finalPrintTop = printTop + SOHAR_PAYEE_TOP_OFFSET_MM; // Move payee lower (down)
-            }
-            
-            // SPECIAL CASE: Move amount in words field to the LEFT and HIGHER for Dhofar Islamic Bank print preview only
-            if (field === 'amountWords' && selectedBank === 'dhofar_islamic') {
-                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + DHOFAR_AMOUNT_WORDS_LEFT_OFFSET_MM;
-                finalPrintTop = printTop + DHOFAR_AMOUNT_WORDS_TOP_OFFSET_MM; // Move amount in words higher (up)
-            }
-            
-            // SPECIAL CASE: Move amount in words field to the LEFT and HIGHER for Oman Arab Bank print preview only
-            if (field === 'amountWords' && selectedBank === 'oman_arab') {
-                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + OMAN_ARAB_AMOUNT_WORDS_LEFT_OFFSET_MM;
-                finalPrintTop = printTop + OMAN_ARAB_AMOUNT_WORDS_TOP_OFFSET_MM; // Move amount in words higher (up)
-            }
-            
-            // SPECIAL CASE: Move amount in words field to the LEFT and HIGHER for Sohar Bank print preview only
-            if (field === 'amountWords' && selectedBank === 'sohar') {
-                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + SOHAR_AMOUNT_WORDS_LEFT_OFFSET_MM;
-                finalPrintTop = printTop + SOHAR_AMOUNT_WORDS_TOP_OFFSET_MM; // Move amount in words higher (up)
-            }
-            
-            // SPECIAL CASE: Move amount field to the LEFT and HIGHER for Dhofar Islamic Bank print preview only
-            if (field === 'amount' && selectedBank === 'dhofar_islamic') {
-                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + DHOFAR_AMOUNT_LEFT_OFFSET_MM;
-                finalPrintTop = printTop + DHOFAR_AMOUNT_TOP_OFFSET_MM; // Move amount higher (up)
-                // CRITICAL: Ensure no rotation or tilt - explicitly set rotation to 0
-                printOverlay.style.transform = 'rotate(0deg) scale(1)';
-                printOverlay.style.webkitTransform = 'rotate(0deg) scale(1)';
-                printOverlay.style.mozTransform = 'rotate(0deg) scale(1)';
-                printOverlay.style.msTransform = 'rotate(0deg) scale(1)';
-                printOverlay.style.oTransform = 'rotate(0deg) scale(1)';
-            }
-            
-            // SPECIAL CASE: Move amount field to the LEFT and HIGHER for Oman Arab Bank print preview only
-            if (field === 'amount' && selectedBank === 'oman_arab') {
-                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + OMAN_ARAB_AMOUNT_LEFT_OFFSET_MM;
-                finalPrintTop = printTop + OMAN_ARAB_AMOUNT_TOP_OFFSET_MM; // Move amount higher (up)
-                // CRITICAL: Ensure no rotation or tilt - explicitly set rotation to 0
-                printOverlay.style.transform = 'rotate(0deg) scale(1)';
-                printOverlay.style.webkitTransform = 'rotate(0deg) scale(1)';
-                printOverlay.style.mozTransform = 'rotate(0deg) scale(1)';
-                printOverlay.style.msTransform = 'rotate(0deg) scale(1)';
-                printOverlay.style.oTransform = 'rotate(0deg) scale(1)';
-            }
-            
-            // SPECIAL CASE: Move amount field to the LEFT and HIGHER for Sohar Bank print preview only
-            if (field === 'amount' && selectedBank === 'sohar') {
-                adjustedPrintLeft = printLeft + PRINT_RIGHT_OFFSET_MM + SOHAR_AMOUNT_LEFT_OFFSET_MM;
-                finalPrintTop = printTop + SOHAR_AMOUNT_TOP_OFFSET_MM; // Move amount higher (up)
-                // CRITICAL: Ensure no rotation or tilt - explicitly set rotation to 0
-                printOverlay.style.transform = 'rotate(0deg) scale(1)';
-                printOverlay.style.webkitTransform = 'rotate(0deg) scale(1)';
-                printOverlay.style.mozTransform = 'rotate(0deg) scale(1)';
-                printOverlay.style.msTransform = 'rotate(0deg) scale(1)';
-                printOverlay.style.oTransform = 'rotate(0deg) scale(1)';
-            }
-            
-            // Bank-specific font sizes (Oman Arab only - slightly smaller)
-            if (selectedBank === 'oman_arab') {
-                if (field === 'date') {
-                    printOverlay.style.fontSize = '3.4mm';
-                }
-                if (field === 'payee') {
-                    printOverlay.style.fontSize = '4.0mm';
-                }
-                if (field === 'amount') {
-                    printOverlay.style.fontSize = '4.0mm';
-                    printOverlay.style.textAlign = 'center';
-                }
-                if (field === 'amountWords') {
-                    // Reduce width slightly for Oman Arab amount in words
-                    printOverlay.style.maxWidth = '39.0mm'; // ~230px
-                    printOverlay.style.width = '39.0mm';
-                    // Increase line-height more
-                    printOverlay.style.lineHeight = '2.5';
-                    printOverlay.style.textAlign = 'center';
-                }
-            }
-            
-            // Bank-specific font sizes (Sohar Bank - same as Oman Arab Bank)
-            if (selectedBank === 'sohar') {
-                if (field === 'date') {
-                    printOverlay.style.fontSize = '3.4mm';
-                }
-                if (field === 'payee') {
-                    printOverlay.style.fontSize = '4.0mm';
-                }
-                if (field === 'amount') {
-                    printOverlay.style.fontSize = '4.0mm';
-                    printOverlay.style.textAlign = 'center';
-                }
-                if (field === 'amountWords') {
-                    // Reduce width slightly for Sohar Bank amount in words
-                    printOverlay.style.maxWidth = '39.0mm'; // ~230px
-                    printOverlay.style.width = '39.0mm';
-                    // Line-height slightly smaller
-                    printOverlay.style.lineHeight = '2.3';
-                    printOverlay.style.textAlign = 'center';
-                }
-            }
-            
-            // Set print position
-            // Left: may be adjusted for date/payee/amountWords/amount fields in Dhofar Islamic Bank
-            // Top: ALWAYS the original calculated value, NEVER modified
-            printOverlay.style.left = adjustedPrintLeft.toFixed(2) + 'mm';
-            printOverlay.style.top = finalPrintTop.toFixed(2) + 'mm';
-        }
-    });
-}
-
-// Real-time field updates (works for both single-preview and multi-slide; overlays by id or data-field)
+// Real-time field updates: one set of % positions for preview and print
 function updateChequePreview() {
-    const dateInput = document.getElementById('chequeDate');
-    const showDateCheckbox = document.getElementById('showDate');
-    const dateOverlay = document.getElementById('dateOverlay');
-    const printDateOverlay = document.getElementById('printDateOverlay');
-    const modalDateOverlay = document.getElementById('modalDateOverlay');
-    const isDateVisible = showDateCheckbox ? showDateCheckbox.checked : true;
-    var dateText = '';
-    if (dateInput) {
-        dateText = isDateVisible ? formatDate(dateInput.value) : '';
-        if (dateOverlay) {
-            dateOverlay.textContent = dateText;
-            dateOverlay.style.display = isDateVisible ? 'block' : 'none';
-        }
-        if (printDateOverlay) {
-            printDateOverlay.textContent = dateText;
-            printDateOverlay.style.display = isDateVisible ? 'block' : 'none';
-        }
-        if (modalDateOverlay) {
-            modalDateOverlay.textContent = dateText;
-            modalDateOverlay.style.display = isDateVisible ? 'block' : 'none';
-        }
-        document.querySelectorAll('.field-overlay[data-field="date"]').forEach(function(el) {
-            el.textContent = dateText;
+    const bank = document.getElementById('bankSelect') ? document.getElementById('bankSelect').value : 'dhofar_islamic';
+    const template = TEMPLATES[bank];
+    if (!template) return;
+    const pctMap = pxToPctMap(template);
+    const values = getValuesFromForm();
+    document.querySelectorAll('.cheque-overlay').forEach(function(overlay) {
+        applyPositions(overlay, pctMap, values, template, false);
+    });
+    var modalOverlay = document.querySelector('.modal-cheque-overlay');
+    if (modalOverlay) applyPositions(modalOverlay, pctMap, values, template, false);
+    var printCanvas = document.getElementById('chequePrintCanvas');
+    if (printCanvas) applyPositions(printCanvas, pctMap, values, template, true);
+    var isDateVisible = document.getElementById('showDate') ? document.getElementById('showDate').checked : true;
+    document.querySelectorAll('[data-field="date"]').forEach(function(el) {
             el.style.display = isDateVisible ? 'block' : 'none';
         });
-    }
-
-    const payeeInput = document.getElementById('payeeName');
-    const payeeOverlay = document.getElementById('payeeOverlay');
-    const printPayeeOverlay = document.getElementById('printPayeeOverlay');
-    var payeeText = payeeInput ? payeeInput.value : '';
-    if (payeeOverlay) payeeOverlay.textContent = payeeText;
-    if (printPayeeOverlay) printPayeeOverlay.textContent = payeeText;
-    document.querySelectorAll('.field-overlay[data-field="payee"]').forEach(function(el) { el.textContent = payeeText; });
-
-    const amountInput = document.getElementById('amount');
-    const currencySelect = document.getElementById('currency');
-    const amountOverlay = document.getElementById('amountOverlay');
-    const printAmountOverlay = document.getElementById('printAmountOverlay');
-    var amountText = '';
-    if (amountInput && currencySelect) {
-        amountText = formatAmount(amountInput.value, currencySelect.value);
-        if (amountOverlay) amountOverlay.textContent = amountText;
-        if (printAmountOverlay) printAmountOverlay.textContent = amountText;
-        document.querySelectorAll('.field-overlay[data-field="amount"]').forEach(function(el) { el.textContent = amountText; });
-    }
-
-    const amountWordsOverlay = document.getElementById('amountWordsOverlay');
-    const printAmountWordsOverlay = document.getElementById('printAmountWordsOverlay');
-    const languageSelect = document.getElementById('amountWordsLanguage');
-    if (amountInput && currencySelect) {
-        const language = languageSelect ? languageSelect.value : 'english';
-        const currency = currencySelect.value || 'OMR';
-        const words = amountToWords(amountInput.value, language, currency);
-        if (amountWordsOverlay) {
-            amountWordsOverlay.textContent = words;
-            amountWordsOverlay.style.direction = language === 'arabic' ? 'rtl' : 'ltr';
-            amountWordsOverlay.style.textAlign = 'center';
-            if (language === 'arabic') amountWordsOverlay.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
-        }
-        document.querySelectorAll('.field-overlay[data-field="amountWords"]').forEach(function(el) {
-            el.textContent = words;
+    var language = document.getElementById('amountWordsLanguage') ? document.getElementById('amountWordsLanguage').value : 'english';
+    document.querySelectorAll('[data-field="amountWords"]').forEach(function(el) {
             el.style.direction = language === 'arabic' ? 'rtl' : 'ltr';
             el.style.textAlign = 'center';
             if (language === 'arabic') el.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
-        });
-        if (printAmountWordsOverlay) {
-            printAmountWordsOverlay.textContent = words;
-            printAmountWordsOverlay.setAttribute('dir', language === 'arabic' ? 'rtl' : 'ltr');
-            printAmountWordsOverlay.style.direction = language === 'arabic' ? 'rtl' : 'ltr';
-            printAmountWordsOverlay.style.textAlign = 'center';
-            if (language === 'arabic') printAmountWordsOverlay.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
-        }
-    }
-
-    const crossingSelect = document.getElementById('crossing');
-    const crossingOverlay = document.getElementById('crossingOverlay');
-    const printCrossingOverlay = document.getElementById('printCrossingOverlay');
-    var crossingText = (crossingSelect && crossingSelect.value) ? crossingSelect.value.toUpperCase() : '';
-    if (crossingOverlay) crossingOverlay.textContent = crossingText;
-    document.querySelectorAll('.field-overlay[data-field="crossing"]').forEach(function(el) { el.textContent = crossingText; });
-    if (printCrossingOverlay) {
-        printCrossingOverlay.textContent = crossingText;
-        printCrossingOverlay.style.transform = 'rotate(-25deg)';
-        printCrossingOverlay.style.fontWeight = '700';
-        printCrossingOverlay.style.color = 'rgba(200, 0, 0, 0.6)';
-    }
-    
-    // Purpose input removed; overlay is static for now
-    
-    // Print positions will be updated dynamically when print is called
+        el.setAttribute('dir', language === 'arabic' ? 'rtl' : 'ltr');
+    });
+    document.querySelectorAll('[data-field="crossing"]').forEach(function(el) {
+        el.style.transform = 'rotate(-25deg)';
+        el.style.fontWeight = '700';
+        el.style.color = 'rgba(200, 0, 0, 0.6)';
+    });
 }
 
 // Initialize the page
@@ -1015,10 +708,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const selectedBank = this.value;
             updateFieldPositions(selectedBank);
             updateChequeTemplate(selectedBank);
-            // Update print positions after screen positions are updated
-            setTimeout(() => {
-                updatePrintPositions();
-            }, 100);
         });
     }
     
@@ -1048,138 +737,68 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Print function - generates PDF and automatically opens print dialog
+    // Print function - updates print container and opens browser print dialog immediately (no PDF)
     function printCheque() {
-        // Collect all cheque data
-        const chequeDate = document.getElementById('chequeDate').value;
-        const payeeName = document.getElementById('payeeName').value;
-        const amount = document.getElementById('amount').value;
-        const currency = document.getElementById('currency').value;
-        const crossing = document.getElementById('crossing').value;
-        const bankSelect = document.getElementById('bankSelect').value;
-        const languageSelect = document.getElementById('amountWordsLanguage');
-        const amountWordsLanguage = languageSelect ? languageSelect.value : 'english';
-        const showDateCheckbox = document.getElementById('showDate');
-        const showDate = showDateCheckbox ? showDateCheckbox.checked : true;
-        
-        // Prepare data to send
-        const chequeData = {
-            chequeDate: chequeDate,
-            payeeName: payeeName,
-            amount: amount,
-            currency: currency,
-            crossing: crossing,
-            bank: bankSelect,
-            amountWordsLanguage: amountWordsLanguage,
-            showDate: showDate
-        };
-        
-        // Show loading indicator (optional)
         const printBtn = document.getElementById('printBtn') || document.getElementById('printChequeBtn');
+        const originalText = printBtn ? printBtn.innerHTML : '';
         if (printBtn) {
-            const originalText = printBtn.innerHTML;
-            printBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
+            printBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Printing...';
             printBtn.disabled = true;
-            
-            // Reset button after a delay (in case of error)
-            setTimeout(() => {
-                printBtn.innerHTML = originalText;
-                printBtn.disabled = false;
-            }, 5000);
         }
-        
-        // Send data to server to generate PDF
-        fetch('/generate-cheque-pdf', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(chequeData)
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to generate PDF');
-            }
-            return response.blob();
-        })
-        .then(pdfBlob => {
-            // Create blob URL
-            const pdfUrl = URL.createObjectURL(pdfBlob);
-            
-            // Create a hidden iframe to load the PDF
-            const iframe = document.createElement('iframe');
-            iframe.style.position = 'fixed';
-            iframe.style.right = '0';
-            iframe.style.bottom = '0';
-            iframe.style.width = '1px';
-            iframe.style.height = '1px';
-            iframe.style.border = 'none';
-            iframe.style.opacity = '0';
-            iframe.src = pdfUrl;
-            document.body.appendChild(iframe);
-            
-            // Wait for PDF to load, then trigger print
-            const attemptPrint = () => {
-                try {
-                    if (iframe.contentWindow) {
-                        iframe.contentWindow.focus();
-                        iframe.contentWindow.print();
-                        
-                        // Clean up after printing
-                        setTimeout(() => {
-                            document.body.removeChild(iframe);
-                            URL.revokeObjectURL(pdfUrl);
-                        }, 1000);
-                        
-                        // Reset button
+
+        var bank = document.getElementById('bankSelect') ? document.getElementById('bankSelect').value : 'dhofar_islamic';
+        var template = TEMPLATES[bank];
+        if (!template) {
+            if (printBtn) { printBtn.innerHTML = originalText; printBtn.disabled = false; }
+            return;
+        }
+        var pctMap = pxToPctMap(template);
+        var values = getValuesFromForm();
+        var printCanvas = document.getElementById('chequePrintCanvas');
+        if (printCanvas) applyPositions(printCanvas, pctMap, values, template, true);
+        var isDateVisible = document.getElementById('showDate') ? document.getElementById('showDate').checked : true;
+        var dateEl = printCanvas && printCanvas.querySelector('[data-field="date"]');
+        if (dateEl) dateEl.style.display = isDateVisible ? 'block' : 'none';
+        var lang = document.getElementById('amountWordsLanguage') ? document.getElementById('amountWordsLanguage').value : 'english';
+        document.querySelectorAll('#chequePrintCanvas [data-field="amountWords"]').forEach(function(el) {
+            el.style.direction = lang === 'arabic' ? 'rtl' : 'ltr';
+            el.style.textAlign = 'center';
+            if (lang === 'arabic') el.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
+        });
+        document.querySelectorAll('#chequePrintCanvas [data-field="crossing"]').forEach(function(el) {
+            el.style.transform = 'rotate(-25deg)';
+            el.style.fontWeight = '700';
+            el.style.color = 'rgba(200, 0, 0, 0.8)';
+        });
+        var styleId = 'dynamicPrintStyle';
+        var styleTag = document.getElementById(styleId) || (function() {
+            var s = document.createElement('style');
+            s.id = styleId;
+            document.head.appendChild(s);
+            return s;
+        })();
+        var w = template.chequeSizeMm.w, h = template.chequeSizeMm.h;
+        var printLeftOffsetMm = 50;
+        var pageW = w + printLeftOffsetMm;
+        styleTag.textContent = '@media print { @page { size: ' + pageW + 'mm ' + h + 'mm; margin: 0; } .cheque-print-container { left: ' + printLeftOffsetMm + 'mm !important; } .chequePrint { width: ' + w + 'mm !important; height: ' + h + 'mm !important; } }';
+        var printContainer = document.getElementById('chequePrintRoot');
+        if (printContainer) {
+            printContainer.setAttribute('data-print-bank', bank);
+            if (printContainer.parentElement !== document.body) document.body.appendChild(printContainer);
+        }
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+                window.print();
+            });
+        });
+
+        // Restore button after a short delay (print dialog is modal)
+        setTimeout(function() {
                         if (printBtn) {
                             printBtn.innerHTML = originalText;
                             printBtn.disabled = false;
-                        }
-                        return true;
-                    }
-                } catch (e) {
-                    // Cross-origin or other error, try alternative method
-                    return false;
-                }
-            };
-            
-            // Try printing after a short delay to allow PDF to load
-            setTimeout(() => {
-                if (!attemptPrint()) {
-                    // Fallback: open in new window
-                    const printWindow = window.open(pdfUrl, '_blank');
-                    if (printWindow) {
-                        setTimeout(() => {
-                            printWindow.print();
-                            setTimeout(() => {
-                                URL.revokeObjectURL(pdfUrl);
-                            }, 1000);
-                        }, 1000);
-                    }
-                    
-                    // Clean up iframe
-                    document.body.removeChild(iframe);
-                    URL.revokeObjectURL(pdfUrl);
-                    
-                    // Reset button
-                    if (printBtn) {
-                        printBtn.innerHTML = originalText;
-                        printBtn.disabled = false;
-                    }
                 }
             }, 500);
-        })
-        .catch(error => {
-            console.error('Error generating PDF:', error);
-            alert('Error generating PDF. Please try again.');
-            
-            // Reset button
-            if (printBtn) {
-                printBtn.innerHTML = originalText;
-                printBtn.disabled = false;
-            }
-        });
     }
     
     // Old print function (kept for reference but not used)
@@ -1378,23 +997,13 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        // Small delay to ensure screen overlays are positioned, then update print positions
         setTimeout(() => {
-            // Update print positions based on actual screen positions
-            updatePrintPositions();
-            
-            // Small delay to ensure DOM is updated before print
-            setTimeout(() => {
-                // Trigger print dialog
                 window.print();
-                
-                // Hide print container after printing (in case user cancels)
                 setTimeout(() => {
                     if (printContainer) {
                         printContainer.style.display = 'none';
                     }
                 }, 100);
-            }, 50);
         }, 100);
     }
     
@@ -1481,94 +1090,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Update modal cheque preview
     function updateModalChequePreview() {
-        // Update modal template image
-        const bankSelect = document.getElementById('bankSelect');
-        const modalTemplate = document.getElementById('modalChequeTemplate');
-        if (bankSelect && modalTemplate) {
-            const bankImageMap = {
-                'dhofar_islamic': 'DHOFAR-ISLAMIC-BANK.png',
-                'oman_arab': 'OMAN-ARAB-BANK.png',
-                'sohar': 'SOHAR-BANK.png'
-            };
-            modalTemplate.src = `{{ url_for('static', filename='cheque_templates/') }}${bankImageMap[bankSelect.value]}`;
+        updateChequeTemplate(document.getElementById('bankSelect') ? document.getElementById('bankSelect').value : 'dhofar_islamic');
+        var modalTemplate = document.getElementById('modalChequeTemplate');
+        if (modalTemplate) {
+            var bankSelect = document.getElementById('bankSelect');
+            var bankImageMap = { 'dhofar_islamic': 'DHOFAR-ISLAMIC-BANK.png', 'oman_arab': 'OMAN-ARAB-BANK.png', 'sohar': 'SOHAR-BANK.png' };
+            modalTemplate.src = '{{ url_for("static", filename="cheque_templates/") }}' + (bankImageMap[bankSelect.value] || bankImageMap.dhofar_islamic);
         }
-        
-        // Update modal field positions
-        const selectedBank = bankSelect ? bankSelect.value : 'dhofar_islamic';
-        const positions = bankFieldPositions[selectedBank];
-        if (positions) {
-            Object.keys(positions).forEach(field => {
-                const modalOverlay = document.getElementById('modal' + field.charAt(0).toUpperCase() + field.slice(1) + 'Overlay');
-                if (modalOverlay) {
-                    modalOverlay.style.top = positions[field].top;
-                    modalOverlay.style.left = positions[field].left;
-                }
-            });
-        }
-        
-        // Update modal field content
-        const dateInput = document.getElementById('chequeDate');
-        const payeeInput = document.getElementById('payeeName');
-        const amountInput = document.getElementById('amount');
-        const currencySelect = document.getElementById('currency');
-        const crossingSelect = document.getElementById('crossing');
-        
-        // Date
-        const showDateCheckbox = document.getElementById('showDate');
-        const isDateVisible = showDateCheckbox ? showDateCheckbox.checked : true;
-        const modalDateOverlay = document.getElementById('modalDateOverlay');
-        if (dateInput && modalDateOverlay) {
-            if (isDateVisible) {
-                modalDateOverlay.textContent = formatDate(dateInput.value);
-                modalDateOverlay.style.display = 'block';
-            } else {
-                modalDateOverlay.textContent = '';
-                modalDateOverlay.style.display = 'none';
-            }
-        }
-        
-        // Payee
-        const modalPayeeOverlay = document.getElementById('modalPayeeOverlay');
-        if (payeeInput && modalPayeeOverlay) {
-            modalPayeeOverlay.textContent = payeeInput.value;
-        }
-        
-        // Amount
-        const modalAmountOverlay = document.getElementById('modalAmountOverlay');
-        if (amountInput && currencySelect && modalAmountOverlay) {
-            modalAmountOverlay.textContent = formatAmount(amountInput.value, currencySelect.value);
-        }
-        
-        // Amount in words
-        const modalAmountWordsOverlay = document.getElementById('modalAmountWordsOverlay');
-        const languageSelect = document.getElementById('amountWordsLanguage');
-        if (amountInput && modalAmountWordsOverlay) {
-            const language = languageSelect ? languageSelect.value : 'english';
-            const currency = currencySelect ? currencySelect.value : 'OMR';
-            const words = amountToWords(amountInput.value, language, currency);
-            modalAmountWordsOverlay.textContent = words;
-            // Set RTL for Arabic
-            if (language === 'arabic') {
-                modalAmountWordsOverlay.style.direction = 'rtl';
-                modalAmountWordsOverlay.style.textAlign = 'center';
-                modalAmountWordsOverlay.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
-            } else {
-                modalAmountWordsOverlay.style.direction = 'ltr';
-                modalAmountWordsOverlay.style.textAlign = 'center';
-            }
-        }
-        
-        // Crossing
-        const modalCrossingOverlay = document.getElementById('modalCrossingOverlay');
-        if (crossingSelect && modalCrossingOverlay) {
-            const text = crossingSelect.value ? crossingSelect.value.toUpperCase() : '';
-            modalCrossingOverlay.textContent = text;
-            modalCrossingOverlay.style.transform = 'rotate(-25deg)';
-            modalCrossingOverlay.style.fontWeight = '700';
-            modalCrossingOverlay.style.color = 'rgba(200, 0, 0, 0.6)';
-        }
+        updateChequePreview();
     }
     
     // Modal event listeners
@@ -1609,16 +1139,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initial preview update
     updateChequePreview();
-    
-    // Initial print positions - wait for image to load
-    const templateImg = document.getElementById('chequeTemplate');
-    if (templateImg.complete) {
-        setTimeout(() => updatePrintPositions(), 100);
-    } else {
-        templateImg.addEventListener('load', () => {
-            setTimeout(() => updatePrintPositions(), 100);
-        });
-    }
     
     // Pre-fill form from first selected serial when opening for Used cheques (e.g. Print from register)
     const firstSerial = (window.selectedSerials && window.selectedSerials.length) ? window.selectedSerials[0] : null;
