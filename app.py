@@ -23165,8 +23165,16 @@ def upload_cheque_file():
         # Save file
         file.save(filepath)
         
+        # Store original filename for display (basename only, no path; cap length)
+        original_filename = (file.filename or '').strip()
+        if original_filename:
+            original_filename = os.path.basename(original_filename)
+        if len(original_filename) > 500:
+            original_filename = original_filename[:500]
+        
         # Update database
         cheque_serial.upload_path = filename
+        cheque_serial.upload_original_filename = original_filename or None
         db.session.commit()
         
         return jsonify({
@@ -23201,6 +23209,7 @@ def delete_cheque_upload():
             except OSError:
                 pass
         cheque_serial.upload_path = None
+        cheque_serial.upload_original_filename = None
         db.session.commit()
         return jsonify({'success': True, 'message': 'Upload removed. You can upload a new image.'})
     except Exception as e:
@@ -24534,6 +24543,17 @@ if __name__ == '__main__':
                     print("✓ Added 'bank_name' column to cheque_books table")
             except Exception as e_cheque:
                 print(f"Note: cheque_books migration skipped or already applied: {e_cheque}")
+
+            # Migrate: Add upload_original_filename to cheque_serials table if it doesn't exist
+            try:
+                cursor.execute("PRAGMA table_info(cheque_serials)")
+                cheque_serial_columns = [row[1] for row in cursor.fetchall()]
+                if 'upload_original_filename' not in cheque_serial_columns:
+                    cursor.execute("ALTER TABLE cheque_serials ADD COLUMN upload_original_filename VARCHAR(500)")
+                    conn.commit()
+                    print("✓ Added 'upload_original_filename' column to cheque_serials table")
+            except Exception as e_cs:
+                print(f"Note: cheque_serials migration skipped or already applied: {e_cs}")
             
             conn.close()
         except Exception as e:

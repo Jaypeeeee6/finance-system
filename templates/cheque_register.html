@@ -53,11 +53,39 @@
 }
 .cheque-register-page .book-section .pagination-container { margin-top: 8px; }
 .cheque-register-page .book-section .pagination-container .pagination { flex-wrap: wrap; gap: 6px; }
-/* Active page number: same element (button) as others = same size; gold color only */
+/* Pagination buttons: match dashboard/item requests (gold outline for active and Prev/Next, gray for other numbers) */
+.cheque-register-page .pagination-container { background: transparent !important; box-shadow: none !important; border: none !important; padding: 0 !important; }
+.cheque-register-page .pagination .btn.btn-sm.btn-primary,
 .cheque-register-page .pagination .btn.btn-sm.cheque-pagination-current {
-    background: #D9BD7D !important;
-    color: #1a1a1a !important;
+    background: transparent !important;
     border: 1px solid #D9BD7D !important;
+    color: #D9BD7D !important;
+}
+.cheque-register-page .pagination .btn.btn-sm.btn-primary:hover,
+.cheque-register-page .pagination .btn.btn-sm.cheque-pagination-current:hover {
+    background: transparent !important;
+    border-color: #c8ac65 !important;
+    color: #c8ac65 !important;
+}
+.cheque-register-page .pagination .btn.btn-sm.btn-secondary {
+    background: transparent !important;
+    border: 1px solid #D9BD7D !important;
+    color: #D9BD7D !important;
+}
+.cheque-register-page .pagination .btn.btn-sm.btn-secondary:hover:not(:disabled) {
+    background: transparent !important;
+    border-color: #c8ac65 !important;
+    color: #c8ac65 !important;
+}
+.cheque-register-page .pagination .btn.btn-sm.btn-outline {
+    background: transparent !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--dark-color) !important;
+}
+.cheque-register-page .pagination .btn.btn-sm.btn-outline:hover {
+    background: var(--light-color) !important;
+    border-color: var(--dark-color) !important;
+    color: var(--dark-color) !important;
 }
 .cheque-register-page .cheque-book-card { margin-bottom: 1.5rem; }
 .cheque-register-page .cheque-book-card:last-child { margin-bottom: 0; }
@@ -272,6 +300,65 @@
 .cheque-register-page .cheque-multi-filter .filter-panel input[type="checkbox"] {
     margin: 0;
 }
+/* Cheque register ellipsis action dropdown (match settings page users tab) */
+.cheque-register-page .cheque-action-ellipsis {
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.cheque-register-page .cheque-action-ellipsis:hover {
+    background: #D9BD7D !important;
+    color: #ffffff !important;
+}
+.cheque-register-page .cheque-action-ellipsis:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+.cheque-register-page .cheque-action-dropdown {
+    z-index: 1400 !important;
+}
+.cheque-register-page .cheque-action-dropdown .cheque-dropdown-item {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    line-height: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 12px !important;
+    color: #212529 !important;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    text-decoration: none;
+}
+.cheque-register-page .cheque-action-dropdown .cheque-dropdown-item:hover {
+    background: #f0f2f5 !important;
+}
+.cheque-register-page .cheque-action-dropdown .cheque-dropdown-item-danger:hover {
+    background: #fff5f5 !important;
+}
+.cheque-register-page .cheque-action-dropdown .cheque-dropdown-item i {
+    font-size: 12px !important;
+    width: 16px !important;
+    text-align: center !important;
+}
+.cheque-register-page .cheque-register-table-wrap {
+    overflow: visible !important;
+}
+.cheque-register-page .cheque-action-cell-wrap {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+}
+.cheque-register-page .cheque-upload-path-text {
+    font-size: 0.75rem;
+    color: #6c757d;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 4px;
+    text-align: center;
+}
 </style>
 {% endblock %}
 
@@ -280,6 +367,7 @@
 {% set show_select_ceo_gm_op = current_user.role in ['CEO', 'GM', 'Operation Manager'] %}
 {% set show_select_auditing = current_user.department == 'Auditing' %}
 {% set show_cheque_select = show_select_it or show_select_ceo_gm_op or show_select_auditing %}
+{% set show_image_actions = current_user.role in ['GM', 'CEO', 'Operation Manager'] or current_user.department == 'Auditing' %}
 <div class="dashboard-container cheque-register-page" data-show-auditing-select="{{ 'true' if show_select_auditing else 'false' }}" data-show-it-select="{{ 'true' if show_select_it else 'false' }}" data-filter-active="{{ 'true' if (book_filter_list or status_filter_list or book_holder_filter_list or bank_filter_list) else 'false' }}">
     <div class="dashboard-header">
         <h2 class="dashboard-title" style="margin:0; display:inline-flex; align-items:center; gap:8px; font-size:1.6rem; font-weight:700;"><i class="fas fa-book"></i> Cheque Register</h2>
@@ -479,39 +567,87 @@
                                     <td>{{ serial.payee_name or '-' }}</td>
                                     <td>{{ serial.cheque_date.strftime('%Y-%m-%d') if serial.cheque_date else '-' }}</td>
                                     <td>{{ "%.3f"|format(serial.amount) if serial.amount else '-' }}</td>
-                                    <td class="upload-cell-td">
-                                        <div class="upload-cell" data-serial-id="{{ serial.id }}" data-status="{{ serial.status }}">
-                                            {% if serial.upload_path %}
+                                    <td class="upload-cell-td" style="position: relative; text-align: center;">
+                                        <div class="cheque-action-cell-wrap">
+                                        <div class="cheque-action-menu-container" style="position: relative; display: inline-block;">
+                                            {% set auditing_no_actions = show_select_auditing and serial.status in ['Available', 'Reserved'] %}
+                                            <button type="button" class="btn action-ellipsis-btn btn-view-outline cheque-action-ellipsis" aria-haspopup="true" aria-expanded="false" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" data-status="{{ serial.status }}" data-upload-path="{{ serial.upload_path or '' }}" title="{% if auditing_no_actions %}No actions for this status{% else %}Actions{% endif %}" {% if auditing_no_actions %}disabled{% endif %}>
+                                                <i class="fas fa-ellipsis-h"></i>
+                                            </button>
+                                            <div class="cheque-action-dropdown" data-serial-id="{{ serial.id }}" role="menu" aria-hidden="true" style="display:none; position: absolute; right: 0; top: 38px; min-width: 200px; background: #fff; border: 1px solid #e9ecef; border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); z-index: 1200;">
+                                                {# IT: Delete #}
+                                                {% if show_select_it %}
+                                                <button type="button" class="cheque-dropdown-item cheque-dropdown-item-danger cheque-action-delete" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#dc3545; cursor:pointer;">
+                                                    <i class="fas fa-trash-alt" style="margin-right:8px;"></i> Delete
+                                                </button>
+                                                {% endif %}
+                                                {# CEO/GM/Operation Manager: status-based actions #}
+                                                {% if show_select_ceo_gm_op %}
+                                                {% if serial.status == 'Available' %}
+                                                <button type="button" class="cheque-dropdown-item cheque-action-reserve-only" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
+                                                    <i class="fas fa-bookmark" style="margin-right:8px;"></i> Reserve Only
+                                                </button>
+                                                <button type="button" class="cheque-dropdown-item cheque-action-reserve-write" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
+                                                    <i class="fas fa-file-invoice" style="margin-right:8px;"></i> Reserve & Write
+                                                </button>
+                                                {% elif serial.status == 'Reserved' %}
+                                                <button type="button" class="cheque-dropdown-item cheque-action-write" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
+                                                    <i class="fas fa-file-invoice" style="margin-right:8px;"></i> Write Cheque
+                                                </button>
+                                                {% elif serial.status == 'Used' %}
+                                                <a href="{{ url_for('write_cheque') }}?serial_ids={{ serial.id }}&print=1" class="cheque-dropdown-item cheque-action-print-link" role="menuitem" style="display:block; padding:10px 12px; color:#212529; text-decoration:none;">
+                                                    <i class="fas fa-print" style="margin-right:8px;"></i> Print Cheque
+                                                </a>
+                                                {% elif serial.status == 'Audited' %}
+                                                <button type="button" class="cheque-dropdown-item cheque-dropdown-item-danger cheque-action-mark-cancelled-ceo" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#dc3545; cursor:pointer;">
+                                                    <i class="fas fa-times-circle" style="margin-right:8px;"></i> Mark as Cancelled
+                                                </button>
+                                                <a href="{{ url_for('write_cheque') }}?serial_ids={{ serial.id }}&print=1" class="cheque-dropdown-item cheque-action-print-link" role="menuitem" style="display:block; padding:10px 12px; color:#212529; text-decoration:none;">
+                                                    <i class="fas fa-print" style="margin-right:8px;"></i> Print Cheque
+                                                </a>
+                                                {% endif %}
+                                                {% endif %}
+                                                {# Auditing: status-based actions #}
+                                                {% if show_select_auditing %}
+                                                {% if serial.status == 'Used' %}
+                                                <button type="button" class="cheque-dropdown-item cheque-action-mark-audited" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
+                                                    <i class="fas fa-check-circle" style="margin-right:8px;"></i> Mark as Audited
+                                                </button>
+                                                <button type="button" class="cheque-dropdown-item cheque-dropdown-item-danger cheque-action-mark-cancelled" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#dc3545; cursor:pointer;">
+                                                    <i class="fas fa-times-circle" style="margin-right:8px;"></i> Mark as Cancelled
+                                                </button>
+                                                {% elif serial.status == 'Audited' %}
+                                                <button type="button" class="cheque-dropdown-item cheque-dropdown-item-danger cheque-action-mark-cancelled" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#dc3545; cursor:pointer;">
+                                                    <i class="fas fa-times-circle" style="margin-right:8px;"></i> Mark as Cancelled
+                                                </button>
+                                                <a href="{{ url_for('write_cheque') }}?serial_ids={{ serial.id }}&print=1" class="cheque-dropdown-item cheque-action-print-link" role="menuitem" style="display:block; padding:10px 12px; color:#212529; text-decoration:none;">
+                                                    <i class="fas fa-print" style="margin-right:8px;"></i> Print Cheque
+                                                </a>
+                                                {% endif %}
+                                                {% endif %}
+                                                {# Upload Image, View Image, Delete Image: GM, CEO, Operation Manager, Auditing #}
+                                                {% if show_image_actions %}
+                                                {% if serial.upload_path %}
                                                 {% set filename = serial.upload_path.split('/')[-1] if '/' in serial.upload_path else serial.upload_path %}
-                                                <div class="upload-cell-buttons">
-                                                    <a href="/uploads/cheque/{{ filename }}" target="_blank" class="btn btn-sm btn-view-outline upload-view-btn" title="View uploaded file">
-                                                        <i class="fas fa-eye"></i>
-                                                    </a>
-                                                    <button type="button" class="btn btn-sm cheque-remove-image-btn cheque-delete-upload-btn" title="Remove this image only so you can upload a different one" aria-label="Remove uploaded image">
-                                                        <span class="remove-image-icon" aria-hidden="true">
-                                                            <i class="fas fa-image"></i>
-                                                            <i class="fas fa-times"></i>
-                                                        </span>
-                                                    </button>
-                                                </div>
-                                                <span class="upload-path-text" title="{{ filename }}">{{ filename }}</span>
-                                            {% else %}
-                                                <div class="upload-cell-buttons">
-                                                    <input type="file" 
-                                                           id="upload_{{ serial.id }}" 
-                                                           class="cheque-upload-input" 
-                                                           accept="image/*,.pdf" 
-                                                           style="display: none;"
-                                                           data-serial-id="{{ serial.id }}">
-                                                    <button type="button" 
-                                                            class="btn btn-sm btn-view-outline upload-btn" 
-                                                            {% if serial.status == 'Available' %}disabled{% endif %}
-                                                            onclick="{% if serial.status != 'Available' %}document.getElementById('upload_{{ serial.id }}').click(){% endif %}"
-                                                            title="{% if serial.status == 'Available' %}Upload available after reserving or using the cheque{% else %}Upload image{% endif %}">
-                                                        <i class="fas fa-upload"></i>
-                                                    </button>
-                                                </div>
-                                            {% endif %}
+                                                <a href="/uploads/cheque/{{ filename }}" target="_blank" class="cheque-dropdown-item" role="menuitem" style="display:block; padding:10px 12px; color:#212529; text-decoration:none;">
+                                                    <i class="fas fa-eye" style="margin-right:8px;"></i> View Image
+                                                </a>
+                                                <button type="button" class="cheque-dropdown-item cheque-action-delete-image" data-serial-id="{{ serial.id }}" data-status="{{ serial.status }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
+                                                    <i class="fas fa-trash" style="margin-right:8px;"></i> Delete Image
+                                                </button>
+                                                {% elif serial.status != 'Available' %}
+                                                <input type="file" id="upload_{{ serial.id }}" class="cheque-upload-input-row" accept="image/*,.pdf" style="display: none;" data-serial-id="{{ serial.id }}">
+                                                <button type="button" class="cheque-dropdown-item cheque-action-upload-image" data-serial-id="{{ serial.id }}" data-upload-input="upload_{{ serial.id }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
+                                                    <i class="fas fa-upload" style="margin-right:8px;"></i> Upload Image
+                                                </button>
+                                                {% endif %}
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% if serial.upload_path %}
+                                        {% set upload_filename = serial.upload_original_filename or (serial.upload_path.split('/')[-1] if '/' in serial.upload_path else serial.upload_path) %}
+                                        <div class="cheque-upload-path-text" title="{{ upload_filename }}">{{ upload_filename }}</div>
+                                        {% endif %}
                                         </div>
                                     </td>
                                 </tr>
@@ -637,6 +773,7 @@ function renderBookPagination(bookNo) {
             btn.className = p === page ? 'btn btn-sm btn-primary cheque-pagination-current' : 'btn btn-sm btn-outline';
             btn.setAttribute('data-book-no', bookNo);
             btn.setAttribute('data-page', p);
+            if (p === page) btn.setAttribute('aria-current', 'page');
             btn.textContent = p;
             if (p !== page) {
                 btn.addEventListener('click', function() {
@@ -773,131 +910,6 @@ document.addEventListener('DOMContentLoaded', function() {
             updateBookHeadingCounts();
         });
     }
-
-    // Delete existing upload so user can upload a different image
-    document.addEventListener('click', function(e) {
-        const deleteBtn = e.target.closest('.cheque-delete-upload-btn');
-        if (!deleteBtn) return;
-        const uploadCell = deleteBtn.closest('.upload-cell');
-        if (!uploadCell) return;
-        const serialId = uploadCell.getAttribute('data-serial-id');
-        const status = uploadCell.getAttribute('data-status') || '';
-        if (!confirm('Remove this uploaded image? You can then upload a different one.')) return;
-        deleteBtn.disabled = true;
-        const formData = new FormData();
-        formData.append('serial_id', serialId);
-        fetch('/cheque-register/delete-upload', { method: 'POST', body: formData })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.success) {
-                    uploadCell.innerHTML = '';
-                    const buttonsDiv = document.createElement('div');
-                    buttonsDiv.className = 'upload-cell-buttons';
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.id = 'upload_' + serialId;
-                    input.className = 'cheque-upload-input';
-                    input.setAttribute('accept', 'image/*,.pdf');
-                    input.style.display = 'none';
-                    input.setAttribute('data-serial-id', serialId);
-                    const btn = document.createElement('button');
-                    btn.type = 'button';
-                    btn.className = 'btn btn-sm btn-view-outline upload-btn';
-                    if (status === 'Available') btn.disabled = true;
-                    btn.title = status === 'Available' ? 'Upload available after reserving or using the cheque' : 'Upload image';
-                    btn.innerHTML = '<i class="fas fa-upload"></i>';
-                    btn.onclick = function() { if (status !== 'Available') input.click(); };
-                    buttonsDiv.appendChild(input);
-                    buttonsDiv.appendChild(btn);
-                    uploadCell.appendChild(buttonsDiv);
-                } else {
-                    alert(data.error || 'Could not remove upload.');
-                    deleteBtn.disabled = false;
-                }
-            })
-            .catch(function(err) {
-                console.error('Delete upload error:', err);
-                alert('An error occurred. Please try again.');
-                deleteBtn.disabled = false;
-            });
-    });
-
-    // Handle file upload for cheque serials (delegated so dynamically added inputs work)
-    document.addEventListener('change', function(e) {
-        if (!e.target.matches('.cheque-upload-input')) return;
-        const input = e.target;
-        const file = input.files[0];
-        if (!file) return;
-        
-        const serialId = input.getAttribute('data-serial-id');
-        const uploadCell = input.closest('.upload-cell');
-        const uploadBtn = uploadCell.querySelector('.upload-btn');
-        
-        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
-        if (!allowedTypes.includes(file.type)) {
-            alert('Please upload an image file (JPG, PNG, GIF) or PDF.');
-            input.value = '';
-            return;
-        }
-        const maxSize = 50 * 1024 * 1024;
-        if (file.size > maxSize) {
-            alert('File size exceeds 50MB limit. Please choose a smaller file.');
-            input.value = '';
-            return;
-        }
-        if (!confirm('Are you sure you want to upload "' + file.name + '" for this cheque? This will replace any existing upload.')) {
-            input.value = '';
-            return;
-        }
-        
-        uploadBtn.disabled = true;
-        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('serial_id', serialId);
-        fetch('/cheque-register/upload', { method: 'POST', body: formData })
-            .then(function(response) { return response.json(); })
-            .then(function(data) {
-                if (data.success) {
-                    uploadBtn.remove();
-                    input.remove();
-                    const buttonsDiv = document.createElement('div');
-                    buttonsDiv.className = 'upload-cell-buttons';
-                    const viewBtn = document.createElement('a');
-                    viewBtn.href = '/uploads/cheque/' + data.filename;
-                    viewBtn.target = '_blank';
-                    viewBtn.className = 'btn btn-sm btn-view-outline upload-view-btn';
-                    viewBtn.title = 'View uploaded file';
-                    viewBtn.innerHTML = '<i class="fas fa-eye"></i>';
-                    buttonsDiv.appendChild(viewBtn);
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.type = 'button';
-                    deleteBtn.className = 'btn btn-sm cheque-remove-image-btn cheque-delete-upload-btn';
-                    deleteBtn.title = 'Remove this image only so you can upload a different one';
-                    deleteBtn.setAttribute('aria-label', 'Remove uploaded image');
-                    deleteBtn.innerHTML = '<span class="remove-image-icon" aria-hidden="true"><i class="fas fa-image"></i><i class="fas fa-times"></i></span>';
-                    buttonsDiv.appendChild(deleteBtn);
-                    uploadCell.appendChild(buttonsDiv);
-                    const pathSpan = document.createElement('span');
-                    pathSpan.className = 'upload-path-text';
-                    pathSpan.title = data.filename;
-                    pathSpan.textContent = data.filename;
-                    uploadCell.appendChild(pathSpan);
-                } else {
-                    alert(data.error || 'Upload failed. Please try again.');
-                    uploadBtn.disabled = false;
-                    uploadBtn.innerHTML = '<i class="fas fa-upload"></i>';
-                    input.value = '';
-                }
-            })
-            .catch(function(error) {
-                console.error('Upload error:', error);
-                alert('An error occurred during upload. Please try again.');
-                uploadBtn.disabled = false;
-                uploadBtn.innerHTML = '<i class="fas fa-upload"></i>';
-                input.value = '';
-            });
-    });
 
     // Checkbox column: IT (Delete), CEO/GM/Operation Manager (Reserve toolbar), or Auditing (Mark Audited/Cancelled)
     var showAuditingSelect = document.querySelector('.cheque-register-page') && document.querySelector('.cheque-register-page').getAttribute('data-show-auditing-select') === 'true';
@@ -1185,6 +1197,263 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.addEventListener('click', function() {
             if (!confirm('Mark the selected cheque(s) as Cancelled?')) return;
             doMarkChequeStatus(this.getAttribute('data-book-no'), 'cancelled');
+        });
+    });
+
+    // Cheque register ellipsis dropdown: toggle and close on outside click
+    function closeAllChequeActionDropdowns() {
+        document.querySelectorAll('.cheque-action-dropdown').forEach(function(d) {
+            d.style.display = 'none';
+            d.setAttribute('aria-hidden', 'true');
+        });
+        document.querySelectorAll('.cheque-action-ellipsis').forEach(function(b) {
+            b.setAttribute('aria-expanded', 'false');
+        });
+    }
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.cheque-action-menu-container') && !e.target.closest('.cheque-action-dropdown')) {
+            closeAllChequeActionDropdowns();
+        }
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeAllChequeActionDropdowns();
+    });
+    document.querySelectorAll('.cheque-action-dropdown').forEach(function(menu) {
+        menu.addEventListener('click', function(ev) {
+            if (ev.target.closest('.cheque-dropdown-item')) closeAllChequeActionDropdowns();
+        });
+    });
+    document.querySelectorAll('.cheque-action-ellipsis').forEach(function(btn) {
+        btn.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+            if (btn.disabled) return;
+            var serialId = btn.getAttribute('data-serial-id');
+            var menu = document.querySelector('.cheque-action-dropdown[data-serial-id="' + serialId + '"]');
+            if (!menu) return;
+            var isOpen = menu.style.display === 'block' && menu.getAttribute('aria-hidden') === 'false';
+            if (isOpen) {
+                closeAllChequeActionDropdowns();
+                return;
+            }
+            closeAllChequeActionDropdowns();
+            menu.style.display = 'block';
+            menu.style.position = 'absolute';
+            menu.style.right = '0';
+            menu.style.top = '38px';
+            menu.setAttribute('aria-hidden', 'false');
+            btn.setAttribute('aria-expanded', 'true');
+        });
+    });
+
+    // Per-row actions: Delete (IT)
+    document.querySelectorAll('.cheque-action-delete').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var serialId = parseInt(this.getAttribute('data-serial-id'), 10);
+            var bookNo = this.getAttribute('data-book-no');
+            if (!confirm('Delete this cheque?')) return;
+            btn.disabled = true;
+            fetch('{{ url_for("delete_cheque_serials") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ serial_ids: [serialId] })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    saveChequeExpandedBooks();
+                    var row = document.querySelector('tr[data-serial-id="' + serialId + '"]');
+                    var card = row ? row.closest('.cheque-book-card') : null;
+                    if (data.deleted_books && data.deleted_books.indexOf(parseInt(bookNo, 10)) !== -1) {
+                        if (card) card.remove();
+                    } else if (row) {
+                        var section = row.closest('.book-section');
+                        var bookNoForPagination = section ? section.getAttribute('data-book-no') : null;
+                        row.remove();
+                        if (bookNoForPagination) {
+                            updateSelectToolbarForBook(bookNoForPagination);
+                            renderBookPagination(bookNoForPagination);
+                        }
+                        updateBookHeadingCounts();
+                    }
+                } else {
+                    alert(data.error || 'Delete failed.');
+                }
+            })
+            .catch(function(err) {
+                alert('An error occurred. Please try again.');
+            })
+            .finally(function() { btn.disabled = false; });
+        });
+    });
+
+    // Per-row actions: Reserve Only (CEO/GM/Op)
+    document.querySelectorAll('.cheque-action-reserve-only').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var serialId = parseInt(this.getAttribute('data-serial-id'), 10);
+            if (!confirm('Reserve this cheque?')) return;
+            btn.disabled = true;
+            fetch('{{ url_for("reserve_cheque") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ serial_ids: [serialId] })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) { saveChequeExpandedBooks(); location.reload(); }
+                else { alert(data.error || 'Reserve failed.'); }
+            })
+            .catch(function(err) { alert('An error occurred.'); })
+            .finally(function() { btn.disabled = false; });
+        });
+    });
+
+    // Per-row actions: Reserve & Write, Write Cheque (CEO/GM/Op)
+    document.querySelectorAll('.cheque-action-reserve-write').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var serialId = parseInt(this.getAttribute('data-serial-id'), 10);
+            saveChequeExpandedBooks();
+            fetch('{{ url_for("reserve_cheque") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ serial_ids: [serialId] })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) window.location.href = '{{ url_for("write_cheque") }}?serial_ids=' + serialId;
+                else alert(data.error || 'Reserve failed.');
+            })
+            .catch(function(err) { alert('An error occurred.'); });
+        });
+    });
+    document.querySelectorAll('.cheque-action-write').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var serialId = parseInt(this.getAttribute('data-serial-id'), 10);
+            saveChequeExpandedBooks();
+            window.location.href = '{{ url_for("write_cheque") }}?serial_ids=' + serialId;
+        });
+    });
+
+    // Per-row actions: Mark as Audited, Mark as Cancelled (Auditing / CEO/GM/Op)
+    document.querySelectorAll('.cheque-action-mark-audited').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var serialId = parseInt(this.getAttribute('data-serial-id'), 10);
+            if (!confirm('Mark this cheque as Audited?')) return;
+            btn.disabled = true;
+            fetch('{{ url_for("mark_cheque_status") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ serial_ids: [serialId], action: 'audited' })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) { saveChequeExpandedBooks(); location.reload(); }
+                else alert(data.error || 'Action failed.');
+            })
+            .catch(function(err) { alert('An error occurred.'); })
+            .finally(function() { btn.disabled = false; });
+        });
+    });
+    document.querySelectorAll('.cheque-action-mark-cancelled, .cheque-action-mark-cancelled-ceo').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var serialId = parseInt(this.getAttribute('data-serial-id'), 10);
+            if (!confirm('Mark this cheque as Cancelled?')) return;
+            btn.disabled = true;
+            fetch('{{ url_for("mark_cheque_status") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ serial_ids: [serialId], action: 'cancelled' })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) { saveChequeExpandedBooks(); location.reload(); }
+                else alert(data.error || 'Action failed.');
+            })
+            .catch(function(err) { alert('An error occurred.'); })
+            .finally(function() { btn.disabled = false; });
+        });
+    });
+
+    // Per-row: Upload Image (trigger file input)
+    document.querySelectorAll('.cheque-action-upload-image').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var inputId = this.getAttribute('data-upload-input');
+            var input = document.getElementById(inputId);
+            if (input) input.click();
+        });
+    });
+    document.addEventListener('change', function(e) {
+        if (!e.target.matches('.cheque-upload-input-row')) return;
+        var input = e.target;
+        var file = input.files[0];
+        if (!file) return;
+        var serialId = input.getAttribute('data-serial-id');
+        var allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Please upload an image file (JPG, PNG, GIF) or PDF.');
+            input.value = '';
+            return;
+        }
+        if (file.size > 50 * 1024 * 1024) {
+            alert('File size exceeds 50MB limit.');
+            input.value = '';
+            return;
+        }
+        if (!confirm('Upload "' + file.name + '" for this cheque?')) {
+            input.value = '';
+            return;
+        }
+        var formData = new FormData();
+        formData.append('file', file);
+        formData.append('serial_id', serialId);
+        fetch('/cheque-register/upload', { method: 'POST', body: formData })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    saveChequeExpandedBooks();
+                    location.reload();
+                } else {
+                    alert(data.error || 'Upload failed.');
+                }
+                input.value = '';
+            })
+            .catch(function(err) {
+                alert('An error occurred during upload.');
+                input.value = '';
+            });
+    });
+
+    // Per-row: Delete Image
+    document.querySelectorAll('.cheque-action-delete-image').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var serialId = this.getAttribute('data-serial-id');
+            var status = this.getAttribute('data-status') || '';
+            if (!confirm('Remove this uploaded image? You can then upload a different one.')) return;
+            btn.disabled = true;
+            var formData = new FormData();
+            formData.append('serial_id', serialId);
+            fetch('/cheque-register/delete-upload', { method: 'POST', body: formData })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        saveChequeExpandedBooks();
+                        location.reload();
+                    } else {
+                        alert(data.error || 'Could not remove upload.');
+                        btn.disabled = false;
+                    }
+                })
+                .catch(function(err) {
+                    alert('An error occurred.');
+                    btn.disabled = false;
+                });
         });
     });
 });

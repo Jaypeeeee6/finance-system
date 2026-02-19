@@ -752,7 +752,8 @@ class ChequeSerial(db.Model):
     payee_name = db.Column(db.String(200), nullable=True)
     cheque_date = db.Column(db.Date, nullable=True)
     amount = db.Column(db.Numeric(12, 3), nullable=True)
-    upload_path = db.Column(db.String(500), nullable=True)  # Path to uploaded file
+    upload_path = db.Column(db.String(500), nullable=True)  # Path to uploaded file (system filename)
+    upload_original_filename = db.Column(db.String(500), nullable=True)  # Original filename as uploaded by user (for display)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
