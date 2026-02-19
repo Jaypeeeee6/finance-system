@@ -306,12 +306,20 @@ function getFinalPos(basePct, template, offsets, bankKey, field, mode) {
             topPct += (28 / template.imgSizePx.h) * 100;
         }
 
-        // Sohar Islamic Bank: preview-only positions (date right, payee lower, amount right, amountWords a little right)
+        // Sohar Islamic Bank: preview-only positions
         if (bankKey === 'sohar' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
             if (field === 'date') { leftPct += (116 / template.imgSizePx.w) * 100; topPct += (10 / template.imgSizePx.h) * 100; }
             if (field === 'payee') { topPct += (23 / template.imgSizePx.h) * 100; }
             if (field === 'amount') { leftPct += (70 / template.imgSizePx.w) * 100; topPct += (27 / template.imgSizePx.h) * 100; }
             if (field === 'amountWords') { leftPct += (15 / template.imgSizePx.w) * 100; topPct += (30 / template.imgSizePx.h) * 100; }
+        }
+
+        // Oman Arab Bank: preview-only positions
+        if (bankKey === 'oman_arab' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
+            if (field === 'date') { leftPct += (93 / template.imgSizePx.w) * 100; }
+            if (field === 'payee') { leftPct -= (55 / template.imgSizePx.w) * 100; topPct += (17 / template.imgSizePx.h) * 100; }
+            if (field === 'amount') { leftPct += (88 / template.imgSizePx.w) * 100; topPct += (20 / template.imgSizePx.h) * 100; }
+            if (field === 'amountWords') { topPct += (22 / template.imgSizePx.h) * 100; leftPct += (25 / template.imgSizePx.w) * 100; }
         }
 
         return { leftPct, topPct };
