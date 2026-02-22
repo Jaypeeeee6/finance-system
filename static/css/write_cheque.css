@@ -685,7 +685,7 @@
     align-items: center;
     justify-content: center;
     flex-wrap: wrap;
-    /* left/top set in % by JS (same as preview) */
+    /* left/top set in mm by JS for print (stable; no drift over time) */
 }
 
 /* ==================== PRINT STYLES ==================== */
@@ -727,6 +727,13 @@
         background: transparent !important;
         visibility: visible !important;
     }
+
+    /* Dhofar Islamic Bank: no mirror; print same orientation as preview */
+    /* Crossing angle for Dhofar (same as other banks) */
+    .cheque-print-container[data-print-bank="dhofar_islamic"] .print-crossing-overlay {
+        transform: rotate(-25deg) !important;
+        -webkit-transform: rotate(-25deg) !important;
+    }
     
     .chequePrint {
         position: relative !important;
@@ -767,7 +774,7 @@
         -ms-transform: scale(1) !important;
         -o-transform: scale(1) !important;
         box-sizing: border-box !important;
-        /* left/top set in % by JS - same coordinate space as preview */
+        /* left/top set in mm by JS - physical units for consistent print position */
     }
     
     /* Font sizes in pt so text is visible in print */

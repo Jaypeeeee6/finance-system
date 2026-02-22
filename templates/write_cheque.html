@@ -207,6 +207,14 @@ const TEMPLATES = {
             amountWords: { top: 160, left: 95 },
             crossing: { top: 20, left: 60 },
             purpose: { top: 200, left: 50 }
+        },
+        // Explicit print positions in mm (physical: left/top from top-left of cheque). Used when printing; container has scaleX(-1) so we set style.left = (w - left).
+        printFieldsMm: {
+            date:   { left: 65,  top: 10 },
+            payee:  { left: 33,  top: 43 },
+            amount: { left: 110, top: 49 },
+            amountWords: { left: 17, top: 43 },
+            crossing: { left: 11, top: 5 }
         }
     },
     oman_arab: {
@@ -331,12 +339,8 @@ function getFinalPos(basePct, template, offsets, bankKey, field, mode) {
     const f = mmToPct(fMm, template.chequeSizeMm);
     let leftPct = base.leftPct + g.x + f.x;
     let topPct = base.topPct + g.y + f.y;
-    // Dhofar Islamic Bank: print-only payee
-    if (bankKey === 'dhofar_islamic' && field === 'payee' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
-        leftPct -= (290 / template.imgSizePx.w) * 100;
-        topPct += (8 / template.imgSizePx.h) * 100;
-    }
-
+    // Dhofar Islamic Bank: print uses base positions then mirror in applyPositions + CSS scaleX(-1)
+    // (no extra print offsets; alignment fixed by mirroring to match physical cheque orientation)
     // Dhofar Islamic Bank: print-only date
     if (bankKey === 'dhofar_islamic' && field === 'date' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
         leftPct -= (327 / template.imgSizePx.w) * 100;
@@ -355,6 +359,7 @@ function getFinalPos(basePct, template, offsets, bankKey, field, mode) {
         topPct += (20 / template.imgSizePx.h) * 100;
     }
 
+
     // Sohar Islamic Bank: print-only positions (each field shifted left individually)
     if (bankKey === 'sohar' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
         if (field === 'date') { leftPct -= (347 / template.imgSizePx.w) * 100; topPct -= (18 / template.imgSizePx.h) * 100; }
@@ -368,19 +373,51 @@ function getFinalPos(basePct, template, offsets, bankKey, field, mode) {
 }
 
 // Apply positions and values to a canvas. mode = 'preview' | 'print'.
+// For print we use mm (not %) so positions stay fixed regardless of when/where layout runs (avoids drift over time).
 function applyPositions(canvasEl, pctMap, values, template, forPrint) {
     if (!canvasEl || !pctMap || !template) return;
     const mode = forPrint ? 'print' : 'preview';
     const offsets = getOffsets();
     const bankKey = (document.getElementById('bankSelect') && document.getElementById('bankSelect').value) || '';
+    const sizeMm = template.chequeSizeMm || { w: 160, h: 75 };
 
     for (const [field, basePos] of Object.entries(pctMap)) {
         const node = canvasEl.querySelector('[data-field="' + field + '"]');
         if (!node) continue;
+        // Dhofar Islamic: use explicit print positions (mm), same orientation as preview (no mirror)
+        if (forPrint && bankKey === 'dhofar_islamic' && template.printFieldsMm && template.printFieldsMm[field]) {
+            const p = template.printFieldsMm[field];
+            const cal = (offsets.dhofar_islamic || {}).print || {};
+            const g = cal.globalMm || {};
+            const f = (cal.fieldsMm && cal.fieldsMm[field]) || {};
+            const leftMm = p.left + (g.x || 0) + (f.x || 0);
+            const topMm = p.top + (g.y || 0) + (f.y || 0);
+            node.style.left = leftMm + 'mm';
+            node.style.top = topMm + 'mm';
+            node.textContent = values[field] != null ? values[field] : '';
+            continue;
+        }
+                // Use physical mm so print position never drifts (percentages on display:none container can resolve inconsistently)
+                // Use physical mm so print position never drifts (percentages on display:none container can resolve inconsistently)
         const final = getFinalPos(pctMap, template, offsets, bankKey, field, mode);
+                // Dhofar Islamic: physical cheque is reversed; mirror horizontal so print aligns
         if (final) {
-            node.style.left = final.leftPct + '%';
-            node.style.top = final.topPct + '%';
+                // Dhofar Islamic: physical cheque is reversed; mirror horizontal so print aligns
+                if (bankKey === 'dhofar_islamic') {
+                    leftMm = sizeMm.w - leftMm;
+                }
+            if (forPrint) {
+                const leftMm = (final.leftPct / 100) * sizeMm.w;
+                if (bankKey === 'dhofar_islamic') {
+                    leftMm = sizeMm.w - leftMm;
+                }
+                const topMm = (final.topPct / 100) * sizeMm.h;
+                node.style.left = leftMm + 'mm';
+                node.style.top = topMm + 'mm';
+            } else {
+                node.style.left = final.leftPct + '%';
+                node.style.top = final.topPct + '%';
+            }
         }
         node.textContent = values[field] != null ? values[field] : '';
     }
