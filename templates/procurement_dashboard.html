@@ -172,8 +172,8 @@
                                 <th class="expand-col"></th>
                                 <th>Type</th>
                                 <th>Payment Type</th>
-                                <th>Payment Method</th>
                                 <th>Requestor</th>
+                                <th>Person/Company Name</th>
                                 <th>Submitted</th>
                                 <th>Completed</th>
                                 <th>Amount</th>
@@ -205,8 +205,8 @@
                                         <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ req.payment_method or 'Card' }}</td>
                                 <td>{{ req.requestor_name }}</td>
+                                <td>{{ req.person_company or '-' }}</td>
                                 <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
                                 <td>
                                     {% if req.status == 'Completed' and req.completion_date %}
@@ -412,8 +412,8 @@
                                     <th>ID</th>
                                     <th>Type</th>
                                     <th>Payment Type</th>
-                                    <th>Payment Method</th>
                                     <th>Requestor</th>
+                                    <th>Person/Company Name</th>
                                     <th>Submitted</th>
                                     <th>Completed</th>
                                     <th>Amount</th>
@@ -443,8 +443,8 @@
                                             <span class="badge" style="background: #17a2b8; color: white;">● One-Time</span>
                                         {% endif %}
                                     </td>
-                                    <td>{{ req.payment_method or 'Card' }}</td>
                                     <td>{{ req.requestor_name }}</td>
+                                    <td>{{ req.person_company or '-' }}</td>
                                     <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
                                     <td>
                                         {% if req.status == 'Completed' and req.completion_date %}
@@ -512,8 +512,8 @@
                                     <th>ID</th>
                                     <th>Type</th>
                                     <th>Payment Type</th>
-                                    <th>Payment Method</th>
                                     <th>Requestor</th>
+                                    <th>Person/Company Name</th>
                                     <th>Submitted</th>
                                     <th>Completed</th>
                                     <th>Amount</th>
@@ -581,8 +581,8 @@
                                     <th>ID</th>
                                     <th>Type</th>
                                     <th>Payment Type</th>
-                                    <th>Payment Method</th>
                                     <th>Requestor</th>
+                                    <th>Person/Company Name</th>
                                     <th>Submission Date</th>
                                     <th>Rejection Date</th>
                                     <th>Amount</th>
@@ -650,8 +650,8 @@
                                     <th>ID</th>
                                     <th>Type</th>
                                     <th>Payment Type</th>
-                                    <th>Payment Method</th>
                                     <th>Requestor</th>
+                                    <th>Person/Company Name</th>
                                     <th>Submission Date</th>
                                     <th>Amount</th>
                                     <th>Status</th>
