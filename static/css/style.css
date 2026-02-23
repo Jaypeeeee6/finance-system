@@ -5439,6 +5439,37 @@ input:checked + .toggle-slider:before {
     flex-shrink: 0;
 }
 
+/* Archive request modal: slightly smaller icon, more padding inside circle */
+#archiveRequestModal .app-modal-icon {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+    padding: 5px;
+    box-sizing: border-box;
+}
+
+/* Archive request modal: red accent instead of gold */
+#archiveRequestModal .app-modal-icon {
+    background: #dc3545;
+}
+#archiveRequestModal .app-modal-title {
+    color: #dc3545;
+}
+#archiveRequestModal .app-modal-btn:not(.app-modal-btn-secondary) {
+    background: #dc3545;
+}
+#archiveRequestModal .app-modal-btn:not(.app-modal-btn-secondary):hover {
+    background: #c82333;
+    color: white;
+}
+#archiveRequestModal .app-modal-btn:not(.app-modal-btn-secondary):active {
+    background: #bd2130;
+}
+#archiveRequestModal .app-modal-footer {
+    background: transparent;
+    border-top: none;
+}
+
 .app-modal-title {
     font-size: 1.1rem;
     font-weight: 600;

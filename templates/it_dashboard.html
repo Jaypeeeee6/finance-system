@@ -413,11 +413,9 @@
                                         <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-view-outline" title="View">
                                             <i class="fas fa-eye"></i>
                                         </a>
-                                        <form method="POST" action="{{ url_for('delete_request', request_id=req.request_id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this request?')">
-                                            <button type="submit" class="btn btn-sm btn-danger">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </form>
+                                        <button type="button" class="btn btn-sm btn-danger" title="Archive" onclick="openArchiveModal({{ req.request_id }})">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
                                 </td>
                             </tr>
                             {% if req.recurring == 'Recurring' %}
@@ -1662,6 +1660,35 @@
     </div>
     </div>
 </div>
+
+<!-- Archive request modal (app-modal) - reason + supporting files (IT) -->
+<div id="archiveRequestModal" class="app-modal" style="display: none;">
+    <div class="app-modal-overlay" onclick="closeArchiveModal()"></div>
+    <div class="app-modal-container">
+        <div class="app-modal-header">
+            <div class="app-modal-icon"><i class="fas fa-archive"></i></div>
+            <h3 class="app-modal-title" id="archiveModalTitle">Archive Request</h3>
+        </div>
+        <form id="archiveRequestForm" method="POST" enctype="multipart/form-data" action="" data-delete-url="{{ url_for('delete_request', request_id=0) }}" data-bulk-url="{{ url_for('bulk_delete_requests') }}">
+            <div class="app-modal-body">
+                <label for="archiveDeletionReason" style="display: block; font-weight: 600; margin-bottom: 6px;">Deletion reason <span style="color: #dc3545;" aria-label="required">*</span></label>
+                <textarea id="archiveDeletionReason" name="deletion_reason" rows="4" required
+                    placeholder="Enter the reason for archiving this request..."
+                    style="width: 100%; padding: 10px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 0.95rem; resize: vertical;"></textarea>
+                <label for="archiveSupportingFiles" style="display: block; font-weight: 600; margin: 14px 0 6px;">Supporting files</label>
+                <input type="file" id="archiveSupportingFiles" name="supporting_files" multiple
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                    style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 0.9rem;">
+                <p style="margin: 8px 0 0; font-size: 0.85rem; color: #6c757d;">PDF, JPG, PNG, DOC, DOCX, XLS, XLSX. Max 10MB per file.</p>
+            </div>
+            <div class="app-modal-footer">
+                <button type="button" class="app-modal-btn app-modal-btn-secondary" onclick="closeArchiveModal()">Cancel</button>
+                <button type="submit" class="app-modal-btn"><i class="fas fa-archive"></i> Archive</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_css %}
@@ -2263,6 +2290,56 @@ function clearSelection() {
     updateBulkActions();
 }
 
+function openArchiveModal(requestId) {
+    var form = document.getElementById('archiveRequestForm');
+    var modal = document.getElementById('archiveRequestModal');
+    var titleEl = document.getElementById('archiveModalTitle');
+    if (!form || !modal) return;
+    removeArchiveFormRequestIds();
+    form.action = form.getAttribute('data-delete-url').replace('0', String(requestId));
+    if (titleEl) titleEl.textContent = 'Archive Request';
+    form.reset();
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function openBulkArchiveModal(requestIds) {
+    var form = document.getElementById('archiveRequestForm');
+    var modal = document.getElementById('archiveRequestModal');
+    var titleEl = document.getElementById('archiveModalTitle');
+    if (!form || !modal || !requestIds || requestIds.length === 0) return;
+    removeArchiveFormRequestIds();
+    form.action = form.getAttribute('data-bulk-url');
+    requestIds.forEach(function(id) {
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'request_ids';
+        input.value = id;
+        form.appendChild(input);
+    });
+    if (titleEl) titleEl.textContent = 'Archive ' + requestIds.length + ' Request(s)';
+    document.getElementById('archiveDeletionReason').value = '';
+    document.getElementById('archiveSupportingFiles').value = '';
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function removeArchiveFormRequestIds() {
+    var form = document.getElementById('archiveRequestForm');
+    if (!form) return;
+    var inputs = form.querySelectorAll('input[name="request_ids"]');
+    inputs.forEach(function(inp) { inp.remove(); });
+}
+
+function closeArchiveModal() {
+    var modal = document.getElementById('archiveRequestModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+    removeArchiveFormRequestIds();
+}
+
 function bulkDelete() {
     const checkedBoxes = document.querySelectorAll('.request-checkbox:checked');
     const requestIds = Array.from(checkedBoxes).map(cb => cb.value);
@@ -2271,24 +2348,7 @@ function bulkDelete() {
         alert('Please select at least one request to delete.');
         return;
     }
-    
-    if (confirm(`Are you sure you want to delete ${requestIds.length} request(s)? This action cannot be undone.`)) {
-        // Create a form to submit multiple deletions
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '{{ url_for("bulk_delete_requests") }}';
-        
-        requestIds.forEach(id => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'request_ids';
-            input.value = id;
-            form.appendChild(input);
-        });
-        
-        document.body.appendChild(form);
-        form.submit();
-    }
+    openBulkArchiveModal(requestIds);
 }
 
 function bulkView() {

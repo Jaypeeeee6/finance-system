@@ -240,6 +240,7 @@
                                 <th>Status</th>
                                 <th>Archived By</th>
                                 <th>Archived At</th>
+                                <th>Reason</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -298,6 +299,13 @@
                                 <td>
                                     {% if req.archived_at %}
                                         {{ req.archived_at.strftime('%Y-%m-%d %H:%M') }}
+                                    {% else %}
+                                        <span style="color: #999;">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if req.archive_reason %}
+                                        <span title="{{ req.archive_reason }}">{{ req.archive_reason[:50] }}{% if req.archive_reason|length > 50 %}…{% endif %}</span>
                                     {% else %}
                                         <span style="color: #999;">-</span>
                                     {% endif %}

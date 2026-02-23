@@ -240,6 +240,8 @@ class PaymentRequest(db.Model):
     archived_at = db.Column(db.DateTime, nullable=True)  # When request was archived
     archived_by = db.Column(db.String(100), nullable=True)  # Name of user who archived the request
     archived_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)  # ID of user who archived the request
+    archive_reason = db.Column(db.Text, nullable=True)  # Reason for archiving (IT/Auditing)
+    archive_supporting_files = db.Column(db.Text, nullable=True)  # JSON array of uploaded file paths
     
     # Relationship to User
     user = db.relationship('User', backref='payment_requests', foreign_keys=[user_id])

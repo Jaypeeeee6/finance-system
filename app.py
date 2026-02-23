@@ -18857,6 +18857,27 @@ def reassign_manager(request_id):
     return redirect(url_for('view_request', request_id=request_id))
 
 
+def _ensure_archive_columns_payment_requests():
+    """Ensure archive_reason and archive_supporting_files columns exist on payment_requests."""
+    try:
+        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(payment_requests)")
+        existing_columns = [row[1] for row in cursor.fetchall()]
+        if 'archive_reason' not in existing_columns:
+            cursor.execute("ALTER TABLE payment_requests ADD COLUMN archive_reason TEXT")
+            conn.commit()
+            print("✓ Added 'archive_reason' column to payment_requests table")
+        if 'archive_supporting_files' not in existing_columns:
+            cursor.execute("ALTER TABLE payment_requests ADD COLUMN archive_supporting_files TEXT")
+            conn.commit()
+            print("✓ Added 'archive_supporting_files' column to payment_requests table")
+        conn.close()
+    except Exception as e:
+        print(f"Warning: Could not migrate payment_requests archive columns: {e}")
+
+
 @app.route('/request/<int:request_id>/delete', methods=['POST'])
 @login_required
 @role_required('IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Manager', 'Auditing Staff', 'Finance Admin')
@@ -18865,6 +18886,8 @@ def delete_request(request_id):
     if not can_access_archives():
         flash('You do not have permission to perform this action.', 'danger')
         return redirect(url_for('dashboard'))
+    
+    _ensure_archive_columns_payment_requests()
     
     req = PaymentRequest.query.get_or_404(request_id)
     
@@ -18901,6 +18924,36 @@ def delete_request(request_id):
     req.archived_at = archive_time
     req.archived_by = current_user.name
     req.archived_by_user_id = current_user.user_id
+    
+    # Store deletion reason and supporting files (IT/Auditing)
+    req.archive_reason = (request.form.get('deletion_reason') or '').strip() or None
+    supporting_files = request.files.getlist('supporting_files')
+    saved_paths = []
+    if supporting_files:
+        allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
+        max_file_size = 10 * 1024 * 1024  # 10MB
+        for f in supporting_files:
+            if not f or not f.filename:
+                continue
+            original_name = f.filename
+            ext = original_name.rsplit('.', 1)[1].lower() if '.' in original_name else ''
+            if ext not in allowed_extensions:
+                flash(f'Invalid file type for "{original_name}". Allowed: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX.', 'warning')
+                break
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(0)
+            if size > max_file_size:
+                flash(f'File "{original_name}" is too large (max 10MB).', 'warning')
+                break
+            timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')
+            filename = secure_filename(original_name)
+            filename = f"archive_support_{request_id}_{timestamp}_{filename}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            f.save(filepath)
+            saved_paths.append(filename)
+    if saved_paths:
+        req.archive_supporting_files = json.dumps(saved_paths)
     
     db.session.commit()
     
@@ -19039,6 +19092,8 @@ def bulk_delete_requests():
         flash('You do not have permission to perform this action.', 'danger')
         return redirect(url_for('dashboard'))
     
+    _ensure_archive_columns_payment_requests()
+    
     request_ids = request.form.getlist('request_ids')
     
     if not request_ids:
@@ -19046,6 +19101,35 @@ def bulk_delete_requests():
         if current_user.department == 'Auditing':
             return redirect(url_for('department_dashboard'))
         return redirect(url_for('it_dashboard'))
+    
+    # Deletion reason and supporting files (same for all in bulk)
+    archive_reason = (request.form.get('deletion_reason') or '').strip() or None
+    saved_paths = []
+    supporting_files = request.files.getlist('supporting_files')
+    if supporting_files:
+        allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'}
+        max_file_size = 10 * 1024 * 1024  # 10MB
+        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')
+        for f in supporting_files:
+            if not f or not f.filename:
+                continue
+            original_name = f.filename
+            ext = original_name.rsplit('.', 1)[1].lower() if '.' in original_name else ''
+            if ext not in allowed_extensions:
+                flash(f'Invalid file type for "{original_name}". Allowed: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX.', 'warning')
+                break
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(0)
+            if size > max_file_size:
+                flash(f'File "{original_name}" is too large (max 10MB).', 'warning')
+                break
+            filename = secure_filename(original_name)
+            filename = f"archive_support_bulk_{timestamp}_{filename}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            f.save(filepath)
+            saved_paths.append(filename)
+    archive_supporting_files_json = json.dumps(saved_paths) if saved_paths else None
     
     archived_count = 0
     already_archived_count = 0
@@ -19064,6 +19148,8 @@ def bulk_delete_requests():
                 req.archived_at = datetime.utcnow()
                 req.archived_by = current_user.name
                 req.archived_by_user_id = current_user.user_id
+                req.archive_reason = archive_reason
+                req.archive_supporting_files = archive_supporting_files_json
                 
                 # Store request info for notifications
                 archived_requests.append({
