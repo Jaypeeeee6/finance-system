@@ -31,7 +31,8 @@
                                     <div class="book-style-dropdown-option" data-value="{{ request_type.name }}">{{ request_type.name }}</div>
                                     {% endfor %}
                                 {% else %}
-                                    <div class="book-style-dropdown-option" data-value="" data-disabled="true">No request types available for your department</div>
+                                    {# Always show "Others" for departments with no request types in the database #}
+                                    <div class="book-style-dropdown-option" data-value="Others">Others</div>
                                 {% endif %}
                             </div>
                         </div>
@@ -39,7 +40,7 @@
                             {% if available_request_types %}
                                 Available request types for {{ user.department }} department
                             {% else %}
-                                No request types configured for your department. Please contact IT to set up request types.
+                                No request types configured for your department. You can select "Others" and specify the type, or contact IT to set up request types.
                             {% endif %}
                         </small>
                     </div>
@@ -1231,6 +1232,11 @@ function syncBookStyleDropdowns() {
 
 document.addEventListener('DOMContentLoaded', function() {
     initBookStyleDropdowns();
+    // When request type dropdown value changes (e.g. user selects "Others"), show/hide the "specify type" field
+    const requestTypeInput = document.getElementById('request_type');
+    if (requestTypeInput) {
+        requestTypeInput.addEventListener('change', handleRequestTypeChange);
+    }
     // Initialize the modal
     initializeRecurringModal();
     
