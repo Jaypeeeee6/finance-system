@@ -4899,6 +4899,23 @@ def procurement_dashboard():
     # Check and notify if balance is low
     check_and_notify_low_balance(available_balance)
 
+    # Date of the latest completed Bank money payment request (Procurement Department Manager) for Money Spent card label
+    completed_bank_money_from_manager = [
+        r for r in completed_requests_bm
+        if r.user and r.user.role == 'Department Manager' and r.user.department == 'Procurement'
+    ]
+    last_bank_money_completion_date = None
+    if completed_bank_money_from_manager:
+        latest_bank_money = max(
+            completed_bank_money_from_manager,
+            key=lambda r: (r.completion_date or date.min, r.updated_at or datetime.min)
+        )
+        last_bank_money_completion_date = (
+            latest_bank_money.completion_date
+            if latest_bank_money.completion_date
+            else (latest_bank_money.updated_at.date() if latest_bank_money.updated_at else None)
+        )
+
     # Persist a snapshot entry for Current Money Status (budget-sheet history)
     try:
         entry = CurrentMoneyEntry(
@@ -4937,7 +4954,8 @@ def procurement_dashboard():
                          completed_amount=money_spent,
                          available_balance=available_balance,
                          pending_amount=pending_amount,
-                         on_hold_amount=on_hold_amount)
+                         on_hold_amount=on_hold_amount,
+                         last_bank_money_completion_date=last_bank_money_completion_date)
 
 
 @app.route('/api/procurement/money-spent', methods=['GET'])
@@ -5857,6 +5875,7 @@ def procurement_item_requests():
     completed_amount = None
     pending_amount = None
     on_hold_amount = None
+    last_bank_money_completion_date = None
     if current_user.role in ['GM', 'Operation Manager', 'Finance Admin'] or (current_user.department == 'Procurement' and current_user.role == 'Department Manager') or current_user.department in ['IT', 'Auditing']:
         # Calculate Bank Money statistics for Current Money Status section
         bank_money_requests = PaymentRequest.query.options(
@@ -5948,6 +5967,23 @@ def procurement_item_requests():
         # Check and notify if balance is low
         check_and_notify_low_balance(available_balance)
 
+        # Date of the latest completed Bank money payment request (Procurement Department Manager) for Money Spent card label
+        completed_bank_money_from_manager = [
+            r for r in completed_requests_bm
+            if r.user and r.user.role == 'Department Manager' and r.user.department == 'Procurement'
+        ]
+        last_bank_money_completion_date = None
+        if completed_bank_money_from_manager:
+            latest_bank_money = max(
+                completed_bank_money_from_manager,
+                key=lambda r: (r.completion_date or date.min, r.updated_at or datetime.min)
+            )
+            last_bank_money_completion_date = (
+                latest_bank_money.completion_date
+                if latest_bank_money.completion_date
+                else (latest_bank_money.updated_at.date() if latest_bank_money.updated_at else None)
+            )
+
         # Persist a snapshot entry for Current Money Status (budget-sheet history)
         try:
             entry = CurrentMoneyEntry(
@@ -6005,7 +6041,8 @@ def procurement_item_requests():
                          available_balance=available_balance,
                          completed_amount=completed_amount,
                          pending_amount=pending_amount,
-                         on_hold_amount=on_hold_amount)
+                         on_hold_amount=on_hold_amount,
+                         last_bank_money_completion_date=last_bank_money_completion_date)
 
 
 @app.route('/procurement/item-request/<int:request_id>')
