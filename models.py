@@ -1,3 +1,4 @@
+import json
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -252,6 +253,22 @@ class PaymentRequest(db.Model):
     # Relationship to user who archived the request
     archiver = db.relationship('User', foreign_keys=[archived_by_user_id], backref='archived_requests')
     
+    @property
+    def has_archive_supporting_files(self):
+        """True if this request has at least one archive supporting file."""
+        return len(self.archive_supporting_files_list) > 0
+
+    @property
+    def archive_supporting_files_list(self):
+        """List of archive supporting file filenames (empty if none)."""
+        if not self.archive_supporting_files:
+            return []
+        try:
+            files = json.loads(self.archive_supporting_files)
+            return files if isinstance(files, list) else []
+        except (TypeError, ValueError):
+            return []
+
     def to_dict(self):
         """Convert request to dictionary"""
         return {

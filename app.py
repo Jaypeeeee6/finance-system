@@ -11466,6 +11466,60 @@ def archives():
                          urgent_filter=urgent_filter)
 
 
+@app.route('/request/<int:request_id>/archive-files')
+@login_required
+@role_required('IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Manager', 'Auditing Staff', 'Finance Admin')
+def view_archive_supporting_files(request_id):
+    """View list of archive supporting files for an archived payment request."""
+    if not can_access_archives():
+        session['permission_denied'] = 'You do not have permission to perform this action.'
+        return redirect(url_for('dashboard'))
+    req = PaymentRequest.query.get_or_404(request_id)
+    if not req.is_archived:
+        flash('Request is not archived.', 'warning')
+        return redirect(url_for('archives'))
+    file_list = []
+    if req.archive_supporting_files:
+        try:
+            file_list = json.loads(req.archive_supporting_files)
+            if not isinstance(file_list, list):
+                file_list = []
+        except (TypeError, ValueError):
+            file_list = []
+    return render_template('archive_supporting_files.html', request_id=request_id, req=req, file_list=file_list)
+
+
+@app.route('/request/<int:request_id>/archive-file/<path:filename>')
+@login_required
+@role_required('IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Manager', 'Auditing Staff', 'Finance Admin')
+def download_archive_supporting_file(request_id, filename):
+    """Download one archive supporting file (filename must be in the request's archive_supporting_files list)."""
+    if not can_access_archives():
+        abort(403)
+    req = PaymentRequest.query.get_or_404(request_id)
+    if not req.is_archived:
+        abort(404)
+    allowed = []
+    if req.archive_supporting_files:
+        try:
+            allowed = json.loads(req.archive_supporting_files)
+            if not isinstance(allowed, list):
+                allowed = []
+        except (TypeError, ValueError):
+            allowed = []
+    # Prevent path traversal: only allow exact basename from the list
+    safe_name = os.path.basename(filename)
+    if safe_name not in allowed:
+        abort(404)
+    upload_folder = app.config['UPLOAD_FOLDER']
+    filepath = os.path.join(upload_folder, safe_name)
+    if not os.path.isfile(filepath):
+        abort(404)
+    # view=1: open in browser (e.g. PDF/image); otherwise download
+    as_attachment = not request.args.get('view', type=bool)
+    return send_from_directory(upload_folder, safe_name, as_attachment=as_attachment, download_name=safe_name)
+
+
 @app.route('/request/<int:request_id>/restore', methods=['POST'])
 @login_required
 @role_required('IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Manager', 'Auditing Staff', 'Finance Admin')

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Archive supporting files - Request #{{ request_id }}{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-paperclip"></i> Archive supporting files</h1>
+        <p>Request #{{ request_id }} — {{ req.requestor_name }} ({{ req.department }})</p>
+    </div>
+    <div class="card">
+        <div class="card-body">
+            <a href="{{ url_for('archives', tab='payment_requests') }}" class="btn btn-sm btn-secondary" style="margin-bottom: 16px;">
+                <i class="fas fa-arrow-left"></i> Back to Archives
+            </a>
+            {% if file_list %}
+            <p class="text-muted">Files uploaded when this request was archived. Click to download.</p>
+            <ul class="list-group" style="max-width: 600px;">
+                {% for filename in file_list %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-file-alt text-muted"></i> {{ filename }}</span>
+                    <a href="{{ url_for('download_archive_supporting_file', request_id=request_id, filename=filename) }}" class="btn btn-sm btn-outline-primary" download>
+                        <i class="fas fa-download"></i> Download
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-muted">No supporting files were uploaded for this archive.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -5,8 +5,8 @@
 {% block content %}
 <div class="dashboard-container">
     <div class="dashboard-header">
-        <h1><i class="fas fa-archive"></i> Archives</h1>
-        <p>Archived payment requests and item requests - IT Department Only</p>
+        <h2 class="dashboard-title" style="margin:0;"><i class="fas fa-archive"></i> Archives</h2>
+        <p>Archived payment requests and item requests</p>
     </div>
 
     <style>
@@ -19,7 +19,7 @@
     }
     .archives-tabs .tab-button {
         flex: 1;
-        padding: 12px 20px;
+        padding: 8px 14px;
         background: none;
         border: none;
         border-bottom: 3px solid transparent;
@@ -131,6 +131,107 @@
         .archives-filters .assign-search-field {
             width: 100%;
         }
+    }
+    /* Archives action buttons: icon-only, outline (same style as dashboard) */
+    .dashboard-container .btn-view-outline {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        background: transparent !important;
+        border: 1px solid #D9BD7D !important;
+        color: #D9BD7D !important;
+        border-radius: 6px;
+        font-size: 12px;
+        text-decoration: none;
+    }
+    .dashboard-container .btn-view-outline i {
+        color: inherit;
+        font-size: 12px;
+    }
+    .dashboard-container .btn-view-outline:hover {
+        background: #D9BD7D !important;
+        color: #ffffff !important;
+    }
+    .dashboard-container .btn-restore-outline {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        background: transparent !important;
+        border: 1px solid #28a745 !important;
+        color: #28a745 !important;
+        border-radius: 6px;
+        font-size: 12px;
+    }
+    .dashboard-container .btn-restore-outline i {
+        color: inherit;
+        font-size: 12px;
+    }
+    .dashboard-container .btn-restore-outline:hover {
+        background: #28a745 !important;
+        color: #ffffff !important;
+    }
+    .dashboard-container .btn-danger-outline {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        background: transparent !important;
+        border: 1px solid #dc3545 !important;
+        color: #dc3545 !important;
+        border-radius: 6px;
+        font-size: 12px;
+    }
+    .dashboard-container .btn-danger-outline i {
+        color: inherit;
+        font-size: 12px;
+    }
+    .dashboard-container .btn-danger-outline:hover {
+        background: #dc3545 !important;
+        color: #ffffff !important;
+    }
+    .dashboard-container .btn-files-outline {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        background: transparent !important;
+        border: 1px solid #17a2b8 !important;
+        color: #17a2b8 !important;
+        border-radius: 6px;
+        font-size: 12px;
+        text-decoration: none;
+    }
+    .dashboard-container .btn-files-outline i {
+        color: inherit;
+        font-size: 12px;
+    }
+    .dashboard-container .btn-files-outline:hover {
+        background: #17a2b8 !important;
+        color: #ffffff !important;
+    }
+    .dashboard-container .data-table td:last-child form {
+        display: inline;
+    }
+    /* Equal spacing between action buttons (View, Restore, Delete) */
+    .dashboard-container .data-table td:last-child {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+    .dashboard-container .data-table td:last-child > a,
+    .dashboard-container .data-table td:last-child > form {
+        margin: 0;
     }
     </style>
 
@@ -311,9 +412,20 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-info" title="View Request">
+                                    <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-view-outline" title="View Request">
                                         <i class="fas fa-eye"></i>
                                     </a>
+                                    {% if req.has_archive_supporting_files %}
+                                    {% if req.archive_supporting_files_list|length == 1 %}
+                                    <a href="{{ url_for('download_archive_supporting_file', request_id=req.request_id, filename=req.archive_supporting_files_list[0]) }}?view=1" target="_blank" class="btn btn-sm btn-files-outline" title="View supporting file">
+                                        <i class="fas fa-paperclip"></i>
+                                    </a>
+                                    {% else %}
+                                    <a href="#" class="btn btn-sm btn-files-outline archive-files-trigger" title="View supporting files" data-request-id="{{ req.request_id }}" data-archive-files="{{ req.archive_supporting_files or '[]' }}">
+                                        <i class="fas fa-paperclip"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% endif %}
                                     <form method="POST" action="{{ url_for('restore_request', request_id=req.request_id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to restore this request? It will be moved back to active requests.')">
                                         <input type="hidden" name="archives_tab" value="{{ archive_tab }}">
                                         <input type="hidden" name="archives_page" value="{{ pagination.page }}">
@@ -322,8 +434,8 @@
                                         <input type="hidden" name="archives_status" value="{{ status_filter or '' }}">
                                         <input type="hidden" name="archives_search" value="{{ search_query or '' }}">
                                         <input type="hidden" name="archives_urgent" value="{{ urgent_filter or '' }}">
-                                        <button type="submit" class="btn btn-sm btn-success" title="Restore Request">
-                                            <i class="fas fa-undo"></i> Restore
+                                        <button type="submit" class="btn btn-sm btn-restore-outline" title="Restore Request">
+                                            <i class="fas fa-undo"></i>
                                         </button>
                                     </form>
                                     <form method="POST" action="{{ url_for('delete_request_permanently', request_id=req.request_id) }}" style="display: inline;" onsubmit="return confirm('⚠️ WARNING: This will permanently delete request #{{ req.request_id }} from the database. This action CANNOT be undone. The request will be removed from reports, calendar, dashboards, and everywhere else. Are you absolutely sure?')">
@@ -334,8 +446,8 @@
                                         <input type="hidden" name="archives_status" value="{{ status_filter or '' }}">
                                         <input type="hidden" name="archives_search" value="{{ search_query or '' }}">
                                         <input type="hidden" name="archives_urgent" value="{{ urgent_filter or '' }}">
-                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete Permanently">
-                                            <i class="fas fa-trash-alt"></i> Delete Permanently
+                                        <button type="submit" class="btn btn-sm btn-danger-outline" title="Delete Permanently">
+                                            <i class="fas fa-trash-alt"></i>
                                         </button>
                                     </form>
                                 </td>
@@ -416,7 +528,7 @@
                                 <td>{{ req.archived_by or '-' }}</td>
                                 <td>{{ req.archived_at.strftime('%Y-%m-%d %H:%M') if req.archived_at else '-' }}</td>
                                 <td>
-                                    <a href="/procurement/item-request/{{ req.id }}/view" class="btn btn-sm btn-info" title="View"><i class="fas fa-eye"></i></a>
+                                    <a href="/procurement/item-request/{{ req.id }}/view" class="btn btn-sm btn-view-outline" title="View"><i class="fas fa-eye"></i></a>
                                     <form method="POST" action="{{ url_for('restore_item_request', item_request_id=req.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to restore this item request? It will be moved back to Item Requests.')">
                                         <input type="hidden" name="archives_tab" value="{{ archive_tab }}">
                                         <input type="hidden" name="archives_page" value="{{ item_pagination.page }}">
@@ -425,7 +537,7 @@
                                         <input type="hidden" name="archives_status" value="{{ status_filter or '' }}">
                                         <input type="hidden" name="archives_search" value="{{ search_query or '' }}">
                                         <input type="hidden" name="archives_urgent" value="{{ urgent_filter or '' }}">
-                                        <button type="submit" class="btn btn-sm btn-success" title="Restore"><i class="fas fa-undo"></i> Restore</button>
+                                        <button type="submit" class="btn btn-sm btn-restore-outline" title="Restore"><i class="fas fa-undo"></i></button>
                                     </form>
                                     <form method="POST" action="{{ url_for('delete_item_request_permanently', item_request_id=req.id) }}" style="display: inline;" onsubmit="return confirm('⚠️ WARNING: This will permanently delete item request #{{ req.id }} from the database. This action CANNOT be undone. The request will be removed from reports, dashboards, and everywhere else. Are you absolutely sure?')">
                                         <input type="hidden" name="archives_tab" value="{{ archive_tab }}">
@@ -435,8 +547,8 @@
                                         <input type="hidden" name="archives_status" value="{{ status_filter or '' }}">
                                         <input type="hidden" name="archives_search" value="{{ search_query or '' }}">
                                         <input type="hidden" name="archives_urgent" value="{{ urgent_filter or '' }}">
-                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete Permanently">
-                                            <i class="fas fa-trash-alt"></i> Delete Permanently
+                                        <button type="submit" class="btn btn-sm btn-danger-outline" title="Delete Permanently">
+                                            <i class="fas fa-trash-alt"></i>
                                         </button>
                                     </form>
                                 </td>
@@ -500,9 +612,74 @@
     </div>
 </div>
 
+<!-- Archive supporting files modal (app-modal) -->
+<div id="archiveFilesModal" class="app-modal" style="display: none;">
+    <div class="app-modal-overlay" onclick="closeArchiveFilesModal()"></div>
+    <div class="app-modal-container">
+        <div class="app-modal-header">
+            <div class="app-modal-icon"><i class="fas fa-paperclip"></i></div>
+            <h3 class="app-modal-title" id="archiveFilesModalTitle">Archive supporting files</h3>
+        </div>
+        <div class="app-modal-body" id="archiveFilesModalBody">
+            <!-- Filled by JS -->
+        </div>
+        <div class="app-modal-footer">
+            <button type="button" class="app-modal-btn app-modal-btn-secondary" onclick="closeArchiveFilesModal()">Close</button>
+        </div>
+    </div>
+</div>
+
 <script>
 const archiveTab = '{{ archive_tab }}';
 const archivePerPage = {{ pagination.per_page if archive_tab == 'payment_requests' else item_pagination.per_page }};
+const archiveFileViewUrlBase = "{{ url_for('download_archive_supporting_file', request_id=0, filename='__NAME__') }}";
+const archiveFileViewUrlSuffix = "?view=1";
+
+function openArchiveFilesModal(triggerEl) {
+    var requestId = triggerEl.getAttribute('data-request-id');
+    var filesJson = triggerEl.getAttribute('data-archive-files') || '[]';
+    var files = [];
+    try {
+        files = JSON.parse(filesJson);
+        if (!Array.isArray(files)) files = [];
+    } catch (e) {
+        files = [];
+    }
+    var titleEl = document.getElementById('archiveFilesModalTitle');
+    var bodyEl = document.getElementById('archiveFilesModalBody');
+    var modal = document.getElementById('archiveFilesModal');
+    if (!titleEl || !bodyEl || !modal) return;
+    titleEl.textContent = 'Archive supporting files — Request #' + requestId;
+    var html = '';
+    files.forEach(function(filename, index) {
+        var viewUrl = archiveFileViewUrlBase.replace('0', requestId).replace('__NAME__', encodeURIComponent(filename)) + archiveFileViewUrlSuffix;
+        html += '<div style="margin-bottom: 10px; padding: 8px; background: #e7f3ff; border-radius: 4px; border: 1px solid #b3d9ff; display: flex; align-items: center; gap: 10px;">';
+        html += '<a href="' + viewUrl + '" target="_blank" class="btn btn-info" style="background-color: #17a2b8; border-color: #17a2b8; color: white; padding: 6px 12px; font-size: 12px; border-radius: 4px;">';
+        html += '<i class="fas fa-download"></i> View file ' + (index + 1) + '</a>';
+        html += '<small style="color: #666;">' + filename.replace(/</g, '&lt;') + '</small>';
+        html += '</div>';
+    });
+    bodyEl.innerHTML = html || '<p class="text-muted">No files.</p>';
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeArchiveFilesModal() {
+    var modal = document.getElementById('archiveFilesModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.archive-files-trigger').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+            e.preventDefault();
+            openArchiveFilesModal(this);
+        });
+    });
+});
 
 function changeArchivesPerPage(perPage, tab) {
     const department = document.getElementById('departmentFilter').value;

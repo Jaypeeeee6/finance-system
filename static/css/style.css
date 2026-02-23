@@ -5417,6 +5417,17 @@ input:checked + .toggle-slider:before {
     overflow: hidden;
 }
 
+/* Archive supporting files modal: wider container */
+#archiveFilesModal .app-modal-container {
+    max-width: 560px;
+}
+/* Archive supporting files modal: wider View file buttons */
+#archiveFilesModal .app-modal-body .btn.btn-info {
+    min-width: 140px;
+    padding: 8px 20px;
+    justify-content: center;
+}
+
 .app-modal-header {
     padding: 16px 20px;
     display: flex;
@@ -5465,11 +5476,6 @@ input:checked + .toggle-slider:before {
 #archiveRequestModal .app-modal-btn:not(.app-modal-btn-secondary):active {
     background: #bd2130;
 }
-#archiveRequestModal .app-modal-footer {
-    background: transparent;
-    border-top: none;
-}
-
 .app-modal-title {
     font-size: 1.1rem;
     font-weight: 600;
@@ -5497,8 +5503,8 @@ input:checked + .toggle-slider:before {
 
 .app-modal-footer {
     padding: 12px 20px;
-    background: #f8f9fa;
-    border-top: 1px solid #e0e0e0;
+    background: transparent;
+    border-top: none;
     display: flex;
     justify-content: flex-end;
     gap: 12px;
