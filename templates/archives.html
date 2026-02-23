@@ -222,15 +222,19 @@
     .dashboard-container .data-table td:last-child form {
         display: inline;
     }
-    /* Equal spacing between action buttons (View, Restore, Delete) */
+    /* Equal spacing between action buttons (View, Restore, Delete) - keep side by side, match row height */
     .dashboard-container .data-table td:last-child {
-        display: flex;
+        display: table-cell;
+        vertical-align: middle;
+    }
+    .dashboard-container .data-table td:last-child .archives-actions-inner {
+        display: inline-flex;
         align-items: center;
         gap: 4px;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
     }
-    .dashboard-container .data-table td:last-child > a,
-    .dashboard-container .data-table td:last-child > form {
+    .dashboard-container .data-table td:last-child .archives-actions-inner > a,
+    .dashboard-container .data-table td:last-child .archives-actions-inner > form {
         margin: 0;
     }
     </style>
@@ -412,6 +416,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
+                                    <div class="archives-actions-inner">
                                     <a href="{{ url_for('view_request', request_id=req.request_id) }}" class="btn btn-sm btn-view-outline" title="View Request">
                                         <i class="fas fa-eye"></i>
                                     </a>
@@ -426,6 +431,7 @@
                                     </a>
                                     {% endif %}
                                     {% endif %}
+                                    {% if user.department in ['Auditing', 'IT'] %}
                                     <form method="POST" action="{{ url_for('restore_request', request_id=req.request_id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to restore this request? It will be moved back to active requests.')">
                                         <input type="hidden" name="archives_tab" value="{{ archive_tab }}">
                                         <input type="hidden" name="archives_page" value="{{ pagination.page }}">
@@ -450,6 +456,8 @@
                                             <i class="fas fa-trash-alt"></i>
                                         </button>
                                     </form>
+                                    {% endif %}
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -528,7 +536,9 @@
                                 <td>{{ req.archived_by or '-' }}</td>
                                 <td>{{ req.archived_at.strftime('%Y-%m-%d %H:%M') if req.archived_at else '-' }}</td>
                                 <td>
+                                    <div class="archives-actions-inner">
                                     <a href="/procurement/item-request/{{ req.id }}/view" class="btn btn-sm btn-view-outline" title="View"><i class="fas fa-eye"></i></a>
+                                    {% if user.department in ['Auditing', 'IT'] %}
                                     <form method="POST" action="{{ url_for('restore_item_request', item_request_id=req.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to restore this item request? It will be moved back to Item Requests.')">
                                         <input type="hidden" name="archives_tab" value="{{ archive_tab }}">
                                         <input type="hidden" name="archives_page" value="{{ item_pagination.page }}">
@@ -551,6 +561,8 @@
                                             <i class="fas fa-trash-alt"></i>
                                         </button>
                                     </form>
+                                    {% endif %}
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}

@@ -11539,6 +11539,9 @@ def restore_request(request_id):
     if not can_access_archives():
         session['permission_denied'] = 'You do not have permission to perform this action.'
         return redirect(url_for('dashboard'))
+    if current_user.department not in ['Auditing', 'IT']:
+        flash('Only Auditing and IT departments can restore archived requests.', 'danger')
+        return _redirect_to_archives()
     
     req = PaymentRequest.query.get_or_404(request_id)
     
@@ -11653,6 +11656,9 @@ def restore_item_request(item_request_id):
     if not can_access_archives():
         session['permission_denied'] = 'You do not have permission to perform this action.'
         return redirect(url_for('dashboard'))
+    if current_user.department not in ['Auditing', 'IT']:
+        flash('Only Auditing and IT departments can restore archived requests.', 'danger')
+        return _redirect_to_archives(tab='item_requests')
     
     item_req = ProcurementItemRequest.query.get_or_404(item_request_id)
     
@@ -11714,6 +11720,9 @@ def delete_item_request_permanently(item_request_id):
     if not can_access_archives():
         flash('You do not have permission to perform this action.', 'danger')
         return redirect(url_for('dashboard'))
+    if current_user.department not in ['Auditing', 'IT']:
+        flash('Only Auditing and IT departments can permanently delete archived requests.', 'danger')
+        return _redirect_to_archives(tab='item_requests')
     
     item_req = ProcurementItemRequest.query.get_or_404(item_request_id)
     
@@ -11790,6 +11799,9 @@ def delete_request_permanently(request_id):
     if not can_access_archives():
         flash('You do not have permission to perform this action.', 'danger')
         return redirect(url_for('dashboard'))
+    if current_user.department not in ['Auditing', 'IT']:
+        flash('Only Auditing and IT departments can permanently delete archived requests.', 'danger')
+        return _redirect_to_archives()
     
     req = PaymentRequest.query.get_or_404(request_id)
     
