@@ -210,10 +210,10 @@ const TEMPLATES = {
         },
         // Explicit print positions in mm (physical: left/top from top-left of cheque). Used when printing; container has scaleX(-1) so we set style.left = (w - left).
         printFieldsMm: {
-            date:   { left: 65,  top: 10 },
-            payee:  { left: 33,  top: 43 },
-            amount: { left: 110, top: 49 },
-            amountWords: { left: 17, top: 43 },
+            date:   { left: -12,  top: 7 },
+            payee:  { left: -40,  top: 25 },
+            amount: { left: 46, top: 39 },
+            amountWords: { left: -73, top: 32 },
             crossing: { left: 11, top: 5 }
         }
     },
@@ -339,28 +339,15 @@ function getFinalPos(basePct, template, offsets, bankKey, field, mode) {
     const f = mmToPct(fMm, template.chequeSizeMm);
     let leftPct = base.leftPct + g.x + f.x;
     let topPct = base.topPct + g.y + f.y;
-    // Dhofar Islamic Bank: print uses base positions then mirror in applyPositions + CSS scaleX(-1)
-    // (no extra print offsets; alignment fixed by mirroring to match physical cheque orientation)
-    // Dhofar Islamic Bank: print-only date
-    if (bankKey === 'dhofar_islamic' && field === 'date' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
-        leftPct -= (327 / template.imgSizePx.w) * 100;
-        topPct -= (12 / template.imgSizePx.h) * 100;
+    // Dhofar Islamic Bank: print-only positions
+    if (bankKey === 'dhofar_islamic' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
+        if (field === 'date') { leftPct -= (327 / template.imgSizePx.w) * 100; topPct -= (12 / template.imgSizePx.h) * 100; }
+        if (field === 'payee') { leftPct -= (115 / template.imgSizePx.w) * 100; topPct += (10 / template.imgSizePx.h) * 100; }
+        if (field === 'amount') { leftPct -= (239 / template.imgSizePx.w) * 100; topPct += (28 / template.imgSizePx.h) * 100; }
+        if (field === 'amountWords') { leftPct -= (400 / template.imgSizePx.w) * 100; topPct += (20 / template.imgSizePx.h) * 100; }
     }
 
-    // Dhofar Islamic Bank: print-only amount
-    if (bankKey === 'dhofar_islamic' && field === 'amount' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
-        leftPct -= (239 / template.imgSizePx.w) * 100;
-        topPct += (28 / template.imgSizePx.h) * 100;
-    }
-
-    // Dhofar Islamic Bank: print-only amount in words
-    if (bankKey === 'dhofar_islamic' && field === 'amountWords' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
-        leftPct -= (400 / template.imgSizePx.w) * 100;
-        topPct += (20 / template.imgSizePx.h) * 100;
-    }
-
-
-    // Sohar Islamic Bank: print-only positions (each field shifted left individually)
+    // Sohar Islamic Bank: print-only positions
     if (bankKey === 'sohar' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
         if (field === 'date') { leftPct -= (347 / template.imgSizePx.w) * 100; topPct -= (18 / template.imgSizePx.h) * 100; }
         if (field === 'payee') { leftPct -= (315 / template.imgSizePx.w) * 100; topPct += (10 / template.imgSizePx.h) * 100; }
@@ -400,12 +387,7 @@ function applyPositions(canvasEl, pctMap, values, template, forPrint) {
                 // Use physical mm so print position never drifts (percentages on display:none container can resolve inconsistently)
                 // Use physical mm so print position never drifts (percentages on display:none container can resolve inconsistently)
         const final = getFinalPos(pctMap, template, offsets, bankKey, field, mode);
-                // Dhofar Islamic: physical cheque is reversed; mirror horizontal so print aligns
         if (final) {
-                // Dhofar Islamic: physical cheque is reversed; mirror horizontal so print aligns
-                if (bankKey === 'dhofar_islamic') {
-                    leftMm = sizeMm.w - leftMm;
-                }
             if (forPrint) {
                 const leftMm = (final.leftPct / 100) * sizeMm.w;
                 if (bankKey === 'dhofar_islamic') {
