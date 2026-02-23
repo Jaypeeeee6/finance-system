@@ -260,14 +260,38 @@ class PaymentRequest(db.Model):
 
     @property
     def archive_supporting_files_list(self):
-        """List of archive supporting file filenames (empty if none)."""
+        """List of storage filenames for archive supporting files (for URLs)."""
+        raw = self._archive_supporting_files_parsed
+        if not raw:
+            return []
+        return [x["file"] if isinstance(x, dict) else x for x in raw]
+
+    @property
+    def _archive_supporting_files_parsed(self):
+        """Parsed archive_supporting_files: list of dicts {file, name} or legacy list of strings."""
         if not self.archive_supporting_files:
             return []
         try:
-            files = json.loads(self.archive_supporting_files)
-            return files if isinstance(files, list) else []
+            data = json.loads(self.archive_supporting_files)
+            if not isinstance(data, list):
+                return []
+            return data
         except (TypeError, ValueError):
             return []
+
+    @property
+    def archive_supporting_files_with_names(self):
+        """List of {file, name} for modal display (name is original upload name)."""
+        raw = self._archive_supporting_files_parsed
+        if not raw:
+            return []
+        out = []
+        for x in raw:
+            if isinstance(x, dict):
+                out.append({"file": x.get("file", ""), "name": x.get("name", x.get("file", ""))})
+            else:
+                out.append({"file": x, "name": x})
+        return out
 
     def to_dict(self):
         """Convert request to dictionary"""

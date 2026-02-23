@@ -11507,17 +11507,28 @@ def download_archive_supporting_file(request_id, filename):
                 allowed = []
         except (TypeError, ValueError):
             allowed = []
-    # Prevent path traversal: only allow exact basename from the list
+    # Support both [{"file": "storage.pdf", "name": "Original.pdf"}] and legacy ["storage.pdf"]
+    allowed_filenames = []
+    display_names = {}
+    for x in allowed:
+        if isinstance(x, dict):
+            fn = x.get('file')
+            if fn:
+                allowed_filenames.append(fn)
+                if x.get('name'):
+                    display_names[fn] = x['name']
+        else:
+            allowed_filenames.append(x)
     safe_name = os.path.basename(filename)
-    if safe_name not in allowed:
+    if safe_name not in allowed_filenames:
         abort(404)
     upload_folder = app.config['UPLOAD_FOLDER']
     filepath = os.path.join(upload_folder, safe_name)
     if not os.path.isfile(filepath):
         abort(404)
-    # view=1: open in browser (e.g. PDF/image); otherwise download
+    download_name = display_names.get(safe_name, safe_name)
     as_attachment = not request.args.get('view', type=bool)
-    return send_from_directory(upload_folder, safe_name, as_attachment=as_attachment, download_name=safe_name)
+    return send_from_directory(upload_folder, safe_name, as_attachment=as_attachment, download_name=download_name)
 
 
 @app.route('/request/<int:request_id>/restore', methods=['POST'])
@@ -19005,7 +19016,7 @@ def delete_request(request_id):
             filename = f"archive_support_{request_id}_{timestamp}_{filename}"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             f.save(filepath)
-            saved_paths.append(filename)
+            saved_paths.append({"file": filename, "name": original_name})
     if saved_paths:
         req.archive_supporting_files = json.dumps(saved_paths)
     
@@ -19182,7 +19193,7 @@ def bulk_delete_requests():
             filename = f"archive_support_bulk_{timestamp}_{filename}"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             f.save(filepath)
-            saved_paths.append(filename)
+            saved_paths.append({"file": filename, "name": original_name})
     archive_supporting_files_json = json.dumps(saved_paths) if saved_paths else None
     
     archived_count = 0

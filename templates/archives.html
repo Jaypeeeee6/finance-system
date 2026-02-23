@@ -651,12 +651,14 @@ function openArchiveFilesModal(triggerEl) {
     if (!titleEl || !bodyEl || !modal) return;
     titleEl.textContent = 'Archive supporting files — Request #' + requestId;
     var html = '';
-    files.forEach(function(filename, index) {
-        var viewUrl = archiveFileViewUrlBase.replace('0', requestId).replace('__NAME__', encodeURIComponent(filename)) + archiveFileViewUrlSuffix;
+    files.forEach(function(item, index) {
+        var storageFile = typeof item === 'object' && item !== null && item.file ? item.file : item;
+        var displayName = typeof item === 'object' && item !== null && item.name ? item.name : item;
+        var viewUrl = archiveFileViewUrlBase.replace('0', requestId).replace('__NAME__', encodeURIComponent(storageFile)) + archiveFileViewUrlSuffix;
         html += '<div style="margin-bottom: 10px; padding: 8px; background: #e7f3ff; border-radius: 4px; border: 1px solid #b3d9ff; display: flex; align-items: center; gap: 10px;">';
         html += '<a href="' + viewUrl + '" target="_blank" class="btn btn-info" style="background-color: #17a2b8; border-color: #17a2b8; color: white; padding: 6px 12px; font-size: 12px; border-radius: 4px;">';
         html += '<i class="fas fa-download"></i> View file ' + (index + 1) + '</a>';
-        html += '<small style="color: #666;">' + filename.replace(/</g, '&lt;') + '</small>';
+        html += '<small style="color: #666;">' + String(displayName).replace(/</g, '&lt;').replace(/"/g, '&quot;') + '</small>';
         html += '</div>';
     });
     bodyEl.innerHTML = html || '<p class="text-muted">No files.</p>';
