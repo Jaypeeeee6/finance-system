@@ -614,6 +614,23 @@ def role_required(*roles):
     return decorator
 
 
+def can_access_archives():
+    """True if current user is allowed to view and use the Archives page (GM, CEO, Operation Manager, Auditing, Abdalaziz, or IT)."""
+    if current_user.role in ['GM', 'CEO', 'Operation Manager']:
+        return True
+    if current_user.name == 'Abdalaziz Al-Brashdi':
+        return True
+    if current_user.department == 'Auditing' and current_user.role in ['Department Manager', 'Auditing Staff']:
+        return True
+    if current_user.role == 'IT Staff':
+        return True
+    if current_user.role == 'Department Manager' and current_user.department == 'IT':
+        return True
+    if current_user.role == 'Finance Admin' and current_user.name == 'Abdalaziz Al-Brashdi':
+        return True
+    return False
+
+
 def log_action(action):
     """Helper function to log user actions"""
     if current_user.is_authenticated:
@@ -11350,11 +11367,10 @@ def _redirect_to_archives(tab=None, page=1, per_page=10):
 
 @app.route('/it/archives')
 @login_required
-@role_required('IT Staff', 'Department Manager')
+@role_required('IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Manager', 'Auditing Staff', 'Finance Admin')
 def archives():
-    """Archives page for IT department - shows archived payment requests and item requests"""
-    # Restrict Department Managers to IT department only
-    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+    """Archives page - shows archived payment requests and item requests (IT, GM, CEO, Operation Manager, Auditing, Abdalaziz)."""
+    if not can_access_archives():
         session['permission_denied'] = 'You do not have permission to access this page.'
         return redirect(url_for('dashboard'))
     
@@ -11452,12 +11468,11 @@ def archives():
 
 @app.route('/request/<int:request_id>/restore', methods=['POST'])
 @login_required
-@role_required('IT Staff', 'Department Manager')
+@role_required('IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Manager', 'Auditing Staff', 'Finance Admin')
 def restore_request(request_id):
-    """Restore an archived payment request (IT only)"""
-    # Restrict Department Managers to IT department only
-    if current_user.role == 'Department Manager' and current_user.department != 'IT':
-        session['permission_denied'] = 'You do not have permission to access this page.'
+    """Restore an archived payment request (IT, GM, CEO, Operation Manager, Auditing, Abdalaziz)."""
+    if not can_access_archives():
+        session['permission_denied'] = 'You do not have permission to perform this action.'
         return redirect(url_for('dashboard'))
     
     req = PaymentRequest.query.get_or_404(request_id)
@@ -11567,10 +11582,10 @@ def restore_request(request_id):
 
 @app.route('/item-request/<int:item_request_id>/restore', methods=['POST'])
 @login_required
-@role_required('IT Staff', 'Department Manager')
+@role_required('IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Manager', 'Auditing Staff', 'Finance Admin')
 def restore_item_request(item_request_id):
-    """Restore an archived item request (IT only)"""
-    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+    """Restore an archived item request (IT, GM, CEO, Operation Manager, Auditing, Abdalaziz)."""
+    if not can_access_archives():
         session['permission_denied'] = 'You do not have permission to perform this action.'
         return redirect(url_for('dashboard'))
     
@@ -11628,10 +11643,10 @@ def restore_item_request(item_request_id):
 
 @app.route('/item-request/<int:item_request_id>/delete_permanently', methods=['POST'])
 @login_required
-@role_required('IT Staff', 'Department Manager')
+@role_required('IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Manager', 'Auditing Staff', 'Finance Admin')
 def delete_item_request_permanently(item_request_id):
-    """Permanently delete an archived item request from the database (IT only)"""
-    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+    """Permanently delete an archived item request (IT, GM, CEO, Operation Manager, Auditing, Abdalaziz)."""
+    if not can_access_archives():
         flash('You do not have permission to perform this action.', 'danger')
         return redirect(url_for('dashboard'))
     
@@ -11704,11 +11719,10 @@ def delete_item_request_permanently(item_request_id):
 
 @app.route('/request/<int:request_id>/delete_permanently', methods=['POST'])
 @login_required
-@role_required('IT Staff', 'Department Manager')
+@role_required('IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Manager', 'Auditing Staff', 'Finance Admin')
 def delete_request_permanently(request_id):
-    """Permanently delete a payment request from the database (IT only)"""
-    # Restrict Department Managers to IT department only
-    if current_user.role == 'Department Manager' and current_user.department != 'IT':
+    """Permanently delete a payment request (IT, GM, CEO, Operation Manager, Auditing, Abdalaziz)."""
+    if not can_access_archives():
         flash('You do not have permission to perform this action.', 'danger')
         return redirect(url_for('dashboard'))
     

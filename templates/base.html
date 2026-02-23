@@ -203,7 +203,7 @@
                 <li class="nav-menu-desktop-hidden"><a href="{{ url_for('procurement_item_requests') }}" class="nav-link"><i class="fas fa-shopping-cart"></i> Item Requests</a></li>
                 {% endif %}
                 {# Sidebar-only links: visible in hamburger menu from 1024px down #}
-                {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT') or current_user.name == 'Super Admin') and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
+                {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT') or current_user.name == 'Super Admin' or current_user.role in ['GM', 'CEO', 'Operation Manager'] or current_user.department == 'Auditing' or current_user.name == 'Abdalaziz Al-Brashdi') and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
                 <li class="nav-menu-sidebar-only"><a href="{{ url_for('archives') }}" class="nav-link"><i class="fas fa-archive"></i> Archives</a></li>
                 {% endif %}
                 {% if (current_user.role == 'Operation Manager' or current_user.department == 'IT' or current_user.role in ['GM', 'CEO'] or current_user.department == 'Auditing') and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
@@ -324,7 +324,7 @@
                     <span>Item Requests</span>
                 </a>
                 {% endif %}
-                {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT') or current_user.name == 'Super Admin') and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
+                {% if (current_user.role == 'IT Staff' or (current_user.role == 'Department Manager' and current_user.department == 'IT') or current_user.name == 'Super Admin' or current_user.role in ['GM', 'CEO', 'Operation Manager'] or current_user.department == 'Auditing' or current_user.name == 'Abdalaziz Al-Brashdi') and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
                 <a href="{{ url_for('archives') }}" class="desktop-sidebar-item {% if flask_request.path.startswith(url_for('archives')) %}active{% endif %}">
                     <i class="fas fa-archive"></i>
                     <span>Archives</span>
