@@ -485,24 +485,24 @@
     <button type="button" class="support-fab" id="support-fab" aria-label="Get support">
         <i class="fas fa-headset"></i>
     </button>
-    <div id="supportHelpModal" class="support-help-modal" style="display: none;">
-        <div class="support-help-overlay" onclick="closeSupportHelpModal()"></div>
-        <div class="support-help-container">
-            <div class="support-help-header">
-                <div class="support-help-icon"><i class="fas fa-headset"></i></div>
-                <h3 class="support-help-title">Get Help from IT</h3>
+    <div id="supportHelpModal" class="app-modal" style="display: none;">
+        <div class="app-modal-overlay" onclick="closeSupportHelpModal()"></div>
+        <div class="app-modal-container">
+            <div class="app-modal-header">
+                <div class="app-modal-icon"><i class="fas fa-headset"></i></div>
+                <h3 class="app-modal-title">Get Help from IT</h3>
             </div>
-            <div class="support-help-body">
-                <div class="support-help-message">
+            <div class="app-modal-body">
+                <div class="app-modal-message">
                     Contact the IT department for support. Use the ticketing system to submit a support request.
                 </div>
-                <div class="support-help-message support-help-arabic" dir="rtl">
+                <div class="app-modal-message app-modal-message-rtl" dir="rtl">
                     للحصول على الدعم، تواصل مع قسم الـ IT وقدّم طلبك من خلال نظام التذاكر.
                 </div>
             </div>
-            <div class="support-help-footer">
-                <button type="button" class="support-help-btn support-help-btn-close" onclick="closeSupportHelpModal()">Cancel</button>
-                <a href="https://ticketing.maagroup.om" target="_blank" rel="noopener noreferrer" class="support-help-btn">
+            <div class="app-modal-footer">
+                <button type="button" class="app-modal-btn app-modal-btn-secondary" onclick="closeSupportHelpModal()">Cancel</button>
+                <a href="https://ticketing.maagroup.om" target="_blank" rel="noopener noreferrer" class="app-modal-btn">
                     <i class="fas fa-external-link-alt"></i> Ask IT Support
                 </a>
             </div>

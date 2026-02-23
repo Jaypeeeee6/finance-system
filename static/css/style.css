@@ -5381,8 +5381,13 @@ input:checked + .toggle-slider:before {
     }
 }
 
-/* Support Modal - same style as item-request-error-modal (new request page) */
-.support-help-modal {
+/* ==========================================================================
+   Reusable app modal (same styles as Get Help from IT / support modal).
+   Use these classes for consistent modals across the app.
+   Structure: .app-modal > .app-modal-overlay + .app-modal-container
+   where .app-modal-container has .app-modal-header, .app-modal-body, .app-modal-footer.
+   ========================================================================== */
+.app-modal {
     position: fixed !important;
     inset: 0 !important;
     display: none !important;
@@ -5392,17 +5397,17 @@ input:checked + .toggle-slider:before {
     background: transparent !important;
 }
 
-.support-help-modal[style*="flex"] {
+.app-modal[style*="flex"] {
     display: flex !important;
 }
 
-.support-help-overlay {
+.app-modal-overlay {
     position: absolute;
     inset: 0;
     background: rgba(0, 0, 0, 0.5);
 }
 
-.support-help-container {
+.app-modal-container {
     position: relative;
     background: white;
     border-radius: 4px;
@@ -5412,7 +5417,7 @@ input:checked + .toggle-slider:before {
     overflow: hidden;
 }
 
-.support-help-header {
+.app-modal-header {
     padding: 16px 20px;
     display: flex;
     align-items: center;
@@ -5420,7 +5425,7 @@ input:checked + .toggle-slider:before {
     border-bottom: 1px solid #e0e0e0;
 }
 
-.support-help-icon {
+.app-modal-icon {
     width: 24px;
     height: 24px;
     background: #D9BD7D;
@@ -5434,19 +5439,19 @@ input:checked + .toggle-slider:before {
     flex-shrink: 0;
 }
 
-.support-help-title {
+.app-modal-title {
     font-size: 1.1rem;
     font-weight: 600;
     margin: 0;
     color: #D9BD7D;
 }
 
-.support-help-body {
+.app-modal-body {
     padding: 20px;
     color: #212529;
 }
 
-.support-help-message {
+.app-modal-message {
     font-size: 0.95rem;
     line-height: 1.5;
     margin-bottom: 12px;
@@ -5454,12 +5459,12 @@ input:checked + .toggle-slider:before {
     font-weight: 500;
 }
 
-.support-help-arabic {
+.app-modal-message-rtl {
     margin-bottom: 0;
     margin-top: 8px;
 }
 
-.support-help-footer {
+.app-modal-footer {
     padding: 12px 20px;
     background: #f8f9fa;
     border-top: 1px solid #e0e0e0;
@@ -5468,7 +5473,7 @@ input:checked + .toggle-slider:before {
     gap: 12px;
 }
 
-.support-help-btn {
+.app-modal-btn {
     background: #D9BD7D;
     color: white;
     border: none;
@@ -5485,23 +5490,23 @@ input:checked + .toggle-slider:before {
     gap: 6px;
 }
 
-.support-help-btn:hover {
+.app-modal-btn:hover {
     background: #c8ac65;
     color: white;
 }
 
-.support-help-btn:active {
+.app-modal-btn:active {
     background: #b89b58;
 }
 
-.support-help-btn-close {
+.app-modal-btn-secondary {
     background: #6c757d;
 }
 
-.support-help-btn-close:hover {
+.app-modal-btn-secondary:hover {
     background: #5a6268;
 }
 
-.support-help-btn-close:active {
+.app-modal-btn-secondary:active {
     background: #545b62;
 }
