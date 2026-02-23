@@ -18859,12 +18859,11 @@ def reassign_manager(request_id):
 
 @app.route('/request/<int:request_id>/delete', methods=['POST'])
 @login_required
-@role_required('IT Staff', 'Department Manager')
+@role_required('IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Manager', 'Auditing Staff', 'Finance Admin')
 def delete_request(request_id):
-    """Archive a payment request (IT only) - soft delete"""
-    # Restrict Department Managers to IT department only
-    if current_user.role == 'Department Manager' and current_user.department != 'IT':
-        flash('You do not have permission to access this page.', 'danger')
+    """Archive a payment request (soft delete) - IT, GM, CEO, Operation Manager, Auditing, Abdalaziz."""
+    if not can_access_archives():
+        flash('You do not have permission to perform this action.', 'danger')
         return redirect(url_for('dashboard'))
     
     req = PaymentRequest.query.get_or_404(request_id)
@@ -18958,6 +18957,8 @@ def delete_request(request_id):
             print(f"Error emitting WebSocket notification: {e}")
     
     flash(f'Payment request #{request_id} has been archived.', 'success')
+    if current_user.department == 'Auditing':
+        return redirect(url_for('department_dashboard'))
     return redirect(url_for('it_dashboard'))
 
 
@@ -19031,18 +19032,19 @@ def archive_item_request(item_request_id):
 
 @app.route('/bulk-delete-requests', methods=['POST'])
 @login_required
-@role_required('IT Staff', 'Department Manager')
+@role_required('IT Staff', 'Department Manager', 'GM', 'CEO', 'Operation Manager', 'Auditing Staff', 'Finance Admin')
 def bulk_delete_requests():
-    """Bulk archive payment requests (IT only) - soft delete"""
-    # Restrict Department Managers to IT department only
-    if current_user.role == 'Department Manager' and current_user.department != 'IT':
-        flash('You do not have permission to access this page.', 'danger')
+    """Bulk archive payment requests (soft delete) - IT, GM, CEO, Operation Manager, Auditing, Abdalaziz."""
+    if not can_access_archives():
+        flash('You do not have permission to perform this action.', 'danger')
         return redirect(url_for('dashboard'))
     
     request_ids = request.form.getlist('request_ids')
     
     if not request_ids:
         flash('No requests selected for archiving.', 'warning')
+        if current_user.department == 'Auditing':
+            return redirect(url_for('department_dashboard'))
         return redirect(url_for('it_dashboard'))
     
     archived_count = 0
@@ -19125,6 +19127,8 @@ def bulk_delete_requests():
         flash(f'{archived_count} payment request(s) have been archived. {already_archived_count} were already archived.', 'success')
     else:
         flash(f'{archived_count} payment request(s) have been archived.', 'success')
+    if current_user.department == 'Auditing':
+        return redirect(url_for('department_dashboard'))
     return redirect(url_for('it_dashboard'))
 
 @app.route('/request/<int:request_id>/mark-installment-paid', methods=['POST'])
