@@ -67,6 +67,7 @@
                 <img src="{{ url_for('static', filename='css/icons/search.svg') }}" class="assign-search-icon" alt="Search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%);" onclick="document.getElementById('tabSearchInput').focus();" >
                 <input type="search" id="tabSearchInput" class="form-control assign-search-input" placeholder="Search by request # or requestor name" aria-label="Search requests" style="padding-left:44px; width:100%;" value="{{ search_query or '' }}">
             </div>
+            <button type="button" class="filter-toggle-btn" aria-label="Open filters"><i class="fas fa-sliders"></i></button>
         </div>
         <div class="filters-right" style="margin-left:auto;">
             <div class="filter-controls">

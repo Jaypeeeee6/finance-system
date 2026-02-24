@@ -1023,6 +1023,218 @@
     });
     </script>
     
+    <!-- Filter bottom sheet (768px down): popup for dashboard filter dropdowns -->
+    <div id="filter-bottom-sheet" class="filter-bottom-sheet" aria-hidden="true">
+        <div class="filter-bottom-sheet-backdrop" id="filter-sheet-backdrop" aria-label="Close filters"></div>
+        <div class="filter-bottom-sheet-panel">
+            <div class="filter-bottom-sheet-header">
+                <h3 class="filter-bottom-sheet-title">Filters</h3>
+                <button type="button" class="filter-bottom-sheet-close" id="filter-sheet-close" aria-label="Close filters">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="filter-bottom-sheet-content" id="filter-sheet-content"></div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var _filterSheetRestoreParent = null;
+        var _filterSheetScrollY = 0;
+        var _filterHeadingMap = { departmentFilter: 'Department', statusFilter: 'Status', urgentFilter: 'Urgent', locationFilter: 'Location' };
+        var _filterSheetMeasureSpan = null;
+        function getFilterHeading(select) {
+            var id = select.id || '';
+            return _filterHeadingMap[id] || (id.replace(/([A-Z])/g, ' $1').replace(/^./, function(s) { return s.toUpperCase(); }).trim()) || 'Filter';
+        }
+        function sizeFilterSelectToOption(select) {
+            if (!select || !select.options || select.options.length === 0) return;
+            var text = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
+            if (!_filterSheetMeasureSpan) {
+                _filterSheetMeasureSpan = document.createElement('span');
+                _filterSheetMeasureSpan.setAttribute('aria-hidden', 'true');
+                _filterSheetMeasureSpan.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;pointer-events:none;';
+                document.body.appendChild(_filterSheetMeasureSpan);
+            }
+            var st = window.getComputedStyle(select);
+            _filterSheetMeasureSpan.style.font = st.font;
+            _filterSheetMeasureSpan.style.fontSize = st.fontSize;
+            _filterSheetMeasureSpan.style.fontFamily = st.fontFamily;
+            _filterSheetMeasureSpan.style.fontWeight = st.fontWeight;
+            _filterSheetMeasureSpan.style.letterSpacing = st.letterSpacing;
+            _filterSheetMeasureSpan.textContent = text;
+            var w = _filterSheetMeasureSpan.offsetWidth + 24;
+            select.style.width = Math.min(w, 280) + 'px';
+            select.style.minWidth = '0';
+        }
+        function wrapFilterControlsInSheet(controls) {
+            if (!controls || controls.querySelector('.filter-sheet-row')) return;
+            var selects = controls.querySelectorAll('select.form-select, select');
+            selects.forEach(function(select) {
+                select._originalOnChange = select.onchange;
+                select.onchange = null;
+                var row = document.createElement('div');
+                row.className = 'filter-sheet-row';
+                var heading = document.createElement('span');
+                heading.className = 'filter-sheet-heading';
+                heading.textContent = getFilterHeading(select);
+                var right = document.createElement('div');
+                right.className = 'filter-sheet-right';
+                var valueSpan = document.createElement('span');
+                valueSpan.className = 'filter-sheet-value';
+                valueSpan.textContent = select.selectedIndex > 0 ? select.options[select.selectedIndex].text : '';
+                var clearBtn = document.createElement('button');
+                clearBtn.type = 'button';
+                clearBtn.className = 'filter-sheet-clear';
+                clearBtn.setAttribute('aria-label', 'Clear filter');
+                clearBtn.innerHTML = '<i class="fas fa-times"></i>';
+                if (select.selectedIndex > 0) clearBtn.classList.add('filter-sheet-clear-visible');
+                clearBtn.addEventListener('click', function() {
+                    select.value = select.options[0] ? select.options[0].value : '';
+                    valueSpan.textContent = '';
+                    clearBtn.classList.remove('filter-sheet-clear-visible');
+                    select.dispatchEvent(new Event('change'));
+                });
+                select.addEventListener('change', function() {
+                    var hasVal = select.selectedIndex > 0;
+                    valueSpan.textContent = hasVal ? select.options[select.selectedIndex].text : '';
+                    clearBtn.classList.toggle('filter-sheet-clear-visible', hasVal);
+                    right.classList.toggle('filter-sheet-has-value', hasVal);
+                    sizeFilterSelectToOption(select);
+                    updateFilterCountBadge();
+                });
+                right.classList.toggle('filter-sheet-has-value', select.selectedIndex > 0);
+                var chevronSpan = document.createElement('span');
+                chevronSpan.className = 'filter-sheet-chevron';
+                chevronSpan.setAttribute('aria-hidden', 'true');
+                chevronSpan.innerHTML = '<i class="fas fa-chevron-down"></i>';
+                right.appendChild(chevronSpan);
+                right.appendChild(valueSpan);
+                right.appendChild(clearBtn);
+                row.appendChild(heading);
+                row.appendChild(right);
+                controls.insertBefore(row, select);
+                right.insertBefore(select, chevronSpan);
+                sizeFilterSelectToOption(select);
+            });
+        }
+        function unwrapFilterControlsInSheet(controls) {
+            if (!controls) return;
+            var rows = controls.querySelectorAll('.filter-sheet-row');
+            rows.forEach(function(row) {
+                var select = row.querySelector('select');
+                if (select) {
+                    select.style.width = '';
+                    select.style.minWidth = '';
+                    if (select._originalOnChange) { select.onchange = select._originalOnChange; delete select._originalOnChange; }
+                    controls.appendChild(select);
+                }
+                row.remove();
+            });
+        }
+        var _filterParamMap = { departmentFilter: 'department', statusFilter: 'status', urgentFilter: 'urgent', location_filter: 'location' };
+        function applyFiltersFromSheetAndNavigate(controls, container) {
+            if (!controls) return;
+            var url = new URL(window.location.href);
+            url.searchParams.set('page', '1');
+            controls.querySelectorAll('select').forEach(function(select) {
+                var param = _filterParamMap[select.id] || select.id;
+                if (select.value) url.searchParams.set(param, select.value);
+                else url.searchParams.delete(param);
+            });
+            var searchInput = container && (container.querySelector('#tabSearchInput') || container.querySelector('input[type="search"]'));
+            if (searchInput) {
+                var v = (searchInput.value || '').trim();
+                if (v) url.searchParams.set('search', v);
+                else url.searchParams.delete('search');
+            }
+            window.location.href = url.toString();
+        }
+        function openFilterSheet(button) {
+            var container = button && button.closest && button.closest('.filters-container');
+            if (!container) return;
+            var filtersRight = container.querySelector('.filters-right');
+            var controls = filtersRight && filtersRight.querySelector('.filter-controls');
+            if (!controls) return;
+            var sheet = document.getElementById('filter-bottom-sheet');
+            var content = document.getElementById('filter-sheet-content');
+            if (!sheet || !content) return;
+            _filterSheetRestoreParent = filtersRight;
+            content.appendChild(controls);
+            wrapFilterControlsInSheet(controls);
+            sheet.classList.add('filter-bottom-sheet-open');
+            sheet.setAttribute('aria-hidden', 'false');
+            _filterSheetScrollY = window.scrollY || window.pageYOffset;
+            document.documentElement.classList.add('filter-sheet-open');
+            document.body.classList.add('filter-sheet-open');
+            document.body.style.top = '-' + _filterSheetScrollY + 'px';
+        }
+        function closeFilterSheet() {
+            var sheet = document.getElementById('filter-bottom-sheet');
+            var content = document.getElementById('filter-sheet-content');
+            if (!sheet || !content) return;
+            var controls = content.querySelector('.filter-controls');
+            if (controls && _filterSheetRestoreParent) {
+                var container = _filterSheetRestoreParent.closest('.filters-container');
+                unwrapFilterControlsInSheet(controls);
+                _filterSheetRestoreParent.appendChild(controls);
+                applyFiltersFromSheetAndNavigate(controls, container);
+                _filterSheetRestoreParent = null;
+                sheet.classList.remove('filter-bottom-sheet-open');
+                sheet.setAttribute('aria-hidden', 'true');
+                document.documentElement.classList.remove('filter-sheet-open');
+                document.body.classList.remove('filter-sheet-open');
+                document.body.style.top = '';
+                window.scrollTo(0, _filterSheetScrollY);
+                updateFilterCountBadge();
+                return;
+            }
+            _filterSheetRestoreParent = null;
+            sheet.classList.remove('filter-bottom-sheet-open');
+            sheet.setAttribute('aria-hidden', 'true');
+            document.documentElement.classList.remove('filter-sheet-open');
+            document.body.classList.remove('filter-sheet-open');
+            document.body.style.top = '';
+            window.scrollTo(0, _filterSheetScrollY);
+            updateFilterCountBadge();
+        }
+        function updateFilterCountBadge() {
+            var controls = document.querySelector('.dashboard-container .filter-controls') || document.querySelector('.archives-filters .filter-controls') || document.querySelector('#filter-sheet-content .filter-controls');
+            if (!controls) return;
+            var count = 0;
+            controls.querySelectorAll('select').forEach(function(s) { if (s.value !== '') count++; });
+            document.querySelectorAll('.filter-count-badge').forEach(function(badge) {
+                badge.textContent = count;
+                badge.style.display = count > 0 ? 'flex' : 'none';
+            });
+        }
+        document.querySelectorAll('.filter-toggle-btn').forEach(function(btn) {
+            if (btn.querySelector('.filter-count-badge')) return;
+            var span = document.createElement('span');
+            span.className = 'filter-count-badge';
+            span.setAttribute('aria-hidden', 'true');
+            span.style.display = 'none';
+            span.textContent = '0';
+            btn.style.position = 'relative';
+            btn.appendChild(span);
+        });
+        updateFilterCountBadge();
+        document.addEventListener('click', function(e) {
+            var openBtn = e.target && e.target.closest && e.target.closest('.filter-toggle-btn');
+            if (openBtn) {
+                e.preventDefault();
+                openFilterSheet(openBtn);
+                return;
+            }
+            if (e.target.id === 'filter-sheet-backdrop' || (e.target.closest && e.target.closest('#filter-sheet-close'))) {
+                closeFilterSheet();
+            }
+        });
+        document.getElementById('filter-sheet-close') && document.getElementById('filter-sheet-close').addEventListener('click', closeFilterSheet);
+        document.getElementById('filter-sheet-backdrop') && document.getElementById('filter-sheet-backdrop').addEventListener('click', closeFilterSheet);
+    })();
+    </script>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

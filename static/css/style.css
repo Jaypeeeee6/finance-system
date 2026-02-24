@@ -491,6 +491,11 @@
     top: 50%;
     transform: translateY(-50%);
 }
+/* Filter icon button: shown only at 768px down (see responsive.css) */
+.filter-toggle-btn {
+    display: none;
+}
+
 .filters-right {
     margin-left: auto !important;
     display: flex !important;
@@ -3347,10 +3352,34 @@ body.flash-error-open {
         padding: 1rem;
     }
 
+    /* Smaller navbar brand, logo, and icons from 768px down */
+    .nav-brand {
+        font-size: 1.2rem;
+    }
+    .nav-brand i {
+        font-size: 1.4rem;
+    }
+    .nav-brand-logo {
+        height: 28px;
+        margin-right: 0.75rem;
+    }
+    .hamburger-menu span {
+        width: 22px;
+        height: 2.5px;
+    }
+    .hamburger-menu.active span:nth-child(1) {
+        transform: rotate(45deg) translate(5px, 5px);
+    }
+    .hamburger-menu.active span:nth-child(3) {
+        transform: rotate(-45deg) translate(5px, -5px);
+    }
+
+    /* 768px down: block layout so paragraph sits directly below heading */
     .dashboard-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 1rem;
+        display: block;
+    }
+    .dashboard-header > p {
+        margin-top: 0.25rem;
     }
 
     .stats-grid {
@@ -3372,6 +3401,27 @@ body.flash-error-open {
     .dashboard-actions {
         flex-direction: column;
     }
+    /* Wrapper (e.g. new-request-dropdown) full width so its button matches width of other buttons */
+    .dashboard-container .dashboard-actions > .new-request-dropdown {
+        width: 100%;
+    }
+    .dashboard-container .dashboard-actions > .new-request-dropdown .btn {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    /* Buttons below heading: slightly smaller, consistent text style (all buttons and links) */
+    .dashboard-container .dashboard-actions .btn {
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+        gap: 0.4rem;
+    }
+    .dashboard-container .dashboard-actions .btn,
+    .dashboard-container .dashboard-actions .btn i,
+    .dashboard-container .dashboard-actions .btn span {
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+    }
 
     .btn {
         width: 100%;
@@ -3380,6 +3430,7 @@ body.flash-error-open {
 
     .main-content {
         padding: 0 1rem;
+        margin-top: 0.75rem;
     }
 
     .modal-content {

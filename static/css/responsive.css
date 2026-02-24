@@ -2,6 +2,15 @@
     display: none;
 }
 
+/* Filter icon button: only visible from 768px down to smallest; always hidden above 768px */
+@media (min-width: 769px) {
+    .filter-toggle-btn,
+    .dashboard-container .filters-container .filter-toggle-btn,
+    .archives-filters .filters-container .filter-toggle-btn {
+        display: none !important;
+    }
+}
+
 @media (max-width: 1024px) {
     /* Pagination: show info above buttons on responsive */
     .pagination-container { flex-direction: column; align-items: center; gap: 0.5rem; width: 100%; }
@@ -340,6 +349,15 @@
 }
 
 @media (max-width: 768px) {
+    /* Navbar: smaller bell and icon from 768px down */
+    .notification-bell-container-responsive .notification-bell {
+        padding: 0.55rem 0.75rem;
+        font-size: 1.1rem;
+    }
+    .notification-bell-container-responsive .notification-bell i {
+        font-size: 1.25rem;
+    }
+
     /* Pagination: stack info above buttons */
     .pagination-container { flex-direction: column; align-items: center; gap: 0.5rem; width: 100%; }
     .pagination-info { text-align: center; width: 100%; }
@@ -441,6 +459,281 @@
         padding-right: 1rem !important;
     }
 
+    /* 768px down: filter icon button next to search; filters move to bottom sheet */
+    .dashboard-container .filters-container .filters-left {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        width: 100% !important;
+    }
+    .dashboard-container .filters-container .filters-left .assign-search-field {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+    }
+    .dashboard-container .filters-container .filters-right {
+        display: none !important; /* filters shown in bottom sheet instead */
+    }
+    /* Filter button visible only in this breakpoint (768px down); hidden above by min-width: 769px rule */
+    .dashboard-container .filters-container .filter-toggle-btn {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        width: 38px !important;
+        height: 38px !important;
+        min-width: 38px !important;
+        padding: 0 !important;
+        border: 1px solid #ced4da !important;
+        border-radius: 8px !important;
+        background: #ffffff !important;
+        color: #495057 !important;
+        cursor: pointer;
+        flex-shrink: 0;
+        position: relative;
+    }
+    .dashboard-container .filters-container .filter-toggle-btn .filter-count-badge,
+    .archives-filters .filters-container .filter-toggle-btn .filter-count-badge {
+        position: absolute;
+        top: -0.25rem;
+        right: -0.25rem;
+        background: var(--danger-color, #dc3545);
+        color: #fff;
+        border-radius: 50%;
+        font-size: 0.7rem;
+        font-weight: 600;
+        min-width: 1.2rem;
+        height: 1.2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+    }
+    .dashboard-container .filters-container .filter-toggle-btn:hover {
+        background: #f8f9fa !important;
+        border-color: #D9BD7D !important;
+        color: #212529 !important;
+    }
+    .dashboard-container .filters-container .filter-toggle-btn i {
+        font-size: 1.1rem;
+    }
+    /* Archives page: same filter button and hide filters at 768px */
+    .archives-filters .filters-right {
+        display: none !important;
+    }
+    .archives-filters .filters-container .filter-toggle-btn {
+        display: flex !important;
+        position: relative;
+    }
+
+    /* 768px down: hide orange filter chip and Clear All inside payment requests table container */
+    .dashboard-container .card .filter-indicator,
+    .archives-filters .card .filter-indicator {
+        display: none !important;
+    }
+
+    /* Filter bottom sheet: lock main page scroll when open (768px down) */
+    html.filter-sheet-open,
+    body.filter-sheet-open {
+        overflow: hidden !important;
+        position: fixed !important;
+        width: 100% !important;
+        left: 0 !important;
+    }
+
+    /* Filter bottom sheet: popup from bottom (768px down) */
+    .filter-bottom-sheet {
+        position: fixed;
+        inset: 0;
+        z-index: 1050;
+        pointer-events: none;
+        visibility: hidden;
+        opacity: 0;
+        transition: visibility 0.2s ease, opacity 0.2s ease;
+    }
+    .filter-bottom-sheet.filter-bottom-sheet-open {
+        pointer-events: auto;
+        visibility: visible;
+        opacity: 1;
+    }
+    .filter-bottom-sheet-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.35);
+        cursor: pointer;
+    }
+    .filter-bottom-sheet-panel {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-height: 70vh;
+        background: #fff;
+        border-radius: 12px 12px 0 0;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+        transform: translateY(100%);
+        transition: transform 0.25s ease-out;
+        display: flex;
+        flex-direction: column;
+    }
+    .filter-bottom-sheet-open .filter-bottom-sheet-panel {
+        transform: translateY(0);
+    }
+    .filter-bottom-sheet-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #e9ecef;
+        flex-shrink: 0;
+    }
+    .filter-bottom-sheet-title {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #212529;
+    }
+    .filter-bottom-sheet-close {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: #6c757d;
+        cursor: pointer;
+    }
+    .filter-bottom-sheet-close:hover {
+        background: #f1f3f5;
+        color: #212529;
+    }
+    .filter-bottom-sheet-content {
+        padding: 1.25rem;
+        overflow-y: auto;
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+    .filter-bottom-sheet-content .filter-controls {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 1.25rem !important;
+        align-items: stretch !important;
+    }
+    .filter-bottom-sheet-content .filter-sheet-row {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 0.75rem !important;
+        min-height: 2.5rem !important;
+    }
+    .filter-bottom-sheet-content .filter-sheet-heading {
+        flex: 0 0 auto !important;
+        font-weight: 600 !important;
+        color: #212529 !important;
+        font-size: 0.95rem !important;
+    }
+    .filter-bottom-sheet-content .filter-sheet-right {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+        gap: 0.5rem !important;
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        position: relative !important;
+    }
+    /* Select: no arrow (we use .filter-sheet-chevron); width set by JS to selected option only */
+    .filter-bottom-sheet-content .filter-sheet-right select.form-select,
+    .filter-bottom-sheet-content .filter-sheet-right select,
+    .filter-bottom-sheet-content .filter-controls select.form-select,
+    .filter-bottom-sheet-content .filter-controls select {
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        padding: 0.25rem 0.5rem !important;
+        padding-right: 0.5rem !important;
+        min-width: 0 !important;
+        flex: 0 0 auto !important;
+        max-width: 100% !important;
+        text-align: right !important;
+        font-size: inherit !important;
+        color: #495057 !important;
+        cursor: pointer !important;
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        background-image: none !important;
+        box-sizing: border-box !important;
+    }
+    /* Fixed-width chevron: same gap from text for every filter */
+    .filter-bottom-sheet-content .filter-sheet-chevron {
+        flex: 0 0 20px !important;
+        width: 20px !important;
+        min-width: 20px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: #6c757d !important;
+        font-size: 0.7rem !important;
+        pointer-events: none !important;
+    }
+    .filter-bottom-sheet-content .filter-sheet-right.filter-sheet-has-value .filter-sheet-chevron {
+        display: none !important;
+    }
+    .filter-bottom-sheet-content .filter-sheet-right.filter-sheet-has-value select.form-select,
+    .filter-bottom-sheet-content .filter-sheet-right.filter-sheet-has-value select {
+        position: absolute !important;
+        left: 0 !important;
+        right: 2rem !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        padding: 0 !important;
+        opacity: 0 !important;
+        z-index: 1 !important;
+        background-image: none !important;
+    }
+    .filter-bottom-sheet-content .filter-sheet-value {
+        flex: 0 1 auto !important;
+        width: auto !important;
+        min-width: min-content !important;
+        text-align: right !important;
+        color: #495057 !important;
+        font-size: 0.95rem !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        position: relative !important;
+        z-index: 0 !important;
+        pointer-events: none !important;
+    }
+    .filter-bottom-sheet-content .filter-sheet-clear {
+        flex: 0 0 auto !important;
+        display: none !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 1.5rem !important;
+        height: 1.5rem !important;
+        min-width: 1.5rem !important;
+        padding: 0 !important;
+        border: none !important;
+        border-radius: 50% !important;
+        background: #e9ecef !important;
+        color: #6c757d !important;
+        cursor: pointer !important;
+        font-size: 0.65rem !important;
+        position: relative !important;
+        z-index: 2 !important;
+    }
+    .filter-bottom-sheet-content .filter-sheet-clear.filter-sheet-clear-visible {
+        display: inline-flex !important;
+    }
+    .filter-bottom-sheet-content .filter-sheet-clear:hover {
+        background: #dee2e6 !important;
+        color: #495057 !important;
+    }
+    .filter-bottom-sheet-content .filter-controls .form-select,
+    .filter-bottom-sheet-content .filter-controls select {
+        max-width: 100% !important;
+    }
     /* IT Dashboard: Full-bleed layout for .dashboard-tabs */
     .dashboard-container .dashboard-tabs,
     .dashboard-container .dashboard-tabs + .card,
@@ -493,7 +786,11 @@
     .dashboard-container .dashboard-actions:has(> *:nth-child(2):last-child) > *:nth-child(2) {
         flex: 1 1 0 !important;
         min-width: 0 !important;
+        max-width: 50% !important;
         box-sizing: border-box !important;
+    }
+    .dashboard-container .dashboard-actions:has(> *:nth-child(2):last-child) > *:nth-child(1) {
+        width: 0 !important; /* same as .btn so both get 50% */
     }
     .dashboard-container .dashboard-actions:has(> *:nth-child(2):last-child) > *:nth-child(1) .btn {
         width: 100% !important;
@@ -509,9 +806,14 @@
     .dashboard-container .dashboard-actions:has(.btn:nth-child(3):last-child) > *:nth-child(2) {
         flex: 1 1 0 !important;
         min-width: 0 !important;
+        max-width: 50% !important; /* force equal width when two in a row */
         box-sizing: border-box !important;
     }
-    /* Dropdown wrapper: let inner button fill so it matches the second button visually */
+    /* Dropdown wrapper: same width behavior as sibling .btn so New Request = My Drafts width */
+    .dashboard-container .dashboard-actions:has(.btn:nth-child(3):last-child) > *:nth-child(1) {
+        width: 0 !important; /* grow from 0 so both get 50% */
+    }
+    /* Dropdown inner button: fill wrapper so it matches sibling button visually */
     .dashboard-container .dashboard-actions:has(.btn:nth-child(3):last-child) > *:nth-child(1) .btn {
         width: 100% !important;
         max-width: 100% !important;
@@ -863,7 +1165,11 @@
     .dashboard-container .dashboard-actions:has(> *:nth-child(2):last-child) > *:nth-child(2) {
         flex: 1 1 0 !important;
         min-width: 0 !important;
+        max-width: 50% !important;
         box-sizing: border-box !important;
+    }
+    .dashboard-container .dashboard-actions:has(> *:nth-child(2):last-child) > *:nth-child(1) {
+        width: 0 !important; /* same as .btn so both get 50% */
     }
     .dashboard-container .dashboard-actions:has(> *:nth-child(2):last-child) > *:nth-child(1) .btn {
         width: 100% !important;
@@ -879,9 +1185,14 @@
     .dashboard-container .dashboard-actions:has(.btn:nth-child(3):last-child) > *:nth-child(2) {
         flex: 1 1 0 !important;
         min-width: 0 !important;
+        max-width: 50% !important; /* force equal width when two in a row */
         box-sizing: border-box !important;
     }
-    /* Dropdown wrapper: let inner button fill so it matches the second button visually */
+    /* Dropdown wrapper: same width behavior as sibling .btn so New Request = My Drafts width */
+    .dashboard-container .dashboard-actions:has(.btn:nth-child(3):last-child) > *:nth-child(1) {
+        width: 0 !important; /* grow from 0 so both get 50% */
+    }
+    /* Dropdown inner button: fill wrapper so it matches sibling button visually */
     .dashboard-container .dashboard-actions:has(.btn:nth-child(3):last-child) > *:nth-child(1) .btn {
         width: 100% !important;
         max-width: 100% !important;

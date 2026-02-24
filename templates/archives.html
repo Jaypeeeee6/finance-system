@@ -257,6 +257,7 @@
                     <img src="{{ url_for('static', filename='css/icons/search.svg') }}" class="assign-search-icon" alt="Search" onclick="document.getElementById('searchInput').focus();">
                     <input type="search" id="searchInput" class="form-control assign-search-input" placeholder="Search by request # or requestor name" aria-label="Search requests" value="{{ search_query or '' }}">
                 </div>
+                <button type="button" class="filter-toggle-btn" aria-label="Open filters"><i class="fas fa-sliders"></i></button>
             </div>
             <div class="filters-right">
                 <div class="filter-controls">
