@@ -169,7 +169,7 @@
                                         <img src="{{ url_for('static', filename='css/icons/chevron-right.svg') }}" class="chevron-toggle" data-request-id="{{ req.request_id }}" alt="expand" />
                                     {% endif %}
                                 </td>
-                                <td><span class="badge badge-info">{{ req.request_type }}</span></td>
+                                <td>{{ req.request_type }}</td>
                                 <td>
                                     {% if req.recurring == 'Recurring' %}
                                         <span class="badge" style="background: #ffc107; color: #212529;">↻ Recurring</span>
@@ -309,7 +309,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <span class="badge badge-info">{{ req.request_type }}</span>
+                                        {{ req.request_type }}
                                     </td>
                                     <td>
                                         {% if req.recurring == 'Recurring' %}
@@ -403,7 +403,7 @@
                                         <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
                                     {% endif %}
                                 </td>
-                                    <td><span class="badge badge-info">{{ req.request_type }}</span></td>
+                                    <td>{{ req.request_type }}</td>
                                     <td>
                                         {% if req.recurring == 'Recurring' %}
                                             <span class="badge" style="background: #ffc107; color: #212529;">↻ Recurring</span>
@@ -474,7 +474,7 @@
                                         <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
                                     {% endif %}
                                 </td>
-                                    <td><span class="badge badge-info">{{ req.request_type }}</span></td>
+                                    <td>{{ req.request_type }}</td>
                                     <td>{{ req.requestor_name }}</td>
                                     <td>{{ req.department }}</td>
                                     <td>{{ req.person_company or '-' }}</td>
@@ -531,7 +531,7 @@
                                         <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
                                     {% endif %}
                                 </td>
-                                <td><span class="badge badge-info">{{ req.request_type }}</span></td>
+                                <td>{{ req.request_type }}</td>
                                 <td>
                                     {% if req.recurring == 'Recurring' %}
                                         <span class="badge" style="background: #ffc107; color: #212529;">↻ Recurring</span>

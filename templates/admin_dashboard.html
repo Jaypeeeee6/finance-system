@@ -170,7 +170,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <span class="badge badge-info">{{ req.request_type }}</span>
+                                        {{ req.request_type }}
                                         {% if req.is_urgent %}
                                             <br>
                                             <span class="badge" style="background: #dc3545; color: white; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 1px;">URGENT</span>
@@ -314,7 +314,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <span class="badge badge-info">{{ req.request_type }}</span>
+                                        {{ req.request_type }}
                                     </td>
                                     <td>
                                         {% if req.recurring == 'Recurring' %}
@@ -413,7 +413,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <span class="badge badge-info">{{ req.request_type }}</span>
+                                        {{ req.request_type }}
                                     </td>
                                     <td>
                                         {% if req.recurring == 'Recurring' %}
@@ -489,7 +489,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <span class="badge badge-info">{{ req.request_type }}</span>
+                                        {{ req.request_type }}
                                     </td>
                                     <td>{{ req.requestor_name }}</td>
                                     <td>{{ req.department }}</td>
@@ -556,7 +556,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <span class="badge badge-info">{{ req.request_type }}</span>
+                                        {{ req.request_type }}
                                     </td>
                                     <td>
                                         {% if req.recurring == 'Recurring' %}
