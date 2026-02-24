@@ -1155,6 +1155,17 @@ body {
     color: #D9BD7D;
 }
 
+/* Cheque Register disabled (visible but unclickable; title tooltip shows on hover) */
+.nav-link.cheque-register-disabled,
+.desktop-sidebar-item.cheque-register-disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.nav-link.cheque-register-disabled:hover,
+.desktop-sidebar-item.cheque-register-disabled:hover {
+    background: transparent;
+}
+
 /* Dropdown toggle variants */
 .desktop-sidebar-dropdown-toggle:hover,
 .desktop-sidebar-dropdown-toggle:focus,

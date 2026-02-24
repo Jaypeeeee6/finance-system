@@ -220,6 +220,7 @@ def inject_feature_flags():
         # Always enable item requests UI (do not hide). Toggle removed from IT settings.
         'show_item_requests_flag': True,
         'show_test_login_flag': bool(flags.get('show_test_login')),
+        'cheque_register_disabled_flag': bool(flags.get('cheque_register_disabled')),
     }
 
 
@@ -594,6 +595,26 @@ def it_toggle_login_testing():
     )
     if request.is_json or request.headers.get('X-Requested-With') == 'fetch':
         return jsonify({'success': True, 'enabled': new_value, 'message': message})
+    flash(message, 'success')
+    return redirect(request.referrer or url_for('it_dashboard'))
+
+
+@app.route('/it/tools/toggle_cheque_register', methods=['POST'])
+@login_required
+@it_department_required
+def it_toggle_cheque_register():
+    """IT-only toggle to temporarily hide the Cheque Register link in the sidebar for all users who have it."""
+    flags = read_feature_flags()
+    current = bool(flags.get('cheque_register_disabled'))
+    new_value = not current
+    write_feature_flags(cheque_register_disabled=new_value)
+    message = (
+        'Cheque Register is now hidden in the sidebar for users who had it.'
+        if new_value else
+        'Cheque Register is now visible again in the sidebar.'
+    )
+    if request.is_json or request.headers.get('X-Requested-With') == 'fetch':
+        return jsonify({'success': True, 'disabled': new_value, 'message': message})
     flash(message, 'success')
     return redirect(request.referrer or url_for('it_dashboard'))
 

@@ -207,7 +207,7 @@
                 <li class="nav-menu-sidebar-only"><a href="{{ url_for('archives') }}" class="nav-link"><i class="fas fa-archive"></i> Archives</a></li>
                 {% endif %}
                 {% if (current_user.role == 'Operation Manager' or current_user.department == 'IT' or current_user.role in ['GM', 'CEO'] or current_user.department == 'Auditing') and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
-                <li class="nav-menu-sidebar-only"><a href="{{ url_for('cheque_register') }}" class="nav-link"><i class="fas fa-book"></i> Cheque Register</a></li>
+                <li class="nav-menu-sidebar-only"><a href="{% if cheque_register_disabled_flag %}#{% else %}{{ url_for('cheque_register') }}{% endif %}" class="nav-link{% if cheque_register_disabled_flag %} cheque-register-disabled{% endif %}"{% if cheque_register_disabled_flag %} onclick="return false;" aria-disabled="true" title="COMING SOON"{% endif %}><i class="fas fa-book"></i> Cheque Register</a></li>
                 {% endif %}
                 {% if current_user.role in ['GM', 'Operation Manager'] or current_user.department == 'IT' %}
                 <li class="nav-menu-sidebar-only"><a href="{{ url_for('settings') }}" class="nav-link"><i class="fas fa-cog"></i> Settings</a></li>
@@ -267,9 +267,13 @@
                                 <i class="fas fa-tools"></i> Enable Maintenance
                             </button>
                             {# Removed 'Show Item Requests' toggle per request - Item Requests always visible #}
-                            <button class="btn btn-sm btn-secondary" type="button" style="width: 100%;" onclick="toggleLoginTesting()">
+                            <button class="btn btn-sm btn-secondary" type="button" style="width: 100%; margin-bottom: 0.5rem;" onclick="toggleLoginTesting()">
                                 <i class="fas fa-flask"></i>
                                 {% if show_test_login_flag %}Hide Login for Testing{% else %}Show Login for Testing{% endif %}
+                            </button>
+                            <button id="cheque-register-toggle" class="btn btn-sm btn-secondary" type="button" style="width: 100%; margin-bottom: 0.5rem;" onclick="toggleChequeRegister()">
+                                <i class="fas fa-book"></i>
+                                {% if cheque_register_disabled_flag %}Enable Cheque Register{% else %}Disable Cheque Register{% endif %}
                             </button>
                         </div>
                     </div>
@@ -331,7 +335,7 @@
                 </a>
                 {% endif %}
                 {% if (current_user.role == 'Operation Manager' or current_user.department == 'IT' or current_user.role in ['GM', 'CEO'] or current_user.department == 'Auditing') and not (current_user.department == 'Branch' and current_user.role in ['Branch Manager', 'Supervisor']) %}
-                <a href="{{ url_for('cheque_register') }}" class="desktop-sidebar-item {% if flask_request.path.startswith(url_for('cheque_register')) or flask_request.path.startswith('/cheque-register/') %}active{% endif %}">
+                <a href="{% if cheque_register_disabled_flag %}#{% else %}{{ url_for('cheque_register') }}{% endif %}" class="desktop-sidebar-item{% if cheque_register_disabled_flag %} cheque-register-disabled{% endif %}{% if not cheque_register_disabled_flag and (flask_request.path.startswith(url_for('cheque_register')) or flask_request.path.startswith('/cheque-register/')) %} active{% endif %}"{% if cheque_register_disabled_flag %} onclick="return false;" aria-disabled="true" title="COMING SOON"{% endif %}>
                     <i class="fas fa-book"></i>
                     <span>Cheque Register</span>
                 </a>
@@ -787,6 +791,28 @@
         } catch (e) {
             console.error(e);
             alert('Error toggling Login for Testing visibility. Please try again.');
+        }
+    }
+
+    async function toggleChequeRegister() {
+        const action = document.getElementById('cheque-register-toggle');
+        const disabling = action && action.textContent.includes('Disable');
+        if (!confirm(disabling ? 'Hide Cheque Register in the sidebar for all users who have it? They can still open the page if they have the URL.' : 'Show Cheque Register in the sidebar again for users who have it?')) return;
+        try {
+            const resp = await fetch('/it/tools/toggle_cheque_register', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'fetch' }
+            });
+            const data = await resp.json();
+            if (data && data.success) {
+                alert(data.message || 'Cheque Register sidebar visibility updated.');
+                location.reload();
+            } else {
+                alert(data.message || 'Failed to toggle Cheque Register visibility.');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error toggling Cheque Register visibility. Please try again.');
         }
     }
     
