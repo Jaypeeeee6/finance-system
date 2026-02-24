@@ -428,6 +428,23 @@
     .data-table td:last-child .btn-block { width: auto !important; }
     .data-table td:last-child .btn { width: auto !important; display: inline-flex !important; }
     .data-table td:last-child .btn { margin: 0 0.2rem; }
+    /* 768px down: slightly smaller text and chips in payment requests table */
+    .dashboard-container .card .data-table th,
+    .dashboard-container .card .data-table td {
+        font-size: 12px !important;
+    }
+    .dashboard-container .card .data-table .badge,
+    .dashboard-container .card .data-table .filter-pill,
+    .dashboard-container .card .data-table .filter-chip,
+    .dashboard-container .card .data-table .branch-chip,
+    .dashboard-container .card .data-table .item-chip {
+        font-size: 11px !important;
+        padding: 5px 8px !important;
+    }
+    /* 768px down: slightly smaller "Payment Requests" heading */
+    .dashboard-container .card .card-body > .card-title.mb-4 {
+        font-size: 1.05rem !important;
+    }
     /* Even wider feel on smaller devices (no gutters) */
     .main-content { padding-left: 0; padding-right: 0; }
     /* Only remove padding from non-IT dashboards - IT dashboard needs full-bleed */
