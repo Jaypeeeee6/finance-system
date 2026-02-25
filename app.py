@@ -1578,6 +1578,18 @@ def get_authorized_manager_approvers(request):
                     authorized_users.append(user)
                     print(f"DEBUG: Added Operation Manager for Department Manager request: {user.name}")
         
+        # Special case: For payment requests from Procurement Manager with request type "Bank money",
+        # the original authorized manager is the Auditing Department Manager. GM, Operation Manager,
+        # and temporary managers remain allowed (already added above).
+        if (request.user.role == 'Department Manager' and
+                (request.user.department or '').strip() == 'Procurement' and
+                getattr(request, 'request_type', None) == 'Bank money'):
+            auditing_dept_managers = User.query.filter_by(role='Department Manager', department='Auditing').all()
+            for user in auditing_dept_managers:
+                if user.user_id != request.user_id and user not in authorized_users:
+                    authorized_users.append(user)
+                    print(f"DEBUG: Added Auditing Department Manager for Procurement Manager Bank money request: {user.name}")
+        
         # Special case: Abdalaziz can approve GM, CEO, Finance Staff, and Operation Manager requests
         # (But GM/CEO/Operation Manager requests are handled above, so this covers Finance Staff)
         # Abdalaziz is the assigned manager for Finance Staff and should receive notifications
@@ -1604,15 +1616,23 @@ def get_authorized_manager_approvers(request):
                     authorized_users.append(user)
                     print(f"DEBUG: Added Finance Admin for Finance department: {user.name}")
         
-        # Special case: Department Manager can approve same department requests
-        dept_managers = User.query.filter_by(
-            role='Department Manager',
-            department=request.user.department
-        ).all()
-        for user in dept_managers:
-            if user.user_id != request.user_id and user not in authorized_users:
-                authorized_users.append(user)
-                print(f"DEBUG: Added Department Manager for same department: {user.name}")
+        # Special case: Department Manager can approve same department requests.
+        # Exception: For Procurement Manager + Bank money, the original approver is Auditing Department Manager
+        # (added above), so do not add Procurement same-department manager here.
+        is_procurement_bank_money = (
+            request.user.role == 'Department Manager' and
+            (request.user.department or '').strip() == 'Procurement' and
+            getattr(request, 'request_type', None) == 'Bank money'
+        )
+        if not is_procurement_bank_money:
+            dept_managers = User.query.filter_by(
+                role='Department Manager',
+                department=request.user.department
+            ).all()
+            for user in dept_managers:
+                if user.user_id != request.user_id and user not in authorized_users:
+                    authorized_users.append(user)
+                    print(f"DEBUG: Added Department Manager for same department: {user.name}")
     
     # Remove duplicates (in case a user was added multiple times)
     seen = set()
@@ -15691,12 +15711,14 @@ def view_request(request_id):
             # 1. It's their own request, OR
             # 2. (For Department Manager) It's from Auditing department, OR
             # 3. It's Completed/Recurring from another department, OR
-            # 4. They are temporary manager
+            # 4. They are temporary manager, OR
+            # 5. (For Department Manager) They are an authorized manager approver (e.g. Bank money from Procurement Manager)
             if req.user_id != current_user.user_id:
                 # Not their own request
                 if current_user.role == 'Department Manager':
-                    # Department Manager can also view their department's requests
-                    if req.department == 'Auditing' or getattr(req, 'temporary_manager_id', None) == current_user.user_id:
+                    # Department Manager can also view their department's requests or any request they are authorized to approve
+                    authorized_approvers = get_authorized_manager_approvers(req)
+                    if (req.department == 'Auditing' or getattr(req, 'temporary_manager_id', None) == current_user.user_id or current_user in authorized_approvers):
                         pass  # Allow access
                     elif req.status not in ['Completed', 'Recurring', 'Proof Pending', 'Proof Sent', 'Proof Rejected']:
                         flash('You do not have permission to view this request.', 'danger')
@@ -16005,6 +16027,15 @@ def view_request(request_id):
     op_manager_user = User.query.filter_by(role='Operation Manager').first()
     op_manager_name = op_manager_user.name if op_manager_user else 'Operation Manager'
     
+    # For Manager Approval Required section: when the original approver is Auditing (Procurement Manager + Bank money),
+    # show Auditing Department Manager name(s) instead of GM/Operation Manager in "Assigned Manager"
+    original_assigned_manager_display = None
+    if (req.user.role == 'Department Manager' and (req.user.department or '').strip() == 'Procurement' and
+            getattr(req, 'request_type', None) == 'Bank money'):
+        auditing_managers = User.query.filter_by(role='Department Manager', department='Auditing').all()
+        if auditing_managers:
+            original_assigned_manager_display = ', '.join(u.name for u in auditing_managers)
+    
     # Get all proof files for this request grouped by batch
     proof_files = []
     proof_batches = []
@@ -16212,10 +16243,13 @@ def view_request(request_id):
         _dt_for_req = None
     is_dept_temp_for_req = bool(_dt_for_req and getattr(_dt_for_req, 'temporary_manager_id', None) == current_user.user_id)
 
+    # Whether current user is an authorized manager approver (shows "Your Approval Required" / Return to Requestor)
+    is_authorized_manager_approver = current_user in get_authorized_manager_approvers(req)
+
     # Prev/next in same order as dashboard "All Requests" tab
     prev_request_id, next_request_id = get_prev_next_request_ids(current_user, request_id)
 
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, departments=departments, was_just_edited=was_just_edited, edited_fields=edited_fields_all, can_schedule_one_time=can_schedule_one_time, one_time_scheduled_by=one_time_scheduled_by, can_edit_request=can_edit_request, return_reason_history=return_reason_history, can_edit_department_only=can_edit_department_only, is_dept_temp_for_req=is_dept_temp_for_req, prev_request_id=prev_request_id, next_request_id=next_request_id)
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, original_assigned_manager_display=original_assigned_manager_display, is_authorized_manager_approver=is_authorized_manager_approver, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, departments=departments, was_just_edited=was_just_edited, edited_fields=edited_fields_all, can_schedule_one_time=can_schedule_one_time, one_time_scheduled_by=one_time_scheduled_by, can_edit_request=can_edit_request, return_reason_history=return_reason_history, can_edit_department_only=can_edit_department_only, is_dept_temp_for_req=is_dept_temp_for_req, prev_request_id=prev_request_id, next_request_id=next_request_id)
 
 
 @app.route('/request/<int:request_id>/schedule_one_time_payment', methods=['POST'])
@@ -18474,6 +18508,11 @@ def manager_approve_request(request_id):
             is_authorized = True
             print("DEBUG: Authorized via Department Manager role")
     
+    # Authorized approvers from central helper (e.g. Auditing Dept Manager for Procurement Bank money)
+    if not is_authorized and current_user in get_authorized_manager_approvers(req):
+        is_authorized = True
+        print("DEBUG: Authorized via get_authorized_manager_approvers")
+    
     print(f"DEBUG: Authorization result: {is_authorized}")
     
     if not is_authorized:
@@ -18898,6 +18937,10 @@ def gm_return_to_requestor(request_id):
         # Special case: Finance Admin can return Finance department requests
         elif current_user.role == 'Finance Admin' and req.user.department == 'Finance':
             is_authorized = True
+    
+    # Authorized approvers from central helper (e.g. Auditing Dept Manager for Procurement Bank money)
+    if not is_authorized and current_user in get_authorized_manager_approvers(req):
+        is_authorized = True
     
     if not is_authorized:
         flash('You are not authorized to return this request to the requestor.', 'error')
