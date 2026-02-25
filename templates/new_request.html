@@ -1252,8 +1252,12 @@ document.addEventListener('DOMContentLoaded', function() {
         showSwiftCode();
     }
     
-    // Initialize payment method handler
+    // Initialize payment method handler and run when payment method changes (Cash/Cheque/Card)
     handlePaymentMethodChange();
+    const paymentMethodInput = document.getElementById('payment_method');
+    if (paymentMethodInput) {
+        paymentMethodInput.addEventListener('change', handlePaymentMethodChange);
+    }
     
     // Add event listeners to account fields to clear auto-populated flag on manual edit
     const accountNameInput = document.getElementById('account_name');
