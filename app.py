@@ -5026,62 +5026,141 @@ def get_procurement_money_spent():
         return jsonify({'error': str(e)}), 500
 
 
+def _procurement_money_spent_uncovered_covered():
+    """
+    Money Spent History: completed item requests that still contribute to the current Money Spent
+    (i.e. not yet offset by submitted bank money = Pending + Completed). Match oldest-completed-first.
+    Expenses Breakdown: the same item requests that *just left* Money Spent History because of the
+    current *pending* bank money (i.e. covered by submitted but not by (submitted - pending)),
+    so they match what was previously shown in History. When the bank money completes, they leave the breakdown.
+    Returns (uncovered_requests, covered_by_pending_requests).
+    """
+    completed = ProcurementItemRequest.query.filter_by(
+        status='Completed', is_archived=False
+    ).order_by(
+        ProcurementItemRequest.updated_at.asc()
+    ).all()
+
+    bank_money_requests = PaymentRequest.query.options(
+        db.joinedload(PaymentRequest.user)
+    ).filter(
+        PaymentRequest.department == 'Procurement',
+        PaymentRequest.request_type == 'Bank money',
+        PaymentRequest.is_archived == False
+    ).all()
+    manager_bank = [
+        r for r in bank_money_requests
+        if r.user and r.user.role == 'Department Manager' and r.user.department == 'Procurement'
+    ]
+    submitted_amount = sum(
+        float(r.amount) for r in manager_bank
+        if r.status in ['Pending Manager Approval', 'Pending Finance Approval', 'Proof Pending', 'Proof Sent', 'Completed']
+    )
+    pending_amount = sum(
+        float(r.amount) for r in manager_bank
+        if r.status in ['Pending Manager Approval', 'Pending Finance Approval', 'Proof Pending', 'Proof Sent']
+    )
+
+    def match_covered(limit):
+        """Requests 'covered' when we consume oldest-first up to limit; only positive amounts."""
+        running = limit
+        out = []
+        for r in completed:
+            amt = float(r.receipt_amount) if r.receipt_amount is not None else 0.0
+            if amt <= 0:
+                continue
+            if running >= amt:
+                out.append(r)
+                running -= amt
+        return out
+
+    # Uncovered = not covered by full submitted amount
+    covered_by_submitted = match_covered(submitted_amount)
+    covered_ids = {r.id for r in covered_by_submitted}
+    uncovered = [r for r in completed if r.id not in covered_ids and (r.receipt_amount or 0) > 0]
+
+    # Expenses Breakdown = requests covered by submitted but NOT by (submitted - pending)
+    # = the ones that "left" History when the current pending was added
+    submitted_minus_pending = max(0.0, submitted_amount - pending_amount)
+    covered_by_submitted_minus_pending = match_covered(submitted_minus_pending)
+    covered_minus_ids = {r.id for r in covered_by_submitted_minus_pending}
+    covered_by_pending = [r for r in covered_by_submitted if r.id not in covered_minus_ids]
+
+    return (uncovered, covered_by_pending)
+
+
 @app.route('/api/procurement/money-spent-history', methods=['GET'])
 @login_required
 def get_procurement_money_spent_history():
-    """API endpoint to get the Money Spent history for Procurement department"""
-    # Only allow Procurement Department Managers, GM, Operation Manager, Finance Admin, IT, and Auditing to access this endpoint
+    """Completed item requests that still contribute to the current Money Spent (not yet offset by submitted bank money)."""
     allowed_roles = ['Department Manager', 'GM', 'Operation Manager', 'Finance Admin']
     allowed_departments = ['Procurement', 'IT', 'Auditing']
-    
-    # Check if user has access
     has_access = (
-        (current_user.role in allowed_roles) or 
+        (current_user.role in allowed_roles) or
         (current_user.department in allowed_departments)
     )
-    
     if not has_access:
         return jsonify({'error': 'Unauthorized'}), 403
-    
+
     try:
-        # Get snapshot entries for Procurement department, ordered by date descending
-        entries = CurrentMoneyEntry.query.filter(
-            CurrentMoneyEntry.department == 'Procurement',
-            CurrentMoneyEntry.entry_kind == 'snapshot',
-            CurrentMoneyEntry.money_spent.isnot(None)  # Filter out entries with null money_spent
-        ).order_by(CurrentMoneyEntry.entry_date.desc()).all()
-        
-        # Convert to list of dictionaries with the fields expected by the frontend
+        uncovered, covered = _procurement_money_spent_uncovered_covered()
+        # Order uncovered newest-first for display
+        uncovered = list(reversed(uncovered))
+
         history = []
-        last_money_spent = None
-        
-        for entry in entries:
-            money_spent_value = float(entry.money_spent) if entry.money_spent is not None else None
-            
-            # Skip entries with null money_spent (shouldn't happen due to filter, but double-check)
-            if money_spent_value is None:
-                continue
-            
-            # Skip duplicate consecutive entries (same money_spent value as previous entry)
-            if last_money_spent is not None and abs(money_spent_value - last_money_spent) < 0.001:
-                continue
-            
+        for r in uncovered:
+            amount = float(r.receipt_amount) if r.receipt_amount is not None else None
             history.append({
-                'entry_date': entry.entry_date.isoformat() if entry.entry_date else None,
-                'money_spent': money_spent_value,
-                'available_balance': float(entry.available_balance) if entry.available_balance is not None else None
+                'id': r.id,
+                'requestor_name': r.requestor_name or '',
+                'department': r.department or '',
+                'item_name': r.item_name or '',
+                'branch_name': r.branch_name or '',
+                'amount': amount,
             })
-            
-            last_money_spent = money_spent_value
-        
-        # Calculate Total Money Spent (of All-Time): Sum of ALL receipt_amount from ALL completed item requests (exclude archived)
-        all_completed_item_requests = ProcurementItemRequest.query.filter_by(status='Completed', is_archived=False).all()
-        total_all_time_money_spent = sum(float(r.receipt_amount) for r in all_completed_item_requests if r.receipt_amount is not None)
-        
+
+        all_completed = ProcurementItemRequest.query.filter_by(status='Completed', is_archived=False).all()
+        total_all_time_money_spent = sum(float(r.receipt_amount) for r in all_completed if r.receipt_amount is not None)
+
         return jsonify({
             'history': history,
             'total_all_time_money_spent': total_all_time_money_spent
         })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/procurement/expenses-breakdown', methods=['GET'])
+@login_required
+def get_procurement_expenses_breakdown():
+    """Completed item requests that have been offset by submitted bank money (shown in Expenses Breakdown / Money Pending)."""
+    allowed_roles = ['Department Manager', 'GM', 'Operation Manager', 'Finance Admin']
+    allowed_departments = ['Procurement', 'IT', 'Auditing']
+    has_access = (
+        (current_user.role in allowed_roles) or
+        (current_user.department in allowed_departments)
+    )
+    if not has_access:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    try:
+        uncovered, covered = _procurement_money_spent_uncovered_covered()
+        # Order covered newest-first for display (same as history)
+        covered = list(reversed(covered))
+
+        breakdown = []
+        for r in covered:
+            amount = float(r.receipt_amount) if r.receipt_amount is not None else None
+            breakdown.append({
+                'id': r.id,
+                'requestor_name': r.requestor_name or '',
+                'department': r.department or '',
+                'item_name': r.item_name or '',
+                'branch_name': r.branch_name or '',
+                'amount': amount,
+            })
+
+        return jsonify({'breakdown': breakdown})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
