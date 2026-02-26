@@ -556,8 +556,9 @@
         left: 0 !important;
     }
 
-    /* Filter bottom sheet: popup from bottom (768px down) */
+    /* Filter bottom sheet: popup from bottom (768px down); show only in this breakpoint */
     .filter-bottom-sheet {
+        display: block !important;
         position: fixed;
         inset: 0;
         z-index: 1050;

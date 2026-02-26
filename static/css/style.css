@@ -2759,6 +2759,11 @@ body.flash-error-open {
     margin: 0;
 }
 
+/* Filter bottom sheet: hidden by default so "Filters" + X don't show below footer on desktop */
+.filter-bottom-sheet {
+    display: none !important;
+}
+
 /* ==================== MAINTENANCE BANNER ==================== */
 .maintenance-banner {
     background: #fff3cd;
