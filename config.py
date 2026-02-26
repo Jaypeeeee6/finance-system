@@ -30,6 +30,10 @@ class Config:
     SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+    # Shared cookie with Ticketing: set in .env (e.g. .localhost or .maagroup.om). Leave unset/empty for single-host (e.g. localhost only).
+    _session_domain = os.environ.get('SESSION_COOKIE_DOMAIN', '').strip()
+    SESSION_COOKIE_DOMAIN = _session_domain or None
+    SESSION_COOKIE_NAME = os.environ.get('SESSION_COOKIE_NAME') or 'session'
     # Ensure session cookie expires when browser closes (no Max-Age or Expires)
     # When session.permanent = False, Flask should create a session cookie without expiration
     # But we explicitly ensure this by not setting SESSION_COOKIE_EXPIRES
@@ -50,7 +54,14 @@ class Config:
     NOTIFICATION_SENDER_NAME = os.environ.get('NOTIFICATION_SENDER_NAME') or 'Payment System - Notifications'
     PIN_SENDER_NAME = os.environ.get('PIN_SENDER_NAME') or 'Payment System - PIN'
     
+    
     # PIN configuration
     PIN_EXPIRY_MINUTES = 2  # PIN expires after 2 minutes
-    
+
+    # Ticketing user sync: same email/password in both apps (set in .env; if unset, sync is skipped)
+    TICKETING_SYNC_URL = os.environ.get('TICKETING_SYNC_URL') or None  # e.g. http://localhost:9009
+    FINANCE_SYNC_SECRET = os.environ.get('FINANCE_SYNC_SECRET') or None  # same as Ticketing's FINANCE_SYNC_SECRET
+
+    # IT Support / Ticketing link (Ask IT Support button). Set in .env: localhost use http://localhost:9009, production use https://ticketing.maagroup.om
+    TICKETING_URL = os.environ.get('TICKETING_URL') or 'http://localhost:9009'
 
