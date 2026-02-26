@@ -375,6 +375,11 @@
     </div>
 
     <div class="dashboard-actions">
+        {% if current_user.department == 'IT' %}
+        <a href="{{ url_for('cheque_calibration') }}" class="btn btn-outline-secondary" style="border: 1px solid #ccc; color: #555;" title="Adjust field positions per bank">
+            <i class="fas fa-ruler-combined"></i> Calibrate
+        </a>
+        {% endif %}
         {% if current_user.department != 'Auditing' %}
         <a href="{{ url_for('write_cheque') }}" class="btn btn-success">
             <i class="fas fa-file-invoice"></i> Write Cheque

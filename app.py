@@ -15533,14 +15533,15 @@ def _ensure_bank_layouts_seeded():
 
 @app.route('/api/cheque-layout/<bank_key>', methods=['GET', 'PUT'])
 @login_required
-@role_required('GM', 'CEO', 'Operation Manager')
 def api_cheque_layout(bank_key):
-    """GET: return layout in mm. PUT: update layout (calibration)."""
+    """GET: return layout in mm. PUT: update layout (calibration). Calibration updates are IT department only."""
     _ensure_bank_layouts_seeded()
     layout = BankLayout.query.filter_by(bank_key=bank_key).first()
     if not layout:
         return jsonify({'error': 'Layout not found', 'layout': None}), 404
     if request.method == 'PUT':
+        if getattr(current_user, 'department', None) != 'IT':
+            return jsonify({'success': False, 'error': 'Only IT department can update calibration.'}), 403
         data = request.get_json() or {}
         try:
             if 'name_x' in data: layout.name_x = float(data['name_x'])
@@ -15578,9 +15579,10 @@ def api_cheque_layout(bank_key):
 
 @app.route('/cheque-calibration')
 @login_required
-@role_required('GM', 'CEO', 'Operation Manager')
 def cheque_calibration():
-    """Calibration page: adjust mm positions per bank and preview."""
+    """Calibration page: adjust mm positions per bank and preview. IT department only."""
+    if getattr(current_user, 'department', None) != 'IT':
+        abort(403)
     return render_template('cheque_calibration.html', user=current_user)
 
 
