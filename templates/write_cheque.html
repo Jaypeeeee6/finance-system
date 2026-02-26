@@ -12,9 +12,14 @@
 <div class="cheque-container dashboard-container">
     <div class="dashboard-header">
         <h1><i class="fas fa-file-invoice"></i> {% if selected_serials and selected_serials|length > 0 %}Writing {{ selected_serials|length }} Cheque{% if selected_serials|length != 1 %}s{% endif %}{% else %}Write Cheque{% endif %}</h1>
-        <a href="{{ url_for('cheque_register') }}" class="btn btn-secondary">
-            <i class="fas fa-arrow-left"></i> Back to Cheque Register
-        </a>
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <a href="{{ url_for('cheque_calibration') }}" class="btn btn-outline-secondary" style="border: 1px solid #ccc; color: #555;" title="Adjust field positions per bank">
+                <i class="fas fa-ruler-combined"></i> Calibrate
+            </a>
+            <a href="{{ url_for('cheque_register') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Cheque Register
+            </a>
+        </div>
     </div>
 
     <div class="cheque-layout">
@@ -195,226 +200,97 @@ window.writeChequeSerialIds = (window.selectedSerials || []).map(function(s) { r
         el.style.fontStyle = 'normal';
     }
 })();
-// Master coordinate space per bank: one set of positions for both preview and print
-const TEMPLATES = {
-    dhofar_islamic: {
-        imgSizePx: { w: 893, h: 418 },
-        chequeSizeMm: { w: 160, h: 75 },
-        fieldsPx: {
-            date: { top: 53, left: 363 },
-            payee: { top: 127, left: 185 },
-            amount: { top: 183, left: 613 },
-            amountWords: { top: 160, left: 95 },
-            crossing: { top: 20, left: 60 },
-            purpose: { top: 200, left: 50 }
-        },
-        // Explicit print positions in mm (physical: left/top from top-left of cheque). Used when printing; container has scaleX(-1) so we set style.left = (w - left).
-        printFieldsMm: {
-            date:   { left: -12,  top: 7 },
-            payee:  { left: -40,  top: 25 },
-            amount: { left: 46, top: 39 },
-            amountWords: { left: -73, top: 32 },
-            crossing: { left: 11, top: 5 }
-        }
-    },
-    oman_arab: {
-        imgSizePx: { w: 893, h: 418 },
-        chequeSizeMm: { w: 160, h: 75 },
-        fieldsPx: {
-            date: { top: 13, left: 610 },
-            payee: { top: 125, left: 90 },
-            amount: { top: 135, left: 645 },
-            amountWords: { top: 165, left: 82 },
-            crossing: { top: 15, left: 40 },
-            purpose: { top: 210, left: 60 }
-        }
-    },
-    sohar: {
-        imgSizePx: { w: 893, h: 418 },
-        chequeSizeMm: { w: 160, h: 75 },
-        fieldsPx: {
-            date: { top: 52, left: 560 },
-            payee: { top: 116, left: 115 },
-            amount: { top: 172, left: 605 },
-            amountWords: { top: 153, left: 80 },
-            crossing: { top: 25, left: 70 },
-            purpose: { top: 205, left: 55 }
-        }
+// Layout from API: coordinates in mm per bank (stored in DB). Fetched on load and bank change.
+window.chequeLayoutByBank = {};
+const DPI = 96;
+const DPI_CALIBRATION = 4;  // Java-style: (dpi + 4) for mm->px
+
+function mmToPx(mm, dpi) {
+    dpi = dpi != null ? dpi : DPI;
+    return (dpi + DPI_CALIBRATION) * mm / 25.4;
+}
+
+// Build percentage map for preview from layout (mm). layout keys: name, amount_words, amount_nums, date, crossing.
+function layoutToPctMap(layout) {
+    if (!layout) return null;
+    const w = layout.template_width_px || 893;
+    const h = layout.template_height_px || 418;
+    function toPct(xMm, yMm) {
+        const pxX = mmToPx(xMm);
+        const pxY = mmToPx(yMm);
+        return { leftPct: (pxX / w) * 100, topPct: (pxY / h) * 100 };
     }
-};
-
-// Mode-specific offsets + calibration (preview % vs print mm; compensates for printer/feed, stock size, font metrics).
-// Stored shape: offsets[bankKey] = { preview: { globalPct: {x,y}, fieldsPct: { payee: {x,y}, ... } }, print: { globalMm: {x,y}, fieldsMm: { payee: {x,y}, ... } } }
-const CALIBRATION_KEY = 'cheque_print_calibration';
-function getOffsets() {
-    try {
-        return JSON.parse(localStorage.getItem(CALIBRATION_KEY) || '{}');
-    } catch (_) { return {}; }
-}
-function setOffsets(offsets) {
-    try { localStorage.setItem(CALIBRATION_KEY, JSON.stringify(offsets)); } catch (_) {}
-}
-// Backwards compatibility
-function getCalibration() { return getOffsets(); }
-function setCalibration(cal) { setOffsets(cal); }
-
-function pxToPctMap(template) {
-    const { w, h } = template.imgSizePx;
-    const out = {};
-    for (const [k, v] of Object.entries(template.fieldsPx)) {
-        out[k] = {
-            topPct: (v.top / h) * 100,
-            leftPct: (v.left / w) * 100
-        };
-    }
-    return out;
-}
-
-// Convert print mm offsets to % (print container is physical mm)
-function mmToPct(mm, chequeSizeMm) {
-    if (!mm || (mm.x == null && mm.y == null)) return { x: 0, y: 0 };
     return {
-        x: ((mm.x || 0) / chequeSizeMm.w) * 100,
-        y: ((mm.y || 0) / chequeSizeMm.h) * 100
+        date: toPct(layout.date[0], layout.date[1]),
+        payee: toPct(layout.name[0], layout.name[1]),
+        amount: toPct(layout.amount_nums[0], layout.amount_nums[1]),
+        amountWords: toPct(layout.amount_words[0], layout.amount_words[1]),
+        crossing: toPct(layout.crossing[0], layout.crossing[1]),
+        purpose: toPct(layout.date[0], layout.date[1])  // fallback
     };
 }
 
-// Final position = base% + mode-specific offset (preview: %; print: mm → %)
-function getFinalPos(basePct, template, offsets, bankKey, field, mode) {
-    const base = basePct[field];
-    if (!base) return null;
-    const o = (offsets[bankKey] || {});
-
-    if (mode === 'preview') {
-        const g = o.preview?.globalPct ?? { x: 0, y: 0 };
-        const f = o.preview?.fieldsPct?.[field] ?? { x: 0, y: 0 };
-        let leftPct = base.leftPct + (g.x || 0) + (f.x || 0);
-        let topPct = base.topPct + (g.y || 0) + (f.y || 0);
-        // Dhofar Islamic Bank: preview-only payee position
-        if (bankKey === 'dhofar_islamic' && field === 'payee' && template.imgSizePx && template.imgSizePx.w) {
-            leftPct -= (40 / template.imgSizePx.w) * 100;
-            topPct += (20 / template.imgSizePx.h) * 100;
-        }
-
-        // Dhofar Islamic Bank: preview-only date position
-        if (bankKey === 'dhofar_islamic' && field === 'date' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
-            leftPct += (65 / template.imgSizePx.w) * 100;
-            topPct += (5 / template.imgSizePx.h) * 100;
-        }
-        
-        // Dhofar Islamic Bank: preview-only amount position
-        if (bankKey === 'dhofar_islamic' && field === 'amount' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
-            leftPct += (87 / template.imgSizePx.w) * 100;
-            topPct += (28 / template.imgSizePx.h) * 100;
-        }
-
-        // Dhofar Islamic Bank: preview-only amountWords position
-        if (bankKey === 'dhofar_islamic' && field === 'amountWords' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
-            leftPct += (40 / template.imgSizePx.w) * 100;
-            topPct += (28 / template.imgSizePx.h) * 100;
-        }
-
-        // Sohar Islamic Bank: preview-only positions
-        if (bankKey === 'sohar' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
-            if (field === 'date') { leftPct += (116 / template.imgSizePx.w) * 100; topPct += (10 / template.imgSizePx.h) * 100; }
-            if (field === 'payee') { topPct += (23 / template.imgSizePx.h) * 100; }
-            if (field === 'amount') { leftPct += (70 / template.imgSizePx.w) * 100; topPct += (27 / template.imgSizePx.h) * 100; }
-            if (field === 'amountWords') { leftPct += (15 / template.imgSizePx.w) * 100; topPct += (30 / template.imgSizePx.h) * 100; }
-        }
-
-        // Oman Arab Bank: preview-only positions
-        if (bankKey === 'oman_arab' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
-            if (field === 'date') { leftPct += (93 / template.imgSizePx.w) * 100; }
-            if (field === 'payee') { leftPct -= (55 / template.imgSizePx.w) * 100; topPct += (17 / template.imgSizePx.h) * 100; }
-            if (field === 'amount') { leftPct += (88 / template.imgSizePx.w) * 100; topPct += (20 / template.imgSizePx.h) * 100; }
-            if (field === 'amountWords') { topPct += (22 / template.imgSizePx.h) * 100; leftPct += (25 / template.imgSizePx.w) * 100; }
-        }
-
-        return { leftPct, topPct };
-    }
-    // print
-    const gMm = o.print?.globalMm ?? { x: 0, y: 0 };
-    const fMm = o.print?.fieldsMm?.[field] ?? { x: 0, y: 0 };
-    const g = mmToPct(gMm, template.chequeSizeMm);
-    const f = mmToPct(fMm, template.chequeSizeMm);
-    let leftPct = base.leftPct + g.x + f.x;
-    let topPct = base.topPct + g.y + f.y;
-    // Dhofar Islamic Bank: print-only positions
-    if (bankKey === 'dhofar_islamic' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
-        if (field === 'date') { leftPct -= (327 / template.imgSizePx.w) * 100; topPct -= (12 / template.imgSizePx.h) * 100; }
-        if (field === 'payee') { leftPct -= (115 / template.imgSizePx.w) * 100; topPct += (10 / template.imgSizePx.h) * 100; }
-        if (field === 'amount') { leftPct -= (239 / template.imgSizePx.w) * 100; topPct += (28 / template.imgSizePx.h) * 100; }
-        if (field === 'amountWords') { leftPct -= (400 / template.imgSizePx.w) * 100; topPct += (20 / template.imgSizePx.h) * 100; }
-    }
-
-    // Sohar Islamic Bank: print-only positions
-    if (bankKey === 'sohar' && template.imgSizePx && template.imgSizePx.w && template.imgSizePx.h) {
-        if (field === 'date') { leftPct -= (347 / template.imgSizePx.w) * 100; topPct -= (18 / template.imgSizePx.h) * 100; }
-        if (field === 'payee') { leftPct -= (315 / template.imgSizePx.w) * 100; topPct += (10 / template.imgSizePx.h) * 100; }
-        if (field === 'amount') { leftPct -= (368 / template.imgSizePx.w) * 100; topPct += (25 / template.imgSizePx.h) * 100; }
-        if (field === 'amountWords') { leftPct -= (500 / template.imgSizePx.w) * 100; topPct += (20 / template.imgSizePx.h) * 100; }
-        if (field === 'crossing') { leftPct -= (80 / template.imgSizePx.w) * 100; }
-    }
-
-    return { leftPct, topPct };
+// Build print positions in mm from layout. Base position + print-only offsets (so print can match preview).
+function layoutToPrintMm(layout) {
+    if (!layout) return null;
+    var w = layout.cheque_width_mm || 160;
+    var h = layout.cheque_height_mm || 75;
+    function off(f, d) { return (layout['print_offset_' + f] && layout['print_offset_' + f][d]) ? layout['print_offset_' + f][d] : 0; }
+    return {
+        date:   { leftMm: layout.date[0] + off('date', 0),   topMm: layout.date[1] + off('date', 1) },
+        payee:  { leftMm: layout.name[0] + off('name', 0),   topMm: layout.name[1] + off('name', 1) },
+        amount: { leftMm: layout.amount_nums[0] + off('amount_nums', 0),  topMm: layout.amount_nums[1] + off('amount_nums', 1) },
+        amountWords: { leftMm: layout.amount_words[0] + off('amount_words', 0), topMm: layout.amount_words[1] + off('amount_words', 1) },
+        crossing: { leftMm: layout.crossing[0] + off('crossing', 0), topMm: layout.crossing[1] + off('crossing', 1) }
+    };
 }
 
-// Apply positions and values to a canvas. mode = 'preview' | 'print'.
-// For print we use mm (not %) so positions stay fixed regardless of when/where layout runs (avoids drift over time).
-function applyPositions(canvasEl, pctMap, values, template, forPrint) {
-    if (!canvasEl || !pctMap || !template) return;
-    const mode = forPrint ? 'print' : 'preview';
-    const offsets = getOffsets();
-    const bankKey = (document.getElementById('bankSelect') && document.getElementById('bankSelect').value) || '';
-    const sizeMm = template.chequeSizeMm || { w: 160, h: 75 };
+function getChequeSizeMm(layout) {
+    return {
+        w: layout && layout.cheque_width_mm != null ? layout.cheque_width_mm : 160,
+        h: layout && layout.cheque_height_mm != null ? layout.cheque_height_mm : 75
+    };
+}
 
-    for (const [field, basePos] of Object.entries(pctMap)) {
-        const node = canvasEl.querySelector('[data-field="' + field + '"]');
-        if (!node) continue;
-        // Dhofar Islamic: use explicit print positions (mm), same orientation as preview (no mirror)
-        if (forPrint && bankKey === 'dhofar_islamic' && template.printFieldsMm && template.printFieldsMm[field]) {
-            const p = template.printFieldsMm[field];
-            const cal = (offsets.dhofar_islamic || {}).print || {};
-            const g = cal.globalMm || {};
-            const f = (cal.fieldsMm && cal.fieldsMm[field]) || {};
-            const leftMm = p.left + (g.x || 0) + (f.x || 0);
-            const topMm = p.top + (g.y || 0) + (f.y || 0);
-            node.style.left = leftMm + 'mm';
-            node.style.top = topMm + 'mm';
-            node.textContent = values[field] != null ? values[field] : '';
-            continue;
-        }
-                // Use physical mm so print position never drifts (percentages on display:none container can resolve inconsistently)
-                // Use physical mm so print position never drifts (percentages on display:none container can resolve inconsistently)
-        const final = getFinalPos(pctMap, template, offsets, bankKey, field, mode);
-        if (final) {
-            if (forPrint) {
-                const leftMm = (final.leftPct / 100) * sizeMm.w;
-                if (bankKey === 'dhofar_islamic') {
-                    leftMm = sizeMm.w - leftMm;
-                }
-                const topMm = (final.topPct / 100) * sizeMm.h;
-                node.style.left = leftMm + 'mm';
-                node.style.top = topMm + 'mm';
-            } else {
-                node.style.left = final.leftPct + '%';
-                node.style.top = final.topPct + '%';
+// Fetch layout for bank and cache it; returns Promise<layout>.
+function fetchChequeLayout(bankKey) {
+    if (window.chequeLayoutByBank[bankKey]) return Promise.resolve(window.chequeLayoutByBank[bankKey]);
+    return fetch('{{ url_for("api_cheque_layout", bank_key="") }}' + encodeURIComponent(bankKey), { credentials: 'same-origin' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.layout) {
+                window.chequeLayoutByBank[bankKey] = data.layout;
+                return data.layout;
             }
+            return null;
+        })
+        .catch(function() { return null; });
+}
+
+// Apply positions and values to a canvas using layout (mm-based). forPrint: use mm for print container.
+// In print we position from bottom (not top) so content prints right-side up when the print system uses a bottom-up coordinate system.
+function applyPositionsFromLayout(canvasEl, layout, values, forPrint) {
+    if (!canvasEl || !layout) return;
+    const pctMap = layoutToPctMap(layout);
+    const printMm = layoutToPrintMm(layout);
+    const chequeH = layout.cheque_height_mm != null ? layout.cheque_height_mm : 75;
+    const fields = ['date', 'payee', 'amount', 'amountWords', 'crossing'];
+    for (var i = 0; i < fields.length; i++) {
+        var field = fields[i];
+        var node = canvasEl.querySelector('[data-field="' + field + '"]');
+        if (!node) continue;
+        if (forPrint && printMm[field]) {
+            node.style.left = printMm[field].leftMm + 'mm';
+            node.style.top = 'auto';
+            node.style.bottom = (chequeH - printMm[field].topMm) + 'mm';
+        } else if (pctMap && pctMap[field]) {
+            node.style.left = pctMap[field].leftPct + '%';
+            node.style.top = pctMap[field].topPct + '%';
+            node.style.bottom = 'auto';
         }
         node.textContent = values[field] != null ? values[field] : '';
     }
 }
-
-// Legacy bankFieldPositions for any code that still expects top/left in px (e.g. modal); derived from TEMPLATES
-const bankFieldPositions = {};
-Object.keys(TEMPLATES).forEach(function(bank) {
-    const t = TEMPLATES[bank];
-    bankFieldPositions[bank] = {};
-    Object.keys(t.fieldsPx).forEach(function(field) {
-        const p = t.fieldsPx[field];
-        bankFieldPositions[bank][field] = { top: p.top + 'px', left: p.left + 'px' };
-    });
-});
 
 function getValuesFromForm() {
     const dateInput = document.getElementById('chequeDate');
@@ -430,24 +306,22 @@ function getValuesFromForm() {
     return { date, payee, amount, amountWords, crossing, purpose: '' };
 }
 
-// Update field positions using master % map (preview + bank-specific styling)
-function updateFieldPositions(bank) {
-    const template = TEMPLATES[bank];
-    if (!template) return;
-    const pctMap = pxToPctMap(template);
+// Update field positions using layout from API (mm-based) + bank-specific styling
+function updateFieldPositionsWithLayout(bank, layout) {
+    if (!layout) return;
     const values = getValuesFromForm();
     document.querySelectorAll('.cheque-overlay').forEach(function(overlay) {
-        applyPositions(overlay, pctMap, values, template, false);
+        applyPositionsFromLayout(overlay, layout, values, false);
     });
     var modalOverlay = document.querySelector('.modal-cheque-overlay');
-    if (modalOverlay) applyPositions(modalOverlay, pctMap, values, template, false);
+    if (modalOverlay) applyPositionsFromLayout(modalOverlay, layout, values, false);
     // Bank-specific styling (preview only)
     var amountWordsSel = '.field-overlay[data-field="amountWords"], .field-amountWords';
     document.querySelectorAll(amountWordsSel).forEach(function(el) {
         el.style.display = 'block';
         el.style.textAlign = 'center';
-        el.style.lineHeight = bank === 'oman_arab' ? '2.3' : '2.0';
-        el.style.maxWidth = bank === 'dhofar_islamic' || bank === 'sohar' ? '400px' : (bank === 'oman_arab' ? '420px' : '300px');
+        el.style.lineHeight = bank === 'oman_arab' ? '2.5' : '2.25';
+        el.style.maxWidth = bank === 'dhofar_islamic' || bank === 'sohar' ? '430px' : (bank === 'oman_arab' ? '450px' : '390px');
         el.style.width = el.style.maxWidth;
     });
     document.querySelectorAll('.field-overlay[data-field="payee"], .field-payee').forEach(function(el) {
@@ -460,6 +334,12 @@ function updateFieldPositions(bank) {
         el.style.display = 'block';
         el.style.maxWidth = '120px';
         el.style.width = '120px';
+    });
+}
+
+function updateFieldPositions(bank) {
+    fetchChequeLayout(bank).then(function(layout) {
+        if (layout) updateFieldPositionsWithLayout(bank, layout);
     });
 }
 
@@ -656,29 +536,31 @@ function amountToWords(amount, language = 'english', currency = 'OMR') {
 const CHEQUE_WIDTH_MM = 190.5;
 const CHEQUE_HEIGHT_MM = 88.9;
 
-// Real-time field updates: one set of % positions for preview and print
+// Real-time field updates using layout from API (mm -> % for preview, mm for print)
 function updateChequePreview() {
-    const bank = document.getElementById('bankSelect') ? document.getElementById('bankSelect').value : 'dhofar_islamic';
-    const template = TEMPLATES[bank];
-    if (!template) return;
-    const pctMap = pxToPctMap(template);
-    const values = getValuesFromForm();
+    var bank = document.getElementById('bankSelect') ? document.getElementById('bankSelect').value : 'dhofar_islamic';
+    var layout = window.chequeLayoutByBank[bank];
+    if (!layout) {
+        fetchChequeLayout(bank).then(function(l) { if (l) { updateChequePreview(); } });
+        return;
+    }
+    var values = getValuesFromForm();
     document.querySelectorAll('.cheque-overlay').forEach(function(overlay) {
-        applyPositions(overlay, pctMap, values, template, false);
+        applyPositionsFromLayout(overlay, layout, values, false);
     });
     var modalOverlay = document.querySelector('.modal-cheque-overlay');
-    if (modalOverlay) applyPositions(modalOverlay, pctMap, values, template, false);
+    if (modalOverlay) applyPositionsFromLayout(modalOverlay, layout, values, false);
     var printCanvas = document.getElementById('chequePrintCanvas');
-    if (printCanvas) applyPositions(printCanvas, pctMap, values, template, true);
+    if (printCanvas) applyPositionsFromLayout(printCanvas, layout, values, true);
     var isDateVisible = document.getElementById('showDate') ? document.getElementById('showDate').checked : true;
     document.querySelectorAll('[data-field="date"]').forEach(function(el) {
-            el.style.display = isDateVisible ? 'block' : 'none';
-        });
+        el.style.display = isDateVisible ? 'block' : 'none';
+    });
     var language = document.getElementById('amountWordsLanguage') ? document.getElementById('amountWordsLanguage').value : 'english';
     document.querySelectorAll('[data-field="amountWords"]').forEach(function(el) {
-            el.style.direction = language === 'arabic' ? 'rtl' : 'ltr';
-            el.style.textAlign = 'center';
-            if (language === 'arabic') el.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
+        el.style.direction = language === 'arabic' ? 'rtl' : 'ltr';
+        el.style.textAlign = 'center';
+        if (language === 'arabic') el.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
         el.setAttribute('dir', language === 'arabic' ? 'rtl' : 'ltr');
     });
     document.querySelectorAll('[data-field="crossing"]').forEach(function(el) {
@@ -748,12 +630,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Bank selection handler
-    const bankSelect = document.getElementById('bankSelect');
+    var bankSelect = document.getElementById('bankSelect');
     if (bankSelect) {
         bankSelect.addEventListener('change', function() {
-            const selectedBank = this.value;
-            updateFieldPositions(selectedBank);
+            var selectedBank = this.value;
             updateChequeTemplate(selectedBank);
+            fetchChequeLayout(selectedBank).then(function(layout) {
+                if (layout) {
+                    updateFieldPositionsWithLayout(selectedBank, layout);
+                    updateChequePreview();
+                }
+            });
         });
     }
     
@@ -783,25 +670,26 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Print function - updates print container and opens browser print dialog immediately (no PDF)
+    // Print function - uses layout (mm) for print container and field positions
     function printCheque() {
-        const printBtn = document.getElementById('printBtn') || document.getElementById('printChequeBtn');
-        const originalText = printBtn ? printBtn.innerHTML : '';
+        var printBtn = document.getElementById('printBtn') || document.getElementById('printChequeBtn');
+        var originalText = printBtn ? printBtn.innerHTML : '';
         if (printBtn) {
             printBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Printing...';
             printBtn.disabled = true;
         }
-
         var bank = document.getElementById('bankSelect') ? document.getElementById('bankSelect').value : 'dhofar_islamic';
-        var template = TEMPLATES[bank];
-        if (!template) {
-            if (printBtn) { printBtn.innerHTML = originalText; printBtn.disabled = false; }
+        var layout = window.chequeLayoutByBank[bank];
+        if (!layout) {
+            fetchChequeLayout(bank).then(function(l) {
+                if (l) printCheque();
+                else if (printBtn) { printBtn.innerHTML = originalText; printBtn.disabled = false; }
+            });
             return;
         }
-        var pctMap = pxToPctMap(template);
         var values = getValuesFromForm();
         var printCanvas = document.getElementById('chequePrintCanvas');
-        if (printCanvas) applyPositions(printCanvas, pctMap, values, template, true);
+        if (printCanvas) applyPositionsFromLayout(printCanvas, layout, values, true);
         var isDateVisible = document.getElementById('showDate') ? document.getElementById('showDate').checked : true;
         var dateEl = printCanvas && printCanvas.querySelector('[data-field="date"]');
         if (dateEl) dateEl.style.display = isDateVisible ? 'block' : 'none';
@@ -816,6 +704,8 @@ document.addEventListener('DOMContentLoaded', function() {
             el.style.fontWeight = '700';
             el.style.color = 'rgba(200, 0, 0, 0.8)';
         });
+        var sizeMm = getChequeSizeMm(layout);
+        var w = sizeMm.w, h = sizeMm.h;
         var styleId = 'dynamicPrintStyle';
         var styleTag = document.getElementById(styleId) || (function() {
             var s = document.createElement('style');
@@ -823,7 +713,6 @@ document.addEventListener('DOMContentLoaded', function() {
             document.head.appendChild(s);
             return s;
         })();
-        var w = template.chequeSizeMm.w, h = template.chequeSizeMm.h;
         var printLeftOffsetMm = 70;
         var pageW = w + printLeftOffsetMm;
         styleTag.textContent = '@media print { @page { size: ' + pageW + 'mm ' + h + 'mm; margin: 0; } .cheque-print-container { left: ' + printLeftOffsetMm + 'mm !important; } .chequePrint { width: ' + w + 'mm !important; height: ' + h + 'mm !important; } }';
@@ -837,14 +726,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.print();
             });
         });
-
-        // Restore button after a short delay (print dialog is modal)
         setTimeout(function() {
-                        if (printBtn) {
-                            printBtn.innerHTML = originalText;
-                            printBtn.disabled = false;
-                }
-            }, 500);
+            if (printBtn) { printBtn.innerHTML = originalText; printBtn.disabled = false; }
+        }, 500);
     }
     
     // Old print function (kept for reference but not used)
@@ -974,7 +858,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     // Increase font size by ~13% to make it bigger
                                     const increasedFontSize = fontSizeMm * 1.13;
                                     field.style.fontSize = increasedFontSize.toFixed(2) + 'mm';
-                                    field.style.fontWeight = '600'; // Make bolder
+                                    field.style.fontWeight = 'normal';
                                 }
                             } else if (field.id === 'printAmountWordsOverlay') {
                                 // Get the inline style line-height (which is "2.0") instead of computed (which is "28px")
@@ -1023,10 +907,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (field.id === 'printAmountOverlay') {
                             field.style.whiteSpace = 'nowrap';
                             field.style.lineHeight = '1.2';
-                            field.style.fontWeight = '600'; // Make bolder
+                            field.style.fontWeight = 'normal';
                         } else {
-                            field.style.lineHeight = '2.0';
-                            field.style.maxWidth = '51.2mm'; // 300px converted to mm
+                            field.style.lineHeight = '2.25';
+                            field.style.maxWidth = '56mm'; // amount-in-words box
                             field.style.whiteSpace = 'normal';
                             field.style.fontSize = '4.3mm'; // Increased from 4.4mm, made bigger
                             field.style.fontWeight = '600'; // Make bolder
@@ -1180,11 +1064,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Initial field positions for default bank
-    updateFieldPositions('dhofar_islamic');
-    
-    // Initial preview update
-    updateChequePreview();
+    // Load layout for current bank then apply positions and preview
+    var initialBank = document.getElementById('bankSelect') ? document.getElementById('bankSelect').value : 'dhofar_islamic';
+    fetchChequeLayout(initialBank).then(function(layout) {
+        if (layout) {
+            updateFieldPositionsWithLayout(initialBank, layout);
+            updateChequePreview();
+        }
+    });
     
     // Pre-fill form from first selected serial when opening for Used cheques (e.g. Print from register)
     const firstSerial = (window.selectedSerials && window.selectedSerials.length) ? window.selectedSerials[0] : null;

@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block title %}Cheque Calibration{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/write_cheque.css') }}">
+<style>
+.calibration-form .form-row { display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; }
+.calibration-form .form-row label { min-width: 140px; margin: 0; }
+.calibration-form .form-row input[type="number"] { width: 80px; padding: 6px 8px; }
+.calibration-form .field-group { margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid #eee; }
+.calibration-form .field-group:last-of-type { border-bottom: none; }
+.calibration-form .field-group h4 { margin: 0 0 0.5rem 0; font-size: 0.95rem; color: #2c3e50; }
+.calibration-actions { margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.calibration-actions .btn { min-width: 120px; }
+.calibration-saved { color: #28a745; font-size: 0.9rem; margin-left: 0.5rem; }
+/* Ensure calibration preview is visible: same structure as write_cheque + min height */
+#calPreviewWrapper { min-height: 380px; }
+#calPreviewWrapper .cheque-preview-carousel { min-height: 320px; }
+#calPreviewWrapper .cheque-image-container.cheque-canvas { max-width: 100%; }
+/* Calibration overlay fields: ensure visible and above image */
+#calChequeOverlay .field-overlay {
+    z-index: 2;
+    min-width: 1px;
+    min-height: 1em;
+}
+#calChequeOverlay .field-overlay[data-field="amount"] {
+    background: rgba(255, 255, 200, 0.85);
+    color: #000;
+    font-weight: 600;
+    white-space: nowrap;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% set bank_cheque_images = {'dhofar_islamic': 'DHOFAR-ISLAMIC-BANK.png', 'oman_arab': 'OMAN-ARAB-BANK.png', 'sohar': 'SOHAR-BANK.png'} %}
+<div class="cheque-container dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-ruler-combined"></i> Cheque Calibration</h1>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <a href="{{ url_for('write_cheque') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Write Cheque
+            </a>
+        </div>
+    </div>
+
+    <div class="cheque-layout">
+        <!-- Left: mm inputs -->
+        <div class="cheque-form-panel">
+            <div class="form-section">
+                <h3><i class="fas fa-sliders-h"></i> Field positions (mm from top-left)</h3>
+                <p style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;">Measure from the top-left corner of the cheque. Adjust values until the preview text lines up with your template.</p>
+                <div class="form-group">
+                    <label>Bank</label>
+                    <select id="calBankSelect" class="form-control" style="max-width: 220px;">
+                        <option value="dhofar_islamic">Dhofar Islamic Bank</option>
+                        <option value="oman_arab">Oman Arab Bank</option>
+                        <option value="sohar">Sohar Bank</option>
+                    </select>
+                </div>
+                <form id="calibrationForm" class="calibration-form">
+                    <div class="field-group">
+                        <h4>Payee name</h4>
+                        <div class="form-row">
+                            <label>X (mm)</label>
+                            <input type="number" id="name_x" step="0.1" class="form-control">
+                            <label>Y (mm)</label>
+                            <input type="number" id="name_y" step="0.1" class="form-control">
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <h4>Amount in words</h4>
+                        <div class="form-row">
+                            <label>X (mm)</label>
+                            <input type="number" id="amount_words_x" step="0.1" class="form-control">
+                            <label>Y (mm)</label>
+                            <input type="number" id="amount_words_y" step="0.1" class="form-control">
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <h4>Amount in numbers</h4>
+                        <div class="form-row">
+                            <label>X (mm)</label>
+                            <input type="number" id="amount_nums_x" step="0.1" class="form-control">
+                            <label>Y (mm)</label>
+                            <input type="number" id="amount_nums_y" step="0.1" class="form-control">
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <h4>Date</h4>
+                        <div class="form-row">
+                            <label>X (mm)</label>
+                            <input type="number" id="date_x" step="0.1" class="form-control">
+                            <label>Y (mm)</label>
+                            <input type="number" id="date_y" step="0.1" class="form-control">
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <h4>Crossing</h4>
+                        <div class="form-row">
+                            <label>X (mm)</label>
+                            <input type="number" id="crossing_x" step="0.1" class="form-control">
+                            <label>Y (mm)</label>
+                            <input type="number" id="crossing_y" step="0.1" class="form-control">
+                        </div>
+                    </div>
+                    <div class="field-group" style="border-top: 2px solid #ddd; margin-top: 1.5rem; padding-top: 1rem;">
+                        <h4 style="color: #0d6efd;"><i class="fas fa-print"></i> Print-only offsets (mm)</h4>
+                        <p style="color: #666; font-size: 0.85rem; margin-bottom: 0.75rem;">Nudge print positions so the printed cheque matches the preview. Leave 0 if already aligned.</p>
+                        <div class="form-row"><label>Payee</label> <label>X</label> <input type="number" id="print_offset_name_x" step="0.1" class="form-control" placeholder="0"> <label>Y</label> <input type="number" id="print_offset_name_y" step="0.1" class="form-control" placeholder="0"></div>
+                        <div class="form-row"><label>Amount words</label> <label>X</label> <input type="number" id="print_offset_amount_words_x" step="0.1" class="form-control" placeholder="0"> <label>Y</label> <input type="number" id="print_offset_amount_words_y" step="0.1" class="form-control" placeholder="0"></div>
+                        <div class="form-row"><label>Amount numbers</label> <label>X</label> <input type="number" id="print_offset_amount_nums_x" step="0.1" class="form-control" placeholder="0"> <label>Y</label> <input type="number" id="print_offset_amount_nums_y" step="0.1" class="form-control" placeholder="0"></div>
+                        <div class="form-row"><label>Date</label> <label>X</label> <input type="number" id="print_offset_date_x" step="0.1" class="form-control" placeholder="0"> <label>Y</label> <input type="number" id="print_offset_date_y" step="0.1" class="form-control" placeholder="0"></div>
+                        <div class="form-row"><label>Crossing</label> <label>X</label> <input type="number" id="print_offset_crossing_x" step="0.1" class="form-control" placeholder="0"> <label>Y</label> <input type="number" id="print_offset_crossing_y" step="0.1" class="form-control" placeholder="0"></div>
+                    </div>
+                    <div class="calibration-actions">
+                        <button type="button" id="calSaveBtn" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <span id="calSavedMsg" class="calibration-saved" style="display: none;">Saved.</span>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right: Live preview -->
+        <div class="cheque-preview-panel">
+            <div class="preview-section">
+                <h3 style="margin-bottom: 0.5rem;"><i class="fas fa-eye"></i> Preview</h3>
+                <p style="color: #666; font-size: 0.85rem; margin-bottom: 0.75rem;">Sample text shows where each field will appear.</p>
+                <div class="cheque-preview" id="calPreviewWrapper">
+                    <div class="cheque-preview-carousel cheque-preview-single" style="min-height: 320px;">
+                        <div class="cheque-preview-slide active" style="width: 100%; max-width: 893px;">
+                            <div class="cheque-image-container cheque-canvas">
+                                <img id="calChequeTemplate" class="cheque-template" src="{{ url_for('static', filename='cheque_templates/DHOFAR-ISLAMIC-BANK.png') }}" alt="Cheque Template">
+                                <div class="cheque-overlay" id="calChequeOverlay">
+                                    <div class="field-overlay" data-field="date"></div>
+                                    <div class="field-overlay" data-field="payee"></div>
+                                    <div class="field-overlay field-amount" data-field="amount" id="calAmountOverlay"></div>
+                                    <div class="field-overlay" data-field="amountWords"></div>
+                                    <div class="field-overlay" data-field="crossing"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var DPI = 96, DPI_CALIBRATION = 4;
+    function mmToPx(mm) { return (DPI + DPI_CALIBRATION) * mm / 25.4; }
+
+    var bankImages = {
+        dhofar_islamic: '{{ url_for("static", filename="cheque_templates/DHOFAR-ISLAMIC-BANK.png") }}',
+        oman_arab: '{{ url_for("static", filename="cheque_templates/OMAN-ARAB-BANK.png") }}',
+        sohar: '{{ url_for("static", filename="cheque_templates/SOHAR-BANK.png") }}'
+    };
+    var apiBase = '{{ url_for("api_cheque_layout", bank_key="") }}';
+
+    function getLayoutFromForm() {
+        function num(id) { var v = document.getElementById(id); return v && v.value !== '' ? parseFloat(v.value) : 0; }
+        return {
+            name: [num('name_x'), num('name_y')],
+            amount_words: [num('amount_words_x'), num('amount_words_y')],
+            amount_nums: [num('amount_nums_x'), num('amount_nums_y')],
+            date: [num('date_x'), num('date_y')],
+            crossing: [num('crossing_x'), num('crossing_y')],
+            template_width_px: 893,
+            template_height_px: 418,
+            cheque_width_mm: 160,
+            cheque_height_mm: 75
+        };
+    }
+
+    function layoutToPctMap(layout) {
+        if (!layout) return {};
+        var w = layout.template_width_px || 893, h = layout.template_height_px || 418;
+        function toPct(xMm, yMm) {
+            var x = Number(xMm);
+            var y = Number(yMm);
+            if (isNaN(x)) x = 0;
+            if (isNaN(y)) y = 0;
+            var pxX = mmToPx(x), pxY = mmToPx(y);
+            return { leftPct: (pxX / w) * 100, topPct: (pxY / h) * 100 };
+        }
+        return {
+            date: toPct(layout.date && layout.date[0], layout.date && layout.date[1]),
+            payee: toPct(layout.name && layout.name[0], layout.name && layout.name[1]),
+            amount: toPct(layout.amount_nums && layout.amount_nums[0], layout.amount_nums && layout.amount_nums[1]),
+            amountWords: toPct(layout.amount_words && layout.amount_words[0], layout.amount_words && layout.amount_words[1]),
+            crossing: toPct(layout.crossing && layout.crossing[0], layout.crossing && layout.crossing[1])
+        };
+    }
+
+    var sampleValues = {
+        date: '25/02/2025',
+        payee: 'Payee Name',
+        amount: '123.456',
+        amountWords: 'One Hundred Twenty-Three Rial Omani Only',
+        crossing: 'A/C PAYEE'
+    };
+
+    function updatePreview() {
+        var layout = getLayoutFromForm();
+        var pctMap = layoutToPctMap(layout);
+        var overlay = document.getElementById('calChequeOverlay');
+        if (!overlay) return;
+        ['date', 'payee', 'amount', 'amountWords', 'crossing'].forEach(function(field) {
+            var node = overlay.querySelector('[data-field="' + field + '"]');
+            if (!node || !pctMap[field]) return;
+            var leftPct = pctMap[field].leftPct;
+            var topPct = pctMap[field].topPct;
+            if (typeof leftPct !== 'number' || isNaN(leftPct)) leftPct = 0;
+            if (typeof topPct !== 'number' || isNaN(topPct)) topPct = 0;
+            node.style.left = leftPct + '%';
+            node.style.top = topPct + '%';
+            node.style.display = 'block';
+            node.textContent = sampleValues[field] || '';
+        });
+        document.querySelectorAll('#calChequeOverlay [data-field="crossing"]').forEach(function(el) {
+            el.style.transform = 'rotate(-25deg)';
+            el.style.fontWeight = '700';
+            el.style.color = 'rgba(200, 0, 0, 0.6)';
+        });
+    }
+
+    function fillFormFromLayout(layout) {
+        if (!layout) return;
+        function set(id, val) { var el = document.getElementById(id); if (el) el.value = val != null && val !== '' ? val : ''; }
+        set('name_x', layout.name && layout.name[0]);
+        set('name_y', layout.name && layout.name[1]);
+        set('amount_words_x', layout.amount_words && layout.amount_words[0]);
+        set('amount_words_y', layout.amount_words && layout.amount_words[1]);
+        set('amount_nums_x', layout.amount_nums && layout.amount_nums[0]);
+        set('amount_nums_y', layout.amount_nums && layout.amount_nums[1]);
+        set('date_x', layout.date && layout.date[0]);
+        set('date_y', layout.date && layout.date[1]);
+        set('crossing_x', layout.crossing && layout.crossing[0]);
+        set('crossing_y', layout.crossing && layout.crossing[1]);
+        if (layout.print_offset_name) { set('print_offset_name_x', layout.print_offset_name[0]); set('print_offset_name_y', layout.print_offset_name[1]); }
+        if (layout.print_offset_amount_words) { set('print_offset_amount_words_x', layout.print_offset_amount_words[0]); set('print_offset_amount_words_y', layout.print_offset_amount_words[1]); }
+        if (layout.print_offset_amount_nums) { set('print_offset_amount_nums_x', layout.print_offset_amount_nums[0]); set('print_offset_amount_nums_y', layout.print_offset_amount_nums[1]); }
+        if (layout.print_offset_date) { set('print_offset_date_x', layout.print_offset_date[0]); set('print_offset_date_y', layout.print_offset_date[1]); }
+        if (layout.print_offset_crossing) { set('print_offset_crossing_x', layout.print_offset_crossing[0]); set('print_offset_crossing_y', layout.print_offset_crossing[1]); }
+    }
+
+    function loadBank(bankKey) {
+        var img = document.getElementById('calChequeTemplate');
+        if (img && bankImages[bankKey]) img.src = bankImages[bankKey];
+        fetch(apiBase + encodeURIComponent(bankKey), { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.layout) {
+                    fillFormFromLayout(data.layout);
+                    updatePreview();
+                }
+            })
+            .catch(function() { updatePreview(); });
+    }
+
+    document.getElementById('calBankSelect').addEventListener('change', function() {
+        loadBank(this.value);
+    });
+
+    ['name_x','name_y','amount_words_x','amount_words_y','amount_nums_x','amount_nums_y','date_x','date_y','crossing_x','crossing_y'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', updatePreview);
+    });
+
+    document.getElementById('calSaveBtn').addEventListener('click', function() {
+        var bankKey = document.getElementById('calBankSelect').value;
+        var payload = {
+            name_x: document.getElementById('name_x').value,
+            name_y: document.getElementById('name_y').value,
+            amount_words_x: document.getElementById('amount_words_x').value,
+            amount_words_y: document.getElementById('amount_words_y').value,
+            amount_nums_x: document.getElementById('amount_nums_x').value,
+            amount_nums_y: document.getElementById('amount_nums_y').value,
+            date_x: document.getElementById('date_x').value,
+            date_y: document.getElementById('date_y').value,
+            crossing_x: document.getElementById('crossing_x').value,
+            crossing_y: document.getElementById('crossing_y').value,
+            print_offset_name_x: document.getElementById('print_offset_name_x').value,
+            print_offset_name_y: document.getElementById('print_offset_name_y').value,
+            print_offset_amount_words_x: document.getElementById('print_offset_amount_words_x').value,
+            print_offset_amount_words_y: document.getElementById('print_offset_amount_words_y').value,
+            print_offset_amount_nums_x: document.getElementById('print_offset_amount_nums_x').value,
+            print_offset_amount_nums_y: document.getElementById('print_offset_amount_nums_y').value,
+            print_offset_date_x: document.getElementById('print_offset_date_x').value,
+            print_offset_date_y: document.getElementById('print_offset_date_y').value,
+            print_offset_crossing_x: document.getElementById('print_offset_crossing_x').value,
+            print_offset_crossing_y: document.getElementById('print_offset_crossing_y').value
+        };
+        var btn = this;
+        btn.disabled = true;
+        fetch(apiBase + encodeURIComponent(bankKey), {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            var msg = document.getElementById('calSavedMsg');
+            if (data.success && msg) {
+                msg.style.display = 'inline';
+                setTimeout(function() { msg.style.display = 'none'; }, 2500);
+            } else if (data.error) {
+                alert(data.error);
+            }
+        })
+        .catch(function() {
+            btn.disabled = false;
+            alert('Failed to save.');
+        });
+    });
+
+    loadBank(document.getElementById('calBankSelect').value);
+})();
+</script>
+{% endblock %}

@@ -12,13 +12,14 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, UserPermission, UserPermissionToggle, RoleDepartmentPermissionDefault, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, ProcurementItemRequest, ProcurementReceiptEntry, ProcurementInvoiceEntry, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry, DepartmentTemporaryManager
+from models import db, User, UserPermission, UserPermissionToggle, RoleDepartmentPermissionDefault, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, BankLayout, ProcurementItemRequest, ProcurementReceiptEntry, ProcurementInvoiceEntry, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry, DepartmentTemporaryManager
 from config import Config
 import json
 from playwright.sync_api import sync_playwright
 from io import BytesIO
 import base64
 from sqlalchemy import func
+
 
 # Wrap Flask's flash to centralize permission-denied handling.
 # Any code that calls flash("You do not have permission...") will instead
@@ -3451,6 +3452,7 @@ def verify_pin():
                 session['tab_session_id'] = tab_session_id
             except Exception:
                 pass
+            _set_ticketing_session(user)
             log_action(f"User {username} logged in successfully with email PIN")
             
             return jsonify({
@@ -3489,6 +3491,20 @@ def verify_pin():
             'success': False,
             'message': 'An error occurred. Please try again.'
         })
+
+
+def _set_ticketing_session(user):
+    """Set session keys so Ticketing (shared cookie) treats the user as logged in."""
+    try:
+        session['user_id'] = user.user_id
+        session['email'] = (user.email or user.username or '')
+        session['username'] = user.username or ''
+        session['full_name'] = user.name or ''
+        # Ticketing: only 'it_staff' gets IT privileges; all other values get "My Tickets" only.
+        session['user_type'] = 'it_staff' if getattr(user, 'role', None) == 'IT Staff' else 'regular_user'
+        session['department'] = user.department or ''
+    except Exception:
+        pass
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -3581,6 +3597,7 @@ def login():
                     session['tab_session_id'] = tab_session_id
                 except Exception:
                     pass
+                _set_ticketing_session(user)
                 app.logger.warning(f"⚠️ User {username} logged in via DEVELOPMENT TESTING MODE (PIN bypassed)")
                 log_action(f"⚠️ DEVELOPMENT: User {username} logged in successfully (PIN bypassed via testing button)")
                 flash(f'⚠️ DEVELOPMENT MODE: Welcome back, {user.name}! (PIN bypassed)', 'warning')
@@ -3615,6 +3632,7 @@ def login():
                     session['tab_session_id'] = tab_session_id
                 except Exception:
                     pass
+                _set_ticketing_session(user)
                 app.logger.info(f"System user logged in successfully, redirecting to dashboard")
                 log_action(f"System account {username} logged in successfully (PIN bypassed)")
                 flash(f'Welcome back, {user.name}!', 'success')
@@ -3671,6 +3689,7 @@ def login():
                     session['tab_session_id'] = tab_session_id
                 except Exception:
                     pass
+                _set_ticketing_session(user)
                 log_action(f"User {username} logged in successfully with email PIN")
                 flash(f'Welcome back, {user.name}!', 'success')
                 return redirect(url_for('dashboard'))
@@ -15438,6 +15457,114 @@ def write_cheque_save():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+def _ensure_bank_layouts_seeded():
+    """Create default bank_layouts rows from current hardcoded positions (px -> mm) if missing. Add print-offset columns if missing."""
+    try:
+        import sqlite3
+        db_path = app.config.get('SQLALCHEMY_DATABASE_URI', '').replace('sqlite:///', '')
+        if db_path:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='bank_layouts'")
+            if cursor.fetchone():
+                cursor.execute("PRAGMA table_info(bank_layouts)")
+                existing = [row[1] for row in cursor.fetchall()]
+                for col in ['print_offset_name_x', 'print_offset_name_y', 'print_offset_amount_words_x', 'print_offset_amount_words_y',
+                            'print_offset_amount_nums_x', 'print_offset_amount_nums_y', 'print_offset_date_x', 'print_offset_date_y',
+                            'print_offset_crossing_x', 'print_offset_crossing_y']:
+                    if col not in existing:
+                        cursor.execute("ALTER TABLE bank_layouts ADD COLUMN " + col + " REAL")
+                        conn.commit()
+            conn.close()
+    except Exception:
+        pass
+    W_PX, H_PX = 893, 418
+    W_MM, H_MM = 160.0, 75.0
+    def px_to_mm(left_px, top_px):
+        return (left_px * W_MM / W_PX, top_px * H_MM / H_PX)
+    defaults = [
+        ('dhofar_islamic', (53, 363), (127, 185), (183, 613), (160, 95), (20, 60)),
+        ('oman_arab', (13, 610), (125, 90), (135, 645), (165, 82), (15, 40)),
+        ('sohar', (52, 560), (116, 115), (172, 605), (153, 80), (25, 70)),
+    ]
+    for bank_key, date_px, name_px, amount_px, amount_words_px, crossing_px in defaults:
+        if BankLayout.query.filter_by(bank_key=bank_key).first():
+            continue
+        date_mm = px_to_mm(date_px[0], date_px[1])
+        name_mm = px_to_mm(name_px[0], name_px[1])
+        amount_nums_mm = px_to_mm(amount_px[0], amount_px[1])
+        amount_words_mm = px_to_mm(amount_words_px[0], amount_words_px[1])
+        crossing_mm = px_to_mm(crossing_px[0], crossing_px[1])
+        layout = BankLayout(
+            bank_key=bank_key,
+            name_x=name_mm[0], name_y=name_mm[1],
+            amount_words_x=amount_words_mm[0], amount_words_y=amount_words_mm[1],
+            amount_nums_x=amount_nums_mm[0], amount_nums_y=amount_nums_mm[1],
+            date_x=date_mm[0], date_y=date_mm[1],
+            crossing_x=crossing_mm[0], crossing_y=crossing_mm[1],
+            template_width_px=W_PX, template_height_px=H_PX,
+            cheque_width_mm=W_MM, cheque_height_mm=H_MM,
+        )
+        db.session.add(layout)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
+@app.route('/api/cheque-layout/<bank_key>', methods=['GET', 'PUT'])
+@login_required
+@role_required('GM', 'CEO', 'Operation Manager')
+def api_cheque_layout(bank_key):
+    """GET: return layout in mm. PUT: update layout (calibration)."""
+    _ensure_bank_layouts_seeded()
+    layout = BankLayout.query.filter_by(bank_key=bank_key).first()
+    if not layout:
+        return jsonify({'error': 'Layout not found', 'layout': None}), 404
+    if request.method == 'PUT':
+        data = request.get_json() or {}
+        try:
+            if 'name_x' in data: layout.name_x = float(data['name_x'])
+            if 'name_y' in data: layout.name_y = float(data['name_y'])
+            if 'amount_words_x' in data: layout.amount_words_x = float(data['amount_words_x'])
+            if 'amount_words_y' in data: layout.amount_words_y = float(data['amount_words_y'])
+            if 'amount_nums_x' in data: layout.amount_nums_x = float(data['amount_nums_x'])
+            if 'amount_nums_y' in data: layout.amount_nums_y = float(data['amount_nums_y'])
+            if 'date_x' in data: layout.date_x = float(data['date_x'])
+            if 'date_y' in data: layout.date_y = float(data['date_y'])
+            if 'crossing_x' in data: layout.crossing_x = float(data['crossing_x']) if data['crossing_x'] is not None else None
+            if 'crossing_y' in data: layout.crossing_y = float(data['crossing_y']) if data['crossing_y'] is not None else None
+            if 'template_width_px' in data: layout.template_width_px = int(data['template_width_px']) if data['template_width_px'] is not None else None
+            if 'template_height_px' in data: layout.template_height_px = int(data['template_height_px']) if data['template_height_px'] is not None else None
+            if 'cheque_width_mm' in data: layout.cheque_width_mm = float(data['cheque_width_mm']) if data['cheque_width_mm'] is not None else None
+            if 'cheque_height_mm' in data: layout.cheque_height_mm = float(data['cheque_height_mm']) if data['cheque_height_mm'] is not None else None
+            # Print-only offsets (mm)
+            if 'print_offset_name_x' in data: layout.print_offset_name_x = float(data['print_offset_name_x']) if data['print_offset_name_x'] not in (None, '') else None
+            if 'print_offset_name_y' in data: layout.print_offset_name_y = float(data['print_offset_name_y']) if data['print_offset_name_y'] not in (None, '') else None
+            if 'print_offset_amount_words_x' in data: layout.print_offset_amount_words_x = float(data['print_offset_amount_words_x']) if data.get('print_offset_amount_words_x') not in (None, '') else None
+            if 'print_offset_amount_words_y' in data: layout.print_offset_amount_words_y = float(data['print_offset_amount_words_y']) if data.get('print_offset_amount_words_y') not in (None, '') else None
+            if 'print_offset_amount_nums_x' in data: layout.print_offset_amount_nums_x = float(data['print_offset_amount_nums_x']) if data.get('print_offset_amount_nums_x') not in (None, '') else None
+            if 'print_offset_amount_nums_y' in data: layout.print_offset_amount_nums_y = float(data['print_offset_amount_nums_y']) if data.get('print_offset_amount_nums_y') not in (None, '') else None
+            if 'print_offset_date_x' in data: layout.print_offset_date_x = float(data['print_offset_date_x']) if data.get('print_offset_date_x') not in (None, '') else None
+            if 'print_offset_date_y' in data: layout.print_offset_date_y = float(data['print_offset_date_y']) if data.get('print_offset_date_y') not in (None, '') else None
+            if 'print_offset_crossing_x' in data: layout.print_offset_crossing_x = float(data['print_offset_crossing_x']) if data.get('print_offset_crossing_x') not in (None, '') else None
+            if 'print_offset_crossing_y' in data: layout.print_offset_crossing_y = float(data['print_offset_crossing_y']) if data.get('print_offset_crossing_y') not in (None, '') else None
+            db.session.commit()
+            return jsonify({'success': True, 'layout': layout.to_layout_dict()})
+        except (TypeError, ValueError) as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 400
+    return jsonify({'layout': layout.to_layout_dict()})
+
+
+@app.route('/cheque-calibration')
+@login_required
+@role_required('GM', 'CEO', 'Operation Manager')
+def cheque_calibration():
+    """Calibration page: adjust mm positions per bank and preview."""
+    return render_template('cheque_calibration.html', user=current_user)
+
+
 @app.route('/generate-cheque-pdf', methods=['POST'])
 @login_required
 @role_required('GM', 'CEO', 'Operation Manager')
@@ -22427,6 +22554,39 @@ def export_reports_pdf():
 
 # ==================== USER MANAGEMENT ROUTES (IT ONLY) ====================
 
+def _sync_user_to_ticketing(user):
+    """Call Ticketing's sync API so the user can log in with the same email/password. No-op if sync not configured."""
+    url = app.config.get('TICKETING_SYNC_URL')
+    secret = app.config.get('FINANCE_SYNC_SECRET')
+    if not url or not secret:
+        return
+    sync_url = url.rstrip('/') + '/api/sync-user-from-finance'
+    email = (user.email or user.username or '').strip()
+    if not email:
+        app.logger.warning("Ticketing sync skipped: user has no email/username")
+        return
+    try:
+        r = requests.post(
+            sync_url,
+            headers={
+                'Content-Type': 'application/json',
+                'X-Sync-Secret': secret,
+            },
+            json={
+                'email': email,
+                'name': user.name or '',
+                'full_name': user.name or '',
+                'password_hash': user.password,
+                'department': user.department or '',
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+        app.logger.info(f"Ticketing sync OK for {email}")
+    except Exception as e:
+        app.logger.warning(f"Ticketing sync failed for {email}: {e}")
+
+
 @app.route('/users')
 @login_required
 @role_required('IT Staff', 'Department Manager')
@@ -22732,6 +22892,8 @@ def new_user():
         
         log_action(f"Created new user: {username} ({role}) for department: {department}")
         
+        _sync_user_to_ticketing(new_user)
+
         # Notify IT Staff about user creation
         notify_users_by_role(
             request=None,  # No request for user management notifications
@@ -22824,6 +22986,8 @@ def edit_user(user_id):
         
         log_action(f"Updated user: {user_to_edit.username} ({new_role}) - Department: {new_department}")
         
+        _sync_user_to_ticketing(user_to_edit)
+        
         # Notify IT Staff about user update
         notify_users_by_role(
             request=None,  # No request for user management notifications
@@ -22897,6 +23061,8 @@ def reset_user_password(user_id):
     
     db.session.commit()
     log_action(f"IT Staff {current_user.username} reset password for: {user_to_reset.username}")
+    
+    _sync_user_to_ticketing(user_to_reset)
     
     # Create notification for the user
     create_notification(

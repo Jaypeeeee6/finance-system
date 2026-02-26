@@ -334,8 +334,23 @@
     flex-wrap: wrap;
 }
 
-#amountWordsOverlay {
-    width: 380px;
+#amountWordsOverlay,
+.field-overlay[data-field="amountWords"],
+.field-amountWords {
+    width: 430px;
+    max-width: 430px;
+    background: transparent !important;
+    background-color: transparent !important;
+    line-height: 2.25;
+}
+
+/* Amount in numbers: no tint, not bold */
+#amountOverlay,
+.field-overlay[data-field="amount"],
+.field-amount {
+    background: transparent !important;
+    background-color: transparent !important;
+    font-weight: normal !important;
 }
 
 #payeeOverlay {
@@ -615,8 +630,12 @@
     max-width: 580px;
 }
 
-#modalAmountWordsOverlay {
-    width: 400px;
+#modalAmountWordsOverlay,
+.modal-field-overlay[data-field="amountWords"] {
+    width: 430px;
+    max-width: 430px;
+    background: transparent !important;
+    background-color: transparent !important;
 }
 
 .modal-footer {
@@ -704,6 +723,11 @@
         width: 230mm !important;
         height: 75mm !important;
         overflow: visible !important;
+        transform: none !important;
+        -webkit-transform: none !important;
+        -moz-transform: none !important;
+        -ms-transform: none !important;
+        -o-transform: none !important;
     }
     
     body * {
@@ -726,6 +750,11 @@
         z-index: 9999 !important;
         background: transparent !important;
         visibility: visible !important;
+        transform: none !important;
+        -webkit-transform: none !important;
+        -moz-transform: none !important;
+        -ms-transform: none !important;
+        -o-transform: none !important;
     }
 
     /* Dhofar Islamic Bank: no mirror; print same orientation as preview */
@@ -740,6 +769,11 @@
         background: none !important;
         overflow: visible !important;
         visibility: visible !important;
+        transform: none !important;
+        -webkit-transform: none !important;
+        -moz-transform: none !important;
+        -ms-transform: none !important;
+        -o-transform: none !important;
         /* width/height overridden by dynamic style from template.chequeSizeMm; overflow visible so left-shifted text (e.g. amount in words) is not clipped */
     }
     
@@ -798,29 +832,34 @@
         line-height: 1.2 !important;
         white-space: nowrap !important;
         font-weight: normal !important;
+        background: transparent !important;
+        background-color: transparent !important;
     }
     
     .print-amount-words-overlay {
         font-size: 8pt !important;
-        max-width: 42.7mm !important;
-        line-height: 2.0 !important;
+        max-width: 48mm !important;
+        width: 48mm !important;
+        line-height: 2.25 !important;
         white-space: normal !important;
         font-weight: normal !important;
         text-align: center !important;
+        background: transparent !important;
+        background-color: transparent !important;
     }
 
     /* Dhofar Islamic Bank: amount in words same size as payee (12pt), wider box for longer text */
     .cheque-print-container[data-print-bank="dhofar_islamic"] .print-amount-words-overlay {
         font-size: 12pt !important;
-        max-width: 90mm !important;
-        width: 90mm !important;
+        max-width: 86mm !important;
+        width: 86mm !important;
     }
 
     /* Sohar Islamic Bank: amount in words same size as payee (12pt), wider box in print */
     .cheque-print-container[data-print-bank="sohar"] .print-amount-words-overlay {
         font-size: 12pt !important;
-        max-width: 90mm !important;
-        width: 90mm !important;
+        max-width: 86mm !important;
+        width: 86mm !important;
     }
     
     .print-crossing-overlay {

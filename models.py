@@ -784,10 +784,70 @@ class ChequeBook(db.Model):
         return f'<ChequeBook {self.id} - Book No. {self.book_no} ({self.start_serial_no}-{self.last_serial_no})>'
 
 
+class BankLayout(db.Model):
+    """Per-bank cheque field positions in mm (top-left origin). Used for preview/print mapping."""
+    __tablename__ = 'bank_layouts'
+
+    bank_key = db.Column(db.String(80), primary_key=True)  # e.g. dhofar_islamic, oman_arab, sohar
+    # Payee name
+    name_x = db.Column(db.REAL, nullable=False)
+    name_y = db.Column(db.REAL, nullable=False)
+    # Amount in words
+    amount_words_x = db.Column(db.REAL, nullable=False)
+    amount_words_y = db.Column(db.REAL, nullable=False)
+    # Amount in numbers
+    amount_nums_x = db.Column(db.REAL, nullable=False)
+    amount_nums_y = db.Column(db.REAL, nullable=False)
+    # Date
+    date_x = db.Column(db.REAL, nullable=False)
+    date_y = db.Column(db.REAL, nullable=False)
+    # Crossing (optional; nullable so existing rows can omit)
+    crossing_x = db.Column(db.REAL, nullable=True)
+    crossing_y = db.Column(db.REAL, nullable=True)
+    # Cheque template image dimensions in px (for mm→px→% conversion)
+    template_width_px = db.Column(db.Integer, nullable=True)
+    template_height_px = db.Column(db.Integer, nullable=True)
+    # Physical cheque size in mm (for print)
+    cheque_width_mm = db.Column(db.REAL, nullable=True)
+    cheque_height_mm = db.Column(db.REAL, nullable=True)
+    # Print-only offsets in mm (added to base position so print matches preview)
+    print_offset_name_x = db.Column(db.REAL, nullable=True)
+    print_offset_name_y = db.Column(db.REAL, nullable=True)
+    print_offset_amount_words_x = db.Column(db.REAL, nullable=True)
+    print_offset_amount_words_y = db.Column(db.REAL, nullable=True)
+    print_offset_amount_nums_x = db.Column(db.REAL, nullable=True)
+    print_offset_amount_nums_y = db.Column(db.REAL, nullable=True)
+    print_offset_date_x = db.Column(db.REAL, nullable=True)
+    print_offset_date_y = db.Column(db.REAL, nullable=True)
+    print_offset_crossing_x = db.Column(db.REAL, nullable=True)
+    print_offset_crossing_y = db.Column(db.REAL, nullable=True)
+
+    def to_layout_dict(self):
+        """Return dict suitable for frontend: fields in mm and optional dimensions."""
+        def f(x):
+            return float(x) if x is not None else 0.0
+        return {
+            'name': (float(self.name_x), float(self.name_y)),
+            'amount_words': (float(self.amount_words_x), float(self.amount_words_y)),
+            'amount_nums': (float(self.amount_nums_x), float(self.amount_nums_y)),
+            'date': (float(self.date_x), float(self.date_y)),
+            'crossing': (f(self.crossing_x), f(self.crossing_y)),
+            'template_width_px': self.template_width_px,
+            'template_height_px': self.template_height_px,
+            'cheque_width_mm': float(self.cheque_width_mm) if self.cheque_width_mm is not None else 160,
+            'cheque_height_mm': float(self.cheque_height_mm) if self.cheque_height_mm is not None else 75,
+            'print_offset_name': (f(self.print_offset_name_x), f(self.print_offset_name_y)),
+            'print_offset_amount_words': (f(self.print_offset_amount_words_x), f(self.print_offset_amount_words_y)),
+            'print_offset_amount_nums': (f(self.print_offset_amount_nums_x), f(self.print_offset_amount_nums_y)),
+            'print_offset_date': (f(self.print_offset_date_x), f(self.print_offset_date_y)),
+            'print_offset_crossing': (f(self.print_offset_crossing_x), f(self.print_offset_crossing_y)),
+        }
+
+
 class ChequeSerial(db.Model):
     """Cheque serial number model"""
     __tablename__ = 'cheque_serials'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     book_id = db.Column(db.Integer, db.ForeignKey('cheque_books.id'), nullable=False)
     serial_no = db.Column(db.Integer, nullable=False)
