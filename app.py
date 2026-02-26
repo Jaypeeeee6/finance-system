@@ -20,6 +20,7 @@ from io import BytesIO
 import base64
 from sqlalchemy import func
 
+
 # Wrap Flask's flash to centralize permission-denied handling.
 # Any code that calls flash("You do not have permission...") will instead
 # store the message in session['permission_denied'] so we can render it once
@@ -3451,6 +3452,7 @@ def verify_pin():
                 session['tab_session_id'] = tab_session_id
             except Exception:
                 pass
+            _set_ticketing_session(user)
             log_action(f"User {username} logged in successfully with email PIN")
             
             return jsonify({
@@ -3489,6 +3491,20 @@ def verify_pin():
             'success': False,
             'message': 'An error occurred. Please try again.'
         })
+
+
+def _set_ticketing_session(user):
+    """Set session keys so Ticketing (shared cookie) treats the user as logged in."""
+    try:
+        session['user_id'] = user.user_id
+        session['email'] = (user.email or user.username or '')
+        session['username'] = user.username or ''
+        session['full_name'] = user.name or ''
+        # Ticketing: only 'it_staff' gets IT privileges; all other values get "My Tickets" only.
+        session['user_type'] = 'it_staff' if getattr(user, 'role', None) == 'IT Staff' else 'regular_user'
+        session['department'] = user.department or ''
+    except Exception:
+        pass
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -3581,6 +3597,7 @@ def login():
                     session['tab_session_id'] = tab_session_id
                 except Exception:
                     pass
+                _set_ticketing_session(user)
                 app.logger.warning(f"⚠️ User {username} logged in via DEVELOPMENT TESTING MODE (PIN bypassed)")
                 log_action(f"⚠️ DEVELOPMENT: User {username} logged in successfully (PIN bypassed via testing button)")
                 flash(f'⚠️ DEVELOPMENT MODE: Welcome back, {user.name}! (PIN bypassed)', 'warning')
@@ -3615,6 +3632,7 @@ def login():
                     session['tab_session_id'] = tab_session_id
                 except Exception:
                     pass
+                _set_ticketing_session(user)
                 app.logger.info(f"System user logged in successfully, redirecting to dashboard")
                 log_action(f"System account {username} logged in successfully (PIN bypassed)")
                 flash(f'Welcome back, {user.name}!', 'success')
@@ -3671,6 +3689,7 @@ def login():
                     session['tab_session_id'] = tab_session_id
                 except Exception:
                     pass
+                _set_ticketing_session(user)
                 log_action(f"User {username} logged in successfully with email PIN")
                 flash(f'Welcome back, {user.name}!', 'success')
                 return redirect(url_for('dashboard'))
@@ -22427,6 +22446,39 @@ def export_reports_pdf():
 
 # ==================== USER MANAGEMENT ROUTES (IT ONLY) ====================
 
+def _sync_user_to_ticketing(user):
+    """Call Ticketing's sync API so the user can log in with the same email/password. No-op if sync not configured."""
+    url = app.config.get('TICKETING_SYNC_URL')
+    secret = app.config.get('FINANCE_SYNC_SECRET')
+    if not url or not secret:
+        return
+    sync_url = url.rstrip('/') + '/api/sync-user-from-finance'
+    email = (user.email or user.username or '').strip()
+    if not email:
+        app.logger.warning("Ticketing sync skipped: user has no email/username")
+        return
+    try:
+        r = requests.post(
+            sync_url,
+            headers={
+                'Content-Type': 'application/json',
+                'X-Sync-Secret': secret,
+            },
+            json={
+                'email': email,
+                'name': user.name or '',
+                'full_name': user.name or '',
+                'password_hash': user.password,
+                'department': user.department or '',
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+        app.logger.info(f"Ticketing sync OK for {email}")
+    except Exception as e:
+        app.logger.warning(f"Ticketing sync failed for {email}: {e}")
+
+
 @app.route('/users')
 @login_required
 @role_required('IT Staff', 'Department Manager')
@@ -22732,6 +22784,8 @@ def new_user():
         
         log_action(f"Created new user: {username} ({role}) for department: {department}")
         
+        _sync_user_to_ticketing(new_user)
+        
         # Notify IT Staff about user creation
         notify_users_by_role(
             request=None,  # No request for user management notifications
@@ -22824,6 +22878,8 @@ def edit_user(user_id):
         
         log_action(f"Updated user: {user_to_edit.username} ({new_role}) - Department: {new_department}")
         
+        _sync_user_to_ticketing(user_to_edit)
+        
         # Notify IT Staff about user update
         notify_users_by_role(
             request=None,  # No request for user management notifications
@@ -22897,6 +22953,8 @@ def reset_user_password(user_id):
     
     db.session.commit()
     log_action(f"IT Staff {current_user.username} reset password for: {user_to_reset.username}")
+    
+    _sync_user_to_ticketing(user_to_reset)
     
     # Create notification for the user
     create_notification(
