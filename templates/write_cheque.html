@@ -667,65 +667,42 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Print function - uses layout (mm) for print container and field positions
+    // Print function — opens a clean dedicated tab that auto-prints and closes.
+    // This avoids all PDF viewer scaling issues and gives consistent results on every laptop.
     function printCheque() {
         var printBtn = document.getElementById('printBtn') || document.getElementById('printChequeBtn');
         var originalText = printBtn ? printBtn.innerHTML : '';
         if (printBtn) {
-            printBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Printing...';
+            printBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Opening print...';
             printBtn.disabled = true;
         }
+
         var bank = document.getElementById('bankSelect') ? document.getElementById('bankSelect').value : 'dhofar_islamic';
-        var layout = window.chequeLayoutByBank[bank];
-        if (!layout) {
-            fetchChequeLayout(bank).then(function(l) {
-                if (l) printCheque();
-                else if (printBtn) { printBtn.innerHTML = originalText; printBtn.disabled = false; }
-            });
-            return;
-        }
-        var values = getValuesFromForm();
-        var printCanvas = document.getElementById('chequePrintCanvas');
-        if (printCanvas) applyPositionsFromLayout(printCanvas, layout, values, true);
-        var isDateVisible = document.getElementById('showDate') ? document.getElementById('showDate').checked : true;
-        var dateEl = printCanvas && printCanvas.querySelector('[data-field="date"]');
-        if (dateEl) dateEl.style.display = isDateVisible ? 'block' : 'none';
-        var lang = document.getElementById('amountWordsLanguage') ? document.getElementById('amountWordsLanguage').value : 'english';
-        document.querySelectorAll('#chequePrintCanvas [data-field="amountWords"]').forEach(function(el) {
-            el.style.direction = lang === 'arabic' ? 'rtl' : 'ltr';
-            el.style.textAlign = 'center';
-            if (lang === 'arabic') el.style.fontFamily = 'Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif';
+        var chequeDate = document.getElementById('chequeDate') ? document.getElementById('chequeDate').value : '';
+        var payeeName = document.getElementById('payeeName') ? document.getElementById('payeeName').value : '';
+        var amount = document.getElementById('amount') ? document.getElementById('amount').value : '';
+        var currency = document.getElementById('currency') ? document.getElementById('currency').value : 'OMR';
+        var crossing = document.getElementById('crossing') ? document.getElementById('crossing').value : '';
+        var showDate = document.getElementById('showDate') ? document.getElementById('showDate').checked : true;
+        var amountWordsLanguage = document.getElementById('amountWordsLanguage') ? document.getElementById('amountWordsLanguage').value : 'english';
+
+        var params = new URLSearchParams({
+            bank: bank,
+            chequeDate: chequeDate,
+            payeeName: payeeName,
+            amount: amount,
+            currency: currency,
+            crossing: crossing,
+            showDate: showDate ? 'true' : 'false',
+            amountWordsLanguage: amountWordsLanguage
         });
-        document.querySelectorAll('#chequePrintCanvas [data-field="crossing"]').forEach(function(el) {
-            el.style.transform = 'rotate(-25deg)';
-            el.style.fontWeight = '700';
-            el.style.color = 'rgba(200, 0, 0, 0.8)';
-        });
-        var sizeMm = getChequeSizeMm(layout);
-        var w = sizeMm.w, h = sizeMm.h;
-        var styleId = 'dynamicPrintStyle';
-        var styleTag = document.getElementById(styleId) || (function() {
-            var s = document.createElement('style');
-            s.id = styleId;
-            document.head.appendChild(s);
-            return s;
-        })();
-        var printLeftOffsetMm = 70;
-        var pageW = w + printLeftOffsetMm;
-        styleTag.textContent = '@media print { @page { size: ' + pageW + 'mm ' + h + 'mm; margin: 0; } .cheque-print-container { left: ' + printLeftOffsetMm + 'mm !important; } .chequePrint { width: ' + w + 'mm !important; height: ' + h + 'mm !important; } }';
-        var printContainer = document.getElementById('chequePrintRoot');
-        if (printContainer) {
-            printContainer.setAttribute('data-print-bank', bank);
-            if (printContainer.parentElement !== document.body) document.body.appendChild(printContainer);
-        }
-        requestAnimationFrame(function() {
-            requestAnimationFrame(function() {
-                window.print();
-            });
-        });
+
+        var printUrl = '{{ url_for("cheque_print_view") }}?' + params.toString();
+        window.open(printUrl, '_blank', 'noopener');
+
         setTimeout(function() {
             if (printBtn) { printBtn.innerHTML = originalText; printBtn.disabled = false; }
-        }, 500);
+        }, 1000);
     }
     
     // Old print function (kept for reference but not used)

@@ -8,7 +8,7 @@
             margin: 0;
             padding: 0;
         }
-        
+
         @media print {
             @page {
                 size: {{ cheque_w_mm }}mm {{ cheque_h_mm }}mm;
@@ -18,8 +18,16 @@
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
+            /* Hide the pre-print instruction banner when printing */
+            #print-instruction-banner {
+                display: none !important;
+            }
         }
-        
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             padding: 0;
@@ -27,8 +35,9 @@
             height: {{ cheque_h_mm }}mm;
             position: relative;
             font-family: Arial, sans-serif;
+            background: white;
         }
-        
+
         .cheque-container {
             position: relative;
             width: {{ cheque_w_mm }}mm;
@@ -36,7 +45,7 @@
             margin: 0;
             padding: 0;
         }
-        
+
         .cheque-overlay {
             position: absolute;
             top: 0;
@@ -44,57 +53,112 @@
             width: 100%;
             height: 100%;
         }
-        
+
         .field-overlay {
             position: absolute;
             background: transparent;
             color: #000;
             font-weight: normal;
+            /* pt units are device-independent — identical on all printers */
         }
-        
+
         .date-overlay {
-            font-size: 12px;
+            font-size: 14pt;
             line-height: 1.2;
         }
-        
+
         .payee-overlay {
-            font-size: 14px;
+            font-size: 16pt;
             line-height: 1.2;
-            max-width: 400px;
-            width: 400px;
+            max-width: 200mm;
+            width: 200mm;
             text-align: center;
+            {% if rtl %}direction: rtl;{% endif %}
         }
-        
+
         .amount-overlay {
-            font-size: 13px;
+            font-size: 15pt;
             line-height: 1.2;
             white-space: nowrap;
-            transform: none; /* ensure no tilt */
-            transform-origin: left center;
             font-style: normal;
         }
-        
+
         .amount-words-overlay {
-            font-size: 10px;
+            font-size: 13pt;
             line-height: 2.0;
-            max-width: 250px;
+            max-width: 180mm;
+            width: 180mm;
             text-align: center;
-            transform: none;
-            transform-origin: left top;
             font-style: normal;
+            {% if rtl %}
+            direction: rtl;
+            font-family: Arial Unicode MS, Tahoma, Segoe UI, Arial, sans-serif;
+            {% endif %}
         }
-        
+
         .crossing-overlay {
-            font-size: 16px;
+            font-size: 17pt;
             font-weight: normal;
             text-transform: uppercase;
             transform: rotate(-25deg);
             color: rgba(200, 0, 0, 0.6);
             white-space: nowrap;
         }
+
+        /* Pre-print instruction banner — only shown in browser, hidden when printing */
+        #print-instruction-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: #1a56db;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            font-size: 13px;
+            padding: 10px 16px;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        #print-instruction-banner strong {
+            font-size: 14px;
+        }
+        #print-instruction-banner .warn {
+            background: #fbbf24;
+            color: #1a1a1a;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-weight: bold;
+        }
+        #print-now-btn {
+            margin-left: auto;
+            background: #fff;
+            color: #1a56db;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 16px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
+
+    {% if auto_print %}
+    <!-- Instruction banner shown before print dialog opens -->
+    <div id="print-instruction-banner">
+        <strong>&#128395; Cheque Print</strong>
+        &nbsp;In the print dialog:
+        <span class="warn">Scale = 100% (Actual Size)</span>
+        &mdash; do NOT use &ldquo;Fit to Page&rdquo;.
+        Paper size should match the cheque.
+        <button id="print-now-btn" onclick="window.print()">Print Now</button>
+    </div>
+    {% endif %}
+
     <div class="cheque-container">
         <div class="cheque-overlay">
             {% if show_date and cheque_date %}
@@ -102,25 +166,25 @@
                 {{ cheque_date }}
             </div>
             {% endif %}
-            
+
             {% if payee_name %}
             <div class="field-overlay payee-overlay" style="top: {{ positions.payee.top }}; left: {{ positions.payee.left }}; {{ positions.payee.extra|default('') }}">
                 {{ payee_name }}
             </div>
             {% endif %}
-            
+
             {% if amount %}
             <div class="field-overlay amount-overlay" style="top: {{ positions.amount.top }}; left: {{ positions.amount.left }}; {{ positions.amount.extra|default('') }}">
                 {{ amount }}
             </div>
             {% endif %}
-            
+
             {% if amount_words %}
             <div class="field-overlay amount-words-overlay" style="top: {{ positions.amountWords.top }}; left: {{ positions.amountWords.left }}; {{ positions.amountWords.extra|default('') }}">
                 {{ amount_words }}
             </div>
             {% endif %}
-            
+
             {% if crossing %}
             <div class="field-overlay crossing-overlay" style="top: {{ positions.crossing.top }}; left: {{ positions.crossing.left }};">
                 {{ crossing }}
@@ -128,6 +192,21 @@
             {% endif %}
         </div>
     </div>
+
+    {% if auto_print %}
+    <script>
+        // Auto-open print dialog after a short delay so the instruction banner is visible first
+        window.addEventListener('load', function () {
+            setTimeout(function () {
+                window.print();
+            }, 800);
+            // Close this tab automatically after the print dialog is dismissed
+            window.addEventListener('afterprint', function () {
+                setTimeout(function () { window.close(); }, 300);
+            });
+        });
+    </script>
+    {% endif %}
+
 </body>
 </html>
-

@@ -15569,7 +15569,13 @@ def write_cheque_save():
 
 
 def _ensure_bank_layouts_seeded():
-    """Create default bank_layouts rows from current hardcoded positions (px -> mm) if missing. Add print-offset columns if missing."""
+    """Create default bank_layouts rows if missing. Migrate columns and fix dimensions if needed."""
+    # Page width is intentionally wider than a standard cheque so fields near
+    # the right edge are never clipped. The physical cheque paper positions are
+    # controlled by the mm values in the layout, not the page boundary.
+    CHEQUE_W_MM = 220.0
+    CHEQUE_H_MM = 88.9
+
     try:
         import sqlite3
         db_path = app.config.get('SQLALCHEMY_DATABASE_URI', '').replace('sqlite:///', '')
@@ -15586,35 +15592,42 @@ def _ensure_bank_layouts_seeded():
                     if col not in existing:
                         cursor.execute("ALTER TABLE bank_layouts ADD COLUMN " + col + " REAL")
                         conn.commit()
+                # Upgrade any rows that are narrower than our new wider page
+                cursor.execute(
+                    "UPDATE bank_layouts SET cheque_width_mm=?, cheque_height_mm=? "
+                    "WHERE cheque_width_mm IS NULL OR cheque_width_mm < 220.0",
+                    (CHEQUE_W_MM, CHEQUE_H_MM)
+                )
+                conn.commit()
             conn.close()
     except Exception:
         pass
-    W_PX, H_PX = 893, 418
-    W_MM, H_MM = 160.0, 75.0
+
+    W_PX, H_PX = 720, 336   # Playwright viewport at 96 dpi → matches 7.5in × 3.5in
     def px_to_mm(left_px, top_px):
-        return (left_px * W_MM / W_PX, top_px * H_MM / H_PX)
+        return (left_px * CHEQUE_W_MM / W_PX, top_px * CHEQUE_H_MM / H_PX)
     defaults = [
-        ('dhofar_islamic', (53, 363), (127, 185), (183, 613), (160, 95), (20, 60)),
-        ('oman_arab', (13, 610), (125, 90), (135, 645), (165, 82), (15, 40)),
-        ('sohar', (52, 560), (116, 115), (172, 605), (153, 80), (25, 70)),
+        ('dhofar_islamic', (220, 90),  (40, 132),  (367, 165), (41, 155),  (60, 20)),
+        ('oman_arab',      (365, 62),  (-5, 130),  (383, 135), (58, 157),  (60, 20)),
+        ('sohar',          (365, 52),  (55, 116),  (378, 163), (20, 153),  (10, 25)),
     ]
     for bank_key, date_px, name_px, amount_px, amount_words_px, crossing_px in defaults:
         if BankLayout.query.filter_by(bank_key=bank_key).first():
             continue
-        date_mm = px_to_mm(date_px[0], date_px[1])
-        name_mm = px_to_mm(name_px[0], name_px[1])
-        amount_nums_mm = px_to_mm(amount_px[0], amount_px[1])
-        amount_words_mm = px_to_mm(amount_words_px[0], amount_words_px[1])
-        crossing_mm = px_to_mm(crossing_px[0], crossing_px[1])
+        date_mm        = px_to_mm(date_px[0],        date_px[1])
+        name_mm        = px_to_mm(name_px[0],        name_px[1])
+        amount_nums_mm = px_to_mm(amount_px[0],      amount_px[1])
+        amount_words_mm= px_to_mm(amount_words_px[0],amount_words_px[1])
+        crossing_mm    = px_to_mm(crossing_px[0],    crossing_px[1])
         layout = BankLayout(
             bank_key=bank_key,
-            name_x=name_mm[0], name_y=name_mm[1],
+            name_x=name_mm[0],          name_y=name_mm[1],
             amount_words_x=amount_words_mm[0], amount_words_y=amount_words_mm[1],
-            amount_nums_x=amount_nums_mm[0], amount_nums_y=amount_nums_mm[1],
-            date_x=date_mm[0], date_y=date_mm[1],
-            crossing_x=crossing_mm[0], crossing_y=crossing_mm[1],
+            amount_nums_x=amount_nums_mm[0],   amount_nums_y=amount_nums_mm[1],
+            date_x=date_mm[0],          date_y=date_mm[1],
+            crossing_x=crossing_mm[0],  crossing_y=crossing_mm[1],
             template_width_px=W_PX, template_height_px=H_PX,
-            cheque_width_mm=W_MM, cheque_height_mm=H_MM,
+            cheque_width_mm=CHEQUE_W_MM, cheque_height_mm=CHEQUE_H_MM,
         )
         db.session.add(layout)
     try:
@@ -15762,7 +15775,7 @@ def generate_cheque_pdf():
             }
         else:
             # Fallback if DB row missing — convert original px values to mm for consistency
-            cheque_w_mm = 190.5
+            cheque_w_mm = 220.0
             cheque_h_mm = 88.9
             fallback_px = {
                 'dhofar_islamic': {
@@ -15867,6 +15880,95 @@ def generate_cheque_pdf():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/cheque-print-view', methods=['GET'])
+@login_required
+@role_required('GM', 'CEO', 'Operation Manager')
+def cheque_print_view():
+    """Serve a clean HTML print page (Option B: direct browser print, no PDF viewer involved)."""
+    cheque_date = request.args.get('chequeDate', '')
+    payee_name = request.args.get('payeeName', '')
+    amount = request.args.get('amount', '')
+    currency = request.args.get('currency', 'OMR')
+    crossing = request.args.get('crossing', '')
+    bank = request.args.get('bank', 'dhofar_islamic')
+    show_date = request.args.get('showDate', 'true').lower() == 'true'
+    amount_words_language = request.args.get('amountWordsLanguage', 'english')
+
+    # Format date
+    formatted_date = ''
+    if show_date and cheque_date:
+        try:
+            date_obj = datetime.strptime(cheque_date, '%Y-%m-%d')
+            formatted_date = date_obj.strftime('%d/%m/%Y')
+        except Exception:
+            formatted_date = cheque_date
+
+    # Format amount
+    formatted_amount = ''
+    if amount:
+        try:
+            formatted_amount = f"{float(amount):,.3f}".replace(',', '')
+        except Exception:
+            formatted_amount = amount
+
+    # Amount in words
+    amount_words = ''
+    if amount:
+        try:
+            amount_words = convert_amount_to_words(float(amount), currency, amount_words_language)
+        except Exception:
+            pass
+
+    # Load layout from database
+    _ensure_bank_layouts_seeded()
+    db_layout = BankLayout.query.filter_by(bank_key=bank).first()
+
+    def _mm(base, offset=None):
+        v = float(base) if base is not None else 0.0
+        o = float(offset) if offset is not None else 0.0
+        return f"{v + o:.2f}mm"
+
+    if db_layout:
+        cheque_w_mm = float(db_layout.cheque_width_mm) if db_layout.cheque_width_mm else 190.5
+        cheque_h_mm = float(db_layout.cheque_height_mm) if db_layout.cheque_height_mm else 88.9
+        positions = {
+            'date':        {'top': _mm(db_layout.date_y,         db_layout.print_offset_date_y),
+                            'left': _mm(db_layout.date_x,        db_layout.print_offset_date_x)},
+            'payee':       {'top': _mm(db_layout.name_y,         db_layout.print_offset_name_y),
+                            'left': _mm(db_layout.name_x,        db_layout.print_offset_name_x)},
+            'amount':      {'top': _mm(db_layout.amount_nums_y,  db_layout.print_offset_amount_nums_y),
+                            'left': _mm(db_layout.amount_nums_x, db_layout.print_offset_amount_nums_x)},
+            'amountWords': {'top': _mm(db_layout.amount_words_y, db_layout.print_offset_amount_words_y),
+                            'left': _mm(db_layout.amount_words_x,db_layout.print_offset_amount_words_x)},
+            'crossing':    {'top': _mm(db_layout.crossing_y,     db_layout.print_offset_crossing_y),
+                            'left': _mm(db_layout.crossing_x,    db_layout.print_offset_crossing_x)},
+        }
+    else:
+        cheque_w_mm = 220.0
+        cheque_h_mm = 88.9
+        positions = {
+            'date':        {'top': '23.81mm', 'left': '58.19mm'},
+            'payee':       {'top': '34.91mm', 'left': '10.58mm'},
+            'amount':      {'top': '43.60mm', 'left': '97.02mm'},
+            'amountWords': {'top': '40.95mm', 'left': '10.85mm'},
+            'crossing':    {'top':  '5.29mm', 'left': '15.88mm'},
+        }
+
+    return render_template('cheque_pdf.html',
+                           cheque_date=formatted_date,
+                           show_date=show_date,
+                           payee_name=payee_name,
+                           amount=formatted_amount,
+                           amount_words=amount_words,
+                           crossing=crossing,
+                           bank_image_base64='',
+                           positions=positions,
+                           cheque_w_mm=cheque_w_mm,
+                           cheque_h_mm=cheque_h_mm,
+                           auto_print=True,
+                           rtl=amount_words_language == 'arabic')
 
 
 def get_currency_name(currency, language='english'):
