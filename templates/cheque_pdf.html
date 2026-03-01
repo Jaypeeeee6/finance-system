@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <style>
         @page {
-            size: 7.5in 3.5in;
+            size: {{ cheque_w_mm }}mm {{ cheque_h_mm }}mm;
             margin: 0;
             padding: 0;
         }
         
         @media print {
             @page {
-                size: 7.5in 3.5in;
+                size: {{ cheque_w_mm }}mm {{ cheque_h_mm }}mm;
                 margin: 0;
             }
             * {
@@ -23,16 +23,16 @@
         body {
             margin: 0;
             padding: 0;
-            width: 7.5in;
-            height: 3.5in;
+            width: {{ cheque_w_mm }}mm;
+            height: {{ cheque_h_mm }}mm;
             position: relative;
             font-family: Arial, sans-serif;
         }
         
         .cheque-container {
             position: relative;
-            width: 7.5in;
-            height: 3.5in;
+            width: {{ cheque_w_mm }}mm;
+            height: {{ cheque_h_mm }}mm;
             margin: 0;
             padding: 0;
         }

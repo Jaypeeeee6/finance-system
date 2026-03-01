@@ -15725,32 +15725,69 @@ def generate_cheque_pdf():
             except:
                 pass
         
-        # Get bank-specific positions
-        bank_positions = {
-            'dhofar_islamic': {
-                'date': {'top': '90px', 'left': '220px'},  # Moved slightly higher (92->90)
-                'payee': {'top': '132px', 'left': '40px'},  # Moved 5px lower (127->132)
-                'amount': {'top': '165px', 'left': '367px'},  # Moved 3px left (370->367)
-                'amountWords': {'top': '155px', 'left': '41px'},  # Moved 3px right (38->41)
-                'crossing': {'top': '20px', 'left': '60px'}
-            },
-            'oman_arab': {
-                'date': {'top': '62px', 'left': '365px', 'extra': 'font-size: 11px;'},  # +20px right (345->365)
-                'payee': {'top': '130px', 'left': '-5px', 'extra': 'font-size: 13px;'},   # Nudge ~1px down (129->130)
-                'amount': {'top': '135px', 'left': '383px', 'extra': 'font-size: 12px;'}, # 8px down (127->135), 3px right (380->383), smaller font
-                'amountWords': {'top': '157px', 'left': '58px', 'extra': 'max-width: 230px; width: 230px; line-height: 2.5;'},  # Bigger line-height
-                'crossing': {'top': '20px', 'left': '60px'}  # Same as Dhofar Islamic Bank for testing
-            },
-            'sohar': {
-                'date': {'top': '52px', 'left': '365px'},  # Moved 50px more left: 415 - 50 = 365
-                'payee': {'top': '116px', 'left': '55px'},  # Moved 60px left: 115 - 60 = 55
-                'amount': {'top': '163px', 'left': '378px'},  # Moved 50px more left: 428 - 50 = 378
-                'amountWords': {'top': '153px', 'left': '20px'},  # Moved 60px left: 80 - 60 = 20
-                'crossing': {'top': '25px', 'left': '10px'}  # Moved 60px left: 70 - 60 = 10
+        # Load bank layout from database (positions in mm — device-independent physical units)
+        _ensure_bank_layouts_seeded()
+        db_layout = BankLayout.query.filter_by(bank_key=bank).first()
+
+        def _mm(base, offset=None):
+            """Return CSS mm string: base position + optional print offset."""
+            v = float(base) if base is not None else 0.0
+            o = float(offset) if offset is not None else 0.0
+            return f"{v + o:.2f}mm"
+
+        if db_layout:
+            cheque_w_mm = float(db_layout.cheque_width_mm) if db_layout.cheque_width_mm else 190.5
+            cheque_h_mm = float(db_layout.cheque_height_mm) if db_layout.cheque_height_mm else 88.9
+            positions = {
+                'date': {
+                    'top':  _mm(db_layout.date_y,         db_layout.print_offset_date_y),
+                    'left': _mm(db_layout.date_x,         db_layout.print_offset_date_x),
+                },
+                'payee': {
+                    'top':  _mm(db_layout.name_y,         db_layout.print_offset_name_y),
+                    'left': _mm(db_layout.name_x,         db_layout.print_offset_name_x),
+                },
+                'amount': {
+                    'top':  _mm(db_layout.amount_nums_y,  db_layout.print_offset_amount_nums_y),
+                    'left': _mm(db_layout.amount_nums_x,  db_layout.print_offset_amount_nums_x),
+                },
+                'amountWords': {
+                    'top':  _mm(db_layout.amount_words_y, db_layout.print_offset_amount_words_y),
+                    'left': _mm(db_layout.amount_words_x, db_layout.print_offset_amount_words_x),
+                },
+                'crossing': {
+                    'top':  _mm(db_layout.crossing_y,     db_layout.print_offset_crossing_y),
+                    'left': _mm(db_layout.crossing_x,     db_layout.print_offset_crossing_x),
+                },
             }
-        }
-        
-        positions = bank_positions.get(bank, bank_positions['dhofar_islamic'])
+        else:
+            # Fallback if DB row missing — convert original px values to mm for consistency
+            cheque_w_mm = 190.5
+            cheque_h_mm = 88.9
+            fallback_px = {
+                'dhofar_islamic': {
+                    'date':        {'top': '23.81mm', 'left': '58.19mm'},
+                    'payee':       {'top': '34.91mm', 'left': '10.58mm'},
+                    'amount':      {'top': '43.60mm', 'left': '97.02mm'},
+                    'amountWords': {'top': '40.95mm', 'left': '10.85mm'},
+                    'crossing':    {'top':  '5.29mm', 'left': '15.88mm'},
+                },
+                'oman_arab': {
+                    'date':        {'top': '16.39mm', 'left': '96.49mm', 'extra': 'font-size: 11px;'},
+                    'payee':       {'top': '34.38mm', 'left': '-1.32mm', 'extra': 'font-size: 13px;'},
+                    'amount':      {'top': '35.71mm', 'left': '101.19mm', 'extra': 'font-size: 12px;'},
+                    'amountWords': {'top': '41.49mm', 'left': '15.34mm', 'extra': 'max-width: 230px; width: 230px; line-height: 2.5;'},
+                    'crossing':    {'top':  '5.29mm', 'left': '15.88mm'},
+                },
+                'sohar': {
+                    'date':        {'top': '13.74mm', 'left': '96.49mm'},
+                    'payee':       {'top': '30.65mm', 'left': '14.54mm'},
+                    'amount':      {'top': '43.07mm', 'left': '99.92mm'},
+                    'amountWords': {'top': '40.43mm', 'left':  '5.29mm'},
+                    'crossing':    {'top':  '6.61mm', 'left':  '2.65mm'},
+                },
+            }
+            positions = fallback_px.get(bank, fallback_px['dhofar_islamic'])
         
         # Get bank image
         bank_images = {
@@ -15772,7 +15809,8 @@ def generate_cheque_pdf():
                 bank_image_base64 = base64.b64encode(img_data).decode('utf-8')
                 bank_image_base64 = f"data:image/png;base64,{bank_image_base64}"
         
-        # Render PDF template
+        # Render PDF template — pass physical cheque dimensions so the template
+        # can size itself correctly for any bank's cheque paper.
         html_content = render_template('cheque_pdf.html',
                                      cheque_date=formatted_date,
                                      show_date=show_date,
@@ -15781,31 +15819,32 @@ def generate_cheque_pdf():
                                      amount_words=amount_words,
                                      crossing=crossing,
                                      bank_image_base64=bank_image_base64,
-                                     positions=positions)
+                                     positions=positions,
+                                     cheque_w_mm=cheque_w_mm,
+                                     cheque_h_mm=cheque_h_mm)
         
         # Generate PDF using Playwright
         pdf_buffer = BytesIO()
+
+        # Derive viewport from physical cheque dimensions (96 dpi reference pixel density)
+        viewport_w = round(cheque_w_mm / 25.4 * 96)
+        viewport_h = round(cheque_h_mm / 25.4 * 96)
         
         with sync_playwright() as p:
-            # Launch browser
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
             
-            # Set page size to cheque dimensions (7.5in x 3.5in)
-            page.set_viewport_size({"width": 720, "height": 336})  # 7.5in * 96dpi = 720px, 3.5in * 96dpi = 336px
+            page.set_viewport_size({"width": viewport_w, "height": viewport_h})
             
-            # Load HTML content
             page.set_content(html_content, wait_until='networkidle')
             
-            # Generate PDF with exact page size
-            # Using scale: 1.0 to ensure actual size (100% scale)
             pdf_bytes = page.pdf(
                 format=None,
-                width='7.5in',
-                height='3.5in',
+                width=f'{cheque_w_mm}mm',
+                height=f'{cheque_h_mm}mm',
                 margin={'top': '0', 'right': '0', 'bottom': '0', 'left': '0'},
                 print_background=True,
-                scale=1.0  # Force 100% scale (actual size)
+                scale=1.0
             )
             
             browser.close()
