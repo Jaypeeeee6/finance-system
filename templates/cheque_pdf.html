@@ -2,16 +2,18 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    {# Wider printable area so long payee/amount-words are not cut off; field positions unchanged #}
+    {% set printable_width_mm = [cheque_w_mm + 90, 280] | max %}
     <style>
         @page {
-            size: {{ cheque_w_mm }}mm {{ cheque_h_mm }}mm;
+            size: {{ printable_width_mm }}mm {{ cheque_h_mm }}mm;
             margin: 0;
             padding: 0;
         }
 
         @media print {
             @page {
-                size: {{ cheque_w_mm }}mm {{ cheque_h_mm }}mm;
+                size: {{ printable_width_mm }}mm {{ cheque_h_mm }}mm;
                 margin: 0;
             }
             * {
@@ -31,7 +33,7 @@
         body {
             margin: 0;
             padding: 0;
-            width: {{ cheque_w_mm }}mm;
+            width: {{ printable_width_mm }}mm;
             height: {{ cheque_h_mm }}mm;
             position: relative;
             font-family: Arial, sans-serif;
@@ -44,6 +46,7 @@
             height: {{ cheque_h_mm }}mm;
             margin: 0;
             padding: 0;
+            overflow: visible;
         }
 
         .cheque-overlay {
@@ -63,12 +66,12 @@
         }
 
         .date-overlay {
-            font-size: 14pt;
+            font-size: 11pt;
             line-height: 1.2;
         }
 
         .payee-overlay {
-            font-size: 16pt;
+            font-size: 12pt;
             line-height: 1.2;
             max-width: 200mm;
             width: 200mm;
@@ -77,17 +80,17 @@
         }
 
         .amount-overlay {
-            font-size: 15pt;
+            font-size: 12pt;
             line-height: 1.2;
             white-space: nowrap;
             font-style: normal;
         }
 
         .amount-words-overlay {
-            font-size: 13pt;
+            font-size: 11pt;
             line-height: 2.0;
-            max-width: 180mm;
-            width: 180mm;
+            max-width: 100mm;
+            width: 100mm;
             text-align: center;
             font-style: normal;
             {% if rtl %}
@@ -97,7 +100,7 @@
         }
 
         .crossing-overlay {
-            font-size: 17pt;
+            font-size: 13pt;
             font-weight: normal;
             text-transform: uppercase;
             transform: rotate(-25deg);
