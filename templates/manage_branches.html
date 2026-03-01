@@ -87,6 +87,7 @@
                                     <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()">
                                 </th>
                                 <th>ID</th>
+                                <th>Code</th>
                                 <th>Name</th>
                                 <th>Location</th>
                                 <th>Status</th>
@@ -102,6 +103,7 @@
                                     <input type="checkbox" class="row-checkbox" value="{{ branch.id }}" onchange="updateBulkActions()">
                                 </td>
                                 <td>{{ branch.id }}</td>
+                                <td><code>{{ branch.branch_code or '—' }}</code></td>
                                 <td><strong>{{ branch.name }}</strong></td>
                                 <td>
                                     <span class="badge badge-info">

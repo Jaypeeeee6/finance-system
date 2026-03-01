@@ -652,13 +652,26 @@ class PersonCompanyOption(db.Model):
         return f'<PersonCompanyOption {self.id} - {self.name} ({self.department}/{self.request_type})>'
 
 
+class Region(db.Model):
+    """Regions for branch code generation (managed via DB queries, no frontend CRUD)"""
+    __tablename__ = 'regions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)  # e.g. "Muscat", "Al Dakhilia"
+    
+    def __repr__(self):
+        return f'<Region {self.id} - {self.name}>'
+
+
 class Branch(db.Model):
     """Branch locations for the company"""
     __tablename__ = 'branches'
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)  # e.g., "Main Branch", "Muscat Branch"
-    restaurant = db.Column(db.String(100), nullable=False)  # Location name for grouping branches
+    restaurant = db.Column(db.String(100), nullable=False)  # Location name for grouping branches (brand)
+    region = db.Column(db.String(50), nullable=True)  # e.g., "Muscat", "Al Dakhilia" (for branch code)
+    branch_code = db.Column(db.String(20), nullable=True)  # e.g., "K-MU001", "B-DK002" (editable, auto-generated for new)
     is_active = db.Column(db.Boolean, default=True)  # Whether this branch is currently active
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -673,6 +686,8 @@ class Branch(db.Model):
             'id': self.id,
             'name': self.name,
             'restaurant': self.restaurant,
+            'region': self.region,
+            'branch_code': self.branch_code,
             'is_active': self.is_active,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),

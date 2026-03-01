@@ -31,6 +31,28 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="region">Region</label>
+                    <select name="region" id="region" class="form-control">
+                        <option value="">-- Select Region (optional) --</option>
+                        {% if regions %}
+                            {% for r in regions %}
+                                <option value="{{ r }}" {% if branch.region == r %}selected{% endif %}>{{ r }}</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="branch_code">Branch / Flat Code</label>
+                    <input type="text" name="branch_code" id="branch_code" class="form-control" 
+                           value="{{ branch.branch_code or '' }}" placeholder="e.g., K-MU001, B-DK002">
+                    <small class="form-text text-muted">Editable. Format: Brand letter-Region code + 3-digit sequence.</small>
+                    <button type="button" class="btn btn-sm btn-outline mt-1" id="generateCodeBtn" style="display: none;">
+                        <i class="fas fa-magic"></i> Suggest code
+                    </button>
+                </div>
+
+                <div class="form-group">
                     <label for="name">Branch Name *</label>
                     <input type="text" name="name" id="name" class="form-control" required 
                            value="{{ branch.name }}" placeholder="e.g., Main Branch, Muscat Branch, Salalah Branch">
@@ -137,11 +159,30 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Add some basic validation
     const form = document.querySelector('form');
     const nameInput = document.getElementById('name');
     const restaurantInput = document.getElementById('restaurant');
-    
+    const regionInput = document.getElementById('region');
+    const branchCodeInput = document.getElementById('branch_code');
+    const generateCodeBtn = document.getElementById('generateCodeBtn');
+
+    function updateGenerateButton() {
+        generateCodeBtn.style.display = (restaurantInput.value && regionInput.value) ? 'inline-block' : 'none';
+    }
+    function fetchSuggestedCode() {
+        var restaurant = restaurantInput.value;
+        var region = regionInput.value;
+        if (!restaurant || !region) return;
+        fetch('{{ url_for("suggest_branch_code_api") }}?restaurant=' + encodeURIComponent(restaurant) + '&region=' + encodeURIComponent(region))
+            .then(function(r) { return r.json(); })
+            .then(function(data) { if (data.code) branchCodeInput.value = data.code; })
+            .catch(function() {});
+    }
+    if (regionInput) { regionInput.addEventListener('change', function() { updateGenerateButton(); if (restaurantInput.value && regionInput.value) fetchSuggestedCode(); }); }
+    if (restaurantInput) { restaurantInput.addEventListener('change', function() { updateGenerateButton(); if (restaurantInput.value && regionInput.value) fetchSuggestedCode(); }); }
+    if (generateCodeBtn) generateCodeBtn.addEventListener('click', fetchSuggestedCode);
+    updateGenerateButton();
+
     form.addEventListener('submit', function(e) {
         const name = nameInput.value.trim();
         const restaurant = restaurantInput.value;
@@ -160,7 +201,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Basic name validation
         if (name.length < 3) {
             e.preventDefault();
             alert('Branch name must be at least 3 characters long.');
@@ -175,7 +215,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Warn about significant changes
         const originalName = '{{ branch.name }}';
         const originalRestaurant = '{{ branch.restaurant }}';
         
@@ -186,8 +225,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
-    
-    // Allow free-form text input without auto-formatting
 });
 </script>
 

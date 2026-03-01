@@ -12,7 +12,7 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, UserPermission, UserPermissionToggle, RoleDepartmentPermissionDefault, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, FinanceAdminNote, ChequeBook, ChequeSerial, BankLayout, ProcurementItemRequest, ProcurementReceiptEntry, ProcurementInvoiceEntry, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry, DepartmentTemporaryManager
+from models import db, User, UserPermission, UserPermissionToggle, RoleDepartmentPermissionDefault, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, Region, FinanceAdminNote, ChequeBook, ChequeSerial, BankLayout, ProcurementItemRequest, ProcurementReceiptEntry, ProcurementInvoiceEntry, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry, DepartmentTemporaryManager
 from config import Config
 import json
 from playwright.sync_api import sync_playwright
@@ -13084,6 +13084,16 @@ def manage_branches():
                          user=current_user)
 
 
+@app.route('/it/branches/suggest-code')
+@login_required
+@role_required('IT Staff', 'Department Manager')
+def suggest_branch_code_api():
+    """Return suggested branch code for given restaurant (brand) and region."""
+    restaurant = request.args.get('restaurant', '').strip()
+    region = request.args.get('region', '').strip()
+    code = suggest_branch_code(restaurant, region)
+    return jsonify({'code': code} if code else {'code': None})
+
 @app.route('/it/branches/add', methods=['GET', 'POST'])
 @login_required
 @role_required('IT Staff', 'Department Manager')
@@ -13097,6 +13107,8 @@ def add_branch():
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
         restaurant = request.form.get('restaurant', '').strip()
+        region = request.form.get('region', '').strip() or None
+        branch_code = request.form.get('branch_code', '').strip() or None
         is_active = request.form.get('is_active') == 'on'
         
         if not restaurant:
@@ -13113,10 +13125,16 @@ def add_branch():
             flash(f'Branch "{name}" already exists.', 'danger')
             return redirect(url_for('add_branch'))
         
+        # Auto-generate branch code if not provided and region is set
+        if not branch_code and region:
+            branch_code = suggest_branch_code(restaurant, region)
+        
         try:
             branch = Branch(
                 name=name,
                 restaurant=restaurant,
+                region=region,
+                branch_code=branch_code,
                 is_active=is_active,
                 created_by_user_id=current_user.user_id
             )
@@ -13142,7 +13160,8 @@ def add_branch():
     existing_location_names = {lp.location_name for lp in available_locations}
     unprioritized_locations = [loc for loc in all_branch_locations if loc not in existing_location_names]
     
-    return render_template('add_branch.html', user=current_user, available_locations=available_locations, unprioritized_locations=unprioritized_locations)
+    regions = [r.name for r in Region.query.order_by(Region.name).all()]
+    return render_template('add_branch.html', user=current_user, available_locations=available_locations, unprioritized_locations=unprioritized_locations, regions=regions)
 
 
 @app.route('/it/branches/edit/<int:branch_id>', methods=['GET', 'POST'])
@@ -13160,6 +13179,8 @@ def edit_branch(branch_id):
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
         restaurant = request.form.get('restaurant', '').strip()
+        region = request.form.get('region', '').strip() or None
+        branch_code = request.form.get('branch_code', '').strip() or None
         is_active = request.form.get('is_active') == 'on'
         
         if not restaurant:
@@ -13182,6 +13203,8 @@ def edit_branch(branch_id):
             
             branch.name = name
             branch.restaurant = restaurant
+            branch.region = region
+            branch.branch_code = branch_code
             branch.is_active = is_active
             branch.updated_at = datetime.utcnow()
             
@@ -13205,7 +13228,8 @@ def edit_branch(branch_id):
     existing_location_names = {lp.location_name for lp in available_locations}
     unprioritized_locations = [loc for loc in all_branch_locations if loc not in existing_location_names]
     
-    return render_template('edit_branch.html', branch=branch, user=current_user, available_locations=available_locations, unprioritized_locations=unprioritized_locations)
+    regions = [r.name for r in Region.query.order_by(Region.name).all()]
+    return render_template('edit_branch.html', branch=branch, user=current_user, available_locations=available_locations, unprioritized_locations=unprioritized_locations, regions=regions)
 
 
 @app.route('/it/branches/<int:branch_id>/aliases/add', methods=['POST'])
@@ -13383,6 +13407,81 @@ def get_all_locations():
     """Helper function to get all unique location names from branches"""
     locations = db.session.query(Branch.restaurant).distinct().all()
     return [loc[0] for loc in locations]
+
+# Branch code: Brand (1 letter) - Region (2 letters from name) + 3-digit sequence (e.g. K-MU001, B-DA002)
+
+def _region_base_letters(region_name):
+    """Letters to use for region code: name after stripping 'Al ' (case-insensitive), uppercase."""
+    if not region_name or not isinstance(region_name, str):
+        return ''
+    r = region_name.strip()
+    if not r:
+        return ''
+    if r.upper().startswith('AL '):
+        r = r[3:].strip()
+    return r.upper()
+
+
+def get_region_code(region_name):
+    """
+    Unique 2-letter code for this region. Regions are processed in name order; the first
+    region with a given base gets first 2 letters; if another has the same first 2 letters,
+    it gets first+third letter, then first+fourth if still a collision, etc.
+    E.g. Al Dakhilia -> DA, Damas -> DM (when both exist).
+    """
+    if not region_name or not isinstance(region_name, str) or not region_name.strip():
+        return None
+    # Build region name -> code map (deterministic: order by name)
+    all_regions = Region.query.order_by(Region.name).all()
+    used_codes = set()
+    name_to_code = {}
+    for r in all_regions:
+        base = _region_base_letters(r.name)
+        if not base:
+            continue
+        code = base[:2] if len(base) >= 2 else base
+        idx = 2
+        while code in used_codes and idx < len(base):
+            code = base[0] + base[idx]
+            idx += 1
+        if code in used_codes:
+            # fallback for rare collision with no more letters: first letter + A,B,C,...
+            code = base[0] + chr(ord('A') + min(len(used_codes), 25)) if base else 'XX'
+        used_codes.add(code)
+        name_to_code[r.name.strip()] = code
+    return name_to_code.get(region_name.strip())
+
+
+def suggest_branch_code(restaurant, region):
+    """
+    Generate next branch code for brand+region.
+    Format: BrandLetter-RegionCodeNNN (e.g. K-MU001, B-DA002).
+    Region code is unique per region (first 2 letters; first+third if collision with another region).
+    Sequence is 1 + max existing sequence for same brand+region (from branch_code or region column).
+    """
+    if not (restaurant and region):
+        return None
+    brand_letter = (restaurant.strip() or 'X')[0].upper()
+    region_code = get_region_code(region)
+    if not region_code:
+        return None
+    # Max sequence: from branches with same restaurant and (region match or branch_code pattern)
+    same_restaurant = Branch.query.filter(Branch.restaurant == restaurant.strip()).all()
+    max_seq = 0
+    for b in same_restaurant:
+        if b.region and b.region.strip() == region.strip():
+            if b.branch_code:
+                m = re.match(r'^.-[A-Z]{2}(\d{3})$', (b.branch_code or '').strip())
+                if m:
+                    max_seq = max(max_seq, int(m.group(1)))
+            else:
+                max_seq = max(max_seq, 0)
+        if b.branch_code:
+            m = re.match(r'^.-([A-Z]{2})(\d{3})$', (b.branch_code or '').strip())
+            if m and m.group(1) == region_code:
+                max_seq = max(max_seq, int(m.group(2)))
+    next_seq = max_seq + 1
+    return f'{brand_letter}-{region_code}{next_seq:03d}'
 
 def get_branches_ordered_by_location():
     """Helper function to get branches ordered by location priority from database"""
