@@ -10084,8 +10084,6 @@ def procurement_request_item():
         # Use branch_names if available, otherwise use branch_name
         if branch_names:
             branch_name = branch_names
-        # Branch type selection from radio buttons: 'branch' (Branch) or 'flats'
-        branch_type = request.form.get('branch_type', '').strip()
         # Date is automatically set to today's date (no longer required from form)
         request_date = datetime.utcnow().date()
         notes = request.form.get('notes', '').strip()
@@ -10097,8 +10095,6 @@ def procurement_request_item():
         if not is_save_draft:
             # Build missing fields list similar to client-side
             missing_fields = []
-            if not branch_type or branch_type not in ('branch', 'flats'):
-                missing_fields.append('branch_type')
             if not requestor_name:
                 missing_fields.append('requestor_name')
             if not category:
@@ -10284,7 +10280,7 @@ def procurement_request_item():
             procurement_quantities=quantity if quantity else None,  # Store requested quantities as formatted string (not raw JSON)
             purpose=purpose,
             branch_name=branch_name,
-            branch_type=branch_type or None,
+            branch_type=None,
             request_date=request_date,
             is_urgent=False,  # Will be set by manager during approval
             notes=notes if notes else None,
@@ -10438,8 +10434,8 @@ def procurement_request_item():
         return redirect(url_for('procurement_item_requests'))
     
     # GET request - show the form
-    # Get available branches ordered by location priority from database
-    available_branches = get_branches_ordered_by_location()
+    # Get available branches for branch dropdown (excludes "All Flat" and "All Store/Shop")
+    available_branches = get_branches_for_request_forms()
     
     # Get categories and items from database based on user's department
     user_department = current_user.department if current_user else None
@@ -13415,6 +13411,11 @@ def get_branches_ordered_by_location():
         # Fallback: if no priorities exist, order alphabetically by restaurant then name
         return Branch.query.filter_by(is_active=True).order_by(Branch.restaurant, Branch.name).all()
 
+def get_branches_for_request_forms():
+    """Branches for new payment/item request forms, excluding 'All Flat' and 'All Store/Shop'."""
+    all_branches = get_branches_ordered_by_location()
+    return [b for b in all_branches if (b.name or '').strip() not in ('All Flat', 'All Store/Shop')]
+
 def shift_location_priorities(new_priority, exclude_location_id=None):
     """
     Shift all locations with priority >= new_priority down by 1.
@@ -14256,25 +14257,17 @@ def new_request():
         # Use branch_names if available, otherwise use branch_name
         if branch_names:
             branch_name = branch_names
-        # Branch type selection from radio buttons: 'branch' (Branch) or 'flats'
-        branch_type = request.form.get('branch_type', '').strip()
         date = datetime.utcnow().date()  # Automatically use today's date
         purpose = request.form.get('purpose')
         payment_method = request.form.get('payment_method', 'Card')  # Default to Card
         
         # For drafts, skip validation - allow saving incomplete forms
         if not is_draft:
-            # Validate branch type - user must choose Branch or Flats
-            if not branch_type or branch_type not in ('branch', 'flats'):
-                flash('Please select whether the request is for branch restaurants or flats.', 'error')
-                available_request_types = get_available_request_types()
-                available_branches = get_branches_ordered_by_location()
-                return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
             # Validate required fields only for submitted requests
             if not branch_name:
                 flash('At least one branch name is required.', 'error')
                 available_request_types = get_available_request_types()
-                available_branches = get_branches_ordered_by_location()
+                available_branches = get_branches_for_request_forms()
                 return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         account_name = request.form.get('account_name')
         account_number = request.form.get('account_number')
@@ -14293,28 +14286,28 @@ def new_request():
                 if not account_number:
                     flash('Account number is required when payment method is Card.', 'error')
                     available_request_types = get_available_request_types()
-                    available_branches = get_branches_ordered_by_location()
+                    available_branches = get_branches_for_request_forms()
                     return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
             
             # Validate account number length (maximum 16 digits) - only if payment method is Card
             if payment_method == 'Card' and account_number and len(account_number) > 16:
                 flash('Account number cannot exceed 16 digits.', 'error')
                 available_request_types = get_available_request_types()
-                available_branches = get_branches_ordered_by_location()
+                available_branches = get_branches_for_request_forms()
                 return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
             
             # Validate account number contains only digits - only if payment method is Card
             if payment_method == 'Card' and account_number and not account_number.isdigit():
                 flash('Account number must contain only numbers.', 'error')
                 available_request_types = get_available_request_types()
-                available_branches = get_branches_ordered_by_location()
+                available_branches = get_branches_for_request_forms()
                 return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
             
             # Validate bank name is selected (required for all payment methods)
             if not bank_name:
                 flash('Please select a bank name.', 'error')
                 available_request_types = get_available_request_types()
-                available_branches = get_branches_ordered_by_location()
+                available_branches = get_branches_for_request_forms()
                 return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
             
             # Validate "Others" description if "Others" is selected
@@ -14447,7 +14440,7 @@ def new_request():
             request_type=final_request_type or 'Draft',
             requestor_name=requestor_name or current_user.name,
             branch_name=branch_name or '',
-            branch_type=branch_type or None,
+            branch_type=None,
             person_company=person_company or None,  # Store person_company regardless of type
             department=current_user.department,
             date=date,
@@ -14640,7 +14633,7 @@ def new_request():
     
     # Get available request types and branches for the New Request page
     available_request_types = get_available_request_types()
-    available_branches = get_branches_ordered_by_location()
+    available_branches = get_branches_for_request_forms()
     today = datetime.utcnow().date().strftime('%Y-%m-%d')
     return render_template('new_request.html', user=current_user, today=today, available_request_types=available_request_types, available_branches=available_branches, draft=draft_data)
 
@@ -14809,19 +14802,19 @@ def edit_draft(draft_id):
             if not draft.branch_name:
                 flash('At least one branch name is required.', 'error')
                 available_request_types = get_available_request_types()
-                available_branches = get_branches_ordered_by_location()
+                available_branches = get_branches_for_request_forms()
                 return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches, draft=draft_to_dict(draft))
             
             if draft.payment_method == 'Card' and not draft.account_number:
                 flash('Account number is required when payment method is Card.', 'error')
                 available_request_types = get_available_request_types()
-                available_branches = get_branches_ordered_by_location()
+                available_branches = get_branches_for_request_forms()
                 return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches, draft=draft_to_dict(draft))
             
             if not draft.bank_name:
                 flash('Please select a bank name.', 'error')
                 available_request_types = get_available_request_types()
-                available_branches = get_branches_ordered_by_location()
+                available_branches = get_branches_for_request_forms()
                 return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches, draft=draft_to_dict(draft))
             
             # Convert draft to regular request
@@ -14857,7 +14850,7 @@ def edit_draft(draft_id):
     
     # GET request - show edit form
     available_request_types = get_available_request_types()
-    available_branches = get_branches_ordered_by_location()
+    available_branches = get_branches_for_request_forms()
     today = datetime.utcnow().date().strftime('%Y-%m-%d')
     return render_template('new_request.html', user=current_user, today=today, available_request_types=available_request_types, available_branches=available_branches, draft=draft_to_dict(draft))
 
@@ -15064,7 +15057,7 @@ def edit_item_draft(draft_id):
             return redirect(url_for('drafts') + '#item-requests')
     
     # GET request - show form with draft data
-    available_branches = get_branches_ordered_by_location()
+    available_branches = get_branches_for_request_forms()
     user_department = current_user.department if current_user else None
     procurement_categories = []
     procurement_items = []
