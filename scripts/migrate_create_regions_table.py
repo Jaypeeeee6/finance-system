@@ -8,6 +8,7 @@ Usage:
   python scripts/migrate_create_regions_table.py
   python scripts/migrate_create_regions_table.py --db instance/payment_system.db
   python scripts/migrate_create_regions_table.py --no-seed   # create table only, no seed
+  python scripts/migrate_create_regions_table.py --replace  # delete existing regions, seed with default list
 """
 import sqlite3
 import argparse
@@ -15,16 +16,12 @@ import os
 import sys
 
 SEED_REGIONS = [
-    'Al Batinah',
-    'Al Buraimi',
-    'Al Dakhilia',
-    'Al Sharqiyah',
-    'Al Wusta',
-    'Dhofar',
     'Muscat',
-    'Nizwa',
-    'Salalah',
-    'Sohar',
+    'Al Maabilah',
+    'Al Dakhilia',
+    'Al Batinah',
+    'Al Sharqiah',
+    'Al Dhahira',
 ]
 
 
@@ -32,6 +29,7 @@ def main():
     p = argparse.ArgumentParser(description='Create regions table and optionally seed')
     p.add_argument('--db', default='instance/payment_system.db', help='Path to SQLite DB')
     p.add_argument('--no-seed', action='store_true', help='Do not insert seed regions')
+    p.add_argument('--replace', action='store_true', help='Delete existing regions and re-seed with default list')
     args = p.parse_args()
 
     db_path = os.path.abspath(args.db)
@@ -55,9 +53,15 @@ def main():
             return
 
         cur = conn.execute("SELECT COUNT(*) FROM regions")
-        if cur.fetchone()[0] > 0:
-            print("Regions already have data; skipping seed.")
+        count = cur.fetchone()[0]
+        if count > 0 and not args.replace:
+            print("Regions already have data; skipping seed. Use --replace to delete and re-seed.")
             return
+
+        if args.replace and count > 0:
+            conn.execute("DELETE FROM regions")
+            conn.commit()
+            print(f"Deleted {count} existing region(s).")
 
         for name in SEED_REGIONS:
             conn.execute("INSERT INTO regions (name) VALUES (?)", (name,))
