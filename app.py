@@ -17019,6 +17019,15 @@ def edit_request(request_id):
                 # Invalid amount, keep existing value
                 pass
 
+        # Handle different amounts per branch (requestor / manager edit when Returned to Requestor or Returned to Manager)
+        if request.form.get('different_amounts_per_branch') == '1':
+            req.different_amounts_per_branch = True
+            branch_amounts_val = request.form.get('branch_amounts', '').strip()
+            req.branch_amounts = branch_amounts_val if branch_amounts_val else None
+        else:
+            req.different_amounts_per_branch = False
+            req.branch_amounts = None
+
         # Server-side validation: prevent saving if any core fields become empty.
         # This mirrors the required fields on the New Request form.
         def _empty(val):

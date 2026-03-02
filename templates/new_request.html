@@ -1315,6 +1315,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (paymentMethodInput) {
         paymentMethodInput.addEventListener('change', handlePaymentMethodChange);
     }
+    // When Payment Type (recurring dropdown) changes, open recurring modal when Recurring is selected
+    const recurringInput = document.getElementById('recurring');
+    if (recurringInput) {
+        recurringInput.addEventListener('change', handleRecurringChange);
+    }
     
     // Add event listeners to account fields to clear auto-populated flag on manual edit
     const accountNameInput = document.getElementById('account_name');

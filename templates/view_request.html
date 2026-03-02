@@ -84,12 +84,13 @@ optgroup option { font-weight: normal; color: #212529; padding-left: 20px; }
     flex-direction: column;
     gap: 8px;
     margin-top: 10px;
+    align-items: flex-start;
 }
 .branch-amount-chip-row {
     display: flex;
     align-items: center;
     gap: 12px;
-    flex-wrap: wrap;
+    width: fit-content;
 }
 .branch-name-pill {
     display: inline-flex;
@@ -100,6 +101,8 @@ optgroup option { font-weight: normal; color: #212529; padding-left: 20px; }
     border-radius: 20px;
     font-size: 13px;
     font-weight: 500;
+    width: fit-content;
+    white-space: nowrap;
 }
 .branch-amount-pill {
     display: inline-flex;
@@ -110,6 +113,29 @@ optgroup option { font-weight: normal; color: #212529; padding-left: 20px; }
     border-radius: 20px;
     font-size: 13px;
     font-weight: 500;
+}
+.branch-chip-amount-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    margin: 0;
+    white-space: nowrap;
+}
+.branch-amounts-chips-container .branch-chip-amount-input {
+    width: 88px;
+    min-width: 88px;
+    max-width: 88px;
+    flex-shrink: 0;
+    padding: 6px 8px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 13px;
+    box-sizing: border-box;
+}
+.branch-amounts-chips-container .branch-chip-amount-input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 
 .edited-badge:focus {
@@ -895,8 +921,23 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 
                 {% if branch_names_with_codes and branch_names_with_codes|length >= 2 %}
                 {% set branch_amounts_list = request.branch_amounts | from_json %}
+                {% set can_edit_amounts_per_branch = can_edit_request and request.status in ['Returned to Manager', 'Returned to Requestor'] %}
                 <div class="form-group">
                     <label>Amount per branch</label>
+                    {% if can_edit_amounts_per_branch %}
+                    <input type="hidden" name="different_amounts_per_branch" value="1">
+                    <input type="hidden" name="branch_amounts" id="view_request_branch_amounts" value="{{ request.branch_amounts or '[]' }}">
+                    <div class="branch-amounts-chips-container" id="view-request-branch-amounts-editable">
+                        {% for item in branch_names_with_codes %}
+                        {% set amt = branch_amounts_list[loop.index0] if loop.index0 < branch_amounts_list|length else '' %}
+                        <div class="branch-amount-chip-row">
+                            <span class="branch-name-pill">{% if item.code %}{{ item.code }} - {% endif %}{{ item.name }}</span>
+                            <label class="branch-chip-amount-label" for="branch_amt_{{ loop.index0 }}">Amount (OMR):</label>
+                            <input type="text" class="branch-chip-amount-input" id="branch_amt_{{ loop.index0 }}" data-branch-index="{{ loop.index0 }}" value="{% if amt %}{{ '%.3f'|format(amt|float) }}{% endif %}" placeholder="0.000">
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
                     <div class="branch-amounts-chips-container">
                         {% for item in branch_names_with_codes %}
                         {% set amt = branch_amounts_list[loop.index0] if loop.index0 < branch_amounts_list|length else '' %}
@@ -906,6 +947,7 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         </div>
                         {% endfor %}
                     </div>
+                    {% endif %}
                 </div>
                 {% endif %}
 
@@ -3103,6 +3145,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     el.addEventListener('change', showSave);
                 }
             });
+
+            // Sync amount-per-branch inputs to hidden field and show Save when editable branch amounts exist
+            const branchAmountsHidden = document.getElementById('view_request_branch_amounts');
+            const branchAmountInputs = document.querySelectorAll('.branch-chip-amount-input');
+            function syncViewRequestBranchAmounts() {
+                if (!branchAmountsHidden || !branchAmountInputs.length) return;
+                const arr = Array.from(branchAmountInputs).sort((a, b) => parseInt(a.getAttribute('data-branch-index'), 10) - parseInt(b.getAttribute('data-branch-index'), 10)).map(function(inp) { return inp.value.trim(); });
+                branchAmountsHidden.value = JSON.stringify(arr);
+            }
+            branchAmountInputs.forEach(function(inp) {
+                inp.addEventListener('input', function() { syncViewRequestBranchAmounts(); showSave(); });
+                inp.addEventListener('change', function() { syncViewRequestBranchAmounts(); showSave(); });
+            });
+            form.addEventListener('submit', function() { syncViewRequestBranchAmounts(); });
         }
     }
     
