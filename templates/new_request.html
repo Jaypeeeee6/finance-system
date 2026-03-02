@@ -68,7 +68,7 @@
                                             <optgroup label="{{ restaurant }} (Location)" data-restaurant="{{ restaurant }}">
                                             {% set current_restaurant = restaurant %}
                                         {% endif %}
-                                        <option value="{{ branch.name }}" data-restaurant="{{ restaurant }}">{{ branch.name }}</option>
+                                        <option value="{{ branch.name }}" data-restaurant="{{ restaurant }}">{% if branch.branch_code %}{{ branch.branch_code }} - {{ branch.name }}{% else %}{{ branch.name }}{% endif %}</option>
                                     {% endfor %}
                                     {% if current_restaurant != "" %}
                                         </optgroup>

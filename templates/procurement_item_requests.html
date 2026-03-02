@@ -335,7 +335,7 @@
                                     {% for branch in branch_list %}
                                         {% set branch_trimmed = branch.strip() %}
                                         {% if branch_trimmed %}
-                                            <span class="branch-chip" style="margin-bottom: 4px; display: block;">{{ branch_trimmed }}</span>
+                                            <span class="branch-chip" style="margin-bottom: 4px; display: block;">{{ branch_display_map.get(branch_trimmed, branch_trimmed) }}</span>
                                         {% endif %}
                                     {% endfor %}
                                 {% else %}
@@ -2317,7 +2317,8 @@ function loadMoneySpentHistory() {
                 const requestor = (entry.requestor_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const department = (entry.department || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const itemName = (entry.item_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                const branch = (entry.branch_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const branchRaw = entry.branch_name_display || entry.branch_name || '';
+                const branch = branchRaw.replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const amount = entry.amount !== null && entry.amount !== undefined ? parseFloat(entry.amount).toFixed(3) : '—';
                 const viewUrl = '/procurement/item-request/' + entry.id + '/view';
                 html += '<tr>';
@@ -2389,7 +2390,8 @@ function loadExpensesBreakdown() {
                 const requestor = (entry.requestor_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const department = (entry.department || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const itemName = (entry.item_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                const branch = (entry.branch_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const branchRaw = entry.branch_name_display || entry.branch_name || '';
+                const branch = branchRaw.replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const amount = entry.amount !== null && entry.amount !== undefined ? parseFloat(entry.amount).toFixed(3) : '—';
                 const viewUrl = '/procurement/item-request/' + entry.id + '/view';
                 html += '<tr><td>' + requestor + '</td><td>' + department + '</td><td>' + itemName + '</td><td>' + branch + '</td>';

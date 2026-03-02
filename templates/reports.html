@@ -1046,7 +1046,7 @@
                         {% for branch in branches %}
                         <div class="checkbox-option">
                             <input type="checkbox" name="branch" id="branch_{{ loop.index }}" value="{{ branch.name }}" {% if branch.name in request.args.getlist('branch') %}checked{% endif %}>
-                            <label for="branch_{{ loop.index }}">{{ branch.name }}</label>
+                            <label for="branch_{{ loop.index }}">{% if branch.branch_code %}{{ branch.branch_code }} - {{ branch.name }}{% else %}{{ branch.name }}{% endif %}</label>
                         </div>
                         {% endfor %}
                     </div>
@@ -1545,7 +1545,7 @@
                                         {% for branch in branch_list %}
                                             {% set branch_trimmed = branch.strip() %}
                                             {% if branch_trimmed %}
-                                                <div style="margin-bottom: 4px;">{{ branch_trimmed }}</div>
+                                                <div style="margin-bottom: 4px;">{{ branch_display_map.get(branch_trimmed, branch_trimmed) }}</div>
                                             {% endif %}
                                         {% endfor %}
                                     {% else %}
@@ -2872,7 +2872,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const branches = [
         {% for branch in branches %}
-        { value: '{{ branch.name }}', text: '{{ branch.name }}' }{% if not loop.last %},{% endif %}
+        { value: '{{ branch.name }}', text: '{% if branch.branch_code %}{{ branch.branch_code }} - {{ branch.name }}{% else %}{{ branch.name }}{% endif %}' }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
     const selectedBranches = {{ request.args.getlist('branch') | tojson }};

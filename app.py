@@ -5174,6 +5174,7 @@ def get_procurement_money_spent_history():
                 'department': r.department or '',
                 'item_name': r.item_name or '',
                 'branch_name': r.branch_name or '',
+                'branch_name_display': format_branch_name_display(r.branch_name),
                 'amount': amount,
             })
 
@@ -5215,6 +5216,7 @@ def get_procurement_expenses_breakdown():
                 'department': r.department or '',
                 'item_name': r.item_name or '',
                 'branch_name': r.branch_name or '',
+                'branch_name_display': format_branch_name_display(r.branch_name),
                 'amount': amount,
             })
 
@@ -6185,7 +6187,8 @@ def procurement_item_requests():
                          completed_amount=completed_amount,
                          pending_amount=pending_amount,
                          on_hold_amount=on_hold_amount,
-                         last_bank_money_completion_date=last_bank_money_completion_date)
+                         last_bank_money_completion_date=last_bank_money_completion_date,
+                         branch_display_map={b.name: (b.branch_code + ' - ' + b.name) if b.branch_code else b.name for b in Branch.query.filter_by(is_active=True).all()})
 
 
 @app.route('/procurement/item-request/<int:request_id>')
@@ -13515,6 +13518,21 @@ def get_branches_for_request_forms():
     all_branches = get_branches_ordered_by_location()
     return [b for b in all_branches if (b.name or '').strip() not in ('All Flat', 'All Store/Shop')]
 
+
+def format_branch_name_display(branch_name_str):
+    """Format comma-separated branch names for display: 'code - name' when branch has branch_code, else 'name'."""
+    parts = []
+    for name in (branch_name_str or '').split(','):
+        name = name.strip()
+        if not name:
+            continue
+        branch = Branch.query.filter_by(name=name).first()
+        if branch and branch.branch_code:
+            parts.append(f"{branch.branch_code} - {branch.name}")
+        else:
+            parts.append(name)
+    return ', '.join(parts)
+
 def shift_location_priorities(new_priority, exclude_location_id=None):
     """
     Shift all locations with priority >= new_priority down by 1.
@@ -16630,7 +16648,9 @@ def view_request(request_id):
     # Prev/next in same order as dashboard "All Requests" tab
     prev_request_id, next_request_id = get_prev_next_request_ids(current_user, request_id)
 
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, original_assigned_manager_display=original_assigned_manager_display, is_authorized_manager_approver=is_authorized_manager_approver, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, departments=departments, was_just_edited=was_just_edited, edited_fields=edited_fields_all, can_schedule_one_time=can_schedule_one_time, one_time_scheduled_by=one_time_scheduled_by, can_edit_request=can_edit_request, return_reason_history=return_reason_history, can_edit_department_only=can_edit_department_only, is_dept_temp_for_req=is_dept_temp_for_req, prev_request_id=prev_request_id, next_request_id=next_request_id)
+    branch_name_display = format_branch_name_display(req.branch_name)
+
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, original_assigned_manager_display=original_assigned_manager_display, is_authorized_manager_approver=is_authorized_manager_approver, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, departments=departments, was_just_edited=was_just_edited, edited_fields=edited_fields_all, can_schedule_one_time=can_schedule_one_time, one_time_scheduled_by=one_time_scheduled_by, can_edit_request=can_edit_request, return_reason_history=return_reason_history, can_edit_department_only=can_edit_department_only, is_dept_temp_for_req=is_dept_temp_for_req, prev_request_id=prev_request_id, next_request_id=next_request_id, branch_name_display=branch_name_display)
 
 
 @app.route('/request/<int:request_id>/schedule_one_time_payment', methods=['POST'])
@@ -20516,7 +20536,8 @@ def reports():
     
     # Get unique branches for filter
     branches = Branch.query.filter_by(is_active=True).order_by(Branch.name).all()
-    
+    branch_display_map = {b.name: (b.branch_code + ' - ' + b.name) if b.branch_code else b.name for b in branches}
+
     # Get request types based on selected departments
     if department_filter:
         # If departments are selected, show request types for those departments
@@ -20538,6 +20559,7 @@ def reports():
                          departments=departments,
                          companies=companies,
                          branches=branches,
+                         branch_display_map=branch_display_map,
                          request_types=request_types,
                          company_filter=company_filter,
                          branch_filter=branch_filter,
@@ -20818,13 +20840,15 @@ def item_request_reports():
     
     # Get unique branches for filter
     branches = Branch.query.filter_by(is_active=True).order_by(Branch.name).all()
-    
+    branch_display_map = {b.name: (b.branch_code + ' - ' + b.name) if b.branch_code else b.name for b in branches}
+
     return render_template('item_request_reports.html', 
                          requests=requests, 
                          pagination=pagination,
                          departments=departments,
                          categories=categories,
                          branches=branches,
+                         branch_display_map=branch_display_map,
                          category_filter=category_filter,
                          branch_filter=branch_filter,
                          status_filter=status_filter,
