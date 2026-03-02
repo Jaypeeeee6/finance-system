@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, send_file, session, Response, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, send_file, session, Response, abort, current_app
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_socketio import SocketIO, emit, join_room
 from flask_mail import Mail, Message
@@ -216,13 +216,15 @@ def format_currency_filter(value):
 
 @app.context_processor
 def inject_feature_flags():
-    """Expose IT-only feature flags to all templates."""
+    """Expose IT-only feature flags and ticketing URL to all templates."""
     flags = read_feature_flags()
+    ticketing_url = current_app.config.get('TICKETING_URL') or 'https://ticketing.maagroup.om'
     return {
         # Always enable item requests UI (do not hide). Toggle removed from IT settings.
         'show_item_requests_flag': True,
         'show_test_login_flag': bool(flags.get('show_test_login')),
         'cheque_register_disabled_flag': bool(flags.get('cheque_register_disabled')),
+        'ticketing_url': ticketing_url,
     }
 
 
