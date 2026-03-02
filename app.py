@@ -14308,6 +14308,8 @@ def draft_to_dict(draft):
         'account_number': draft.account_number,
         'bank_name': draft.bank_name,
         'amount': float(draft.amount) if draft.amount else None,
+        'different_amounts_per_branch': getattr(draft, 'different_amounts_per_branch', False),
+        'branch_amounts': getattr(draft, 'branch_amounts', None),
         'recurring': draft.recurring,
         'recurring_interval': draft.recurring_interval,
         'person_company': draft.person_company,
@@ -14362,6 +14364,7 @@ def get_available_request_types():
 @login_required
 def new_request():
     """Create a new payment request"""
+    _ensure_archive_columns_payment_requests()  # also ensures different_amounts_per_branch, branch_amounts
     if request.method == 'POST':
         # Check if this is a draft save
         is_draft = request.form.get('save_as_draft') == 'true'
@@ -14553,6 +14556,9 @@ def new_request():
             final_request_type = f"Others: {others_description}"
         
         # For drafts, allow nullable fields
+        different_amounts_per_branch = request.form.get('different_amounts_per_branch') == '1'
+        branch_amounts_json = request.form.get('branch_amounts', '').strip() or None
+
         new_req = PaymentRequest(
             request_type=final_request_type or 'Draft',
             requestor_name=requestor_name or current_user.name,
@@ -14567,6 +14573,8 @@ def new_request():
             account_number=account_number if payment_method == 'Card' else '',
             bank_name=bank_name or '',
             amount=amount_clean if amount_clean else (0 if is_draft else None),  # Use 0 for drafts if no amount
+            different_amounts_per_branch=different_amounts_per_branch,
+            branch_amounts=branch_amounts_json,
             recurring=recurring,
             recurring_interval=recurring_interval if recurring == 'Recurring' else None,
             status=initial_status,
@@ -14578,8 +14586,18 @@ def new_request():
         )
         
         
-        db.session.add(new_req)
-        db.session.commit()
+        try:
+            db.session.add(new_req)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            app.logger.exception("Failed to save payment request")
+            import traceback
+            traceback.print_exc()
+            flash(f'Failed to save request: {str(e)}. Please try again or contact IT if the problem persists.', 'danger')
+            available_request_types = get_available_request_types()
+            available_branches = get_branches_for_request_forms()
+            return render_template('new_request.html', user=current_user, today=datetime.utcnow().date().strftime('%Y-%m-%d'), available_request_types=available_request_types, available_branches=available_branches)
         
         # Skip notifications and schedules for drafts
         if is_draft:
@@ -14782,6 +14800,7 @@ def drafts():
 @login_required
 def edit_draft(draft_id):
     """Edit a draft"""
+    _ensure_archive_columns_payment_requests()  # also ensures different_amounts_per_branch, branch_amounts
     draft = PaymentRequest.query.filter_by(
         request_id=draft_id,
         is_draft=True,
@@ -14831,6 +14850,10 @@ def edit_draft(draft_id):
         
         draft.recurring = request.form.get('recurring', 'One-Time')
         draft.recurring_interval = request.form.get('recurring_interval') if draft.recurring == 'Recurring' else None
+        
+        draft.different_amounts_per_branch = request.form.get('different_amounts_per_branch') == '1'
+        branch_amounts_val = request.form.get('branch_amounts', '').strip()
+        draft.branch_amounts = branch_amounts_val if branch_amounts_val else None
         
         # Handle person_company - check both text input and dropdown
         # Store regardless of request type to preserve data across edits
@@ -16650,7 +16673,15 @@ def view_request(request_id):
 
     branch_name_display = format_branch_name_display(req.branch_name)
 
-    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, original_assigned_manager_display=original_assigned_manager_display, is_authorized_manager_approver=is_authorized_manager_approver, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, departments=departments, was_just_edited=was_just_edited, edited_fields=edited_fields_all, can_schedule_one_time=can_schedule_one_time, one_time_scheduled_by=one_time_scheduled_by, can_edit_request=can_edit_request, return_reason_history=return_reason_history, can_edit_department_only=can_edit_department_only, is_dept_temp_for_req=is_dept_temp_for_req, prev_request_id=prev_request_id, next_request_id=next_request_id, branch_name_display=branch_name_display)
+    # For "amount per branch" chips: list of {name, code} with branch_code looked up (when different_amounts_per_branch)
+    branch_names_with_codes = []
+    if getattr(req, 'different_amounts_per_branch', False) and req.branch_name and getattr(req, 'branch_amounts', None):
+        for bname in [b.strip() for b in req.branch_name.split(',') if b.strip()]:
+            branch = Branch.query.filter_by(name=bname).first()
+            code = branch.branch_code if branch else None
+            branch_names_with_codes.append({'name': bname, 'code': code})
+
+    return render_template('view_request.html', request=req, user=current_user, schedule_rows=schedule_rows, total_paid_amount=float(total_paid_amount), manager_name=manager_name, temporary_manager_name=temporary_manager_name, available_managers=available_managers, proof_files=proof_files, proof_batches=proof_batches, current_server_time=current_server_time, finance_notes=finance_notes, gm_name=gm_name, op_manager_name=op_manager_name, original_assigned_manager_display=original_assigned_manager_display, is_authorized_manager_approver=is_authorized_manager_approver, requestor_receipts=requestor_receipts, finance_admin_receipts=finance_admin_receipts, available_request_types=available_request_types, available_branches=available_branches, departments=departments, was_just_edited=was_just_edited, edited_fields=edited_fields_all, can_schedule_one_time=can_schedule_one_time, one_time_scheduled_by=one_time_scheduled_by, can_edit_request=can_edit_request, return_reason_history=return_reason_history, can_edit_department_only=can_edit_department_only, is_dept_temp_for_req=is_dept_temp_for_req, prev_request_id=prev_request_id, next_request_id=next_request_id, branch_name_display=branch_name_display, branch_names_with_codes=branch_names_with_codes)
 
 
 @app.route('/request/<int:request_id>/schedule_one_time_payment', methods=['POST'])
@@ -19501,24 +19532,30 @@ def reassign_manager(request_id):
 
 
 def _ensure_archive_columns_payment_requests():
-    """Ensure archive_reason and archive_supporting_files columns exist on payment_requests."""
+    """Ensure archive_reason, archive_supporting_files, different_amounts_per_branch, branch_amounts exist on payment_requests.
+    Uses the same db.engine as the app so we always touch the correct database."""
     try:
-        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(payment_requests)")
-        existing_columns = [row[1] for row in cursor.fetchall()]
-        if 'archive_reason' not in existing_columns:
-            cursor.execute("ALTER TABLE payment_requests ADD COLUMN archive_reason TEXT")
-            conn.commit()
-            print("✓ Added 'archive_reason' column to payment_requests table")
-        if 'archive_supporting_files' not in existing_columns:
-            cursor.execute("ALTER TABLE payment_requests ADD COLUMN archive_supporting_files TEXT")
-            conn.commit()
-            print("✓ Added 'archive_supporting_files' column to payment_requests table")
-        conn.close()
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            result = conn.execute(text("PRAGMA table_info(payment_requests)"))
+            existing_columns = [row[1] for row in result]
+            to_add = []
+            if 'archive_reason' not in existing_columns:
+                to_add.append(('archive_reason', "ALTER TABLE payment_requests ADD COLUMN archive_reason TEXT"))
+            if 'archive_supporting_files' not in existing_columns:
+                to_add.append(('archive_supporting_files', "ALTER TABLE payment_requests ADD COLUMN archive_supporting_files TEXT"))
+            if 'different_amounts_per_branch' not in existing_columns:
+                to_add.append(('different_amounts_per_branch', "ALTER TABLE payment_requests ADD COLUMN different_amounts_per_branch INTEGER DEFAULT 0"))
+            if 'branch_amounts' not in existing_columns:
+                to_add.append(('branch_amounts', "ALTER TABLE payment_requests ADD COLUMN branch_amounts TEXT"))
+            for name, sql in to_add:
+                conn.execute(text(sql))
+                conn.commit()
+                print(f"✓ Added '{name}' column to payment_requests table")
     except Exception as e:
-        print(f"Warning: Could not migrate payment_requests archive columns: {e}")
+        print(f"Warning: Could not migrate payment_requests columns: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 @app.route('/request/<int:request_id>/delete', methods=['POST'])
@@ -25156,6 +25193,9 @@ def mark_installment_late():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        
+        # Ensure payment_requests has archive and different_amounts columns (safe to call every startup)
+        _ensure_archive_columns_payment_requests()
         
         # Migrate: Add amount and receipt_path columns to procurement_item_requests if they don't exist
         try:

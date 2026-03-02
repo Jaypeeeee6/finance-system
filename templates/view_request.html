@@ -78,6 +78,40 @@ optgroup option { font-weight: normal; color: #212529; padding-left: 20px; }
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* Branch amounts per branch (Submit Request tab - when different_amounts_per_branch is true) */
+.branch-amounts-chips-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+.branch-amount-chip-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.branch-name-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    background: #000;
+    color: white;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+}
+.branch-amount-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    background: #f0f0f0;
+    color: #333;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
 .edited-badge:focus {
     outline: 2px solid #ffc107;
     outline-offset: 2px;
@@ -858,6 +892,22 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         </div>
                     {% endif %}
                 </div>
+
+                {% if branch_names_with_codes and branch_names_with_codes|length >= 2 %}
+                {% set branch_amounts_list = request.branch_amounts | from_json %}
+                <div class="form-group">
+                    <label>Amount per branch</label>
+                    <div class="branch-amounts-chips-container">
+                        {% for item in branch_names_with_codes %}
+                        {% set amt = branch_amounts_list[loop.index0] if loop.index0 < branch_amounts_list|length else '' %}
+                        <div class="branch-amount-chip-row">
+                            <span class="branch-name-pill">{% if item.code %}{{ item.code }} - {% endif %}{{ item.name }}</span>
+                            <span class="branch-amount-pill">{% if amt %}OMR {{ '%.3f'|format(amt|float) }}{% else %}—{% endif %}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
 
                 <!-- Payment Type Display -->
                 {% if request.recurring or request.payment_date %}

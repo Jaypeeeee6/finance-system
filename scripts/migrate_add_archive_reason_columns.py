@@ -43,6 +43,20 @@ def main():
             print("Added column archive_supporting_files to payment_requests.")
         else:
             print("Column archive_supporting_files already exists on payment_requests. No action taken.")
+
+        if not column_exists(conn, table, 'different_amounts_per_branch'):
+            conn.execute("ALTER TABLE payment_requests ADD COLUMN different_amounts_per_branch INTEGER DEFAULT 0")
+            conn.commit()
+            print("Added column different_amounts_per_branch to payment_requests.")
+        else:
+            print("Column different_amounts_per_branch already exists on payment_requests. No action taken.")
+
+        if not column_exists(conn, table, 'branch_amounts'):
+            conn.execute("ALTER TABLE payment_requests ADD COLUMN branch_amounts TEXT")
+            conn.commit()
+            print("Added column branch_amounts to payment_requests.")
+        else:
+            print("Column branch_amounts already exists on payment_requests. No action taken.")
     finally:
         conn.close()
 
