@@ -1422,6 +1422,10 @@ document.addEventListener('DOMContentLoaded', function() {
             bankNameInput.value = '';
             bankNameInput.dataset.autoPopulated = 'false';
             if (bankNameNote) bankNameNote.style.display = 'none';
+            // Sync the book-style dropdown so the visible label resets to placeholder
+            if (typeof syncBookStyleDropdowns === 'function') {
+                syncBookStyleDropdowns();
+            }
             // Hide SWIFT code display if it was shown
             if (typeof showSwiftCode === 'function') {
                 showSwiftCode();
@@ -2536,6 +2540,10 @@ function initializeSupplierSearch() {
             if (finalBankName && (!bankNameInput.value || wasAutoPopulated)) {
                 bankNameInput.value = finalBankName;
                 bankNameInput.dataset.autoPopulated = 'true';
+                // Sync the book-style dropdown so the visible label and selected state update
+                if (typeof syncBookStyleDropdowns === 'function') {
+                    syncBookStyleDropdowns();
+                }
                 // Show note
                 if (bankNameNote) bankNameNote.style.display = 'block';
                 // Trigger change event to show SWIFT code if applicable
