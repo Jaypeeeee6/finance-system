@@ -63,5 +63,5 @@ class Config:
     FINANCE_SYNC_SECRET = os.environ.get('FINANCE_SYNC_SECRET') or None  # same as Ticketing's FINANCE_SYNC_SECRET
 
     # IT Support / Ticketing link (Ask IT Support button). Set in .env: localhost use http://localhost:9009, production use https://ticketing.maagroup.om
-    TICKETING_URL = os.environ.get('TICKETING_URL') or 'http://localhost:9009'
+    TICKETING_URL = os.environ.get('TICKETING_URL') or 'https://ticketing.maagroup.om'
 
