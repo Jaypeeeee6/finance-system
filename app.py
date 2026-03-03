@@ -20283,6 +20283,54 @@ def get_installment_edit_history(schedule_id):
 
 # ==================== REPORTS ROUTES ====================
 
+def _report_display_amount_for_request(req, branch_filter_list):
+    """
+    When a branch filter is applied, return the amount to show for this request in the report:
+    - If the request has different_amounts_per_branch and branch_amounts, return the sum of
+      amounts only for branches that match the filter (so the amount column and total card
+      show only the portion that applies to the selected branch(es)).
+    - Otherwise return the full request amount.
+    branch_filter_list: list of selected branch names (e.g. from request.args.getlist('branch')).
+    """
+    if not branch_filter_list:
+        return None  # Caller uses full amount
+    try:
+        if not getattr(req, 'different_amounts_per_branch', False) or not getattr(req, 'branch_amounts', None):
+            return float(req.amount)
+        branch_names_str = (req.branch_name or '').strip()
+        if not branch_names_str:
+            return float(req.amount)
+        branch_names = [b.strip() for b in branch_names_str.split(',') if b.strip()]
+        try:
+            amounts = json.loads(req.branch_amounts) if isinstance(req.branch_amounts, str) else (req.branch_amounts or [])
+        except Exception:
+            amounts = []
+        if len(amounts) != len(branch_names):
+            return float(req.amount)
+        # Build set of names that count as "selected" (canonical + aliases for each filter branch)
+        selected_names = set()
+        for fname in branch_filter_list:
+            fname = (fname or '').strip()
+            if not fname:
+                continue
+            selected_names.add(fname)
+            branch = Branch.query.filter_by(name=fname).first()
+            if branch and getattr(branch, 'aliases', None):
+                for a in branch.aliases:
+                    if getattr(a, 'alias_name', None):
+                        selected_names.add(a.alias_name.strip())
+        display = 0.0
+        for i, bname in enumerate(branch_names):
+            if bname in selected_names and i < len(amounts):
+                try:
+                    display += float(amounts[i])
+                except (TypeError, ValueError):
+                    pass
+        return display if display > 0 else float(req.amount)
+    except Exception:
+        return float(req.amount)
+
+
 @app.route('/reports')
 @login_required
 @role_required('Finance Admin', 'Finance Staff', 'GM', 'CEO', 'IT Staff', 'Department Manager', 'Operation Manager', 'Auditing Staff')
@@ -20499,8 +20547,16 @@ def reports():
     on_hold_count = len([r for r in all_filtered_requests if r.status == 'On Hold'])
     
     # Calculate total amount
-    # If a date range is applied, for recurring requests only sum matching paid schedules
+    # When branch filter is applied, for requests with different_amounts_per_branch use only the amount for the selected branch(es).
+    # If a date range is applied, for recurring requests only sum matching paid schedules.
     total_amount = 0.0
+    request_display_amounts = {}  # request_id -> amount to show in table (when branch filter applied)
+    if branch_filter:
+        for r in all_filtered_requests:
+            display_amt = _report_display_amount_for_request(r, branch_filter)
+            if display_amt is not None:
+                request_display_amounts[r.request_id] = display_amt
+
     if date_from or date_to:
         # Pre-parse date bounds
         date_from_dt = datetime.strptime(date_from, '%Y-%m-%d').date() if date_from else None
@@ -20518,15 +20574,19 @@ def reports():
                     schedules = sched_q.all()
                     total_amount += sum(float(s.amount) for s in schedules)
                 else:
-                    total_amount += float(r.amount)
+                    amt = request_display_amounts.get(r.request_id) if branch_filter else None
+                    total_amount += float(amt) if amt is not None else float(r.amount)
             except Exception:
-                # Fallback - include request amount if anything goes wrong
                 try:
-                    total_amount += float(r.amount)
+                    amt = request_display_amounts.get(r.request_id) if branch_filter else None
+                    total_amount += float(amt) if amt is not None else float(r.amount)
                 except Exception:
                     pass
     else:
-        total_amount = sum(float(r.amount) for r in all_filtered_requests)
+        if branch_filter and request_display_amounts:
+            total_amount = sum(request_display_amounts.get(r.request_id, float(r.amount)) for r in all_filtered_requests)
+        else:
+            total_amount = sum(float(r.amount) for r in all_filtered_requests)
     it_amount = None
     
     # Paginate the query for display with the same ordering
@@ -20622,6 +20682,7 @@ def reports():
                          pending_count=pending_count,
                          on_hold_count=on_hold_count,
                          total_amount=total_amount,
+                         request_display_amounts=request_display_amounts,
                          it_amount=it_amount,
                          user=current_user)
 

@@ -1575,7 +1575,11 @@
                                     {% endif %}
                                 </td>
                                 <td>
+                                    {% if branch_filter and request_display_amounts is defined and req.request_id in request_display_amounts %}
+                                    OMR {{ "%.3f"|format(request_display_amounts[req.request_id]) }}
+                                    {% else %}
                                     OMR {{ "%.3f"|format(req.amount) }}
+                                    {% endif %}
                                 </td>
                                 <td class="status-col">
                                     {% if req.status == 'Approved' %}
