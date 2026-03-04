@@ -24,29 +24,31 @@
         <div class="cheque-form-panel">
             <div class="form-section">
                 <h3><i class="fas fa-edit"></i> Fill in the fields and print</h3>
-                
+                {% if not can_edit_cheque %}
+                <p class="text-muted" style="margin-bottom: 1rem;"><i class="fas fa-lock"></i> This cheque is Audited or Cancelled and cannot be edited. You can still view and print it.</p>
+                {% endif %}
                 <form id="chequeForm">
                     <div class="form-group">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
                             <label for="chequeDate">Cheque's date</label>
-                            <button type="button" id="toggleDateBtn" class="btn btn-sm" style="padding: 5px 8px; min-width: auto; width: auto;">
+                            <button type="button" id="toggleDateBtn" class="btn btn-sm" style="padding: 5px 8px; min-width: auto; width: auto;" {% if not can_edit_cheque %}disabled{% endif %}>
                                 <i class="fas fa-eye" id="toggleDateIcon"></i>
                             </button>
                         </div>
-                        <input type="date" id="chequeDate" name="chequeDate" class="form-control" required>
+                        <input type="date" id="chequeDate" name="chequeDate" class="form-control" required {% if not can_edit_cheque %}readonly disabled{% endif %}>
                         <input type="checkbox" id="showDate" checked style="display: none;">
                     </div>
 
                     <div class="form-group">
                         <label for="payeeName">Payee Name</label>
-                        <input type="text" id="payeeName" name="payeeName" class="form-control" placeholder="Enter payee name" required>
+                        <input type="text" id="payeeName" name="payeeName" class="form-control" placeholder="Enter payee name" required {% if not can_edit_cheque %}readonly disabled{% endif %}>
                     </div>
 
                     <div class="form-group">
                         <label for="amount">Amount</label>
                         <div class="amount-input-group">
-                            <input type="number" id="amount" name="amount" class="form-control" placeholder="0.000" step="0.001" required>
-                            <select id="currency" name="currency" class="form-control">
+                            <input type="number" id="amount" name="amount" class="form-control" placeholder="0.000" step="0.001" required {% if not can_edit_cheque %}readonly disabled{% endif %}>
+                            <select id="currency" name="currency" class="form-control" {% if not can_edit_cheque %}disabled{% endif %}>
                                 <option value="OMR">OMR</option>
                                 <option value="USD">USD</option>
                                 <option value="EUR">EUR</option>
@@ -56,7 +58,7 @@
 
                     <div class="form-group">
                         <label for="crossing">Crossing</label>
-                        <select id="crossing" name="crossing" class="form-control">
+                        <select id="crossing" name="crossing" class="form-control" {% if not can_edit_cheque %}disabled{% endif %}>
                             <option value="">Select an option</option>
                             <option value="Cancelled">Cancelled</option>
                             <option value="A/C Payee">A/C Payee</option>
@@ -67,7 +69,7 @@
 
                     <div class="form-group">
                         <label for="amountWordsLanguage">Amount in Words Language</label>
-                        <select id="amountWordsLanguage" name="amountWordsLanguage" class="form-control">
+                        <select id="amountWordsLanguage" name="amountWordsLanguage" class="form-control" {% if not can_edit_cheque %}disabled{% endif %}>
                             <option value="english">English</option>
                             <option value="arabic">Arabic (العربية)</option>
                         </select>
@@ -89,9 +91,11 @@
                         <button type="button" class="btn btn-success bank-action-btn" id="printBtn" title="Print the cheque currently shown">
                             <i class="fas fa-print"></i> Print Cheque
                         </button>
+                        {% if can_edit_cheque|default(true) %}
                         <button type="button" class="btn btn-primary bank-action-btn" id="saveChequeBtn">
                             <i class="fas fa-save"></i> Save Cheque
                         </button>
+                        {% endif %}
                     </div>
                 </div>
 

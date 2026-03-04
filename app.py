@@ -15526,17 +15526,19 @@ def write_cheque():
     book_bank_name = None
     book_bank_key = 'dhofar_islamic'  # default for template image/positions
     serial_ids_param = request.args.get('serial_ids', '').strip()
+    can_edit_cheque = True  # allow edit only when all selected serials are Reserved or Used
     if serial_ids_param:
         try:
             ids = [int(x) for x in serial_ids_param.split(',') if x.strip()]
             if ids:
+                # Load Reserved, Used, Audited, Cancelled so view/print works for all
                 serials = ChequeSerial.query.filter(
                     ChequeSerial.id.in_(ids),
-                    ChequeSerial.status.in_(['Reserved', 'Used'])
+                    ChequeSerial.status.in_(['Reserved', 'Used', 'Audited', 'Cancelled'])
                 ).order_by(ChequeSerial.id).all()
                 selected_serials = []
                 for s in serials:
-                    item = {'id': s.id, 'serial_no': s.serial_no, 'book_no': s.book.book_no if s.book else None}
+                    item = {'id': s.id, 'serial_no': s.serial_no, 'book_no': s.book.book_no if s.book else None, 'status': s.status}
                     if s.payee_name is not None:
                         item['payee_name'] = s.payee_name
                     if s.cheque_date is not None:
@@ -15544,6 +15546,8 @@ def write_cheque():
                     if s.amount is not None:
                         item['amount'] = float(s.amount)
                     selected_serials.append(item)
+                # GM, CEO, Operation Manager: can edit only when all are Reserved or Used
+                can_edit_cheque = all(s.status in ('Reserved', 'Used') for s in serials)
                 if serials and serials[0].book and serials[0].book.bank_name:
                     book_bank_name = serials[0].book.bank_name
                     bn_lower = book_bank_name.lower()
@@ -15560,7 +15564,8 @@ def write_cheque():
                          approved_requests=approved_requests,
                          selected_serials=selected_serials,
                          book_bank_name=book_bank_name,
-                         book_bank_key=book_bank_key)
+                         book_bank_key=book_bank_key,
+                         can_edit_cheque=can_edit_cheque)
 
 
 @app.route('/write-cheque/save', methods=['POST'])
@@ -15579,12 +15584,13 @@ def write_cheque_save():
         serial_ids = [int(x) for x in serial_ids if x is not None]
         if not serial_ids:
             return jsonify({'success': False, 'error': 'No serial IDs provided'}), 400
-        serials = ChequeSerial.query.filter(
-            ChequeSerial.id.in_(serial_ids),
-            ChequeSerial.status == 'Reserved'
-        ).all()
+        serials = ChequeSerial.query.filter(ChequeSerial.id.in_(serial_ids)).all()
         if len(serials) != len(serial_ids):
-            return jsonify({'success': False, 'error': 'One or more serials not found or not Reserved'}), 400
+            return jsonify({'success': False, 'error': 'One or more serials not found'}), 400
+        # GM, CEO, Operation Manager: only allow save when status is Reserved or Used
+        for s in serials:
+            if s.status not in ('Reserved', 'Used'):
+                return jsonify({'success': False, 'error': 'Cannot edit: one or more cheques are Audited or Cancelled. Only Used cheques can be edited.'}), 400
         cheque_date_str = data.get('chequeDate', '')
         payee_name = (data.get('payeeName') or '').strip()
         amount_raw = data.get('amount')
@@ -15603,7 +15609,8 @@ def write_cheque_save():
                 except (ValueError, TypeError):
                     pass
             s.amount = amount
-            s.status = 'Used'
+            if s.status == 'Reserved':
+                s.status = 'Used'
         db.session.commit()
         return jsonify({'success': True, 'updated_count': len(serials), 'message': f'Successfully saved {len(serials)} cheque(s) to the book.'})
     except Exception as e:
@@ -24074,6 +24081,9 @@ def upload_cheque_file():
         cheque_serial = ChequeSerial.query.get(serial_id)
         if not cheque_serial:
             return jsonify({'success': False, 'error': 'Cheque serial not found'}), 404
+        # GM, CEO, Operation Manager: cannot upload when cheque is Audited or Cancelled
+        if current_user.role in ('GM', 'CEO', 'Operation Manager') and cheque_serial.status in ('Audited', 'Cancelled'):
+            return jsonify({'success': False, 'error': 'Cannot edit: this cheque is Audited or Cancelled.'}), 400
         
         # Validate file extension
         allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'pdf'}
@@ -24135,6 +24145,9 @@ def delete_cheque_upload():
         cheque_serial = ChequeSerial.query.get(serial_id)
         if not cheque_serial:
             return jsonify({'success': False, 'error': 'Cheque serial not found'}), 404
+        # GM, CEO, Operation Manager: cannot delete upload when cheque is Audited or Cancelled
+        if current_user.role in ('GM', 'CEO', 'Operation Manager') and cheque_serial.status in ('Audited', 'Cancelled'):
+            return jsonify({'success': False, 'error': 'Cannot edit: this cheque is Audited or Cancelled.'}), 400
         if not cheque_serial.upload_path:
             return jsonify({'success': True, 'message': 'No upload to remove'})
         filename = cheque_serial.upload_path.split('/')[-1] if '/' in cheque_serial.upload_path else cheque_serial.upload_path

@@ -496,6 +496,9 @@
                             </button>
                         </span>
                         <span class="toolbar-print-only" style="display: none;">
+                            <button type="button" class="btn btn-sm btn-outline btn-edit-cheque-toolbar" data-book-no="{{ group.grouper }}">
+                                <i class="fas fa-edit"></i> Edit Cheque
+                            </button>
                             <button type="button" class="btn btn-sm btn-reserve-write btn-print-cheque" data-book-no="{{ group.grouper }}">
                                 <i class="fas fa-print"></i> Print Cheque
                             </button>
@@ -600,6 +603,9 @@
                                                     <i class="fas fa-file-invoice" style="margin-right:8px;"></i> Write Cheque
                                                 </button>
                                                 {% elif serial.status == 'Used' %}
+                                                <a href="{{ url_for('write_cheque') }}?serial_ids={{ serial.id }}" class="cheque-dropdown-item" role="menuitem" style="display:block; padding:10px 12px; color:#212529; text-decoration:none;">
+                                                    <i class="fas fa-edit" style="margin-right:8px;"></i> Edit Cheque
+                                                </a>
                                                 <a href="{{ url_for('write_cheque') }}?serial_ids={{ serial.id }}&print=1" class="cheque-dropdown-item cheque-action-print-link" role="menuitem" style="display:block; padding:10px 12px; color:#212529; text-decoration:none;">
                                                     <i class="fas fa-print" style="margin-right:8px;"></i> Print Cheque
                                                 </a>
@@ -630,17 +636,19 @@
                                                 </a>
                                                 {% endif %}
                                                 {% endif %}
-                                                {# Upload Image, View Image, Delete Image: GM, CEO, Operation Manager, Auditing #}
+                                                {# Upload Image, View Image, Delete Image: GM, CEO, Operation Manager, Auditing. CEO/GM/Op: only when status is Used (not Audited/Cancelled). #}
                                                 {% if show_image_actions %}
                                                 {% if serial.upload_path %}
                                                 {% set filename = serial.upload_path.split('/')[-1] if '/' in serial.upload_path else serial.upload_path %}
                                                 <a href="/uploads/cheque/{{ filename }}" target="_blank" class="cheque-dropdown-item" role="menuitem" style="display:block; padding:10px 12px; color:#212529; text-decoration:none;">
                                                     <i class="fas fa-eye" style="margin-right:8px;"></i> View Image
                                                 </a>
+                                                {% if not show_select_ceo_gm_op or serial.status == 'Used' %}
                                                 <button type="button" class="cheque-dropdown-item cheque-action-delete-image" data-serial-id="{{ serial.id }}" data-status="{{ serial.status }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
                                                     <i class="fas fa-trash" style="margin-right:8px;"></i> Delete Image
                                                 </button>
-                                                {% elif serial.status != 'Available' %}
+                                                {% endif %}
+                                                {% elif serial.status != 'Available' and (not show_select_ceo_gm_op or serial.status == 'Used') %}
                                                 <input type="file" id="upload_{{ serial.id }}" class="cheque-upload-input-row" accept="image/*,.pdf" style="display: none;" data-serial-id="{{ serial.id }}">
                                                 <button type="button" class="cheque-dropdown-item cheque-action-upload-image" data-serial-id="{{ serial.id }}" data-upload-input="upload_{{ serial.id }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
                                                     <i class="fas fa-upload" style="margin-right:8px;"></i> Upload Image
@@ -1002,18 +1010,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (row && row.getAttribute('data-status') !== allowedStatus) cb.checked = false;
         });
     }
-    // Enforce only one Used cheque selected per book
-    function enforceSingleUsedPerBook(bookNo) {
-        var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
-        if (!section) return;
-        var usedChecked = [];
-        section.querySelectorAll('.cheque-row-select:checked').forEach(function(cb) {
-            var row = cb.closest('tr');
-            if (row && row.getAttribute('data-status') === 'Used') usedChecked.push(cb);
-        });
-        if (usedChecked.length <= 1) return;
-        usedChecked.slice(1).forEach(function(cb) { cb.checked = false; });
-    }
     document.querySelectorAll('.cheque-row-select').forEach(function(cb) {
         cb.addEventListener('change', function() {
             var bookNo = this.getAttribute('data-book-no');
@@ -1021,7 +1017,6 @@ document.addEventListener('DOMContentLoaded', function() {
             var status = row ? row.getAttribute('data-status') : null;
             if (this.checked && status && !showAuditingSelect && !showItSelect) {
                 enforceSingleStatusPerBook(bookNo, status);
-                if (status === 'Used') enforceSingleUsedPerBook(bookNo);
             }
             updateSelectToolbarForBook(bookNo);
         });
@@ -1041,7 +1036,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         var r = rowCb.closest('tr');
                         rowCb.checked = r && r.getAttribute('data-status') === firstStatus;
                     });
-                    if (firstStatus === 'Used') enforceSingleUsedPerBook(bookNo);
                 }
             } else {
                 section.querySelectorAll('.cheque-row-select:not([disabled])').forEach(function(rowCb) {
@@ -1150,6 +1144,19 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 doReserveSelected(bookNo, true);
             }
+        });
+    });
+    document.querySelectorAll('.btn-edit-cheque-toolbar').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var bookNo = this.getAttribute('data-book-no');
+            saveChequeExpandedBooks();
+            var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
+            if (!section) return;
+            var checked = section.querySelectorAll('.cheque-row-select:checked');
+            if (checked.length === 0) return;
+            var serialIds = Array.from(checked).map(function(c) { return parseInt(c.getAttribute('data-serial-id'), 10); });
+            window.location.href = '{{ url_for("write_cheque") }}?serial_ids=' + serialIds.join(',');
         });
     });
     document.querySelectorAll('.btn-print-cheque').forEach(function(btn) {
