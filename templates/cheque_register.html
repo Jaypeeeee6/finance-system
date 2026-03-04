@@ -380,11 +380,6 @@
             <i class="fas fa-ruler-combined"></i> Calibrate
         </a>
         {% endif %}
-        {% if current_user.department != 'Auditing' %}
-        <a href="{{ url_for('write_cheque') }}" class="btn btn-success">
-            <i class="fas fa-file-invoice"></i> Write Cheque
-        </a>
-        {% endif %}
         <a href="{{ url_for('new_book') }}" class="btn btn-success">
             <i class="fas fa-plus-circle"></i> New Book
         </a>
