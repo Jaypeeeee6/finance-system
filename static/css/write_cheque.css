@@ -134,6 +134,12 @@
     gap: 1rem;
 }
 
+/* Keep amount input LTR and left-aligned so the decimal point doesn't move the cursor */
+.cheque-form-panel #amount.amount-text-input {
+    direction: ltr;
+    text-align: left;
+}
+
 .form-actions {
     display: flex;
     gap: 1rem;

@@ -47,7 +47,7 @@
                     <div class="form-group">
                         <label for="amount">Amount</label>
                         <div class="amount-input-group">
-                            <input type="number" id="amount" name="amount" class="form-control" placeholder="0.000" step="0.001" required {% if not can_edit_cheque %}readonly disabled{% endif %}>
+                            <input type="text" id="amount" name="amount" class="form-control amount-text-input" placeholder="0.000" inputmode="decimal" autocomplete="off" required {% if not can_edit_cheque %}readonly disabled{% endif %}>
                             <select id="currency" name="currency" class="form-control" {% if not can_edit_cheque %}disabled{% endif %}>
                                 <option value="OMR">OMR</option>
                                 <option value="USD">USD</option>
@@ -496,11 +496,11 @@ function amountToWords(amount, language = 'english', currency = 'OMR') {
         if (intNum === 0) words = 'صفر';
         if (numeric < 0) words = `ناقص ${words}`;
         
-        // Format: "فقط [amount in words] [currency] و #[decimal digits]# بيسة لاغير"
+        // Format: "[amount in words] [currency] و #[decimal digits]# بيسة لاغير فقط" (فقط at end)
         if (decStr && Number(decStr) > 0) {
-            return `فقط ${words} ${currencyName} و #${decStr}# بيسة لاغير`;
+            return `${words} ${currencyName} و #${decStr}# بيسة لاغير فقط`;
         } else {
-            return `فقط ${words} ${currencyName} لاغير`;
+            return `${words} ${currencyName} لاغير فقط`;
         }
     } else {
         // English format
@@ -592,6 +592,18 @@ document.addEventListener('DOMContentLoaded', function() {
             field.addEventListener('change', updateChequePreview);
         }
     });
+
+    // Amount: allow only digits and one decimal point so cursor stays in place (no number-input reformatting)
+    const amountEl = document.getElementById('amount');
+    if (amountEl) {
+        amountEl.addEventListener('input', function() {
+            var val = this.value;
+            var filtered = val.replace(/[^\d.]/g, '');
+            var parts = filtered.split('.');
+            if (parts.length > 2) filtered = parts[0] + '.' + parts.slice(1).join('');
+            if (filtered !== val) this.value = filtered;
+        });
+    }
 
     // No amount-in-words input; overlay is auto-generated from amount
     

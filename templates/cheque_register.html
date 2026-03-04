@@ -574,7 +574,7 @@
                                     </td>
                                     <td>{{ serial.payee_name or '-' }}</td>
                                     <td>{{ serial.cheque_date.strftime('%Y-%m-%d') if serial.cheque_date else '-' }}</td>
-                                    <td>{{ "%.3f"|format(serial.amount) if serial.amount else '-' }}</td>
+                                    <td>{{ serial.amount|format_currency if serial.amount else '-' }}</td>
                                     <td class="upload-cell-td" style="position: relative; text-align: center;">
                                         <div class="cheque-action-cell-wrap">
                                         <div class="cheque-action-menu-container" style="position: relative; display: inline-block;">
