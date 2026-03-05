@@ -20312,24 +20312,24 @@ def _report_display_amount_for_request(req, branch_filter_list):
     - If the request has different_amounts_per_branch and branch_amounts, return the sum of
       amounts only for branches that match the filter (so the amount column and total card
       show only the portion that applies to the selected branch(es)).
-    - Otherwise return the full request amount.
+    - Otherwise return the full request amount (requestor amount + finance extra amount).
     branch_filter_list: list of selected branch names (e.g. from request.args.getlist('branch')).
     """
     if not branch_filter_list:
         return None  # Caller uses full amount
     try:
         if not getattr(req, 'different_amounts_per_branch', False) or not getattr(req, 'branch_amounts', None):
-            return float(req.amount)
+            return req.total_display_amount
         branch_names_str = (req.branch_name or '').strip()
         if not branch_names_str:
-            return float(req.amount)
+            return req.total_display_amount
         branch_names = [b.strip() for b in branch_names_str.split(',') if b.strip()]
         try:
             amounts = json.loads(req.branch_amounts) if isinstance(req.branch_amounts, str) else (req.branch_amounts or [])
         except Exception:
             amounts = []
         if len(amounts) != len(branch_names):
-            return float(req.amount)
+            return req.total_display_amount
         # Build set of names that count as "selected" (canonical + aliases for each filter branch)
         selected_names = set()
         for fname in branch_filter_list:
@@ -20349,9 +20349,9 @@ def _report_display_amount_for_request(req, branch_filter_list):
                     display += float(amounts[i])
                 except (TypeError, ValueError):
                     pass
-        return display if display > 0 else float(req.amount)
+        return display if display > 0 else req.total_display_amount
     except Exception:
-        return float(req.amount)
+        return req.total_display_amount
 
 
 @app.route('/reports')
@@ -20598,18 +20598,18 @@ def reports():
                     total_amount += sum(float(s.amount) for s in schedules)
                 else:
                     amt = request_display_amounts.get(r.request_id) if branch_filter else None
-                    total_amount += float(amt) if amt is not None else float(r.amount)
+                    total_amount += float(amt) if amt is not None else r.total_display_amount
             except Exception:
                 try:
                     amt = request_display_amounts.get(r.request_id) if branch_filter else None
-                    total_amount += float(amt) if amt is not None else float(r.amount)
+                    total_amount += float(amt) if amt is not None else r.total_display_amount
                 except Exception:
                     pass
     else:
         if branch_filter and request_display_amounts:
-            total_amount = sum(request_display_amounts.get(r.request_id, float(r.amount)) for r in all_filtered_requests)
+            total_amount = sum(request_display_amounts.get(r.request_id, r.total_display_amount) for r in all_filtered_requests)
         else:
-            total_amount = sum(float(r.amount) for r in all_filtered_requests)
+            total_amount = sum(r.total_display_amount for r in all_filtered_requests)
     it_amount = None
     
     # Paginate the query for display with the same ordering
@@ -22175,8 +22175,8 @@ def export_reports_excel():
         except Exception:
             return 0.0
 
-    # Sum all amounts (requests may be in any status)
-    total_amount = sum(to_float(r.amount) for r in result_requests)
+    # Sum all amounts (requests may be in any status); use total_display_amount (requestor + finance extra)
+    total_amount = sum(r.total_display_amount for r in result_requests)
 
     try:
         # Create Excel workbook
@@ -22302,7 +22302,7 @@ def export_reports_excel():
                 payment_type_display = r.recurring or 'One-Time'
             
             # Calculate amount value explicitly as float to ensure it's numeric
-            amount_value = to_float(r.amount)
+            amount_value = r.total_display_amount
             if amount_value is None:
                 amount_value = 0.0
             
@@ -22669,8 +22669,8 @@ def export_reports_pdf():
         except Exception:
             return 0.0
 
-    # Sum all amounts (requests may be in any status)
-    total_amount = sum(to_float(r.amount) for r in result_requests)
+    # Sum all amounts (requests may be in any status); use total_display_amount (requestor + finance extra)
+    total_amount = sum(r.total_display_amount for r in result_requests)
 
     try:
         # Build PDF in landscape orientation
@@ -22910,7 +22910,7 @@ def export_reports_pdf():
                 str(r.requestor_name or ''),
                 str(r.department or ''),
                 str(r.recurring or 'One-Time'),
-                f"OMR {to_float(r.amount):.3f}",
+                f"OMR {r.total_display_amount:.3f}",
                 str(r.branch_name or '').replace(',', ', '),
                 str(company_display or ''),
                 str(r.approver or '')

@@ -383,7 +383,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        OMR {{ "%.3f"|format(req.amount) }}
+                                        OMR {{ "%.3f"|format(req.total_display_amount) }}
                                     </td>
                                 <td>
                                     {% if req.status == 'Approved' %}
@@ -525,7 +525,7 @@
                                             {% endif %}
                                         </td>
                                         <td>
-                                                OMR {{ "%.3f"|format(req.amount) }}
+                                                OMR {{ "%.3f"|format(req.total_display_amount) }}
                                         </td>
                                         <td>
                                             {% if req.status == 'Approved' %}
@@ -610,7 +610,7 @@
                                             {% endif %}
                                         </td>
                                         <td>
-                                                OMR {{ "%.3f"|format(req.amount) }}
+                                                OMR {{ "%.3f"|format(req.total_display_amount) }}
                                         </td>
                                         <td>
                                             <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
@@ -677,7 +677,7 @@
                                         <td>{{ req.person_company or '-' }}</td>
                                         <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
                                         <td>
-                                                OMR {{ "%.3f"|format(req.amount) }}
+                                                OMR {{ "%.3f"|format(req.total_display_amount) }}
                                         </td>
                                         <td>
                                             {% if req.status == 'Approved' %}
@@ -764,7 +764,7 @@
                                             {% endif %}
                                         </td>
                                         <td>
-                                                OMR {{ "%.3f"|format(req.amount) }}
+                                                OMR {{ "%.3f"|format(req.total_display_amount) }}
                                         </td>
                                         <td>
                                             <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>

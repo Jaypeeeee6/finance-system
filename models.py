@@ -283,6 +283,13 @@ class PaymentRequest(db.Model):
             return []
 
     @property
+    def total_display_amount(self):
+        """Amount for display in dashboards/reports: requestor amount + any finance extra amount (e.g. tax, exchange)."""
+        base = float(self.amount) if self.amount is not None else 0.0
+        extra = float(self.finance_extra_amount) if self.finance_extra_amount is not None else 0.0
+        return base + extra
+
+    @property
     def archive_supporting_files_with_names(self):
         """List of {file, name} for modal display (name is original upload name)."""
         raw = self._archive_supporting_files_parsed

@@ -160,7 +160,7 @@
                                         <span style="color: #999;">-</span>
                                     {% endif %}
                                 </td>
-                                <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                <td>OMR {{ "%.3f"|format(req.total_display_amount) }}</td>
                                 <td>
                                     {% if req.status == 'Approved' %}
                                         <span class="badge badge-success">✓ {{ req.status }}</span>
@@ -258,7 +258,7 @@
                                     <td>{{ req.person_company or '-' }}</td>
                                     <td>{{ req.submission_date.strftime('%Y-%m-%d') if req.submission_date else req.date.strftime('%Y-%m-%d') }}</td>
                                     <td>{{ req.completion_date.strftime('%Y-%m-%d') if req.completion_date else 'N/A' }}</td>
-                                    <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                    <td>OMR {{ "%.3f"|format(req.total_display_amount) }}</td>
                                     <td>
                                         <span class="badge" style="background: #28a745; color: white;">✓ {{ req.status }}</span>
                                     </td>
@@ -356,7 +356,7 @@
                                     <td>{{ req.person_company or '-' }}</td>
                                     <td>{{ req.submission_date.strftime('%Y-%m-%d') if req.submission_date else req.date.strftime('%Y-%m-%d') }}</td>
                                     <td>{{ req.manager_rejection_date.strftime('%Y-%m-%d') if req.manager_rejection_date else req.finance_rejection_date.strftime('%Y-%m-%d') if req.finance_rejection_date else '<span style="color: #999;">-</span>' }}</td>
-                                    <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                    <td>OMR {{ "%.3f"|format(req.total_display_amount) }}</td>
                                     <td>
                                         <span class="badge" style="background: #dc3545; color: white;">✗ {{ req.status }}</span>
                                     </td>
@@ -417,7 +417,7 @@
                                     <td>{{ req.person_company or '-' }}</td>
                                     <td>{{ req.submission_date.strftime('%Y-%m-%d') if req.submission_date else req.date.strftime('%Y-%m-%d') }}</td>
                                     <td>{{ req.next_due_date.strftime('%Y-%m-%d') if req.next_due_date else 'N/A' }}</td>
-                                    <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                    <td>OMR {{ "%.3f"|format(req.total_display_amount) }}</td>
                                     <td>
                                         {% if req.status == 'Approved' %}
                                             <span class="badge badge-success">✓ {{ req.status }}</span>

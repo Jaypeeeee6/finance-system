@@ -373,7 +373,7 @@
                                 <td>{{ req.requestor_name }}</td>
                                 <td>{{ req.department }}</td>
                                 <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
-                                <td>OMR {{ "%.3f"|format(req.amount) }}</td>
+                                <td>OMR {{ "%.3f"|format(req.total_display_amount) }}</td>
                                 <td>
                                     {% if req.status == 'Approved' %}
                                         <span class="badge badge-success">✓ {{ req.status }}</span>
