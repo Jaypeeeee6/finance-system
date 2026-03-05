@@ -373,6 +373,46 @@ div.dashboard-container div.card.post-approval-actions div.card-header {
     border-top: none !important;
 }
 
+/* Finance extra amount - red text (display and form) */
+.finance-extra-amount-display label,
+.finance-extra-amount-display input,
+.finance-extra-amount-display small {
+    color: #dc3545 !important;
+}
+.finance-extra-amount-display input {
+    background: #f5f5f5 !important;
+    font-weight: bold !important;
+    font-size: 1.1rem !important;
+}
+.finance-extra-amount-form label,
+.finance-extra-amount-form label span,
+.finance-extra-amount-form #finance_extra_amount_section label,
+.finance-extra-amount-form #finance_extra_amount_section small {
+    color: #dc3545 !important;
+}
+.finance-extra-amount-form #finance_extra_amount_section input.form-control {
+    color: #dc3545 !important;
+}
+
+/* Stack checkbox and Extra Amount section vertically (override .form-group.checkbox-group flex) */
+.finance-extra-amount-form {
+    display: block !important;
+}
+.finance-extra-amount-form > label {
+    display: flex !important;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.finance-extra-amount-form #finance_extra_amount_section {
+    display: none;
+    margin-top: 12px;
+    width: 100%;
+}
+.finance-extra-amount-form #finance_extra_amount_section[style*="block"] {
+    display: block !important;
+}
+
 /* Manager Decision section - Light Blue - High specificity to override main CSS */
 .dashboard-container .card.manager-decision .card-header {
     background: #e3f2fd !important;
@@ -918,6 +958,15 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         </div>
                     {% endif %}
                 </div>
+
+                <!-- Extra Amount Paid by Finance (visible in Submit Request tab when set by Finance on approval) -->
+                {% if request.approver or request.reference_number %}
+                <div class="form-group finance-extra-amount-display">
+                    <label><i class="fas fa-plus-circle"></i> Extra Amount Paid by Finance</label>
+                    <input type="text" value="{% if request.finance_extra_amount is not none and request.finance_extra_amount|float != 0 %}{{ "%.3f"|format(request.finance_extra_amount|float) }} OMR{% else %}—{% endif %}" readonly style="background: #f5f5f5; font-weight: bold; max-width: 200px;">
+                    <small class="form-text text-muted">Additional amount (e.g. tax, exchange rates) paid by Finance upon payment.</small>
+                </div>
+                {% endif %}
 
                 {% if branch_names_with_codes and branch_names_with_codes|length >= 2 %}
                 {% set branch_amounts_list = request.branch_amounts | from_json %}
@@ -2316,6 +2365,13 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                         </div>
                         {% endif %}
                         
+                        <!-- Extra Amount Paid by Finance - always show row when request has been finance-approved -->
+                        <div class="form-group finance-extra-amount-display">
+                            <label><i class="fas fa-plus-circle"></i> Extra Amount Paid by Finance</label>
+                            <input type="text" value="{% if request.finance_extra_amount is not none and request.finance_extra_amount|float != 0 %}{{ "%.3f"|format(request.finance_extra_amount|float) }} OMR{% else %}—{% endif %}" readonly>
+                            <small class="form-text text-muted">Additional amount (e.g. tax, exchange rates) paid by Finance upon payment.</small>
+                        </div>
+                        
                         {% if request.payment_method == 'Cash' and request.cash_receiver %}
                         <div class="form-group">
                             <label><i class="fas fa-user-check"></i> Cash Receiver</label>
@@ -2595,6 +2651,20 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                                         <small class="form-text text-muted">
                                             Required field. Enter the receipt reference number (alphanumeric only).
                                         </small>
+                                    </div>
+                                    
+                                    <!-- Extra amount paid by Finance (tax, exchange, etc.) -->
+                                    <div class="form-group checkbox-group finance-extra-amount-form">
+                                        <label for="has_finance_extra_amount" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                            <input type="checkbox" name="has_finance_extra_amount" id="has_finance_extra_amount" value="1" style="margin: 0; accent-color: #dc3545;">
+                                            <span>Extra amounts to be paid by Finance (e.g. tax, exchange rates)?</span>
+                                        </label>
+                                        <div id="finance_extra_amount_section" class="form-group" style="display: none; margin-top: 12px; margin-left: 0; width: 100%;">
+                                            <label for="finance_extra_amount" style="display: block; margin-top: 8px;">Extra Amount (OMR)</label>
+                                            <input type="number" name="finance_extra_amount" id="finance_extra_amount" class="form-control" 
+                                                   placeholder="0.000" step="0.001" min="0" style="max-width: 200px; display: block;">
+                                            <small class="form-text text-muted" style="display: block;">Amount in OMR (e.g. tax, exchange rate difference) paid by Finance upon payment.</small>
+                                        </div>
                                     </div>
                                     
                                     <!-- Cash Receiver Field (only visible when payment method is Cash) -->
@@ -4742,6 +4812,7 @@ function toggleFinanceApprovalFields() {
         }
         // Check payment method and show/hide cash receiver field
         toggleCashReceiverField();
+        toggleFinanceExtraAmountSection();
     } else if (status === 'return_to_manager') {
         returnFields.style.display = 'block';
         returnReasonField.setAttribute('required', 'required');
@@ -4750,6 +4821,21 @@ function toggleFinanceApprovalFields() {
         if (receiptUploadContainer) {
             receiptUploadContainer.setAttribute('data-required', 'false');
         }
+    }
+}
+
+// Toggle extra amount section when "Extra amounts to be paid by Finance" checkbox changes
+function toggleFinanceExtraAmountSection() {
+    const checkbox = document.getElementById('has_finance_extra_amount');
+    const section = document.getElementById('finance_extra_amount_section');
+    const input = document.getElementById('finance_extra_amount');
+    if (!checkbox || !section || !input) return;
+    if (checkbox.checked) {
+        section.style.display = 'block';
+    } else {
+        section.style.display = 'none';
+        input.value = '';
+        input.removeAttribute('required');
     }
 }
 
@@ -5391,6 +5477,13 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('DOMContentLoaded', function() {
     // Check if we're on the finance tab and initialize cash receiver field
     toggleCashReceiverField();
+    toggleFinanceExtraAmountSection();
+    
+    // Extra amount checkbox: show/hide extra amount input
+    const hasFinanceExtraCheckbox = document.getElementById('has_finance_extra_amount');
+    if (hasFinanceExtraCheckbox) {
+        hasFinanceExtraCheckbox.addEventListener('change', toggleFinanceExtraAmountSection);
+    }
     
     // Also ensure any hidden required fields have their required attribute removed
     // This prevents "An invalid form control with name='...' is not focusable" errors

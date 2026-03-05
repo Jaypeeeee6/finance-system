@@ -17816,6 +17816,22 @@ def approve_request(request_id):
         # Save reference number
         req.reference_number = reference_number
         
+        # Save finance extra amount (e.g. tax, exchange rates) if checkbox was checked
+        # Checkbox submits 'on' (no value) or '1' (value="1") when checked
+        has_finance_extra = request.form.get('has_finance_extra_amount') in ('on', '1')
+        if has_finance_extra:
+            try:
+                extra_val = request.form.get('finance_extra_amount', '').strip().replace(',', '')
+                finance_extra_amount = float(extra_val) if extra_val else None
+                if finance_extra_amount is not None and finance_extra_amount < 0:
+                    flash('Extra amount cannot be negative.', 'error')
+                    return redirect_with_return_url('view_request', request_id=request_id)
+                req.finance_extra_amount = round(finance_extra_amount, 3) if finance_extra_amount is not None else None
+            except (TypeError, ValueError):
+                req.finance_extra_amount = None
+        else:
+            req.finance_extra_amount = None
+        
         # Save cash receiver (only for Cash payment method)
         cash_receiver = request.form.get('cash_receiver', '').strip()
         if req.payment_method == 'Cash' and cash_receiver:
