@@ -880,14 +880,44 @@ class ChequeSerial(db.Model):
     payee_name = db.Column(db.String(200), nullable=True)
     cheque_date = db.Column(db.Date, nullable=True)
     amount = db.Column(db.Numeric(12, 3), nullable=True)
-    upload_path = db.Column(db.String(500), nullable=True)  # Path to uploaded file (system filename)
-    upload_original_filename = db.Column(db.String(500), nullable=True)  # Original filename as uploaded by user (for display)
+    upload_path = db.Column(db.String(500), nullable=True)  # Legacy: single file (system filename)
+    upload_original_filename = db.Column(db.String(500), nullable=True)  # Legacy: single file display name
+    upload_paths = db.Column(db.Text, nullable=True)  # JSON array of {"file": "storage_name", "name": "display_name"}
+    cancelled_upload_paths = db.Column(db.Text, nullable=True)  # JSON array of cancelled-cheque files (from Mark as Cancelled)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Unique constraint: same serial number cannot exist in the same book
     __table_args__ = (db.UniqueConstraint('book_id', 'serial_no', name='unique_book_serial'),)
-    
+
+    @property
+    def uploads_list(self):
+        """List of {file: storage_name, name: display_name} for template/view. Supports legacy single upload_path."""
+        if self.upload_paths:
+            try:
+                data = json.loads(self.upload_paths)
+                if isinstance(data, list) and data:
+                    return [{"file": item.get("file", item) if isinstance(item, dict) else item, "name": item.get("name", item) if isinstance(item, dict) else item} for item in data]
+            except (TypeError, ValueError):
+                pass
+        if self.upload_path:
+            name = self.upload_original_filename or (self.upload_path.split("/")[-1] if "/" in self.upload_path else self.upload_path)
+            return [{"file": self.upload_path.split("/")[-1] if "/" in self.upload_path else self.upload_path, "name": name}]
+        return []
+
+    @property
+    def cancelled_uploads_list(self):
+        """List of {file: storage_name, name: display_name} for cancelled-cheque files (Mark as Cancelled uploads)."""
+        if not self.cancelled_upload_paths:
+            return []
+        try:
+            data = json.loads(self.cancelled_upload_paths)
+            if isinstance(data, list) and data:
+                return [{"file": item.get("file", item) if isinstance(item, dict) else item, "name": item.get("name", item) if isinstance(item, dict) else item} for item in data]
+        except (TypeError, ValueError):
+            pass
+        return []
+
     def __repr__(self):
         return f'<ChequeSerial {self.id} - Book {self.book_id} Serial {self.serial_no} ({self.status})>'
 

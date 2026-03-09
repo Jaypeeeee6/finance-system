@@ -109,11 +109,41 @@ def ensure_procurement_item_request_columns_exist():
         # Non-fatal - app can run and show a warning
         print(f"Warning: Could not ensure procurement_item_requests new columns: {e}")
 
-# Run migration immediately at import time so running `python app.py` works on older Flask versions
+def ensure_cheque_serials_columns_exist():
+    """Ensure cheque_serials has upload_paths and cancelled_upload_paths (SQLite). Runs at import so flask run also migrates."""
+    try:
+        import sqlite3
+        db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '') or ''
+        if not db_uri.startswith('sqlite:///'):
+            return
+        db_path = db_uri.replace('sqlite:///', '')
+        if os.name == 'nt':
+            db_path = db_path.replace('/', '\\')
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(cheque_serials)")
+        cols = [row[1] for row in cursor.fetchall()]
+        if 'upload_paths' not in cols:
+            cursor.execute("ALTER TABLE cheque_serials ADD COLUMN upload_paths TEXT")
+            conn.commit()
+            print("✓ Added 'upload_paths' column to cheque_serials table (startup)")
+        if 'cancelled_upload_paths' not in cols:
+            cursor.execute("ALTER TABLE cheque_serials ADD COLUMN cancelled_upload_paths TEXT")
+            conn.commit()
+            print("✓ Added 'cancelled_upload_paths' column to cheque_serials table (startup)")
+        conn.close()
+    except Exception as e:
+        print(f"Warning: Could not ensure cheque_serials columns: {e}")
+
+# Run migrations immediately at import time so `flask run` and `python app.py` both migrate
 try:
     ensure_procurement_item_request_columns_exist()
 except Exception as _err:
     print(f"Warning: ensure_procurement_item_request_columns_exist failed at startup: {_err}")
+try:
+    ensure_cheque_serials_columns_exist()
+except Exception as _err:
+    print(f"Warning: ensure_cheque_serials_columns_exist failed at startup: {_err}")
 
 # Reduce noisy print output by routing stdout/stderr into Flask logger and raising default log level to INFO.
 import logging, sys
@@ -24082,104 +24112,222 @@ def uploaded_cheque_file(filename):
 @app.route('/cheque-register/upload', methods=['POST'])
 @login_required
 def upload_cheque_file():
-    """Upload a file for a cheque serial"""
+    """Upload one or more files for a cheque serial. Appends to existing uploads."""
     try:
-        if 'file' not in request.files:
-            return jsonify({'success': False, 'error': 'No file provided'}), 400
-        
-        file = request.files['file']
+        files = request.files.getlist('file')
+        if not files:
+            files = [request.files.get('file')] if request.files.get('file') else []
         serial_id = request.form.get('serial_id')
-        
         if not serial_id:
             return jsonify({'success': False, 'error': 'Serial ID not provided'}), 400
-        
-        if file.filename == '':
-            return jsonify({'success': False, 'error': 'No file selected'}), 400
-        
-        # Get the cheque serial
         cheque_serial = ChequeSerial.query.get(serial_id)
         if not cheque_serial:
             return jsonify({'success': False, 'error': 'Cheque serial not found'}), 404
-        # GM, CEO, Operation Manager: cannot upload when cheque is Audited or Cancelled
         if current_user.role in ('GM', 'CEO', 'Operation Manager') and cheque_serial.status in ('Audited', 'Cancelled'):
             return jsonify({'success': False, 'error': 'Cannot edit: this cheque is Audited or Cancelled.'}), 400
-        
-        # Validate file extension
+
         allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'pdf'}
-        file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-        if file_extension not in allowed_extensions:
-            return jsonify({'success': False, 'error': 'Invalid file type. Allowed: JPG, PNG, GIF, PDF'}), 400
-        
-        # Validate file size (50MB max)
         max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
-        file.seek(0, 2)  # Seek to end
-        file_size = file.tell()
-        file.seek(0)  # Reset to beginning
-        
-        if file_size > max_file_size:
-            return jsonify({'success': False, 'error': f'File too large. Maximum size is {max_file_size // (1024 * 1024)}MB'}), 400
-        
-        # Generate unique filename
         import uuid
-        
-        unique_id = str(uuid.uuid4())[:8]
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = secure_filename(f"cheque_{serial_id}_{timestamp}_{unique_id}_{file.filename}")
-        filepath = os.path.join(app.config['CHEQUE_UPLOAD_FOLDER'], filename)
-        
-        # Save file
-        file.save(filepath)
-        
-        # Store original filename for display (basename only, no path; cap length)
-        original_filename = (file.filename or '').strip()
-        if original_filename:
-            original_filename = os.path.basename(original_filename)
-        if len(original_filename) > 500:
-            original_filename = original_filename[:500]
-        
-        # Update database
-        cheque_serial.upload_path = filename
-        cheque_serial.upload_original_filename = original_filename or None
+        existing = cheque_serial.uploads_list
+        added = []
+        for file in files:
+            if not file or file.filename == '':
+                continue
+            ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+            if ext not in allowed_extensions:
+                return jsonify({'success': False, 'error': f'Invalid file type: {file.filename}. Allowed: JPG, PNG, GIF, PDF'}), 400
+            file.seek(0, 2)
+            size = file.tell()
+            file.seek(0)
+            if size > max_file_size:
+                return jsonify({'success': False, 'error': f'File too large: {file.filename}. Max {max_file_size // (1024 * 1024)}MB'}), 400
+            unique_id = str(uuid.uuid4())[:8]
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = secure_filename(f"cheque_{serial_id}_{timestamp}_{unique_id}_{file.filename}")
+            filepath = os.path.join(app.config['CHEQUE_UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            orig = (file.filename or '').strip()
+            orig = os.path.basename(orig) if orig else filename
+            if len(orig) > 500:
+                orig = orig[:500]
+            existing.append({'file': filename, 'name': orig})
+            added.append(filename)
+        if not added:
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+        cheque_serial.upload_paths = json.dumps(existing)
+        cheque_serial.upload_path = None
+        cheque_serial.upload_original_filename = None
         db.session.commit()
-        
         return jsonify({
             'success': True,
-            'filename': filename,
-            'message': 'File uploaded successfully'
+            'filename': added[0] if len(added) == 1 else None,
+            'uploaded_count': len(added),
+            'message': f'{len(added)} file(s) uploaded successfully'
         })
-        
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+def _file_basename(u):
+    f = u.get('file', u) if isinstance(u, dict) else u
+    return (f or '').split('/')[-1]
+
+
 @app.route('/cheque-register/delete-upload', methods=['POST'])
 @login_required
 def delete_cheque_upload():
-    """Remove the uploaded file for a cheque serial so the user can upload a different image."""
+    """Remove uploaded files for a cheque serial. Pass optional 'filename' (single), or JSON body with
+    files_to_remove: [filenames] and/or cancelled_to_remove: [filenames] to remove selected files."""
     try:
-        serial_id = request.form.get('serial_id') or (request.get_json() or {}).get('serial_id')
+        data = request.get_json(silent=True) or {}
+        serial_id = request.form.get('serial_id') or data.get('serial_id')
+        filename_to_remove = request.form.get('filename') or data.get('filename')
+        files_to_remove = data.get('files_to_remove') or []
+        cancelled_to_remove = data.get('cancelled_to_remove') or []
         if not serial_id:
             return jsonify({'success': False, 'error': 'Serial ID not provided'}), 400
         cheque_serial = ChequeSerial.query.get(serial_id)
         if not cheque_serial:
             return jsonify({'success': False, 'error': 'Cheque serial not found'}), 404
-        # GM, CEO, Operation Manager: cannot delete upload when cheque is Audited or Cancelled
         if current_user.role in ('GM', 'CEO', 'Operation Manager') and cheque_serial.status in ('Audited', 'Cancelled'):
             return jsonify({'success': False, 'error': 'Cannot edit: this cheque is Audited or Cancelled.'}), 400
-        if not cheque_serial.upload_path:
+
+        # Remove selected files (JSON body)
+        if files_to_remove or cancelled_to_remove:
+            removed = 0
+            if files_to_remove:
+                uploads = cheque_serial.uploads_list
+                keep = [u for u in uploads if _file_basename(u) not in files_to_remove]
+                for fn in files_to_remove:
+                    fp = os.path.join(app.config['CHEQUE_UPLOAD_FOLDER'], fn)
+                    if os.path.isfile(fp):
+                        try:
+                            os.remove(fp)
+                            removed += 1
+                        except OSError:
+                            pass
+                if not keep:
+                    cheque_serial.upload_paths = None
+                    cheque_serial.upload_path = None
+                    cheque_serial.upload_original_filename = None
+                else:
+                    cheque_serial.upload_paths = json.dumps(keep)
+                    cheque_serial.upload_path = None
+                    cheque_serial.upload_original_filename = None
+            if cancelled_to_remove:
+                cancelled = cheque_serial.cancelled_uploads_list
+                keep_c = [u for u in cancelled if _file_basename(u) not in cancelled_to_remove]
+                for fn in cancelled_to_remove:
+                    fp = os.path.join(app.config['CHEQUE_UPLOAD_FOLDER'], fn)
+                    if os.path.isfile(fp):
+                        try:
+                            os.remove(fp)
+                            removed += 1
+                        except OSError:
+                            pass
+                if not keep_c:
+                    cheque_serial.cancelled_upload_paths = None
+                else:
+                    cheque_serial.cancelled_upload_paths = json.dumps(keep_c)
+            db.session.commit()
+            return jsonify({'success': True, 'message': f'{removed} file(s) removed.', 'removed_count': removed})
+            # end selected-files path
+
+        uploads = cheque_serial.uploads_list
+        if not uploads and not cheque_serial.cancelled_uploads_list:
             return jsonify({'success': True, 'message': 'No upload to remove'})
-        filename = cheque_serial.upload_path.split('/')[-1] if '/' in cheque_serial.upload_path else cheque_serial.upload_path
-        filepath = os.path.join(app.config['CHEQUE_UPLOAD_FOLDER'], filename)
-        if os.path.isfile(filepath):
-            try:
-                os.remove(filepath)
-            except OSError:
-                pass
-        cheque_serial.upload_path = None
-        cheque_serial.upload_original_filename = None
+        if filename_to_remove:
+            storage_name = filename_to_remove.split('/')[-1] if '/' in filename_to_remove else filename_to_remove
+            new_list = [u for u in uploads if _file_basename(u) != storage_name]
+            filepath = os.path.join(app.config['CHEQUE_UPLOAD_FOLDER'], storage_name)
+            if os.path.isfile(filepath):
+                try:
+                    os.remove(filepath)
+                except OSError:
+                    pass
+            if not new_list:
+                cheque_serial.upload_paths = None
+                cheque_serial.upload_path = None
+                cheque_serial.upload_original_filename = None
+            else:
+                cheque_serial.upload_paths = json.dumps(new_list)
+                cheque_serial.upload_path = None
+                cheque_serial.upload_original_filename = None
+        else:
+            for u in uploads:
+                fn = _file_basename(u)
+                fp = os.path.join(app.config['CHEQUE_UPLOAD_FOLDER'], fn)
+                if os.path.isfile(fp):
+                    try:
+                        os.remove(fp)
+                    except OSError:
+                        pass
+            cheque_serial.upload_paths = None
+            cheque_serial.upload_path = None
+            cheque_serial.upload_original_filename = None
         db.session.commit()
-        return jsonify({'success': True, 'message': 'Upload removed. You can upload a new image.'})
+        return jsonify({'success': True, 'message': 'Upload(s) removed.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/cheque-register/upload-cancelled', methods=['POST'])
+@login_required
+def upload_cheque_cancelled_file():
+    """Upload one or more files for a cancelled cheque (Auditing: Mark as Cancelled). Stored in cancelled_upload_paths."""
+    try:
+        files = request.files.getlist('file')
+        if not files:
+            files = [request.files.get('file')] if request.files.get('file') else []
+        serial_id = request.form.get('serial_id')
+        if not serial_id:
+            return jsonify({'success': False, 'error': 'Serial ID not provided'}), 400
+        cheque_serial = ChequeSerial.query.get(serial_id)
+        if not cheque_serial:
+            return jsonify({'success': False, 'error': 'Cheque serial not found'}), 404
+        if current_user.department != 'Auditing':
+            return jsonify({'success': False, 'error': 'Forbidden'}), 403
+        if cheque_serial.status not in ('Used', 'Audited'):
+            return jsonify({'success': False, 'error': 'Cheque must be Used or Audited to upload cancelled image(s).'}), 400
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'pdf'}
+        max_file_size = app.config.get('MAX_FILE_SIZE', 50 * 1024 * 1024)
+        import uuid
+        existing = cheque_serial.cancelled_uploads_list
+        added = []
+        for file in files:
+            if not file or file.filename == '':
+                continue
+            ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+            if ext not in allowed_extensions:
+                return jsonify({'success': False, 'error': f'Invalid file type: {file.filename}. Allowed: JPG, PNG, GIF, PDF'}), 400
+            file.seek(0, 2)
+            size = file.tell()
+            file.seek(0)
+            if size > max_file_size:
+                return jsonify({'success': False, 'error': f'File too large: {file.filename}. Max {max_file_size // (1024 * 1024)}MB'}), 400
+            unique_id = str(uuid.uuid4())[:8]
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = secure_filename(f"cheque_cancelled_{serial_id}_{timestamp}_{unique_id}_{file.filename}")
+            filepath = os.path.join(app.config['CHEQUE_UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            orig = (file.filename or '').strip()
+            orig = os.path.basename(orig) if orig else filename
+            if len(orig) > 500:
+                orig = orig[:500]
+            existing.append({'file': filename, 'name': orig})
+            added.append(filename)
+        if not added:
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+        cheque_serial.cancelled_upload_paths = json.dumps(existing)
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'uploaded_count': len(added),
+            'message': f'{len(added)} cancelled cheque file(s) uploaded.'
+        })
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -25523,6 +25671,14 @@ if __name__ == '__main__':
                     cursor.execute("ALTER TABLE cheque_serials ADD COLUMN upload_original_filename VARCHAR(500)")
                     conn.commit()
                     print("✓ Added 'upload_original_filename' column to cheque_serials table")
+                if 'upload_paths' not in cheque_serial_columns:
+                    cursor.execute("ALTER TABLE cheque_serials ADD COLUMN upload_paths TEXT")
+                    conn.commit()
+                    print("✓ Added 'upload_paths' column to cheque_serials table")
+                if 'cancelled_upload_paths' not in cheque_serial_columns:
+                    cursor.execute("ALTER TABLE cheque_serials ADD COLUMN cancelled_upload_paths TEXT")
+                    conn.commit()
+                    print("✓ Added 'cancelled_upload_paths' column to cheque_serials table")
             except Exception as e_cs:
                 print(f"Note: cheque_serials migration skipped or already applied: {e_cs}")
             

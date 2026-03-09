@@ -631,30 +631,44 @@
                                                 </a>
                                                 {% endif %}
                                                 {% endif %}
-                                                {# Upload Image, View Image, Delete Image: GM, CEO, Operation Manager, Auditing. CEO/GM/Op: only when status is Used (not Audited/Cancelled). #}
+                                                {# Upload Files, View File(s), Remove files: GM, CEO, Operation Manager, Auditing. CEO/GM/Op: only when status is Used (not Audited/Cancelled). #}
+                                                {% set uploads_list = serial.uploads_list %}
+                                                {% set cancelled_uploads_list = serial.cancelled_uploads_list %}
+                                                {% set show_files_modal = (uploads_list|length >= 2) or (cancelled_uploads_list|length > 0) %}
                                                 {% if show_image_actions %}
-                                                {% if serial.upload_path %}
-                                                {% set filename = serial.upload_path.split('/')[-1] if '/' in serial.upload_path else serial.upload_path %}
-                                                <a href="/uploads/cheque/{{ filename }}" target="_blank" class="cheque-dropdown-item" role="menuitem" style="display:block; padding:10px 12px; color:#212529; text-decoration:none;">
-                                                    <i class="fas fa-eye" style="margin-right:8px;"></i> View Image
+                                                {% if uploads_list or cancelled_uploads_list %}
+                                                {% if uploads_list|length == 1 and not cancelled_uploads_list %}
+                                                <a href="/uploads/cheque/{{ uploads_list[0].file }}" target="_blank" class="cheque-dropdown-item" role="menuitem" style="display:block; padding:10px 12px; color:#212529; text-decoration:none;">
+                                                    <i class="fas fa-eye" style="margin-right:8px;"></i> View File
                                                 </a>
-                                                {% if not show_select_ceo_gm_op or serial.status == 'Used' %}
-                                                <button type="button" class="cheque-dropdown-item cheque-action-delete-image" data-serial-id="{{ serial.id }}" data-status="{{ serial.status }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
-                                                    <i class="fas fa-trash" style="margin-right:8px;"></i> Delete Image
+                                                {% else %}
+                                                <button type="button" class="cheque-dropdown-item cheque-view-files-trigger" data-serial-id="{{ serial.id }}" data-serial-no="{{ serial.serial_no }}" data-book-no="{{ group.grouper }}" data-files-json='{{ uploads_list|tojson }}' data-cancelled-files-json='{{ cancelled_uploads_list|tojson }}' role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
+                                                    <i class="fas fa-eye" style="margin-right:8px;"></i> View Files
                                                 </button>
                                                 {% endif %}
-                                                {% elif serial.status != 'Available' and (not show_select_ceo_gm_op or serial.status == 'Used') %}
-                                                <input type="file" id="upload_{{ serial.id }}" class="cheque-upload-input-row" accept="image/*,.pdf" style="display: none;" data-serial-id="{{ serial.id }}">
+                                                {% if (uploads_list or cancelled_uploads_list) and (not show_select_ceo_gm_op or serial.status == 'Used') %}
+                                                <button type="button" class="cheque-dropdown-item cheque-action-delete-image" data-serial-id="{{ serial.id }}" data-serial-no="{{ serial.serial_no }}" data-book-no="{{ group.grouper }}" data-files-json='{{ uploads_list|tojson }}' data-cancelled-files-json='{{ cancelled_uploads_list|tojson }}' data-status="{{ serial.status }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
+                                                    <i class="fas fa-trash" style="margin-right:8px;"></i> Remove files
+                                                </button>
+                                                {% endif %}
+                                                {% endif %}
+                                                {% if serial.status != 'Available' and (not show_select_ceo_gm_op or serial.status == 'Used') %}
+                                                <input type="file" id="upload_{{ serial.id }}" class="cheque-upload-input-row" accept="image/*,.pdf" multiple style="display: none;" data-serial-id="{{ serial.id }}">
                                                 <button type="button" class="cheque-dropdown-item cheque-action-upload-image" data-serial-id="{{ serial.id }}" data-upload-input="upload_{{ serial.id }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
-                                                    <i class="fas fa-upload" style="margin-right:8px;"></i> Upload Image
+                                                    <i class="fas fa-upload" style="margin-right:8px;"></i> Upload Files
                                                 </button>
                                                 {% endif %}
                                                 {% endif %}
                                             </div>
                                         </div>
-                                        {% if serial.upload_path %}
-                                        {% set upload_filename = serial.upload_original_filename or (serial.upload_path.split('/')[-1] if '/' in serial.upload_path else serial.upload_path) %}
-                                        <div class="cheque-upload-path-text" title="{{ upload_filename }}">{{ upload_filename }}</div>
+                                        {% if uploads_list or cancelled_uploads_list %}
+                                        <div class="cheque-upload-path-text" title="{% if uploads_list %}{{ uploads_list|length }} cheque file(s){% if cancelled_uploads_list %}, {{ cancelled_uploads_list|length }} cancelled{% endif %}{% elif cancelled_uploads_list %}{{ cancelled_uploads_list|length }} cancelled file(s){% endif %}">
+                                        {% if uploads_list %}
+                                        {% if uploads_list|length == 1 and not cancelled_uploads_list %}{{ uploads_list[0].name }}{% else %}{{ uploads_list|length }} file(s){% endif %}{% if cancelled_uploads_list %}{% if uploads_list %}, {% endif %}{{ cancelled_uploads_list|length }} cancelled{% endif %}
+                                        {% elif cancelled_uploads_list %}
+                                        {{ cancelled_uploads_list|length }} cancelled file(s)
+                                        {% endif %}
+                                        </div>
                                         {% endif %}
                                         </div>
                                     </td>
@@ -700,6 +714,47 @@
         </div>
     {% endif %}
 </div>
+
+<!-- Cheque files modal (View Files when multiple uploads) -->
+<div id="chequeFilesModal" class="app-modal" style="display: none;">
+    <div class="app-modal-overlay" onclick="closeChequeFilesModal()"></div>
+    <div class="app-modal-container">
+        <div class="app-modal-header">
+            <div class="app-modal-icon"><i class="fas fa-paperclip"></i></div>
+            <h3 class="app-modal-title" id="chequeFilesModalTitle">Cheque files</h3>
+        </div>
+        <div class="app-modal-body" id="chequeFilesModalBody">
+            <!-- Filled by JS -->
+        </div>
+        <div class="app-modal-footer" id="chequeFilesModalFooter">
+            <button type="button" class="app-modal-btn app-modal-btn-secondary" onclick="closeChequeFilesModal()">Close</button>
+            <button type="button" class="app-modal-btn" id="chequeFilesModalRemoveSelectedBtn" style="display: none; background-color: #dc3545; border-color: #dc3545;"><i class="fas fa-trash"></i> Remove selected</button>
+        </div>
+    </div>
+</div>
+
+{% if show_select_auditing %}
+<!-- Mark as Cancelled modal (Auditing): upload image of cancelled cheque -->
+<div id="markCancelledModal" class="app-modal" style="display: none;">
+    <div class="app-modal-overlay" onclick="closeMarkCancelledModal()"></div>
+    <div class="app-modal-container">
+        <div class="app-modal-header">
+            <div class="app-modal-icon" style="background-color: #f8d7da;"><i class="fas fa-times-circle" style="color: #dc3545;"></i></div>
+            <h3 class="app-modal-title">Mark as Cancelled</h3>
+        </div>
+        <div class="app-modal-body">
+            <p style="margin: 0 0 12px; font-size: 0.95rem;">Upload image(s) of the cancelled cheque for the audit trail. You can select multiple files.</p>
+            <label for="markCancelledFile" style="display: block; font-weight: 600; margin-bottom: 6px;">Cancelled cheque file(s) <span style="color: #dc3545;">*</span></label>
+            <input type="file" id="markCancelledFile" accept=".pdf,.jpg,.jpeg,.png,.gif" multiple style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.9rem;">
+            <p style="margin: 8px 0 0; font-size: 0.85rem; color: #6c757d;">JPG, PNG, GIF or PDF. Max 50MB per file. Multiple files allowed.</p>
+        </div>
+        <div class="app-modal-footer">
+            <button type="button" class="app-modal-btn app-modal-btn-secondary" onclick="closeMarkCancelledModal()">Cancel</button>
+            <button type="button" id="markCancelledConfirmBtn" class="app-modal-btn" style="background-color: #dc3545; border-color: #dc3545;"><i class="fas fa-times-circle"></i> Mark as Cancelled</button>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <script>
 var chequePaginationState = {};
@@ -1404,7 +1459,8 @@ document.addEventListener('DOMContentLoaded', function() {
             .finally(function() { btn.disabled = false; });
         });
     });
-    document.querySelectorAll('.cheque-action-mark-cancelled, .cheque-action-mark-cancelled-ceo').forEach(function(btn) {
+    // CEO/GM/Operation Manager: Mark as Cancelled with simple confirm
+    document.querySelectorAll('.cheque-action-mark-cancelled-ceo').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
             var serialId = parseInt(this.getAttribute('data-serial-id'), 10);
@@ -1425,7 +1481,221 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Per-row: Upload Image (trigger file input)
+    // Auditing: Mark as Cancelled — open modal to upload image of cancelled cheque
+    var markCancelledModal = document.getElementById('markCancelledModal');
+    var markCancelledFileInput = document.getElementById('markCancelledFile');
+    var markCancelledConfirmBtn = document.getElementById('markCancelledConfirmBtn');
+    if (markCancelledModal && markCancelledFileInput && markCancelledConfirmBtn) {
+        function openMarkCancelledModal(serialId) {
+            markCancelledModal.setAttribute('data-serial-id', String(serialId));
+            markCancelledFileInput.value = '';
+            markCancelledModal.style.display = 'flex';
+        }
+        function closeMarkCancelledModal() {
+            markCancelledModal.style.display = 'none';
+            markCancelledModal.removeAttribute('data-serial-id');
+        }
+        window.closeMarkCancelledModal = closeMarkCancelledModal;
+
+        document.querySelectorAll('.cheque-action-mark-cancelled').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                var serialId = parseInt(this.getAttribute('data-serial-id'), 10);
+                if (!serialId) return;
+                openMarkCancelledModal(serialId);
+            });
+        });
+
+        markCancelledConfirmBtn.addEventListener('click', function() {
+            var serialId = markCancelledModal.getAttribute('data-serial-id');
+            if (!serialId) return;
+            var files = markCancelledFileInput.files;
+            if (!files || files.length === 0) {
+                alert('Please upload at least one file (image or PDF) of the cancelled cheque.');
+                return;
+            }
+            var allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+            for (var i = 0; i < files.length; i++) {
+                var f = files[i];
+                if (!allowedTypes.includes(f.type)) {
+                    alert('Please upload only image files (JPG, PNG, GIF) or PDF. Invalid: ' + f.name);
+                    return;
+                }
+                if (f.size > 50 * 1024 * 1024) {
+                    alert('File size exceeds 50MB limit: ' + f.name);
+                    return;
+                }
+            }
+            markCancelledConfirmBtn.disabled = true;
+            var originalBtnText = markCancelledConfirmBtn.innerHTML;
+            markCancelledConfirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+            var formData = new FormData();
+            formData.append('serial_id', serialId);
+            for (var j = 0; j < files.length; j++) {
+                formData.append('file', files[j]);
+            }
+            fetch('{{ url_for("upload_cheque_cancelled_file") }}', { method: 'POST', body: formData })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success) {
+                        alert(data.error || 'Upload failed.');
+                        markCancelledConfirmBtn.disabled = false;
+                        markCancelledConfirmBtn.innerHTML = originalBtnText;
+                        return;
+                    }
+                    markCancelledConfirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Marking...';
+                    return fetch('{{ url_for("mark_cheque_status") }}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        body: JSON.stringify({ serial_ids: [parseInt(serialId, 10)], action: 'cancelled' })
+                    }).then(function(r) { return r.json(); });
+                })
+                .then(function(data) {
+                    if (data && data.success) {
+                        saveChequeExpandedBooks();
+                        closeMarkCancelledModal();
+                        location.reload();
+                    } else if (data && !data.success) {
+                        alert(data.error || 'Action failed.');
+                    }
+                    markCancelledConfirmBtn.disabled = false;
+                    markCancelledConfirmBtn.innerHTML = originalBtnText;
+                })
+                .catch(function(err) {
+                    alert('An error occurred.');
+                    markCancelledConfirmBtn.disabled = false;
+                    markCancelledConfirmBtn.innerHTML = originalBtnText;
+                });
+        });
+    }
+
+    // Cheque files modal (View Files or Remove files mode)
+    var chequeFilesModalRemoveMode = false;
+    var chequeFilesModalSerialId = null;
+
+    function openChequeFilesModal(triggerEl, opts) {
+        opts = opts || {};
+        var removeMode = opts.removeMode === true;
+        chequeFilesModalRemoveMode = removeMode;
+        var bookNo = triggerEl.getAttribute('data-book-no');
+        var serialNo = triggerEl.getAttribute('data-serial-no');
+        var serialId = triggerEl.getAttribute('data-serial-id');
+        chequeFilesModalSerialId = serialId;
+        var filesJson = triggerEl.getAttribute('data-files-json') || '[]';
+        var cancelledJson = triggerEl.getAttribute('data-cancelled-files-json') || '[]';
+        var files = [];
+        var cancelledFiles = [];
+        try {
+            files = JSON.parse(filesJson);
+            if (!Array.isArray(files)) files = [];
+        } catch (e) { files = []; }
+        try {
+            cancelledFiles = JSON.parse(cancelledJson);
+            if (!Array.isArray(cancelledFiles)) cancelledFiles = [];
+        } catch (e) { cancelledFiles = []; }
+        var titleEl = document.getElementById('chequeFilesModalTitle');
+        var bodyEl = document.getElementById('chequeFilesModalBody');
+        var modal = document.getElementById('chequeFilesModal');
+        var removeBtn = document.getElementById('chequeFilesModalRemoveSelectedBtn');
+        if (!titleEl || !bodyEl || !modal) return;
+        titleEl.textContent = removeMode ? 'Remove files — Book ' + bookNo + ', Serial No. ' + (serialNo || '') : 'Cheque files — Book ' + bookNo + ', Serial No. ' + (serialNo || '');
+        if (removeBtn) removeBtn.style.display = removeMode ? 'inline-flex' : 'none';
+
+        function renderFileList(list, type) {
+            var h = '';
+            list.forEach(function(item, index) {
+                var storageFile = typeof item === 'object' && item !== null && item.file ? item.file : item;
+                var displayName = typeof item === 'object' && item !== null && item.name ? item.name : item;
+                var viewUrl = '/uploads/cheque/' + encodeURIComponent(storageFile);
+                h += '<div style="margin-bottom: 10px; padding: 8px; background: #e7f3ff; border-radius: 4px; border: 1px solid #b3d9ff; display: flex; align-items: center; gap: 10px;">';
+                if (removeMode) {
+                    h += '<input type="checkbox" class="cheque-files-remove-cb" data-filename="' + String(storageFile).replace(/"/g, '&quot;') + '" data-type="' + (type || 'regular') + '" aria-label="Select to remove">';
+                }
+                h += '<a href="' + viewUrl + '" target="_blank" class="btn btn-info" style="background-color: #17a2b8; border-color: #17a2b8; color: white; padding: 6px 12px; font-size: 12px; border-radius: 4px;">';
+                h += '<i class="fas fa-external-link-alt"></i> View file ' + (index + 1) + '</a>';
+                h += '<small style="color: #666;">' + String(displayName).replace(/</g, '&lt;').replace(/"/g, '&quot;') + '</small>';
+                h += '</div>';
+            });
+            return h || '<p class="text-muted">No files.</p>';
+        }
+        var html = '';
+        if (files.length > 0) {
+            html += '<p style="font-weight: 600; margin: 0 0 8px; font-size: 0.95rem;">Cheque files</p>';
+            html += renderFileList(files, 'regular');
+        }
+        if (cancelledFiles.length > 0) {
+            html += '<p style="font-weight: 600; margin: 16px 0 8px; font-size: 0.95rem;">Cancelled Cheque Files</p>';
+            html += renderFileList(cancelledFiles, 'cancelled');
+        }
+        if (!html) html = '<p class="text-muted">No files.</p>';
+        if (removeMode) html += '<p style="margin-top: 12px; font-size: 0.875rem; color: #6c757d;">Select the files you want to remove, then click Remove selected.</p>';
+        bodyEl.innerHTML = html;
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+    function closeChequeFilesModal() {
+        var modal = document.getElementById('chequeFilesModal');
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+    }
+    window.closeChequeFilesModal = closeChequeFilesModal;
+
+    document.getElementById('chequeFilesModalRemoveSelectedBtn').addEventListener('click', function() {
+        var serialId = chequeFilesModalSerialId;
+        if (!serialId) return;
+        var checked = document.querySelectorAll('#chequeFilesModalBody .cheque-files-remove-cb:checked');
+        var filesToRemove = [];
+        var cancelledToRemove = [];
+        checked.forEach(function(cb) {
+            var fn = cb.getAttribute('data-filename');
+            var type = cb.getAttribute('data-type');
+            if (fn) {
+                if (type === 'cancelled') cancelledToRemove.push(fn);
+                else filesToRemove.push(fn);
+            }
+        });
+        if (filesToRemove.length === 0 && cancelledToRemove.length === 0) {
+            alert('Please select at least one file to remove.');
+            return;
+        }
+        this.disabled = true;
+        var btn = this;
+        fetch('{{ url_for("delete_cheque_upload") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({
+                serial_id: serialId,
+                files_to_remove: filesToRemove,
+                cancelled_to_remove: cancelledToRemove
+            })
+        })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    saveChequeExpandedBooks();
+                    closeChequeFilesModal();
+                    location.reload();
+                } else {
+                    alert(data.error || 'Could not remove files.');
+                    btn.disabled = false;
+                }
+            })
+            .catch(function(err) {
+                alert('An error occurred.');
+                btn.disabled = false;
+            });
+    });
+
+    document.querySelectorAll('.cheque-view-files-trigger').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+            e.preventDefault();
+            openChequeFilesModal(this);
+        });
+    });
+
+    // Per-row: Upload Files (trigger file input)
     document.querySelectorAll('.cheque-action-upload-image').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -1437,27 +1707,28 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('change', function(e) {
         if (!e.target.matches('.cheque-upload-input-row')) return;
         var input = e.target;
-        var file = input.files[0];
-        if (!file) return;
+        var files = input.files;
+        if (!files || files.length === 0) return;
         var serialId = input.getAttribute('data-serial-id');
         var allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
-        if (!allowedTypes.includes(file.type)) {
-            alert('Please upload an image file (JPG, PNG, GIF) or PDF.');
-            input.value = '';
-            return;
-        }
-        if (file.size > 50 * 1024 * 1024) {
-            alert('File size exceeds 50MB limit.');
-            input.value = '';
-            return;
-        }
-        if (!confirm('Upload "' + file.name + '" for this cheque?')) {
-            input.value = '';
-            return;
+        for (var i = 0; i < files.length; i++) {
+            var file = files[i];
+            if (!allowedTypes.includes(file.type)) {
+                alert('Please upload image files (JPG, PNG, GIF) or PDF. Invalid: ' + file.name);
+                input.value = '';
+                return;
+            }
+            if (file.size > 50 * 1024 * 1024) {
+                alert('File size exceeds 50MB limit: ' + file.name);
+                input.value = '';
+                return;
+            }
         }
         var formData = new FormData();
-        formData.append('file', file);
         formData.append('serial_id', serialId);
+        for (var j = 0; j < files.length; j++) {
+            formData.append('file', files[j]);
+        }
         fetch('/cheque-register/upload', { method: 'POST', body: formData })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -1475,31 +1746,11 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     });
 
-    // Per-row: Delete Image
+    // Per-row: Remove files — open cheque files modal in remove mode to choose which files to delete
     document.querySelectorAll('.cheque-action-delete-image').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
-            var serialId = this.getAttribute('data-serial-id');
-            var status = this.getAttribute('data-status') || '';
-            if (!confirm('Remove this uploaded image? You can then upload a different one.')) return;
-            btn.disabled = true;
-            var formData = new FormData();
-            formData.append('serial_id', serialId);
-            fetch('/cheque-register/delete-upload', { method: 'POST', body: formData })
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (data.success) {
-                        saveChequeExpandedBooks();
-                        location.reload();
-                    } else {
-                        alert(data.error || 'Could not remove upload.');
-                        btn.disabled = false;
-                    }
-                })
-                .catch(function(err) {
-                    alert('An error occurred.');
-                    btn.disabled = false;
-                });
+            openChequeFilesModal(this, { removeMode: true });
         });
     });
 });
