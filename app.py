@@ -21817,8 +21817,11 @@ def new_book():
                 return render_template('new_book.html', book_holders=book_holders, bank_names=bank_names)
 
             serial_count = last_serial_no - start_serial_no + 1
-            if serial_count > 50:
-                flash('Maximum 50 serial numbers (cheques) per book allowed. This range would generate more.', 'error')
+            if serial_count != 50:
+                if serial_count > 50:
+                    flash('Each book must have exactly 50 cheques. This range would generate more than 50.', 'error')
+                else:
+                    flash('Each book must have exactly 50 cheques. This range would generate less than 50.', 'error')
                 return render_template('new_book.html', book_holders=book_holders, bank_names=bank_names)
 
             # Check if book number already exists

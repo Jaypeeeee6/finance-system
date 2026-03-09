@@ -548,7 +548,7 @@
                             </thead>
                             <tbody>
                                 {% for serial in group.list %}
-                                <tr data-book-no="{{ group.grouper }}" data-serial-id="{{ serial.id }}" data-status="{{ serial.status }}">
+                                <tr id="cheque-row-{{ serial.id }}" data-book-no="{{ group.grouper }}" data-serial-id="{{ serial.id }}" data-status="{{ serial.status }}">
                                     {% if show_cheque_select %}
                                     <td class="cheque-td-select">
                                         <input type="checkbox" class="cheque-row-select" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" aria-label="Select serial {{ serial.serial_no }}" {% if show_select_ceo_gm_op and serial.status == 'Cancelled' %}disabled{% endif %}{% if show_select_auditing and serial.status not in ['Used', 'Audited'] %} disabled{% endif %}>
@@ -864,6 +864,30 @@ function restoreChequeExpandedBooks() {
     } catch (e) {}
 }
 
+function scrollToChequeRow(serialId) {
+    var row = document.getElementById('cheque-row-' + serialId);
+    if (!row) return;
+    var section = row.closest('.book-section');
+    if (!section) return;
+    var bookNo = section.getAttribute('data-book-no');
+    if (!bookNo) return;
+    section.classList.remove('collapsed');
+    var header = section.querySelector('.book-section-header');
+    if (header) header.setAttribute('aria-expanded', 'true');
+    var visible = getVisibleRowsForBook(bookNo);
+    var idx = -1;
+    visible.forEach(function(tr, i) { if (parseInt(tr.getAttribute('data-serial-id'), 10) === parseInt(serialId, 10)) idx = i; });
+    if (idx >= 0) {
+        var state = chequePaginationState[bookNo] || { page: 1, per_page: 10 };
+        var perPage = Math.max(1, parseInt(state.per_page, 10) || 10);
+        state.page = Math.ceil((idx + 1) / perPage);
+        renderBookPagination(bookNo);
+    }
+    setTimeout(function() {
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Collapsible book section headers
     document.querySelectorAll('.cheque-register-page .book-section-header').forEach(function(header) {
@@ -887,6 +911,21 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!chequePaginationState[bookNo]) chequePaginationState[bookNo] = { page: 1, per_page: 10 };
         renderBookPagination(bookNo);
     });
+
+    // Scroll to edited cheque when returning from write-cheque save (?scroll_to=serial_id)
+    var scrollToParam = null;
+    try {
+        var params = new URLSearchParams(window.location.search);
+        scrollToParam = params.get('scroll_to');
+    } catch (e) {}
+    if (scrollToParam) {
+        scrollToChequeRow(scrollToParam);
+        if (window.history && window.history.replaceState) {
+            params.delete('scroll_to');
+            var newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+            window.history.replaceState({}, '', newUrl);
+        }
+    }
     document.querySelectorAll('.cheque-per-page-select').forEach(function(sel) {
         sel.addEventListener('change', function() {
             var bookNo = this.getAttribute('data-book-no');

@@ -254,8 +254,8 @@
                     <div class="form-group">
                         <label for="last_serial_no">Last Serial No. <span class="required-star">*</span></label>
                         <input type="number" name="last_serial_no" id="last_serial_no" class="new-book-field" required min="1" placeholder="e.g., 150">
-                        <small>Last serial number in the range (inclusive). Maximum 50 cheques per book.</small>
-                        <p id="serialRangeError" class="serial-range-error" style="display: none;" role="alert">Maximum 50 serial numbers allowed. This range would generate more than 50.</p>
+                        <small>Last serial number in the range (inclusive). Each book must have exactly 50 cheques.</small>
+                        <p id="serialRangeError" class="serial-range-error" style="display: none;" role="alert"></p>
                     </div>
                 </div>
 
@@ -355,25 +355,37 @@ document.addEventListener('DOMContentLoaded', function() {
     const previewText = document.getElementById('previewText');
 
     const serialRangeError = document.getElementById('serialRangeError');
-    const MAX_SERIALS = 50;
+    const EXACT_SERIALS = 50;
 
     function updatePreview() {
         const start = parseInt(startSerialInput.value) || 0;
         const last = parseInt(lastSerialInput.value) || 0;
         const count = start && last && start <= last ? last - start + 1 : 0;
-        const overLimit = count > MAX_SERIALS;
+        const overLimit = count > EXACT_SERIALS;
+        const underLimit = count > 0 && count < EXACT_SERIALS;
+        const showError = overLimit || underLimit;
 
-        startSerialInput.classList.toggle('error', overLimit);
-        lastSerialInput.classList.toggle('error', overLimit);
-        if (serialRangeError) serialRangeError.style.display = overLimit ? 'block' : 'none';
+        startSerialInput.classList.toggle('error', showError);
+        lastSerialInput.classList.toggle('error', showError);
+        if (serialRangeError) {
+            if (overLimit) {
+                serialRangeError.textContent = 'Each book must have exactly 50 cheques. This range would generate ' + count + ' (more than 50).';
+                serialRangeError.style.display = 'block';
+            } else if (underLimit) {
+                serialRangeError.textContent = 'Each book must have exactly 50 cheques. This range would generate ' + count + ' (less than 50).';
+                serialRangeError.style.display = 'block';
+            } else {
+                serialRangeError.style.display = 'none';
+            }
+        }
 
         if (start && last && start <= last) {
             previewSection.style.display = 'block';
-            if (overLimit) {
-                previewText.textContent = `This range would generate ${count} serial number(s). Maximum is ${MAX_SERIALS}.`;
+            if (showError) {
+                previewText.textContent = 'This range would generate ' + count + ' serial number(s). Each book must have exactly ' + EXACT_SERIALS + '.';
                 previewText.style.color = '#dc3545';
             } else {
-                previewText.textContent = `This will generate ${count} serial number(s): ${start} to ${last} (inclusive)`;
+                previewText.textContent = 'This will generate ' + count + ' serial number(s): ' + start + ' to ' + last + ' (inclusive)';
                 previewText.style.color = '';
             }
         } else if (start && last && start > last) {
@@ -400,13 +412,21 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Starting serial number must be less than or equal to last serial number');
             return false;
         }
-        if (count > MAX_SERIALS) {
+        if (count !== EXACT_SERIALS) {
             e.preventDefault();
             e.stopPropagation();
-            alert('Serial numbers per book must be 50 or fewer, not more than 50. This range would generate ' + count + ' serial number(s). Please adjust the range and try again.');
+            var msg = count > EXACT_SERIALS
+                ? 'Each book must have exactly 50 cheques. This range would generate ' + count + ' (more than 50). Please adjust the range.'
+                : 'Each book must have exactly 50 cheques. This range would generate ' + count + ' (less than 50). Please adjust the range.';
+            alert(msg);
             startSerialInput.classList.add('error');
             lastSerialInput.classList.add('error');
-            if (serialRangeError) serialRangeError.style.display = 'block';
+            if (serialRangeError) {
+                serialRangeError.textContent = count > EXACT_SERIALS
+                    ? 'Each book must have exactly 50 cheques. This range would generate ' + count + ' (more than 50).'
+                    : 'Each book must have exactly 50 cheques. This range would generate ' + count + ' (less than 50).';
+                serialRangeError.style.display = 'block';
+            }
             lastSerialInput.focus();
             return false;
         }

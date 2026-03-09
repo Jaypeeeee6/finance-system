@@ -191,6 +191,98 @@
 // Selected reserved serials when coming from Cheque Register (multiple cheques = same form applied to all)
 window.selectedSerials = {{ selected_serials|default([])|tojson|safe }};
 window.writeChequeSerialIds = (window.selectedSerials || []).map(function(s) { return s.id; });
+window.canEditCheque = {{ can_edit_cheque|default(true)|lower|tojson }};
+
+// Draft: persist form state to localStorage when leaving without save; restore when returning (no DB save until Save Cheque).
+// Draft is keyed by cheque serial IDs so it only restores when writing the *same* cheque(s) again.
+var WRITE_CHEQUE_DRAFT_KEY_PREFIX = 'writeChequeDraft_';
+function getDraftKeyForSerialIds(serialIds) {
+    if (!serialIds || serialIds.length === 0) return null;
+    var sorted = serialIds.slice().sort(function(a, b) { return a - b; });
+    return WRITE_CHEQUE_DRAFT_KEY_PREFIX + sorted.join('_');
+}
+function getDraftFromForm() {
+    var dateEl = document.getElementById('chequeDate');
+    var showDateEl = document.getElementById('showDate');
+    var payeeEl = document.getElementById('payeeName');
+    var amountEl = document.getElementById('amount');
+    var currencyEl = document.getElementById('currency');
+    var crossingEl = document.getElementById('crossing');
+    var langEl = document.getElementById('amountWordsLanguage');
+    var bankEl = document.getElementById('bankSelect');
+    return {
+        chequeDate: dateEl ? dateEl.value : '',
+        showDate: showDateEl ? showDateEl.checked : true,
+        payeeName: payeeEl ? payeeEl.value : '',
+        amount: amountEl ? amountEl.value : '',
+        currency: currencyEl ? currencyEl.value : 'OMR',
+        crossing: crossingEl ? crossingEl.value : '',
+        amountWordsLanguage: langEl ? langEl.value : 'english',
+        bankSelect: bankEl ? bankEl.value : 'dhofar_islamic'
+    };
+}
+function saveDraftToStorage() {
+    if (!window.canEditCheque) return;
+    var serialIds = window.writeChequeSerialIds || [];
+    var key = getDraftKeyForSerialIds(serialIds);
+    if (!key) return;
+    try {
+        var draft = getDraftFromForm();
+        localStorage.setItem(key, JSON.stringify(draft));
+    } catch (e) { /* ignore quota/private */ }
+}
+function restoreDraftFromStorage() {
+    if (!window.canEditCheque) return;
+    var serialIds = window.writeChequeSerialIds || [];
+    var key = getDraftKeyForSerialIds(serialIds);
+    if (!key) return;
+    try {
+        var raw = localStorage.getItem(key);
+        if (!raw) return;
+        var draft = JSON.parse(raw);
+        var dateEl = document.getElementById('chequeDate');
+        var showDateEl = document.getElementById('showDate');
+        var payeeEl = document.getElementById('payeeName');
+        var amountEl = document.getElementById('amount');
+        var currencyEl = document.getElementById('currency');
+        var crossingEl = document.getElementById('crossing');
+        var langEl = document.getElementById('amountWordsLanguage');
+        var bankEl = document.getElementById('bankSelect');
+        var toggleDateBtn = document.getElementById('toggleDateBtn');
+        var toggleDateIcon = document.getElementById('toggleDateIcon');
+        if (draft.chequeDate && dateEl) dateEl.value = draft.chequeDate;
+        if (bankEl && draft.bankSelect) {
+            bankEl.value = draft.bankSelect;
+            updateChequeTemplate(draft.bankSelect);
+            fetchChequeLayout(draft.bankSelect).then(function(layout) {
+                if (layout) {
+                    updateFieldPositionsWithLayout(draft.bankSelect, layout);
+                    updateChequePreview();
+                }
+            });
+        }
+        if (showDateEl != null && draft.hasOwnProperty('showDate')) {
+            showDateEl.checked = draft.showDate;
+            if (toggleDateBtn && toggleDateIcon) {
+                toggleDateIcon.className = draft.showDate ? 'fas fa-eye' : 'fas fa-eye-slash';
+                toggleDateBtn.classList.toggle('btn-primary', draft.showDate);
+                toggleDateBtn.classList.toggle('btn-secondary', !draft.showDate);
+            }
+        }
+        if (payeeEl && draft.payeeName != null) payeeEl.value = draft.payeeName;
+        if (amountEl && draft.amount != null) amountEl.value = draft.amount;
+        if (currencyEl && draft.currency) currencyEl.value = draft.currency;
+        if (crossingEl && draft.crossing != null) crossingEl.value = draft.crossing;
+        if (langEl && draft.amountWordsLanguage) langEl.value = draft.amountWordsLanguage;
+    } catch (e) { /* ignore */ }
+}
+function clearDraftFromStorage(serialIds) {
+    try {
+        if (serialIds && serialIds.length > 0) {
+            localStorage.removeItem(getDraftKeyForSerialIds(serialIds));
+        }
+    } catch (e) {}
+}
 
 // Ensure on-screen amount overlay is never tilted
 (function() {
@@ -585,11 +677,18 @@ document.addEventListener('DOMContentLoaded', function() {
         'chequeDate', 'payeeName', 'amount', 'currency', 'crossing', 'amountWordsLanguage'
     ];
     
+    var draftSaveTimer = null;
+    function debouncedSaveDraft() {
+        if (draftSaveTimer) clearTimeout(draftSaveTimer);
+        draftSaveTimer = setTimeout(saveDraftToStorage, 500);
+    }
+    window.addEventListener('beforeunload', function() { saveDraftToStorage(); });
+
     formFields.forEach(fieldId => {
         const field = document.getElementById(fieldId);
         if (field) {
-            field.addEventListener('input', updateChequePreview);
-            field.addEventListener('change', updateChequePreview);
+            field.addEventListener('input', function() { updateChequePreview(); debouncedSaveDraft(); });
+            field.addEventListener('change', function() { updateChequePreview(); debouncedSaveDraft(); });
         }
     });
 
@@ -628,8 +727,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 toggleDateBtn.classList.add('btn-secondary');
             }
             
-            // Update cheque preview
+            // Update cheque preview and draft
             updateChequePreview();
+            debouncedSaveDraft();
         });
         
         // Initialize button state
@@ -654,6 +754,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     updateChequePreview();
                 }
             });
+            debouncedSaveDraft();
         });
     }
     
@@ -683,11 +784,45 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Save cheque data (returns Promise, resolves on success, rejects on failure). Used by Save button and by Print (save-then-print).
+    function saveChequeData() {
+        var serialIds = window.writeChequeSerialIds || [];
+        if (serialIds.length === 0) {
+            return Promise.reject(new Error('No cheques selected to save. Go to Cheque Register, select Reserved cheque(s), and click Write Cheque.'));
+        }
+        var payeeName = document.getElementById('payeeName') && document.getElementById('payeeName').value.trim();
+        var amount = document.getElementById('amount') && document.getElementById('amount').value;
+        if (!payeeName || !amount) {
+            return Promise.reject(new Error('Please fill in Payee Name and Amount before saving.'));
+        }
+        var chequeDate = document.getElementById('chequeDate') && document.getElementById('chequeDate').value;
+        return fetch('{{ url_for("write_cheque_save") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({
+                serial_ids: serialIds,
+                chequeDate: chequeDate,
+                payeeName: payeeName,
+                amount: amount,
+                currency: document.getElementById('currency') && document.getElementById('currency').value,
+                crossing: document.getElementById('crossing') && document.getElementById('crossing').value
+            })
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.success) {
+                clearDraftFromStorage(serialIds);
+                return data;
+            }
+            return Promise.reject(new Error(data.error || 'Save failed.'));
+        });
+    }
+
+    // Default label for Print Cheque button (used when resetting after print window opens)
+    var PRINT_CHEQUE_BTN_LABEL = '<i class="fas fa-print"></i> Print Cheque';
+
     // Print function — opens a clean dedicated tab that auto-prints and closes.
     // This avoids all PDF viewer scaling issues and gives consistent results on every laptop.
-    function printCheque() {
+    function openPrintWindow() {
         var printBtn = document.getElementById('printBtn') || document.getElementById('printChequeBtn');
-        var originalText = printBtn ? printBtn.innerHTML : '';
         if (printBtn) {
             printBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Opening print...';
             printBtn.disabled = true;
@@ -717,8 +852,27 @@ document.addEventListener('DOMContentLoaded', function() {
         window.open(printUrl, '_blank', 'noopener');
 
         setTimeout(function() {
-            if (printBtn) { printBtn.innerHTML = originalText; printBtn.disabled = false; }
+            if (printBtn) { printBtn.innerHTML = PRINT_CHEQUE_BTN_LABEL; printBtn.disabled = false; }
         }, 1000);
+    }
+
+    // Print Cheque: save first, then open print window.
+    function printCheque() {
+        var printBtn = document.getElementById('printBtn') || document.getElementById('printChequeBtn');
+        var originalText = printBtn ? printBtn.innerHTML : '';
+        if (printBtn) {
+            printBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            printBtn.disabled = true;
+        }
+        saveChequeData()
+            .then(function() {
+                if (printBtn) { printBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Opening print...'; }
+                openPrintWindow();
+            })
+            .catch(function(err) {
+                alert(err.message || 'An error occurred while saving.');
+                if (printBtn) { printBtn.innerHTML = originalText; printBtn.disabled = false; }
+            });
     }
     
     // Old print function (kept for reference but not used)
@@ -943,49 +1097,20 @@ document.addEventListener('DOMContentLoaded', function() {
     if (saveChequeBtn) {
         saveChequeBtn.addEventListener('click', function() {
             var serialIds = window.writeChequeSerialIds || [];
-            if (serialIds.length === 0) {
-                alert('No cheques selected to save. Go to Cheque Register, select Reserved cheque(s), and click Write Cheque.');
-                return;
-            }
-            var chequeDate = document.getElementById('chequeDate') && document.getElementById('chequeDate').value;
-            var payeeName = document.getElementById('payeeName') && document.getElementById('payeeName').value.trim();
-            var amount = document.getElementById('amount') && document.getElementById('amount').value;
-            if (!payeeName || !amount) {
-                alert('Please fill in Payee Name and Amount before saving.');
-                return;
-            }
             saveChequeBtn.disabled = true;
             var originalHtml = saveChequeBtn.innerHTML;
             saveChequeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-            fetch('{{ url_for("write_cheque_save") }}', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                body: JSON.stringify({
-                    serial_ids: serialIds,
-                    chequeDate: chequeDate,
-                    payeeName: payeeName,
-                    amount: amount,
-                    currency: document.getElementById('currency') && document.getElementById('currency').value,
-                    crossing: document.getElementById('crossing') && document.getElementById('crossing').value
-                })
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.success) {
+            saveChequeData()
+                .then(function(data) {
                     alert(data.message || 'Cheque(s) saved successfully.');
-                    window.location.href = '{{ url_for("cheque_register") }}';
-                } else {
-                    alert(data.error || 'Save failed.');
+                    var firstId = serialIds.length ? serialIds[0] : '';
+                    window.location.href = firstId ? '{{ url_for("cheque_register") }}?scroll_to=' + encodeURIComponent(firstId) : '{{ url_for("cheque_register") }}';
+                })
+                .catch(function(err) {
+                    alert(err.message || 'An error occurred while saving.');
                     saveChequeBtn.disabled = false;
                     saveChequeBtn.innerHTML = originalHtml;
-                }
-            })
-            .catch(function(err) {
-                console.error(err);
-                alert('An error occurred while saving.');
-                saveChequeBtn.disabled = false;
-                saveChequeBtn.innerHTML = originalHtml;
-            });
+                });
         });
     }
     
@@ -1065,13 +1190,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Pre-fill form from first selected serial when opening for Used cheques (e.g. Print from register)
     const firstSerial = (window.selectedSerials && window.selectedSerials.length) ? window.selectedSerials[0] : null;
-    if (firstSerial && (firstSerial.payee_name != null || firstSerial.cheque_date != null || firstSerial.amount != null)) {
+    var hasSerialData = firstSerial && (firstSerial.payee_name != null || firstSerial.cheque_date != null || firstSerial.amount != null);
+    if (hasSerialData) {
         const payeeEl = document.getElementById('payeeName');
         const dateEl = document.getElementById('chequeDate');
         const amountEl = document.getElementById('amount');
         if (payeeEl && firstSerial.payee_name != null) payeeEl.value = firstSerial.payee_name;
         if (dateEl && firstSerial.cheque_date) dateEl.value = firstSerial.cheque_date;
         if (amountEl && firstSerial.amount != null) amountEl.value = String(firstSerial.amount);
+        updateChequePreview();
+    }
+    // Restore draft when returning to write cheque without having saved (no DB data for selected serials)
+    if (window.canEditCheque && !hasSerialData) {
+        restoreDraftFromStorage();
         updateChequePreview();
     }
     
