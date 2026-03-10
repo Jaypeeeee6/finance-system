@@ -3486,7 +3486,6 @@ def verify_pin():
             except Exception:
                 pass
             _set_ticketing_session(user)
-            _set_ticketing_session(user)
             log_action(f"User {username} logged in successfully with email PIN")
             
             return jsonify({
@@ -3528,21 +3527,9 @@ def verify_pin():
 
 
 def _set_ticketing_session(user):
-    """Set session keys so Ticketing (shared cookie) treats the user as logged in."""
-    try:
-        session['user_id'] = user.user_id
-        session['email'] = (user.email or user.username or '')
-        session['username'] = user.username or ''
-        session['full_name'] = user.name or ''
-        # Ticketing: only 'it_staff' gets IT privileges; all other values get "My Tickets" only.
-        session['user_type'] = 'it_staff' if getattr(user, 'role', None) == 'IT Staff' else 'regular_user'
-        session['department'] = user.department or ''
-    except Exception:
-        pass
-
-
-def _set_ticketing_session(user):
-    """Set session keys so Ticketing (shared cookie) treats the user as logged in."""
+    """Set session keys so Ticketing (shared cookie) treats the user as logged in.
+    When Finance and Ticketing share SECRET_KEY, SESSION_COOKIE_DOMAIN, and SESSION_COOKIE_NAME,
+    logging into Finance automatically logs the user into Ticketing."""
     try:
         session['user_id'] = user.user_id
         session['email'] = (user.email or user.username or '')
@@ -3646,7 +3633,6 @@ def login():
                 except Exception:
                     pass
                 _set_ticketing_session(user)
-                _set_ticketing_session(user)
                 app.logger.warning(f"⚠️ User {username} logged in via DEVELOPMENT TESTING MODE (PIN bypassed)")
                 log_action(f"⚠️ DEVELOPMENT: User {username} logged in successfully (PIN bypassed via testing button)")
                 flash(f'⚠️ DEVELOPMENT MODE: Welcome back, {user.name}! (PIN bypassed)', 'warning')
@@ -3681,7 +3667,6 @@ def login():
                     session['tab_session_id'] = tab_session_id
                 except Exception:
                     pass
-                _set_ticketing_session(user)
                 _set_ticketing_session(user)
                 app.logger.info(f"System user logged in successfully, redirecting to dashboard")
                 log_action(f"System account {username} logged in successfully (PIN bypassed)")
@@ -3739,7 +3724,6 @@ def login():
                     session['tab_session_id'] = tab_session_id
                 except Exception:
                     pass
-                _set_ticketing_session(user)
                 _set_ticketing_session(user)
                 log_action(f"User {username} logged in successfully with email PIN")
                 flash(f'Welcome back, {user.name}!', 'success')

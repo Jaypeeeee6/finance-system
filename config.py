@@ -1,6 +1,13 @@
 import os
 from datetime import timedelta
 
+# Load .env so SECRET_KEY, SESSION_COOKIE_DOMAIN etc. are available (required for shared login with Ticketing)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv not installed; rely on system env or flask run's auto-load
+
 class Config:
     """Application configuration"""
     
