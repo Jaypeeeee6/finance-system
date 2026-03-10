@@ -184,6 +184,7 @@ class PaymentRequest(db.Model):
     amount = db.Column(db.Numeric(12, 3), nullable=False)  # OMR supports 3 decimal places
     different_amounts_per_branch = db.Column(db.Boolean, default=False)  # User chose different amount per branch
     branch_amounts = db.Column(db.Text, nullable=True)  # JSON array of amounts per branch (same order as branch_name)
+    truck_plate_no = db.Column(db.String(50), nullable=True)  # Optional, Logistic department only
     recurring = db.Column(db.String(20))  # One-Time, Recurring
     recurring_interval = db.Column(db.String(50))  # Monthly, Quarterly, Annually
     status = db.Column(db.String(20), default='Pending')  # Pending, Send Proof, Received Proof, Approved

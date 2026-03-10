@@ -600,6 +600,13 @@
                     </div>
                 </div>
 
+                {% if user.department == 'Logistic' %}
+                <div class="form-group">
+                    <label for="truck_plate_no">Truck Plate No. (optional)</label>
+                    <input type="text" name="truck_plate_no" id="truck_plate_no" value="{{ draft.truck_plate_no if draft and draft.truck_plate_no else '' }}" placeholder="e.g. 1526 MA">
+                </div>
+                {% endif %}
+
                 <div class="form-group">
                     <label for="purpose">Purpose/Description <span class="required-star">*</span></label>
                     <textarea name="purpose" id="purpose" rows="4" required></textarea>

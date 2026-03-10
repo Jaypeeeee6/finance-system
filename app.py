@@ -14342,6 +14342,7 @@ def draft_to_dict(draft):
         'amount': float(draft.amount) if draft.amount else None,
         'different_amounts_per_branch': getattr(draft, 'different_amounts_per_branch', False),
         'branch_amounts': getattr(draft, 'branch_amounts', None),
+        'truck_plate_no': getattr(draft, 'truck_plate_no', None),
         'recurring': draft.recurring,
         'recurring_interval': draft.recurring_interval,
         'person_company': draft.person_company,
@@ -14590,6 +14591,9 @@ def new_request():
         # For drafts, allow nullable fields
         different_amounts_per_branch = request.form.get('different_amounts_per_branch') == '1'
         branch_amounts_json = request.form.get('branch_amounts', '').strip() or None
+        truck_plate_no = request.form.get('truck_plate_no', '').strip() or None
+        if truck_plate_no and current_user.department != 'Logistic':
+            truck_plate_no = None  # Only store for Logistic department
 
         new_req = PaymentRequest(
             request_type=final_request_type or 'Draft',
@@ -14607,6 +14611,7 @@ def new_request():
             amount=amount_clean if amount_clean else (0 if is_draft else None),  # Use 0 for drafts if no amount
             different_amounts_per_branch=different_amounts_per_branch,
             branch_amounts=branch_amounts_json,
+            truck_plate_no=truck_plate_no,
             recurring=recurring,
             recurring_interval=recurring_interval if recurring == 'Recurring' else None,
             status=initial_status,
@@ -14886,6 +14891,10 @@ def edit_draft(draft_id):
         draft.different_amounts_per_branch = request.form.get('different_amounts_per_branch') == '1'
         branch_amounts_val = request.form.get('branch_amounts', '').strip()
         draft.branch_amounts = branch_amounts_val if branch_amounts_val else None
+        if current_user.department == 'Logistic':
+            truck_plate_val = request.form.get('truck_plate_no', '').strip()
+            draft.truck_plate_no = truck_plate_val if truck_plate_val else None
+        # else: leave draft.truck_plate_no unchanged (non-Logistic won't have the field)
         
         # Handle person_company - check both text input and dropdown
         # Store regardless of request type to preserve data across edits
@@ -19638,6 +19647,8 @@ def _ensure_archive_columns_payment_requests():
                 to_add.append(('different_amounts_per_branch', "ALTER TABLE payment_requests ADD COLUMN different_amounts_per_branch INTEGER DEFAULT 0"))
             if 'branch_amounts' not in existing_columns:
                 to_add.append(('branch_amounts', "ALTER TABLE payment_requests ADD COLUMN branch_amounts TEXT"))
+            if 'truck_plate_no' not in existing_columns:
+                to_add.append(('truck_plate_no', "ALTER TABLE payment_requests ADD COLUMN truck_plate_no VARCHAR(50)"))
             for name, sql in to_add:
                 conn.execute(text(sql))
                 conn.commit()

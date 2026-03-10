@@ -884,6 +884,13 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     </div>
                 </div>
 
+                {% if request.department == 'Logistic' and request.truck_plate_no %}
+                <div class="form-group">
+                    <label for="truck_plate_no">Truck Plate No.</label>
+                    <input type="text" id="truck_plate_no" value="{{ request.truck_plate_no }}" readonly style="background: #f5f5f5;">
+                </div>
+                {% endif %}
+
                 <div class="form-group">
                     <label for="purpose">
                         {% if can_manager_approve %}<input type="checkbox" class="field-verification-checkbox" data-field="purpose" required>{% endif %}
