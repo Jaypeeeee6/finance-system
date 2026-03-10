@@ -9,6 +9,49 @@
     position: relative;
 }
 
+.branch-chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 0;
+    min-height: 0;
+}
+.branch-chips-container:not(:empty) {
+    margin-bottom: 8px;
+}
+.branch-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #000;
+    color: white;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    width: fit-content;
+}
+.branch-chip span { white-space: nowrap; }
+.branch-chip .remove-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0;
+    transition: background 0.2s;
+    line-height: 1;
+}
+.branch-chip .remove-chip:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
 .branch-dropdown {
     position: absolute;
     top: 100%;
@@ -761,7 +804,38 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
                     <label for="branch_name">
                         Branch Name {% if 'branch_name' in edited_fields %}<span class="edited-badge" data-field="branch_name" role="button" tabindex="0">Edited</span>{% endif %}
                     </label>
+                    {% if (can_edit_request and request.status in ['Returned to Manager', 'Returned to Requestor']) or (request.status == 'Pending Manager Approval' and ((user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager']) or can_edit_department_only)) %}
+                    <div class="branch-select-container">
+                        <div id="view_request_branch_chips_container" class="branch-chips-container"></div>
+                        <input type="text" id="view_request_branch_search" class="form-control" placeholder="Search branches..." autocomplete="off">
+                        <select name="branch_name" id="branch_name_select_options" class="form-control" style="display: none;">
+                            <option value="">-- Select Branch --</option>
+                            {% if available_branches %}
+                                {% set current_restaurant = "" %}
+                                {% for branch in available_branches %}
+                                    {% set restaurant = branch.restaurant %}
+                                    {% if restaurant != current_restaurant %}
+                                        {% if current_restaurant != "" %}
+                                            </optgroup>
+                                        {% endif %}
+                                        <optgroup label="{{ restaurant }} (Location)" data-restaurant="{{ restaurant }}">
+                                        {% set current_restaurant = restaurant %}
+                                    {% endif %}
+                                    <option value="{{ branch.name }}" data-restaurant="{{ restaurant }}">{% if branch.branch_code %}{{ branch.branch_code }} - {{ branch.name }}{% else %}{{ branch.name }}{% endif %}</option>
+                                {% endfor %}
+                                {% if current_restaurant != "" %}
+                                    </optgroup>
+                                {% endif %}
+                            {% endif %}
+                        </select>
+                        <input type="hidden" name="branch_name" id="view_request_branch_name_value" value="{{ request.branch_name or '' }}">
+                        <input type="hidden" name="branch_names" id="view_request_branch_names" value="{{ request.branch_name or '' }}">
+                        <div id="view_request_branch_dropdown" class="branch-dropdown" style="display: none;"></div>
+                    </div>
+                    <small class="form-text text-muted">Select or remove branches; chosen branches appear as chips above.</small>
+                    {% else %}
                     <input type="text" id="branch_name" value="{{ branch_name_display or request.branch_name|replace(',', ', ') }}" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                    {% endif %}
                 </div>
 
                 <div class="form-group" id="personCompanyGroupView">
@@ -3231,6 +3305,135 @@ document.addEventListener('DOMContentLoaded', function() {
             form.addEventListener('submit', function() { syncViewRequestBranchAmounts(); });
         }
     }
+
+    // Initialize editable Branch Name (chips + dropdown) when present (Returned to Manager / Returned to Requestor, or Pending Manager Approval for IT / authorized managers)
+    (function initViewRequestBranchDropdown() {
+            const viewBranchChips = document.getElementById('view_request_branch_chips_container');
+            const viewBranchSearch = document.getElementById('view_request_branch_search');
+            const viewBranchSelect = document.getElementById('branch_name_select_options');
+            const viewBranchDropdown = document.getElementById('view_request_branch_dropdown');
+            const viewBranchNamesInput = document.getElementById('view_request_branch_names');
+            const viewBranchNameValue = document.getElementById('view_request_branch_name_value');
+            const viewBranchContainer = document.querySelector('.branch-select-container');
+            const form = document.querySelector('#step-submit form');
+            if (!(viewBranchChips && viewBranchSearch && viewBranchSelect && viewBranchDropdown && viewBranchNamesInput && viewBranchContainer && form)) return;
+            const saveContainer = document.getElementById('save-edits-container');
+            const showSave = function() {
+                if (saveContainer) saveContainer.style.display = 'block';
+            };
+                let viewSelectedBranches = [];
+                const initialBranchNames = (viewBranchNamesInput.value || '').split(',').map(function(b) { return b.trim(); }).filter(Boolean);
+                const hiddenSelect = viewBranchSelect;
+                function viewBuildDropdown() {
+                    viewBranchDropdown.innerHTML = '';
+                    const options = hiddenSelect.querySelectorAll('option');
+                    let currentGroup = null;
+                    options.forEach(function(option) {
+                        if (option.value === '') return;
+                        const restaurant = option.getAttribute('data-restaurant') || 'Other';
+                        if (!currentGroup || currentGroup !== restaurant) {
+                            const groupDiv = document.createElement('div');
+                            groupDiv.className = 'branch-group';
+                            groupDiv.textContent = restaurant + ' (Location)';
+                            groupDiv.setAttribute('data-restaurant', restaurant);
+                            viewBranchDropdown.appendChild(groupDiv);
+                            currentGroup = restaurant;
+                        }
+                        const optionDiv = document.createElement('div');
+                        optionDiv.className = 'branch-option';
+                        optionDiv.textContent = option.textContent;
+                        optionDiv.setAttribute('data-value', option.value);
+                        optionDiv.setAttribute('data-restaurant', restaurant);
+                        const value = option.value;
+                        const text = option.textContent;
+                        optionDiv.addEventListener('mousedown', function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const idx = viewSelectedBranches.findIndex(function(b) { return b.value === value; });
+                            if (idx !== -1) {
+                                viewSelectedBranches.splice(idx, 1);
+                            } else {
+                                viewSelectedBranches.push({ value: value, text: text });
+                            }
+                            viewUpdateChips();
+                        });
+                        optionDiv.addEventListener('click', function(e) { e.preventDefault(); e.stopPropagation(); });
+                        viewBranchDropdown.appendChild(optionDiv);
+                    });
+                    viewUpdateDropdownSelection();
+                }
+                function viewUpdateDropdownSelection() {
+                    viewBranchDropdown.querySelectorAll('.branch-option').forEach(function(option) {
+                        const value = option.getAttribute('data-value');
+                        const isSelected = viewSelectedBranches.some(function(b) { return b.value === value; });
+                        option.classList.toggle('selected', isSelected);
+                    });
+                }
+                function viewUpdateChips(skipShowSave) {
+                    viewBranchChips.innerHTML = '';
+                    viewSelectedBranches.forEach(function(branch, index) {
+                        const chip = document.createElement('div');
+                        chip.className = 'branch-chip';
+                        chip.innerHTML = '<span>' + escapeHtml(branch.text) + '</span><button type="button" class="remove-chip" title="Remove branch">×</button>';
+                        chip.querySelector('.remove-chip').addEventListener('click', function() {
+                            viewSelectedBranches.splice(index, 1);
+                            viewUpdateChips();
+                            viewUpdateDropdownSelection();
+                            showSave();
+                        });
+                        viewBranchChips.appendChild(chip);
+                    });
+                    const csv = viewSelectedBranches.map(function(b) { return b.value; }).join(',');
+                    viewBranchNamesInput.value = csv;
+                    if (viewBranchNameValue) viewBranchNameValue.value = csv;
+                    viewUpdateDropdownSelection();
+                    if (!skipShowSave) showSave();
+                }
+                window.viewRemoveBranchChip = function(index) {
+                    viewSelectedBranches.splice(index, 1);
+                    viewUpdateChips();
+                    viewUpdateDropdownSelection();
+                    showSave();
+                };
+                initialBranchNames.forEach(function(bname) {
+                    const option = Array.from(hiddenSelect.options).find(function(opt) { return opt.value === bname; });
+                    if (option) viewSelectedBranches.push({ value: option.value, text: option.textContent });
+                });
+                viewBuildDropdown();
+                viewUpdateChips(true);
+                viewBranchSearch.addEventListener('focus', function() {
+                    viewBranchDropdown.style.display = 'block';
+                    viewBranchContainer.classList.add('dropdown-open');
+                });
+                viewBranchSearch.addEventListener('input', function() {
+                    const term = (this.value || '').trim().toLowerCase();
+                    viewBranchDropdown.querySelectorAll('.branch-option').forEach(function(opt) {
+                        const text = (opt.textContent || '').toLowerCase();
+                        const restaurant = (opt.getAttribute('data-restaurant') || '').toLowerCase();
+                        const match = term === '' || text.indexOf(term) !== -1 || restaurant.indexOf(term) !== -1;
+                        opt.classList.toggle('hidden', !match);
+                    });
+                    viewBranchDropdown.querySelectorAll('.branch-group').forEach(function(grp) {
+                        const restaurant = grp.getAttribute('data-restaurant');
+                        const hasVisible = Array.from(viewBranchDropdown.querySelectorAll('.branch-option')).some(function(o) {
+                            return o.getAttribute('data-restaurant') === restaurant && !o.classList.contains('hidden');
+                        });
+                        grp.style.display = hasVisible ? 'block' : 'none';
+                    });
+                    viewBranchDropdown.style.display = 'block';
+                });
+                document.addEventListener('click', function closeViewBranchDropdown(e) {
+                    if (!viewBranchContainer.contains(e.target)) {
+                        viewBranchDropdown.style.display = 'none';
+                        viewBranchContainer.classList.remove('dropdown-open');
+                    }
+                });
+                form.addEventListener('submit', function() {
+                    const csv = viewSelectedBranches.map(function(b) { return b.value; }).join(',');
+                    viewBranchNamesInput.value = csv;
+                    if (viewBranchNameValue) viewBranchNameValue.value = csv;
+                });
+    })();
     
     // Finance Admin: Only enable Request Type field and Others description field
     if (canEditFinanceAdmin || canEditDepartmentOnly) {

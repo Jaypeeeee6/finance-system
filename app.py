@@ -16996,11 +16996,21 @@ def edit_request(request_id):
     }
 
     # If this is a manager/GM/Operation Manager/temporary manager editing while status is
-    # "Pending Manager Approval", restrict them so they can ONLY change the Department field.
+    # "Pending Manager Approval", allow them to change Department and Branch Name only.
     if is_manager_pending_edit and req.status == 'Pending Manager Approval':
         new_department = (request.form.get('department') or '').strip()
         if new_department:
             req.department = new_department
+        # Branch Name (chips/dropdown submit branch_names or branch_name)
+        branch_names_val = request.form.get('branch_names', '').strip()
+        branch_name_val = request.form.get('branch_name', '').strip()
+        if branch_names_val:
+            req.branch_name = branch_names_val
+        elif branch_name_val:
+            req.branch_name = branch_name_val
+        else:
+            flash('At least one branch is required.', 'error')
+            return redirect(url_for('view_request', request_id=request_id))
 
     # For all other cases (IT, Returned to Manager, Finance Admin as configured),
     # apply the normal Request Type editing logic.
@@ -17026,7 +17036,15 @@ def edit_request(request_id):
     # For Finance Admin editing Request Type only in Pending Finance Approval status,
     # skip updating all other fields
     if not is_finance_admin_edit and not (is_manager_pending_edit and req.status == 'Pending Manager Approval'):
-        req.branch_name = request.form.get('branch_name') or req.branch_name
+        # Prefer comma-separated branch_names (from chips) when provided, else single branch_name
+        branch_names_val = request.form.get('branch_names', '').strip()
+        branch_name_val = request.form.get('branch_name', '').strip()
+        if branch_names_val:
+            req.branch_name = branch_names_val
+        elif branch_name_val:
+            req.branch_name = branch_name_val
+        else:
+            req.branch_name = req.branch_name
         req.person_company = request.form.get('person_company') or req.person_company
         req.person_company = request.form.get('company_name') or req.person_company
         req.purpose = request.form.get('purpose') or req.purpose
@@ -17091,6 +17109,14 @@ def edit_request(request_id):
             # Request Type
             if field_empty('request_type', req.request_type):
                 missing_fields.append('Request Type')
+            # Branch Name (from branch_names or branch_name)
+            submitted_branch_names = request.form.get('branch_names', None)
+            submitted_branch_name = request.form.get('branch_name', None)
+            if submitted_branch_names is not None or submitted_branch_name is not None:
+                if _empty(submitted_branch_names) and _empty(submitted_branch_name):
+                    missing_fields.append('Branch Name')
+            elif _empty(req.branch_name):
+                missing_fields.append('Branch Name')
             # Person/Company Name – also consider select placeholder
             submitted_person = request.form.get('person_company', None)
             submitted_person_select = request.form.get('person_company_select_edit', None)
