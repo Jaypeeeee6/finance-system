@@ -5488,6 +5488,12 @@ input:checked + .toggle-slider:before {
 #archiveFilesModal .app-modal-container {
     max-width: 560px;
 }
+
+/* Cheque files modal (View Files / Remove files): wider container */
+#chequeFilesModal .app-modal-container {
+    max-width: 560px;
+}
+
 /* Archive supporting files modal: wider View file buttons */
 #archiveFilesModal .app-modal-body .btn.btn-info {
     min-width: 140px;

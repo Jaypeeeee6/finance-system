@@ -152,6 +152,21 @@
     line-height: 1;
     padding: 1px;
 }
+.cheque-register-page .cheque-book-toolbars-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+.cheque-register-page .cheque-book-toolbars-wrap .cheque-book-toolbar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-bottom: 0;
+}
 .cheque-register-page .cheque-book-toolbar {
     display: flex;
     align-items: center;
@@ -359,6 +374,22 @@
     margin-top: 4px;
     text-align: center;
 }
+.cheque-register-page .cheque-book-toolbar .btn-upload-files-toolbar {
+    background-color: #D9BD7D !important;
+    border-color: #D9BD7D !important;
+    color: #fff !important;
+}
+.cheque-register-page .cheque-book-toolbar .btn-upload-files-toolbar:hover {
+    background-color: transparent !important;
+    border-color: #D9BD7D !important;
+    color: #D9BD7D !important;
+}
+/* Bulk upload assignment table */
+#bulkUploadAssignTable { margin-bottom: 0; }
+#bulkUploadAssignTable th { white-space: nowrap; padding: 8px 10px; font-weight: 600; }
+#bulkUploadAssignTable td { padding: 8px 10px; vertical-align: middle; }
+#bulkUploadAssignTable .bulk-upload-file-name { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#bulkUploadAssignTable .bulk-upload-cb { margin: 0; cursor: pointer; }
 </style>
 {% endblock %}
 
@@ -368,7 +399,8 @@
 {% set show_select_auditing = current_user.department == 'Auditing' %}
 {% set show_cheque_select = show_select_it or show_select_ceo_gm_op or show_select_auditing %}
 {% set show_image_actions = current_user.role in ['GM', 'CEO', 'Operation Manager'] or current_user.department == 'Auditing' %}
-<div class="dashboard-container cheque-register-page" data-show-auditing-select="{{ 'true' if show_select_auditing else 'false' }}" data-show-it-select="{{ 'true' if show_select_it else 'false' }}" data-filter-active="{{ 'true' if (book_filter_list or status_filter_list or book_holder_filter_list or bank_filter_list) else 'false' }}">
+<div class="dashboard-container cheque-register-page" data-show-auditing-select="{{ 'true' if show_select_auditing else 'false' }}" data-show-it-select="{{ 'true' if show_select_it else 'false' }}" data-show-bulk-upload="{{ 'true' if show_image_actions else 'false' }}" data-filter-active="{{ 'true' if (book_filter_list or status_filter_list or book_holder_filter_list or bank_filter_list) else 'false' }}">
+<input type="file" id="chequeBulkUploadInput" accept="image/*,.pdf" multiple style="display: none;">
     <div class="dashboard-header">
         <h2 class="dashboard-title" style="margin:0; display:inline-flex; align-items:center; gap:8px; font-size:1.6rem; font-weight:700;"><i class="fas fa-book"></i> Cheque Register</h2>
         <p>View and manage cheque books and serial numbers</p>
@@ -468,6 +500,7 @@
                         {% endif %}
                     </div>
                     <div class="book-section-content" id="book-content-{{ group.grouper }}">
+                    <div class="cheque-book-toolbars-wrap">
                     {% if show_select_it %}
                     <div class="cheque-book-toolbar cheque-toolbar-it" data-book-no="{{ group.grouper }}" style="display: none;">
                         <button type="button" class="btn btn-danger btn-sm btn-delete-selected" data-book-no="{{ group.grouper }}">
@@ -528,6 +561,14 @@
                         </span>
                     </div>
                     {% endif %}
+                    {% if show_image_actions %}
+                    <div class="cheque-book-toolbar cheque-toolbar-upload" data-book-no="{{ group.grouper }}" style="display: none;">
+                        <button type="button" class="btn btn-sm btn-upload-files-toolbar" data-book-no="{{ group.grouper }}">
+                            <i class="fas fa-upload"></i> Upload Files
+                        </button>
+                    </div>
+                    {% endif %}
+                    </div>
                     <div class="table-responsive cheque-register-table-wrap">
                         <table class="data-table cheque-book-table">
                             <thead>
@@ -732,6 +773,32 @@
         </div>
     </div>
 </div>
+
+{% if show_image_actions %}
+<!-- Bulk Upload Modal: assign selected files to selected cheques -->
+<div id="bulkUploadModal" class="app-modal" style="display: none;">
+    <div class="app-modal-overlay" id="bulkUploadModalOverlay"></div>
+    <div class="app-modal-container">
+        <div class="app-modal-header">
+            <div class="app-modal-icon"><i class="fas fa-upload"></i></div>
+            <h3 class="app-modal-title">Assign files to cheques</h3>
+        </div>
+        <div class="app-modal-body">
+            <p class="text-muted" style="margin: 0 0 12px; font-size: 0.9rem;">Assign each file to at least one cheque. You must assign all files before confirming.</p>
+            <div class="table-responsive" style="max-height: 360px; overflow: auto;">
+                <table class="data-table" id="bulkUploadAssignTable">
+                    <thead id="bulkUploadAssignThead"></thead>
+                    <tbody id="bulkUploadAssignTbody"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="app-modal-footer">
+            <button type="button" class="app-modal-btn app-modal-btn-secondary" id="bulkUploadCancelBtn">Cancel</button>
+            <button type="button" class="app-modal-btn" id="bulkUploadConfirmBtn" disabled><i class="fas fa-check"></i> Confirm</button>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 {% if show_select_auditing %}
 <!-- Mark as Cancelled modal (Auditing): upload image of cancelled cheque -->
@@ -1013,9 +1080,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Checkbox column: IT (Delete), CEO/GM/Operation Manager (Reserve toolbar), or Auditing (Mark Audited/Cancelled)
+    // Checkbox column: IT (Delete), CEO/GM/Operation Manager (Reserve toolbar), Auditing (Mark Audited/Cancelled), or Upload Files (non-IT with image actions)
     var showAuditingSelect = document.querySelector('.cheque-register-page') && document.querySelector('.cheque-register-page').getAttribute('data-show-auditing-select') === 'true';
     var showItSelect = document.querySelector('.cheque-register-page') && document.querySelector('.cheque-register-page').getAttribute('data-show-it-select') === 'true';
+    var showBulkUpload = document.querySelector('.cheque-register-page') && document.querySelector('.cheque-register-page').getAttribute('data-show-bulk-upload') === 'true';
+
+    function getSelectedUsedSerialIdsForBook(bookNo) {
+        var ids = [];
+        var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
+        if (!section) return ids;
+        section.querySelectorAll('.cheque-row-select:checked').forEach(function(cb) {
+            var row = cb.closest('tr');
+            if (row && row.getAttribute('data-status') === 'Used') {
+                var id = parseInt(cb.getAttribute('data-serial-id'), 10);
+                if (!isNaN(id)) ids.push(id);
+            }
+        });
+        return ids;
+    }
+
     function updateSelectToolbarForBook(bookNo) {
         var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
         if (!section) return;
@@ -1023,6 +1106,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var toolbarIt = section.querySelector('.cheque-toolbar-it');
         var toolbarReserve = section.querySelector('.cheque-toolbar-reserve');
         var toolbarAuditing = section.querySelector('.cheque-toolbar-auditing');
+        var toolbarUpload = section.querySelector('.cheque-toolbar-upload');
         if (toolbarIt) toolbarIt.style.display = checked.length > 0 ? 'flex' : 'none';
         if (toolbarReserve) {
             toolbarReserve.style.display = checked.length > 0 ? 'flex' : 'none';
@@ -1082,6 +1166,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (auditingAudited) auditingAudited.style.display = 'none';
                 }
             }
+        }
+        if (toolbarUpload && showBulkUpload) {
+            var usedIds = getSelectedUsedSerialIdsForBook(bookNo);
+            toolbarUpload.style.display = usedIds.length >= 2 ? 'flex' : 'none';
         }
         var selectAll = section.querySelector('.cheque-select-all');
         if (selectAll) {
@@ -1745,6 +1833,181 @@ document.addEventListener('DOMContentLoaded', function() {
                 input.value = '';
             });
     });
+
+    // Bulk Upload Files (per-book toolbar): open assignment modal after user selects multiple files
+    var chequeBulkUploadPendingIds = [];
+    var bulkUploadFiles = [];
+    var bulkUploadSerials = [];
+
+    function getSerialMetaFromRow(serialId) {
+        var row = document.querySelector('.cheque-register-page tr[data-serial-id="' + serialId + '"]');
+        if (!row) return { serialId: parseInt(serialId, 10), bookNo: '', serialNo: '' };
+        var bookNo = row.getAttribute('data-book-no') || '';
+        var serialNo = (row.cells && row.cells.length >= 3) ? (row.cells[2].textContent || '').trim() : '';
+        return { serialId: parseInt(serialId, 10), bookNo: bookNo, serialNo: serialNo };
+    }
+
+    function validateBulkUploadAssignments() {
+        var tbody = document.getElementById('bulkUploadAssignTbody');
+        if (!tbody) return false;
+        var rows = tbody.querySelectorAll('tr');
+        for (var i = 0; i < rows.length; i++) {
+            if (rows[i].querySelectorAll('.bulk-upload-cb:checked').length === 0) return false;
+        }
+        return true;
+    }
+
+    function updateBulkUploadModalButtons() {
+        var valid = validateBulkUploadAssignments();
+        var confirmBtn = document.getElementById('bulkUploadConfirmBtn');
+        if (confirmBtn) confirmBtn.disabled = !valid;
+    }
+
+    function openBulkUploadModal(filesArray, serialsArray) {
+        bulkUploadFiles = filesArray;
+        bulkUploadSerials = serialsArray;
+        var thead = document.getElementById('bulkUploadAssignThead');
+        var tbody = document.getElementById('bulkUploadAssignTbody');
+        if (!thead || !tbody) return;
+        thead.innerHTML = '';
+        tbody.innerHTML = '';
+        var headerRow = document.createElement('tr');
+        headerRow.appendChild(document.createElement('th')).textContent = 'File';
+        serialsArray.forEach(function(s) {
+            var th = document.createElement('th');
+            th.textContent = 'Book ' + s.bookNo + ', Serial ' + s.serialNo;
+            th.setAttribute('title', 'Serial ID ' + s.serialId);
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        filesArray.forEach(function(file, fileIndex) {
+            var tr = document.createElement('tr');
+            var tdName = document.createElement('td');
+            tdName.className = 'bulk-upload-file-name';
+            tdName.textContent = file.name || 'File ' + (fileIndex + 1);
+            tdName.setAttribute('title', file.name || '');
+            tr.appendChild(tdName);
+            serialsArray.forEach(function(ser) {
+                var td = document.createElement('td');
+                var cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.className = 'bulk-upload-cb';
+                cb.setAttribute('data-file-index', String(fileIndex));
+                cb.setAttribute('data-serial-id', String(ser.serialId));
+                cb.addEventListener('change', updateBulkUploadModalButtons);
+                td.appendChild(cb);
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+        updateBulkUploadModalButtons();
+        var modal = document.getElementById('bulkUploadModal');
+        if (modal) {
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    function closeBulkUploadModal() {
+        var modal = document.getElementById('bulkUploadModal');
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+        bulkUploadFiles = [];
+        bulkUploadSerials = [];
+    }
+
+    document.querySelectorAll('.btn-upload-files-toolbar').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var bookNo = this.getAttribute('data-book-no');
+            var ids = getSelectedUsedSerialIdsForBook(bookNo);
+            if (ids.length < 2) return;
+            chequeBulkUploadPendingIds = ids;
+            var bulkInput = document.getElementById('chequeBulkUploadInput');
+            if (bulkInput) { bulkInput.value = ''; bulkInput.click(); }
+        });
+    });
+
+    document.getElementById('chequeBulkUploadInput') && document.getElementById('chequeBulkUploadInput').addEventListener('change', function() {
+        if (chequeBulkUploadPendingIds.length === 0) { this.value = ''; return; }
+        var files = this.files;
+        if (!files || files.length === 0) { chequeBulkUploadPendingIds = []; this.value = ''; return; }
+        var allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+        for (var i = 0; i < files.length; i++) {
+            var file = files[i];
+            if (!allowedTypes.includes(file.type)) {
+                alert('Please upload image files (JPG, PNG, GIF) or PDF. Invalid: ' + file.name);
+                chequeBulkUploadPendingIds = []; this.value = ''; return;
+            }
+            if (file.size > 50 * 1024 * 1024) {
+                alert('File size exceeds 50MB limit: ' + file.name);
+                chequeBulkUploadPendingIds = []; this.value = ''; return;
+            }
+        }
+        var ids = chequeBulkUploadPendingIds.slice();
+        chequeBulkUploadPendingIds = [];
+        var serials = ids.map(function(id) { return getSerialMetaFromRow(id); });
+        openBulkUploadModal(Array.from(files), serials);
+        this.value = '';
+    });
+
+    var bulkUploadModalEl = document.getElementById('bulkUploadModal');
+    if (bulkUploadModalEl) {
+        var overlay = document.getElementById('bulkUploadModalOverlay');
+        if (overlay) overlay.addEventListener('click', closeBulkUploadModal);
+        document.getElementById('bulkUploadCancelBtn') && document.getElementById('bulkUploadCancelBtn').addEventListener('click', closeBulkUploadModal);
+        document.getElementById('bulkUploadConfirmBtn') && document.getElementById('bulkUploadConfirmBtn').addEventListener('click', function() {
+            if (this.disabled || bulkUploadFiles.length === 0 || bulkUploadSerials.length === 0) return;
+            var tbody = document.getElementById('bulkUploadAssignTbody');
+            var serialToFiles = {};
+            bulkUploadSerials.forEach(function(s) { serialToFiles[s.serialId] = []; });
+            tbody.querySelectorAll('.bulk-upload-cb:checked').forEach(function(cb) {
+                var fileIndex = parseInt(cb.getAttribute('data-file-index'), 10);
+                var serialId = parseInt(cb.getAttribute('data-serial-id'), 10);
+                if (!isNaN(serialId) && !isNaN(fileIndex) && bulkUploadFiles[fileIndex]) serialToFiles[serialId].push(bulkUploadFiles[fileIndex]);
+            });
+            var confirmBtn = this;
+            confirmBtn.disabled = true;
+            var originalHtml = confirmBtn.innerHTML;
+            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+            var serialIds = bulkUploadSerials.map(function(s) { return s.serialId; });
+            function uploadNext(index) {
+                if (index >= serialIds.length) {
+                    saveChequeExpandedBooks();
+                    closeBulkUploadModal();
+                    location.reload();
+                    return;
+                }
+                var serialId = serialIds[index];
+                var filesForSerial = serialToFiles[serialId];
+                if (!filesForSerial || filesForSerial.length === 0) {
+                    uploadNext(index + 1);
+                    return;
+                }
+                var formData = new FormData();
+                formData.append('serial_id', serialId);
+                for (var j = 0; j < filesForSerial.length; j++) formData.append('file', filesForSerial[j]);
+                fetch('{{ url_for("upload_cheque_file") }}', { method: 'POST', body: formData })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (!data.success) {
+                            alert(data.error || 'Upload failed for one or more cheques.');
+                            confirmBtn.disabled = false;
+                            confirmBtn.innerHTML = originalHtml;
+                            return;
+                        }
+                        uploadNext(index + 1);
+                    })
+                    .catch(function(err) {
+                        alert('An error occurred during upload.');
+                        confirmBtn.disabled = false;
+                        confirmBtn.innerHTML = originalHtml;
+                    });
+            }
+            uploadNext(0);
+        });
+    }
 
     // Per-row: Remove files — open cheque files modal in remove mode to choose which files to delete
     document.querySelectorAll('.cheque-action-delete-image').forEach(function(btn) {
