@@ -12,13 +12,13 @@ import threading
 import time
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, UserPermission, UserPermissionToggle, RoleDepartmentPermissionDefault, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, Region, FinanceAdminNote, ChequeBook, ChequeSerial, BankLayout, ProcurementItemRequest, ProcurementReceiptEntry, ProcurementInvoiceEntry, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry, DepartmentTemporaryManager
+from models import db, User, UserPermission, UserPermissionToggle, RoleDepartmentPermissionDefault, PaymentRequest, AuditLog, Notification, PaidNotification, RecurringPaymentSchedule, LateInstallment, InstallmentEditHistory, ReturnReasonHistory, RequestType, Branch, BranchAlias, Region, FinanceAdminNote, ChequeBook, ChequeSerial, BankLayout, ProcurementItemRequest, ProcurementReceiptEntry, ProcurementInvoiceEntry, PersonCompanyOption, ProcurementCategory, ProcurementItem, LocationPriority, CurrentMoneyEntry, DepartmentTemporaryManager, ChequeBookPermission
 from config import Config
 import json
 from playwright.sync_api import sync_playwright
 from io import BytesIO
 import base64
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 
 
@@ -135,6 +135,35 @@ def ensure_cheque_serials_columns_exist():
     except Exception as e:
         print(f"Warning: Could not ensure cheque_serials columns: {e}")
 
+
+def ensure_cheque_book_permissions_table_exists():
+    """Create cheque_book_permissions table if it does not exist yet (SQLite)."""
+    try:
+        import sqlite3
+        db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '') or ''
+        if not db_uri.startswith('sqlite:///'):
+            return
+        db_path = db_uri.replace('sqlite:///', '')
+        if os.name == 'nt':
+            db_path = db_path.replace('/', '\\')
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS cheque_book_permissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                book_id INTEGER NOT NULL REFERENCES cheque_books(id) ON DELETE CASCADE,
+                serial_id INTEGER REFERENCES cheque_serials(id) ON DELETE CASCADE,
+                granted_to_user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                granted_by_user_id INTEGER NOT NULL REFERENCES users(user_id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Warning: Could not ensure cheque_book_permissions table: {e}")
+
+
 # Run migrations immediately at import time so `flask run` and `python app.py` both migrate
 try:
     ensure_procurement_item_request_columns_exist()
@@ -144,6 +173,10 @@ try:
     ensure_cheque_serials_columns_exist()
 except Exception as _err:
     print(f"Warning: ensure_cheque_serials_columns_exist failed at startup: {_err}")
+try:
+    ensure_cheque_book_permissions_table_exists()
+except Exception as _err:
+    print(f"Warning: ensure_cheque_book_permissions_table_exists failed at startup: {_err}")
 
 # Reduce noisy print output by routing stdout/stderr into Flask logger and raising default log level to INFO.
 import logging, sys
@@ -21718,34 +21751,104 @@ def export_item_request_reports_pdf():
         return redirect(url_for('item_request_reports', **request.args))
 
 
+def _cheque_visibility_or_filter():
+    """Return an SQLAlchemy OR filter suitable for a query that already JOINs ChequeSerial with ChequeBook.
+    Returns None when the current user has unrestricted access (Auditing / IT)."""
+    if getattr(current_user, 'department', None) in ('Auditing', 'IT'):
+        return None
+    wperm_sq = db.session.query(ChequeBookPermission.book_id).filter(
+        ChequeBookPermission.granted_to_user_id == current_user.user_id,
+        ChequeBookPermission.serial_id.is_(None)
+    ).subquery()
+    sperm_sq = db.session.query(ChequeBookPermission.serial_id).filter(
+        ChequeBookPermission.granted_to_user_id == current_user.user_id,
+        ChequeBookPermission.serial_id.isnot(None)
+    ).subquery()
+    return or_(
+        ChequeBook.book_holder_user_id == current_user.user_id,
+        ChequeBook.id.in_(wperm_sq),
+        ChequeSerial.id.in_(sperm_sq)
+    )
+
+
+def _user_can_access_cheque_serial(serial):
+    """Return True if current_user is allowed to view/act on the given ChequeSerial."""
+    if getattr(current_user, 'department', None) in ('Auditing', 'IT'):
+        return True
+    book = serial.book
+    if not book:
+        return False
+    if book.book_holder_user_id == current_user.user_id:
+        return True
+    if ChequeBookPermission.query.filter_by(
+        book_id=book.id, serial_id=None, granted_to_user_id=current_user.user_id
+    ).first():
+        return True
+    if ChequeBookPermission.query.filter_by(
+        serial_id=serial.id, granted_to_user_id=current_user.user_id
+    ).first():
+        return True
+    return False
+
+
 @app.route('/cheque-register')
 @login_required
 def cheque_register():
     """View cheque register page"""
+    # Visibility rule:
+    # - Auditing + IT: see all books
+    # - Others: own books + any books/serials explicitly granted via ChequeBookPermission
+    full_access = getattr(current_user, 'department', None) in ('Auditing', 'IT')
+
     # Get filters from query parameters (multiple values per filter)
     book_filter_list = request.args.getlist('book')
     status_filter_list = request.args.getlist('status')
     book_holder_filter_list = request.args.getlist('book_holder')
     bank_filter_list = request.args.getlist('bank')
-    
-    # Get all unique book numbers for the filter dropdown
-    book_numbers = db.session.query(ChequeBook.book_no).distinct().order_by(ChequeBook.book_no).all()
-    book_numbers = [book[0] for book in book_numbers]
-    
-    # Get distinct book holders (users who hold at least one book) for filter dropdown
-    book_holders_query = db.session.query(User.user_id, User.name).join(
+
+    # Compute the set of visible book IDs for dropdown population
+    if full_access:
+        visible_book_ids = None  # unrestricted
+    else:
+        _own_bids = [r[0] for r in db.session.query(ChequeBook.id).filter(
+            ChequeBook.book_holder_user_id == current_user.user_id).all()]
+        _wperm_bids = [r[0] for r in db.session.query(ChequeBookPermission.book_id).filter(
+            ChequeBookPermission.granted_to_user_id == current_user.user_id,
+            ChequeBookPermission.serial_id.is_(None)).all()]
+        _sperm_bids = [r[0] for r in db.session.query(ChequeSerial.book_id).join(
+            ChequeBookPermission, ChequeBookPermission.serial_id == ChequeSerial.id
+        ).filter(ChequeBookPermission.granted_to_user_id == current_user.user_id).distinct().all()]
+        visible_book_ids = list(set(_own_bids + _wperm_bids + _sperm_bids))
+
+    # Get all unique book numbers for the filter dropdown (scoped)
+    bno_q = db.session.query(ChequeBook.book_no)
+    if visible_book_ids is not None:
+        bno_q = bno_q.filter(ChequeBook.id.in_(visible_book_ids))
+    book_numbers = [b[0] for b in bno_q.distinct().order_by(ChequeBook.book_no).all()]
+
+    # Get distinct book holders for filter dropdown (scoped)
+    bh_q = db.session.query(User.user_id, User.name).join(
         ChequeBook, ChequeBook.book_holder_user_id == User.user_id
-    ).filter(ChequeBook.book_holder_user_id.isnot(None)).distinct().order_by(User.name).all()
-    book_holders = [{'user_id': u[0], 'name': u[1]} for u in book_holders_query]
-    
-    # Get distinct bank names for filter dropdown
-    bank_names = db.session.query(ChequeBook.bank_name).filter(
-        ChequeBook.bank_name.isnot(None), ChequeBook.bank_name != ''
-    ).distinct().order_by(ChequeBook.bank_name).all()
-    bank_names = [b[0] for b in bank_names]
-    
-    # Build query
+    ).filter(ChequeBook.book_holder_user_id.isnot(None))
+    if visible_book_ids is not None:
+        bh_q = bh_q.filter(ChequeBook.id.in_(visible_book_ids))
+    book_holders = [{'user_id': u[0], 'name': u[1]} for u in bh_q.distinct().order_by(User.name).all()]
+
+    # Get distinct bank names for filter dropdown (scoped)
+    bn_q = db.session.query(ChequeBook.bank_name).filter(
+        ChequeBook.bank_name.isnot(None), ChequeBook.bank_name != '')
+    if visible_book_ids is not None:
+        bn_q = bn_q.filter(ChequeBook.id.in_(visible_book_ids))
+    bank_names = [b[0] for b in bn_q.distinct().order_by(ChequeBook.bank_name).all()]
+
+    # Build main serial query with permission-aware visibility
     query = db.session.query(ChequeSerial).join(ChequeBook)
+
+    # Apply visibility scope (own books + any permission-granted books/serials)
+    if not full_access:
+        _vis = _cheque_visibility_or_filter()
+        if _vis is not None:
+            query = query.filter(_vis)
     
     # Apply book filter(s) if provided
     if book_filter_list:
@@ -21787,21 +21890,33 @@ def cheque_register():
         ChequeBook.book_no, ChequeSerial.serial_no
     ).all()
     
-    return render_template('cheque_register.html', 
-                          cheque_serials=cheque_serials, 
+    # For Auditing: supply data for the "Manage Access" permission modal
+    all_books_for_modal = []
+    eligible_users_for_modal = []
+    if getattr(current_user, 'department', None) == 'Auditing':
+        all_books_for_modal = ChequeBook.query.order_by(ChequeBook.book_no).all()
+        eligible_users_for_modal = User.query.filter(
+            User.role.in_(['CEO', 'GM', 'Operation Manager'])
+        ).order_by(User.name).all()
+
+    return render_template('cheque_register.html',
+                          cheque_serials=cheque_serials,
                           book_numbers=book_numbers,
                           book_holders=book_holders,
                           bank_names=bank_names,
                           book_filter_list=book_filter_list,
                           status_filter_list=status_filter_list,
                           book_holder_filter_list=book_holder_filter_list,
-                          bank_filter_list=bank_filter_list)
+                          bank_filter_list=bank_filter_list,
+                          all_books=all_books_for_modal,
+                          eligible_users=eligible_users_for_modal)
 
 
 @app.route('/cheque-register/reserve', methods=['POST'])
 @login_required
 def reserve_cheque():
     """Reserve cheque serial numbers (Available -> Reserved). Used by Reserve & Write from cheque register."""
+    full_access = getattr(current_user, 'department', None) in ('Auditing', 'IT')
     try:
         data = request.get_json()
         serial_ids = data.get('serial_ids', [])
@@ -21810,10 +21925,14 @@ def reserve_cheque():
             return jsonify({'success': False, 'error': 'No serial numbers selected'}), 400
         
         # Find selected serials that are currently Available and reserve only those
-        serials = ChequeSerial.query.filter(
+        serials_q = ChequeSerial.query.join(ChequeBook).filter(
             ChequeSerial.id.in_(serial_ids),
             ChequeSerial.status == 'Available'
-        ).all()
+        )
+        _vis = _cheque_visibility_or_filter()
+        if _vis is not None:
+            serials_q = serials_q.filter(_vis)
+        serials = serials_q.all()
         
         reserved_count = 0
         for serial in serials:
@@ -24134,6 +24253,7 @@ def uploaded_cheque_file(filename):
 @login_required
 def upload_cheque_file():
     """Upload one or more files for a cheque serial. Appends to existing uploads."""
+    full_access = getattr(current_user, 'department', None) in ('Auditing', 'IT')
     try:
         files = request.files.getlist('file')
         if not files:
@@ -24144,6 +24264,8 @@ def upload_cheque_file():
         cheque_serial = ChequeSerial.query.get(serial_id)
         if not cheque_serial:
             return jsonify({'success': False, 'error': 'Cheque serial not found'}), 404
+        if not _user_can_access_cheque_serial(cheque_serial):
+            return jsonify({'success': False, 'error': 'Forbidden'}), 403
         if current_user.role in ('GM', 'CEO', 'Operation Manager') and cheque_serial.status in ('Audited', 'Cancelled'):
             return jsonify({'success': False, 'error': 'Cannot edit: this cheque is Audited or Cancelled.'}), 400
 
@@ -24201,6 +24323,7 @@ def _file_basename(u):
 def delete_cheque_upload():
     """Remove uploaded files for a cheque serial. Pass optional 'filename' (single), or JSON body with
     files_to_remove: [filenames] and/or cancelled_to_remove: [filenames] to remove selected files."""
+    full_access = getattr(current_user, 'department', None) in ('Auditing', 'IT')
     try:
         data = request.get_json(silent=True) or {}
         serial_id = request.form.get('serial_id') or data.get('serial_id')
@@ -24212,6 +24335,8 @@ def delete_cheque_upload():
         cheque_serial = ChequeSerial.query.get(serial_id)
         if not cheque_serial:
             return jsonify({'success': False, 'error': 'Cheque serial not found'}), 404
+        if not _user_can_access_cheque_serial(cheque_serial):
+            return jsonify({'success': False, 'error': 'Forbidden'}), 403
         if current_user.role in ('GM', 'CEO', 'Operation Manager') and cheque_serial.status in ('Audited', 'Cancelled'):
             return jsonify({'success': False, 'error': 'Cannot edit: this cheque is Audited or Cancelled.'}), 400
 
@@ -24358,6 +24483,7 @@ def upload_cheque_cancelled_file():
 @login_required
 def mark_cheque_status():
     """Mark cheques as Audited (Used only, Auditing only) or Cancelled (Used/Audited; Auditing, GM, CEO, Operation Manager)."""
+    full_access = getattr(current_user, 'department', None) in ('Auditing', 'IT')
     try:
         data = request.get_json()
         serial_ids = data.get('serial_ids', [])
@@ -24381,10 +24507,14 @@ def mark_cheque_status():
             # action == 'cancelled': allow Used or Audited; allow Auditing or GM/CEO/Operation Manager
             if current_user.department != 'Auditing' and current_user.role not in ('GM', 'CEO', 'Operation Manager'):
                 return jsonify({'success': False, 'error': 'Forbidden'}), 403
-            serials = ChequeSerial.query.filter(
+            serials_q = ChequeSerial.query.join(ChequeBook).filter(
                 ChequeSerial.id.in_(serial_ids),
                 ChequeSerial.status.in_(['Used', 'Audited'])
-            ).all()
+            )
+            _vis = _cheque_visibility_or_filter()
+            if _vis is not None:
+                serials_q = serials_q.filter(_vis)
+            serials = serials_q.all()
             if not serials:
                 return jsonify({'success': False, 'error': 'No Used or Audited cheques found with the selected IDs'}), 400
 
@@ -24438,6 +24568,129 @@ def delete_cheque_serials():
             'deleted_books': deleted_books,
             'message': f'Deleted {len(deleted_serial_ids)} cheque(s).'
         })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== CHEQUE PERMISSION MANAGEMENT ====================
+
+@app.route('/cheque-register/api/books/<int:book_id>/serials')
+@login_required
+def api_cheque_book_serials(book_id):
+    """Return all serials for a given book (Auditing only – used by the permissions modal)."""
+    if getattr(current_user, 'department', None) != 'Auditing':
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+    book = ChequeBook.query.get(book_id)
+    if not book:
+        return jsonify({'success': False, 'error': 'Book not found'}), 404
+    serials = ChequeSerial.query.filter_by(book_id=book_id).order_by(ChequeSerial.serial_no).all()
+    return jsonify({
+        'success': True,
+        'serials': [{'id': s.id, 'serial_no': s.serial_no, 'status': s.status} for s in serials]
+    })
+
+
+@app.route('/cheque-register/api/permissions')
+@login_required
+def api_cheque_permissions():
+    """Return all active ChequeBookPermissions (Auditing only)."""
+    if getattr(current_user, 'department', None) != 'Auditing':
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+    perms = ChequeBookPermission.query.order_by(ChequeBookPermission.created_at.desc()).all()
+    result = []
+    for p in perms:
+        if p.serial_id and p.serial:
+            scope_label = f'Serial #{p.serial.serial_no}'
+        else:
+            scope_label = 'Whole Book'
+        result.append({
+            'id': p.id,
+            'book_id': p.book_id,
+            'book_no': p.book.book_no if p.book else None,
+            'scope': scope_label,
+            'serial_id': p.serial_id,
+            'serial_no': p.serial.serial_no if p.serial else None,
+            'granted_to_name': p.granted_to.name if p.granted_to else 'Unknown',
+            'granted_to_role': p.granted_to.role if p.granted_to else '',
+            'granted_to_user_id': p.granted_to_user_id,
+            'granted_by_name': p.granted_by.name if p.granted_by else 'Unknown',
+            'created_at': p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else ''
+        })
+    return jsonify({'success': True, 'permissions': result})
+
+
+@app.route('/cheque-register/permissions/grant', methods=['POST'])
+@login_required
+def grant_cheque_permission():
+    """Grant access to a book or specific serials for a GM/CEO/Operation Manager user (Auditing only)."""
+    if getattr(current_user, 'department', None) != 'Auditing':
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+    data = request.get_json() or {}
+    book_id = data.get('book_id')
+    granted_to_user_id = data.get('granted_to_user_id')
+    serial_ids = data.get('serial_ids')  # list of serial IDs or None/[] for whole-book
+
+    if not book_id or not granted_to_user_id:
+        return jsonify({'success': False, 'error': 'book_id and granted_to_user_id are required'}), 400
+
+    book = ChequeBook.query.get(book_id)
+    if not book:
+        return jsonify({'success': False, 'error': 'Book not found'}), 404
+
+    target_user = User.query.get(granted_to_user_id)
+    if not target_user or target_user.role not in ('CEO', 'GM', 'Operation Manager'):
+        return jsonify({'success': False, 'error': 'Target user must be CEO, GM, or Operation Manager'}), 400
+
+    created = 0
+    try:
+        if serial_ids:
+            for sid in serial_ids:
+                serial = ChequeSerial.query.get(sid)
+                if not serial or serial.book_id != book.id:
+                    continue
+                existing = ChequeBookPermission.query.filter_by(
+                    book_id=book.id, serial_id=sid, granted_to_user_id=granted_to_user_id
+                ).first()
+                if not existing:
+                    db.session.add(ChequeBookPermission(
+                        book_id=book.id, serial_id=sid,
+                        granted_to_user_id=granted_to_user_id,
+                        granted_by_user_id=current_user.user_id
+                    ))
+                    created += 1
+        else:
+            existing = ChequeBookPermission.query.filter_by(
+                book_id=book.id, serial_id=None, granted_to_user_id=granted_to_user_id
+            ).first()
+            if not existing:
+                db.session.add(ChequeBookPermission(
+                    book_id=book.id, serial_id=None,
+                    granted_to_user_id=granted_to_user_id,
+                    granted_by_user_id=current_user.user_id
+                ))
+                created += 1
+        db.session.commit()
+        return jsonify({'success': True, 'created': created,
+                        'message': f'{created} permission(s) granted.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/cheque-register/permissions/<int:perm_id>/revoke', methods=['POST'])
+@login_required
+def revoke_cheque_permission(perm_id):
+    """Revoke a single ChequeBookPermission (Auditing only)."""
+    if getattr(current_user, 'department', None) != 'Auditing':
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+    perm = ChequeBookPermission.query.get(perm_id)
+    if not perm:
+        return jsonify({'success': False, 'error': 'Permission not found'}), 404
+    try:
+        db.session.delete(perm)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Permission revoked.'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500

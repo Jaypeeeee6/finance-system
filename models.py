@@ -1220,3 +1220,26 @@ class CurrentMoneyEntry(db.Model):
 
     def __repr__(self):
         return f'<CurrentMoneyEntry {self.id} - {self.department} - {self.entry_kind} - {self.available_balance}>'
+
+
+class ChequeBookPermission(db.Model):
+    """Permission granted by Auditing allowing a specific user (GM/CEO/Operation Manager)
+    to view and act on a cheque book (whole book) or specific serial numbers within a book."""
+    __tablename__ = 'cheque_book_permissions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    book_id = db.Column(db.Integer, db.ForeignKey('cheque_books.id'), nullable=False)
+    # NULL = whole-book permission; set to a serial id for a per-serial permission
+    serial_id = db.Column(db.Integer, db.ForeignKey('cheque_serials.id'), nullable=True)
+    granted_to_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    granted_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    book = db.relationship('ChequeBook', backref='permissions', foreign_keys=[book_id])
+    serial = db.relationship('ChequeSerial', backref='permissions', foreign_keys=[serial_id])
+    granted_to = db.relationship('User', foreign_keys=[granted_to_user_id], backref='cheque_permissions_received')
+    granted_by = db.relationship('User', foreign_keys=[granted_by_user_id], backref='cheque_permissions_granted')
+
+    def __repr__(self):
+        scope = f'serial {self.serial_id}' if self.serial_id else 'whole book'
+        return f'<ChequeBookPermission book_id={self.book_id} {scope} → user {self.granted_to_user_id}>'
