@@ -136,6 +136,34 @@ def ensure_cheque_serials_columns_exist():
         print(f"Warning: Could not ensure cheque_serials columns: {e}")
 
 
+def ensure_cheque_book_acknowledgment_columns_exist():
+    """Add acknowledgment columns to cheque_books if they do not exist yet (SQLite)."""
+    try:
+        import sqlite3
+        db_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'instance', 'payment_system.db')
+        if not os.path.exists(db_path):
+            return
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(cheque_books)")
+        cols = [row[1] for row in cursor.fetchall()]
+        if 'acknowledged' not in cols:
+            cursor.execute("ALTER TABLE cheque_books ADD COLUMN acknowledged INTEGER NOT NULL DEFAULT 0")
+            conn.commit()
+            print("✓ Added 'acknowledged' column to cheque_books table (startup)")
+        if 'acknowledged_at' not in cols:
+            cursor.execute("ALTER TABLE cheque_books ADD COLUMN acknowledged_at DATETIME")
+            conn.commit()
+            print("✓ Added 'acknowledged_at' column to cheque_books table (startup)")
+        if 'acknowledged_by_user_id' not in cols:
+            cursor.execute("ALTER TABLE cheque_books ADD COLUMN acknowledged_by_user_id INTEGER REFERENCES users(user_id)")
+            conn.commit()
+            print("✓ Added 'acknowledged_by_user_id' column to cheque_books table (startup)")
+        conn.close()
+    except Exception as e:
+        print(f"Warning: Could not ensure cheque_book acknowledgment columns: {e}")
+
+
 def ensure_cheque_book_permissions_table_exists():
     """Create cheque_book_permissions table if it does not exist yet (SQLite)."""
     try:
@@ -173,6 +201,10 @@ try:
     ensure_cheque_serials_columns_exist()
 except Exception as _err:
     print(f"Warning: ensure_cheque_serials_columns_exist failed at startup: {_err}")
+try:
+    ensure_cheque_book_acknowledgment_columns_exist()
+except Exception as _err:
+    print(f"Warning: ensure_cheque_book_acknowledgment_columns_exist failed at startup: {_err}")
 try:
     ensure_cheque_book_permissions_table_exists()
 except Exception as _err:
@@ -21899,6 +21931,14 @@ def cheque_register():
             User.role.in_(['CEO', 'GM', 'Operation Manager'])
         ).order_by(User.name).all()
 
+    # Count books pending acknowledgment by the current user (book holder)
+    pending_ack_count = 0
+    if current_user.role in ('CEO', 'GM', 'Operation Manager'):
+        pending_ack_count = ChequeBook.query.filter_by(
+            book_holder_user_id=current_user.user_id,
+            acknowledged=False
+        ).count()
+
     return render_template('cheque_register.html',
                           cheque_serials=cheque_serials,
                           book_numbers=book_numbers,
@@ -21909,7 +21949,8 @@ def cheque_register():
                           book_holder_filter_list=book_holder_filter_list,
                           bank_filter_list=bank_filter_list,
                           all_books=all_books_for_modal,
-                          eligible_users=eligible_users_for_modal)
+                          eligible_users=eligible_users_for_modal,
+                          pending_ack_count=pending_ack_count)
 
 
 @app.route('/cheque-register/reserve', methods=['POST'])
@@ -22001,13 +22042,15 @@ def new_book():
                 return render_template('new_book.html', book_holders=book_holders, bank_names=bank_names)
 
             # Create the cheque book
+            # acknowledged starts False if a holder is assigned (they must confirm receipt)
             cheque_book = ChequeBook(
                 book_no=book_no,
                 start_serial_no=start_serial_no,
                 last_serial_no=last_serial_no,
                 book_holder_user_id=book_holder_user_id,
                 bank_name=bank_name,
-                created_by_user_id=current_user.user_id
+                created_by_user_id=current_user.user_id,
+                acknowledged=not bool(book_holder_user_id)
             )
             db.session.add(cheque_book)
             db.session.flush()  # Get the book ID
@@ -22086,6 +22129,18 @@ def edit_book(book_no):
                 if start_serial_no > min_serial or last_serial_no < max_serial:
                     flash(f'Serial range must include all existing serials ({min_serial} to {max_serial}). You may only expand the range.', 'error')
                     return render_template('edit_book.html', book=book, book_holders=book_holders, bank_names=bank_names)
+
+            # If the holder is being changed (or newly assigned), require fresh acknowledgment
+            old_holder = book.book_holder_user_id
+            if book_holder_user_id and book_holder_user_id != old_holder:
+                book.acknowledged = False
+                book.acknowledged_at = None
+                book.acknowledged_by_user_id = None
+            elif not book_holder_user_id:
+                # No holder assigned – nothing to acknowledge
+                book.acknowledged = True
+                book.acknowledged_at = None
+                book.acknowledged_by_user_id = None
 
             book.book_no = new_book_no
             book.start_serial_no = start_serial_no
@@ -24573,6 +24628,31 @@ def delete_cheque_serials():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+# ==================== CHEQUE BOOK ACKNOWLEDGMENT ====================
+
+@app.route('/cheque-register/acknowledge-book/<int:book_no>', methods=['POST'])
+@login_required
+def acknowledge_cheque_book(book_no):
+    """Book holder confirms they have physically received the cheque book."""
+    book = ChequeBook.query.filter_by(book_no=book_no).first()
+    if not book:
+        flash('Book not found.', 'error')
+        return redirect(url_for('cheque_register'))
+    # Only the assigned book holder can acknowledge
+    if book.book_holder_user_id != current_user.user_id:
+        flash('You are not the assigned holder of this book.', 'error')
+        return redirect(url_for('cheque_register'))
+    if book.acknowledged:
+        flash(f'Book {book_no} was already acknowledged.', 'info')
+        return redirect(url_for('cheque_register'))
+    book.acknowledged = True
+    book.acknowledged_at = datetime.utcnow()
+    book.acknowledged_by_user_id = current_user.user_id
+    db.session.commit()
+    flash(f'Receipt of Book No. {book_no} confirmed. Thank you!', 'success')
+    return redirect(url_for('cheque_register'))
+
+
 # ==================== CHEQUE PERMISSION MANAGEMENT ====================
 
 @app.route('/cheque-register/api/books/<int:book_id>/serials')
@@ -24637,6 +24717,9 @@ def grant_cheque_permission():
     book = ChequeBook.query.get(book_id)
     if not book:
         return jsonify({'success': False, 'error': 'Book not found'}), 404
+
+    if book.book_holder_user_id and not book.acknowledged:
+        return jsonify({'success': False, 'error': 'Cannot grant permissions for this book — the book holder has not yet acknowledged receipt.'}), 400
 
     target_user = User.query.get(granted_to_user_id)
     if not target_user or target_user.role not in ('CEO', 'GM', 'Operation Manager'):

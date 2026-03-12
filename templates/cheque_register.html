@@ -33,6 +33,8 @@
 }
 .cheque-register-page .book-section.collapsed .book-section-header .book-section-chevron i { transform: rotate(-90deg); }
 .cheque-register-page .book-section:not(.collapsed) .book-section-header .book-section-chevron i { transform: rotate(0deg); }
+.cheque-register-page .book-section-locked .book-section-header { cursor: not-allowed !important; user-select: none; }
+.cheque-register-page .book-section-locked .book-section-header .book-section-chevron { color: #adb5bd; }
 .cheque-register-page .book-section.collapsed .book-section-content { display: none !important; }
 .cheque-register-page .book-section .book-section-content { margin-top: 1rem; }
 .cheque-register-page .upload-cell-td { text-align: center; }
@@ -391,12 +393,50 @@
 #bulkUploadAssignTable .bulk-upload-file-name { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #bulkUploadAssignTable .bulk-upload-cb { margin: 0; cursor: pointer; }
 
+/* ---- Acknowledgment summary bar ---- */
+.ack-summary-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    border-radius: 8px;
+    padding: 12px 18px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.ack-summary-bar .ack-icon { color: #f59e0b; font-size: 1.15rem; flex-shrink: 0; }
+.ack-summary-bar .ack-text { flex: 1; min-width: 200px; font-size: 0.93rem; color: #7c5c00; font-weight: 500; }
+.ack-summary-bar .ack-text strong { color: #5a4000; }
+/* ---- Per-book acknowledgment button ---- */
+.btn-ack-receipt {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 12px; font-size: 0.82rem; font-weight: 600;
+    background: #f59e0b; border: none; border-radius: 5px;
+    color: #fff; cursor: pointer; white-space: nowrap;
+    text-decoration: none;
+}
+.btn-ack-receipt:hover { background: #d97706; color: #fff; }
+/* ---- Auditing: pending badge ---- */
+.badge-ack-pending {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 10px; font-size: 0.75rem;
+    font-weight: 600; background: #fff3cd; color: #856404;
+    border: 1px solid #ffe082; white-space: nowrap;
+}
+.badge-ack-confirmed {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 10px; font-size: 0.75rem;
+    font-weight: 600; background: #d1e7dd; color: #0a3622;
+    border: 1px solid #badbcc; white-space: nowrap;
+}
+
 /* ---- Permissions Modal ---- */
 #chequePermModal { display: none; position: fixed; inset: 0; z-index: 9999; align-items: center; justify-content: center; }
 #chequePermModalOverlay { position: absolute; inset: 0; background: rgba(0,0,0,0.45); }
 #chequePermModalContainer {
     position: relative; background: #fff; border-radius: 10px;
-    width: 100%; max-width: 760px; max-height: 90vh;
+    width: 100%; max-width: 1100px; max-height: 90vh;
     display: flex; flex-direction: column;
     box-shadow: 0 8px 32px rgba(0,0,0,0.22);
     overflow: hidden;
@@ -430,6 +470,37 @@
     border-radius: 5px; background: #fff; width: 100%;
 }
 .perm-grant-form select:focus { outline: none; border-color: #D9BD7D; box-shadow: 0 0 0 2px rgba(217,189,125,0.2); }
+/* Searchable book dropdown */
+.perm-book-search-wrap { position: relative; width: 100%; }
+#permBookSearchInput {
+    padding: 7px 32px 7px 10px; font-size: 0.9rem; border: 1px solid #ced4da;
+    border-radius: 5px; background: #fff; width: 100%; box-sizing: border-box;
+}
+#permBookSearchInput:focus { outline: none; border-color: #D9BD7D; box-shadow: 0 0 0 2px rgba(217,189,125,0.2); }
+.perm-book-search-wrap .perm-book-caret {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    color: #6c757d; font-size: 0.75rem; pointer-events: none;
+}
+.perm-book-dropdown {
+    position: absolute; top: calc(100% + 2px); left: 0; right: 0; z-index: 10000;
+    background: #fff; border: 1px solid #ced4da; border-radius: 5px;
+    max-height: 210px; overflow-y: auto; box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    display: none;
+}
+.perm-book-opt {
+    padding: 7px 12px; font-size: 0.87rem; cursor: pointer; color: #212529;
+    border-bottom: 1px solid #f1f1f1;
+}
+.perm-book-opt:last-child { border-bottom: none; }
+.perm-book-opt:hover, .perm-book-opt.perm-book-opt-highlighted { background: #fdf3d7; }
+.perm-book-opt.perm-book-opt-pending { background: #fffbf0; color: #856404; }
+.perm-book-opt.perm-book-opt-pending:hover { background: #fff3cd; }
+.perm-book-opt-no-results { padding: 8px 12px; font-size: 0.85rem; color: #6c757d; cursor: default; }
+.perm-book-pending-tag {
+    font-size: 0.74rem; font-weight: 600; color: #dc3545;
+    background: #fff3cd; border: 1px solid #ffe082;
+    border-radius: 3px; padding: 1px 5px; margin-left: 5px;
+}
 #permSerialsGroup {
     width: 100%; border: 1px solid #e9ecef; border-radius: 6px;
     padding: 10px 12px; max-height: 160px; overflow-y: auto; background: #f8f9fa;
@@ -481,6 +552,17 @@
 {% set show_image_actions = current_user.role in ['GM', 'CEO', 'Operation Manager'] or current_user.department == 'Auditing' %}
 <div class="dashboard-container cheque-register-page" data-show-auditing-select="{{ 'true' if show_select_auditing else 'false' }}" data-show-it-select="{{ 'true' if show_select_it else 'false' }}" data-show-bulk-upload="{{ 'true' if show_image_actions else 'false' }}" data-filter-active="{{ 'true' if (book_filter_list or status_filter_list or book_holder_filter_list or bank_filter_list) else 'false' }}">
 <input type="file" id="chequeBulkUploadInput" accept="image/*,.pdf" multiple style="display: none;">
+
+    {% if pending_ack_count and pending_ack_count > 0 %}
+    <div class="ack-summary-bar">
+        <span class="ack-icon"><i class="fas fa-exclamation-circle"></i></span>
+        <span class="ack-text">
+            You have <strong>{{ pending_ack_count }} book{{ 's' if pending_ack_count > 1 else '' }}</strong>
+            awaiting your acknowledgment. Click <strong>Book Received</strong> on each highlighted book to unlock and access its contents.
+        </span>
+    </div>
+    {% endif %}
+
     <div class="dashboard-header">
         <h2 class="dashboard-title" style="margin:0; display:inline-flex; align-items:center; gap:8px; font-size:1.6rem; font-weight:700;"><i class="fas fa-book"></i> Cheque Register</h2>
         <p>View and manage cheque books and serial numbers</p>
@@ -571,14 +653,35 @@
 
     {% if cheque_serials %}
         {% for group in cheque_serials | groupby('book.book_no') %}
-        <div class="card cheque-book-card" style="border: 1px solid #dee2e6; border-radius: 8px; background: #fff;">
+        {% set book_obj = group.list[0].book if group.list else none %}
+        {% set needs_ack = book_obj and book_obj.book_holder_user_id and not book_obj.acknowledged %}
+        {% set is_my_unacked = needs_ack and book_obj.book_holder_user_id == current_user.user_id %}
+        <div class="card cheque-book-card" style="border: 1px solid {% if is_my_unacked %}#ffe082{% else %}#dee2e6{% endif %}; border-radius: 8px; background: {% if is_my_unacked %}#fffdf0{% else %}#fff{% endif %};">
             <div class="card-body">
-                <div class="book-section collapsed" data-book-no="{{ group.grouper }}">
-                    <div class="book-section-header" role="button" tabindex="0" aria-expanded="false" aria-controls="book-content-{{ group.grouper }}" id="book-header-{{ group.grouper }}">
-                        <span class="book-section-chevron" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                <div class="book-section collapsed {% if is_my_unacked %}book-section-locked{% endif %}" data-book-no="{{ group.grouper }}"{% if is_my_unacked %} data-locked="true"{% endif %}>
+                    <div class="book-section-header" role="button" tabindex="{{ '0' if not is_my_unacked else '-1' }}" aria-expanded="false" aria-controls="book-content-{{ group.grouper }}" id="book-header-{{ group.grouper }}" {% if is_my_unacked %}title="Acknowledge receipt to unlock this book"{% endif %}>
+                        <span class="book-section-chevron" aria-hidden="true">{% if is_my_unacked %}<i class="fas fa-lock" style="color:#f59e0b;"></i>{% else %}<i class="fas fa-chevron-down"></i>{% endif %}</span>
                         <h3 class="book-section-title" style="margin:0;">Book No. {{ group.grouper }}{% if group.list %}{% set book = group.list[0].book %}{% if book and (book.book_holder or book.bank_name) %}<span class="book-heading-meta"> — {{ book.book_holder.name if book.book_holder else '' }}{% if book.book_holder and book.bank_name %}, {% endif %}{{ book.bank_name or '' }}</span>{% endif %}{% endif %}</h3>
                         <span class="book-heading-result-count" data-book-no="{{ group.grouper }}">{% if book_filter_list or status_filter_list or book_holder_filter_list or bank_filter_list %}({{ group.list|length }} results){% endif %}</span>
                         {% if group.list %}<span class="book-heading-serial-range">Serial No: {{ group.list[0].serial_no }} - {{ group.list[-1].serial_no }}</span>{% endif %}
+
+                        {# ── Acknowledgment badge / button ── #}
+                        {% if is_my_unacked %}
+                        <form method="POST" action="{{ url_for('acknowledge_cheque_book', book_no=group.grouper) }}" onclick="event.stopPropagation();" style="margin:0;">
+                            <button type="submit" class="btn-ack-receipt" title="Confirm you received this book">
+                                <i class="fas fa-check-circle"></i> Book Received
+                            </button>
+                        </form>
+                        {% elif show_select_auditing and book_obj %}
+                            {% if needs_ack %}
+                            <span class="badge-ack-pending"><i class="fas fa-clock"></i> Pending</span>
+                            {% elif book_obj.book_holder_user_id %}
+                            <span class="badge-ack-confirmed" title="Acknowledged by {{ book_obj.acknowledged_by.name if book_obj.acknowledged_by else 'holder' }} on {{ book_obj.acknowledged_at.strftime('%Y-%m-%d') if book_obj.acknowledged_at else '' }}">
+                                <i class="fas fa-check-circle"></i> Received
+                            </span>
+                            {% endif %}
+                        {% endif %}
+
                         {% set has_non_available = group.list | selectattr('status', 'ne', 'Available') | list | length > 0 %}
                         {% if has_non_available %}
                         <span class="btn btn-sm btn-outline btn-edit-book btn-edit-book-disabled" title="Edit book (disabled: book has cheques that are not Available)">Edit</span>
@@ -926,15 +1029,24 @@
             <p class="perm-section-title"><i class="fas fa-plus-circle" style="margin-right:5px;"></i>Grant Access</p>
             <div class="perm-grant-form">
                 <div class="perm-form-group">
-                    <label for="permBookSelect">Book</label>
-                    <select id="permBookSelect">
-                        <option value="">— Select book —</option>
-                        {% for b in all_books %}
-                        <option value="{{ b.id }}" data-book-no="{{ b.book_no }}">
-                            Book {{ b.book_no }}{% if b.book_holder %} – {{ b.book_holder.name }}{% endif %}{% if b.bank_name %} ({{ b.bank_name }}){% endif %}
-                        </option>
-                        {% endfor %}
-                    </select>
+                    <label for="permBookSearchInput">Book</label>
+                    <div class="perm-book-search-wrap" id="permBookSearchWrap">
+                        <input type="text" id="permBookSearchInput" autocomplete="off" placeholder="Search book no., holder, bank…">
+                        <span class="perm-book-caret"><i class="fas fa-chevron-down"></i></span>
+                        <input type="hidden" id="permBookSelect" value="">
+                        <div class="perm-book-dropdown" id="permBookDropdown">
+                            {% for b in all_books %}
+                            {% set b_pending = b.book_holder_user_id and not b.acknowledged %}
+                            <div class="perm-book-opt {% if b_pending %}perm-book-opt-pending{% endif %}"
+                                 data-value="{{ b.id }}"
+                                 data-pending="{{ 'true' if b_pending else 'false' }}"
+                                 data-label="Book {{ b.book_no }}{% if b.book_holder %} – {{ b.book_holder.name }}{% endif %}{% if b.bank_name %} ({{ b.bank_name }}){% endif %}">
+                                Book {{ b.book_no }}{% if b.book_holder %} – {{ b.book_holder.name }}{% endif %}{% if b.bank_name %} ({{ b.bank_name }}){% endif %}{% if b_pending %}<span class="perm-book-pending-tag">⚠ Pending</span>{% endif %}
+                            </div>
+                            {% endfor %}
+                            <div class="perm-book-opt-no-results" id="permBookNoResults" style="display:none;">No books found.</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="perm-form-group">
                     <label for="permScopeSelect">Scope</label>
@@ -1148,7 +1260,7 @@ function restoreChequeExpandedBooks() {
         if (!Array.isArray(expanded) || expanded.length === 0) return;
         expanded.forEach(function(bookNo) {
             var section = document.querySelector('.book-section[data-book-no="' + bookNo + '"]');
-            if (section) {
+            if (section && section.dataset.locked !== 'true') {
                 section.classList.remove('collapsed');
                 var header = section.querySelector('.book-section-header');
                 if (header) header.setAttribute('aria-expanded', 'true');
@@ -1162,6 +1274,7 @@ function scrollToChequeRow(serialId) {
     if (!row) return;
     var section = row.closest('.book-section');
     if (!section) return;
+    if (section.dataset.locked === 'true') return;
     var bookNo = section.getAttribute('data-book-no');
     if (!bookNo) return;
     section.classList.remove('collapsed');
@@ -1187,6 +1300,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var section = header.closest('.book-section');
         if (!section) return;
         function toggleSection() {
+            if (section.dataset.locked === 'true') return;
             section.classList.toggle('collapsed');
             var expanded = !section.classList.contains('collapsed');
             header.setAttribute('aria-expanded', expanded);
@@ -2193,10 +2307,100 @@ document.addEventListener('DOMContentLoaded', function() {
 (function() {
     if (!document.getElementById('chequePermModal')) return;
 
+    // ── Searchable book dropdown ──
+    (function() {
+        var searchInput = document.getElementById('permBookSearchInput');
+        var hiddenSelect = document.getElementById('permBookSelect');
+        var dropdown = document.getElementById('permBookDropdown');
+        var noResults = document.getElementById('permBookNoResults');
+        var wrap = document.getElementById('permBookSearchWrap');
+        if (!searchInput || !dropdown) return;
+
+        function showDropdown() { dropdown.style.display = 'block'; filterOpts(searchInput.value); }
+        function hideDropdown() { dropdown.style.display = 'none'; }
+
+        function filterOpts(q) {
+            q = (q || '').toLowerCase().trim();
+            var opts = dropdown.querySelectorAll('.perm-book-opt');
+            var visible = 0;
+            opts.forEach(function(opt) {
+                var label = (opt.getAttribute('data-label') || opt.textContent || '').toLowerCase();
+                var show = !q || label.indexOf(q) !== -1;
+                opt.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+            noResults.style.display = visible === 0 ? '' : 'none';
+        }
+
+        function selectOpt(opt) {
+            var val = opt.getAttribute('data-value') || '';
+            var label = opt.getAttribute('data-label') || '';
+            hiddenSelect.value = val;
+            searchInput.value = label;
+            hideDropdown();
+            hiddenSelect.dispatchEvent(new Event('change'));
+        }
+
+        searchInput.addEventListener('focus', showDropdown);
+        searchInput.addEventListener('input', function() {
+            hiddenSelect.value = '';
+            filterOpts(this.value);
+            dropdown.style.display = 'block';
+        });
+
+        dropdown.addEventListener('mousedown', function(e) {
+            var opt = e.target.closest('.perm-book-opt');
+            if (opt) { e.preventDefault(); selectOpt(opt); }
+        });
+
+        document.addEventListener('mousedown', function(e) {
+            if (!wrap.contains(e.target)) hideDropdown();
+        });
+
+        // Keyboard navigation
+        searchInput.addEventListener('keydown', function(e) {
+            var opts = Array.from(dropdown.querySelectorAll('.perm-book-opt')).filter(function(o) { return o.style.display !== 'none'; });
+            var hi = dropdown.querySelector('.perm-book-opt-highlighted');
+            var idx = hi ? opts.indexOf(hi) : -1;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault(); dropdown.style.display = 'block';
+                if (hi) hi.classList.remove('perm-book-opt-highlighted');
+                idx = (idx + 1) % opts.length;
+                if (opts[idx]) { opts[idx].classList.add('perm-book-opt-highlighted'); opts[idx].scrollIntoView({ block: 'nearest' }); }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (hi) hi.classList.remove('perm-book-opt-highlighted');
+                idx = (idx - 1 + opts.length) % opts.length;
+                if (opts[idx]) { opts[idx].classList.add('perm-book-opt-highlighted'); opts[idx].scrollIntoView({ block: 'nearest' }); }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (hi) { selectOpt(hi); }
+            } else if (e.key === 'Escape') {
+                hideDropdown();
+            }
+        });
+
+        // Expose reset for modal open
+        wrap._resetBookSearch = function() {
+            hiddenSelect.value = '';
+            searchInput.value = '';
+            filterOpts('');
+            hideDropdown();
+        };
+    })();
+
     window.openPermissionsModal = function() {
         var modal = document.getElementById('chequePermModal');
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
+        // Reset grant form state
+        var wrap = document.getElementById('permBookSearchWrap');
+        if (wrap && wrap._resetBookSearch) wrap._resetBookSearch();
+        document.getElementById('permGrantFeedback').innerHTML = '';
+        var grantBtn = document.getElementById('permGrantBtn');
+        grantBtn.disabled = false;
+        grantBtn.style.opacity = '';
+        grantBtn.style.cursor = '';
         loadPermissions();
     };
 
@@ -2269,10 +2473,26 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Book change
+    // Book change — block pending books
     document.getElementById('permBookSelect').addEventListener('change', function() {
+        var feedback = document.getElementById('permGrantFeedback');
+        var grantBtn = document.getElementById('permGrantBtn');
+        var bookId = this.value;
+        var selectedOpt = bookId ? document.querySelector('#permBookDropdown .perm-book-opt[data-value="' + bookId + '"]') : null;
+        var isPending = selectedOpt && selectedOpt.getAttribute('data-pending') === 'true';
+        if (isPending) {
+            feedback.innerHTML = '<span style="color:#dc3545;"><i class="fas fa-lock"></i> This book is pending acknowledgment by the holder. Permissions cannot be granted until it is received.</span>';
+            grantBtn.disabled = true;
+            grantBtn.style.opacity = '0.5';
+            grantBtn.style.cursor = 'not-allowed';
+        } else {
+            feedback.innerHTML = '';
+            grantBtn.disabled = false;
+            grantBtn.style.opacity = '';
+            grantBtn.style.cursor = '';
+        }
         if (document.getElementById('permScopeSelect').value === 'serials') {
-            loadSerials(this.value);
+            loadSerials(bookId);
         }
     });
 
@@ -2341,7 +2561,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success) {
                 feedback.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> ' + escHtml(data.message) + '</span>';
                 // Reset form
-                document.getElementById('permBookSelect').value = '';
+                var wrap = document.getElementById('permBookSearchWrap');
+                if (wrap && wrap._resetBookSearch) wrap._resetBookSearch();
                 document.getElementById('permScopeSelect').value = 'book';
                 document.getElementById('permSerialsWrapper').style.display = 'none';
                 document.getElementById('permSerialsGroup').innerHTML = '<span id="permSerialsEmpty" style="color:#6c757d;">Select a book first.</span>';

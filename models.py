@@ -797,15 +797,24 @@ class ChequeBook(db.Model):
     bank_name = db.Column(db.String(200), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
-    
+
+    # Receipt acknowledgment fields
+    # True once the book holder confirms they physically received the book.
+    # NULL / False = pending acknowledgment (only meaningful when book_holder_user_id is set).
+    acknowledged = db.Column(db.Boolean, default=False, nullable=False)
+    acknowledged_at = db.Column(db.DateTime, nullable=True)
+    acknowledged_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+
     # Relationship to User who created this book
     created_by = db.relationship('User', backref='created_cheque_books', foreign_keys=[created_by_user_id])
     # Relationship to User who holds the book (CEO, GM, Operation Manager)
     book_holder = db.relationship('User', backref='cheque_books_held', foreign_keys=[book_holder_user_id])
-    
+    # Relationship to User who acknowledged receipt
+    acknowledged_by = db.relationship('User', backref='acknowledged_cheque_books', foreign_keys=[acknowledged_by_user_id])
+
     # Relationship to serial numbers
     serials = db.relationship('ChequeSerial', backref='book', cascade='all, delete-orphan', lazy='dynamic')
-    
+
     def __repr__(self):
         return f'<ChequeBook {self.id} - Book No. {self.book_no} ({self.start_serial_no}-{self.last_serial_no})>'
 
