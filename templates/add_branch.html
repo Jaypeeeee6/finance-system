@@ -288,7 +288,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     searchInput.value = text;
                     dropdown.style.display = 'none';
                     const parentCodeEl = document.getElementById('parent_branch_code');
-                    if (parentCodeEl) parentCodeEl.value = this.getAttribute('data-branch-code') || '';
+                    if (parentCodeEl) {
+                        parentCodeEl.value = (restaurant === 'Office') ? 'O' : (branchCode || '');
+                    }
                     if (restaurant && restaurantInput) {
                         restaurantInput.value = restaurant;
                         restaurantInput.dispatchEvent(new Event('change'));

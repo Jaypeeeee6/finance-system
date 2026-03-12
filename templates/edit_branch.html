@@ -111,7 +111,7 @@
                             <label for="parent_branch_search">Branch <span class="required-star">*</span></label>
                             <div class="parent-branch-select-container">
                                 <input type="hidden" name="parent_branch_id" id="parent_branch_id" value="{{ branch.parent_branch_id or '' }}">
-                                <input type="hidden" id="parent_branch_code" value="{{ branch.parent_branch.branch_code if branch.parent_branch else '' }}">
+                                <input type="hidden" id="parent_branch_code" value="{% if branch.parent_branch %}{% if branch.parent_branch.restaurant == 'Office' %}O{% else %}{{ branch.parent_branch.branch_code or '' }}{% endif %}{% endif %}">
                                 <input type="text" id="parent_branch_search" class="form-control" placeholder="Search branches..." autocomplete="off" value="{% if branch.parent_branch %}{% if branch.parent_branch.branch_code %}{{ branch.parent_branch.branch_code }} - {% endif %}{{ branch.parent_branch.name }} ({{ branch.parent_branch.restaurant }}){% endif %}">
                                 <select id="parent_branch_options" style="display: none;" aria-hidden="true">
                                     {% if branches_for_flat %}
@@ -357,7 +357,9 @@ var id = opt.value;
                 searchInput.value = text;
                 dropdown.style.display = 'none';
                 var parentCodeEl = document.getElementById('parent_branch_code');
-                if (parentCodeEl) parentCodeEl.value = this.getAttribute('data-branch-code') || '';
+                if (parentCodeEl) {
+                    parentCodeEl.value = (restaurant === 'Office') ? 'O' : (branchCode || '');
+                }
                 if (restaurant && restaurantInput) {
                     restaurantInput.value = restaurant;
                     restaurantInput.dispatchEvent(new Event('change'));
