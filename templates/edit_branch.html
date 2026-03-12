@@ -3,6 +3,11 @@
 {% block title %}Edit Branch or Flat{% endblock %}
 
 {% block content %}
+<style>
+.form-check.type-option .form-check-input { margin-top: 0; margin-bottom: 0; vertical-align: middle; flex-shrink: 0; }
+.form-check.type-option .form-check-label { line-height: 1.2; margin-bottom: 0; display: inline-flex; align-items: center; }
+.form-check.type-option { gap: 0; }
+</style>
 <div class="dashboard-container">
     <div class="dashboard-header">
         <h1><i class="fas fa-edit"></i> Edit Branch or Flat</h1>
@@ -62,12 +67,12 @@
                 <div class="form-group">
                     <label>Type <span style="color: red;">*</span></label>
                     <div style="display: flex; flex-direction: row; align-items: center; gap: 1.5rem;">
-                        <div class="form-check" style="display: inline-flex; align-items: center; margin-bottom: 0;">
+                        <div class="form-check type-option" style="display: inline-flex; align-items: center; margin-bottom: 0;">
                             <input type="checkbox" name="type_branch" id="type_branch" class="form-check-input branch-type-cb"
                                    {% if (branch.branch_type or 'branch') == 'branch' %}checked{% endif %}>
                             <label for="type_branch" class="form-check-label" style="margin-left: 0.25rem;">Branch</label>
                         </div>
-                        <div class="form-check" style="display: inline-flex; align-items: center; margin-bottom: 0;">
+                        <div class="form-check type-option" style="display: inline-flex; align-items: center; margin-bottom: 0;">
                             <input type="checkbox" name="type_flat" id="type_flat" class="form-check-input branch-type-cb"
                                    {% if (branch.branch_type or 'branch') == 'flat' %}checked{% endif %}>
                             <label for="type_flat" class="form-check-label" style="margin-left: 0.25rem;">Flat</label>

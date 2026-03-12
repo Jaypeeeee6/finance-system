@@ -250,19 +250,37 @@
                                 <td><code>{{ branch.branch_code or '—' }}</code></td>
                                 <td><strong>{{ branch.name }}</strong></td>
                                 <td>
+                                    {% if branch.restaurant == 'Kucu' %}
+                                    <span class="badge location-chip" style="background: #ffc107; color: #212529;">
+                                        <i class="fas fa-map-marker-alt"></i> {{ branch.restaurant }}
+                                    </span>
+                                    {% elif branch.restaurant == 'Boom' %}
+                                    <span class="badge location-chip" style="background: #212529; color: #fff;">
+                                        <i class="fas fa-map-marker-alt"></i> {{ branch.restaurant }}
+                                    </span>
+                                    {% elif branch.restaurant == 'Thoum' %}
+                                    <span class="badge location-chip" style="background: #ad1457; color: #fff;">
+                                        <i class="fas fa-map-marker-alt"></i> {{ branch.restaurant }}
+                                    </span>
+                                    {% elif branch.restaurant == 'Mishmisha' %}
+                                    <span class="badge location-chip" style="background: #c62828; color: #fff;">
+                                        <i class="fas fa-map-marker-alt"></i> {{ branch.restaurant }}
+                                    </span>
+                                    {% elif branch.restaurant == 'Office' %}
+                                    <span class="badge location-chip" style="background: #D9BD7D; color: #212529;">
+                                        <i class="fas fa-map-marker-alt"></i> {{ branch.restaurant }}
+                                    </span>
+                                    {% else %}
                                     <span class="badge badge-info">
                                         <i class="fas fa-map-marker-alt"></i> {{ branch.restaurant }}
                                     </span>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     {% if branch.is_active %}
-                                        <span class="badge badge-success">
-                                            <i class="fas fa-check-circle"></i> Active
-                                        </span>
+                                        <span style="color: #2e7d32; font-weight: 600;">Active</span>
                                     {% else %}
-                                        <span class="badge badge-danger">
-                                            <i class="fas fa-times-circle"></i> Inactive
-                                        </span>
+                                        <span style="color: #c62828; font-weight: 600;">Inactive</span>
                                     {% endif %}
                                 </td>
                                 <td>{{ branch.created_by.name if branch.created_by else 'System' }}</td>

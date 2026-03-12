@@ -3,17 +3,39 @@
 {% block title %}Add Branch or Flat{% endblock %}
 
 {% block content %}
+<style>
+/* Align Type checkboxes with their labels */
+.form-check.type-option .form-check-input { margin-top: 0; margin-bottom: 0; vertical-align: middle; flex-shrink: 0; }
+.form-check.type-option .form-check-label { line-height: 1.2; }
+.form-check.type-option { gap: 0; }
+</style>
 <div class="dashboard-container">
     <div class="dashboard-header">
-        <h1><i class="fas fa-plus"></i> Add Branch or Flat</h1>
+        <h2 class="dashboard-title" style="margin:0; display:inline-flex; align-items:center; gap:8px; font-size:1.6rem; font-weight:700;"><i class="fas fa-plus"></i> Add Branch or Flat</h2>
         <p>Add a new company branch or flat location</p>
     </div>
 
-    <div class="card">
+    <div class="card form-page-book-style">
         <div class="card-body">
             <form method="POST" action="{{ url_for('add_branch') }}">
                 <div class="form-group">
-                    <label for="restaurant">Location <span style="color: red;">*</span></label>
+                    <label>Type <span class="required-star">*</span></label>
+                    <div style="display: flex; flex-direction: row; align-items: center; gap: 1.5rem;">
+                        <div class="form-check type-option" style="display: inline-flex; align-items: center; margin-bottom: 0;">
+                            <input type="checkbox" name="type_branch" id="type_branch" class="form-check-input branch-type-cb" checked>
+                            <label for="type_branch" class="form-check-label" style="margin-left: 0.25rem; margin-bottom: 0; display: inline-flex; align-items: center;">Branch</label>
+                        </div>
+                        <div class="form-check type-option" style="display: inline-flex; align-items: center; margin-bottom: 0;">
+                            <input type="checkbox" name="type_flat" id="type_flat" class="form-check-input branch-type-cb">
+                            <label for="type_flat" class="form-check-label" style="margin-left: 0.25rem; margin-bottom: 0; display: inline-flex; align-items: center;">Flat</label>
+                        </div>
+                    </div>
+                    <input type="hidden" name="branch_type" id="branch_type" value="branch">
+                    <small class="form-text text-muted">Choose whether this entry is a branch or a flat</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="restaurant">Location <span class="required-star">*</span></label>
                     <select name="restaurant" id="restaurant" class="form-control" required>
                         <option value="">-- Select Location --</option>
                         {% if available_locations %}
@@ -43,37 +65,22 @@
                     <small class="form-text text-muted">Region is used to auto-generate the branch code (e.g. Muscat → MU, Al Dakhilia → DK)</small>
                 </div>
 
-                <div class="form-group">
-                    <label for="branch_code">Branch / Flat Code</label>
-                    <input type="text" name="branch_code" id="branch_code" class="form-control" 
-                           placeholder="e.g., K-MU001, B-DK002 (auto-filled when Location + Region are selected)">
-                    <small class="form-text text-muted">Auto-generated from Location (brand) + Region + sequence. You can edit it if needed.</small>
-                    <button type="button" class="btn btn-sm btn-outline mt-1" id="generateCodeBtn" style="display: none;">
-                        <i class="fas fa-magic"></i> Generate code
-                    </button>
-                </div>
-
-                <div class="form-group">
-                    <label for="name">Branch Name <span style="color: red;">*</span></label>
-                    <input type="text" name="name" id="name" class="form-control" required 
-                           placeholder="e.g., Main Branch, Muscat Branch, Salalah Branch">
-                    <small class="form-text text-muted">Enter a descriptive name for this branch or flat</small>
-                </div>
-
-                <div class="form-group">
-                    <label>Type <span style="color: red;">*</span></label>
-                    <div style="display: flex; flex-direction: row; align-items: center; gap: 1.5rem;">
-                        <div class="form-check" style="display: inline-flex; align-items: center; margin-bottom: 0;">
-                            <input type="checkbox" name="type_branch" id="type_branch" class="form-check-input branch-type-cb" checked>
-                            <label for="type_branch" class="form-check-label" style="margin-left: 0.25rem;">Branch</label>
-                        </div>
-                        <div class="form-check" style="display: inline-flex; align-items: center; margin-bottom: 0;">
-                            <input type="checkbox" name="type_flat" id="type_flat" class="form-check-input branch-type-cb">
-                            <label for="type_flat" class="form-check-label" style="margin-left: 0.25rem;">Flat</label>
-                        </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="branch_code">Branch / Flat Code</label>
+                        <input type="text" name="branch_code" id="branch_code" class="form-control" 
+                               placeholder="e.g., K-MU001, B-DK002 (auto-filled when Location + Region are selected)">
+                        <small class="form-text text-muted">Auto-generated from Location (brand) + Region + sequence. You can edit it if needed.</small>
+                        <button type="button" class="btn btn-sm btn-outline mt-1" id="generateCodeBtn" style="display: none;">
+                            <i class="fas fa-magic"></i> Generate code
+                        </button>
                     </div>
-                    <input type="hidden" name="branch_type" id="branch_type" value="branch">
-                    <small class="form-text text-muted">Choose whether this entry is a branch or a flat</small>
+                    <div class="form-group">
+                        <label for="name">Branch / Flat Name <span class="required-star">*</span></label>
+                        <input type="text" name="name" id="name" class="form-control" required 
+                               placeholder="e.g., Main Branch, Muscat Branch, Salalah Branch">
+                        <small class="form-text text-muted">Enter a descriptive name for this branch or flat</small>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -87,49 +94,16 @@
                 </div>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Add Branch or Flat
-                    </button>
-                    <a href="{{ url_for('manage_branches') }}" class="btn btn-secondary">
-                        <i class="fas fa-times"></i> Cancel
-                    </a>
+                    <div class="form-actions-buttons">
+                        <button type="submit" class="btn btn-success" style="background:#28a745;border-color:#28a745;color:#ffffff;">
+                            <i class="fas fa-save"></i> Add Branch or Flat
+                        </button>
+                        <a href="{{ url_for('manage_branches') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </div>
                 </div>
             </form>
-        </div>
-    </div>
-
-    <!-- Help Section -->
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-info-circle"></i> Branch & Flat Guidelines</h3>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <h5>Naming Conventions:</h5>
-                    <ul>
-                        <li>Use clear, descriptive names</li>
-                        <li>Keep names concise but informative</li>
-                        <li>Use appropriate capitalization (e.g., "Main Branch", "Muscat Branch")</li>
-                        <li>Avoid abbreviations when possible</li>
-                    </ul>
-                    
-                    <h5>Location Options:</h5>
-                    <ul>
-                        <li><strong>Kucu:</strong> For Kucu location branches</li>
-                        <li><strong>Boom:</strong> For Boom location branches</li>
-                        <li><strong>Thoum:</strong> For Thoum location branches</li>
-                        <li><strong>Kitchen:</strong> For kitchen/back-of-house branches</li>
-                        <li><strong>Office:</strong> For office/administrative branches</li>
-                    </ul>
-                </div>
-            </div>
-            
-            <div class="alert alert-info mt-3">
-                <i class="fas fa-lightbulb"></i>
-                <strong>Tip:</strong> You can always edit or deactivate branches later if needed. 
-                However, you cannot delete branches that are being used by existing payment requests.
-            </div>
         </div>
     </div>
 </div>
