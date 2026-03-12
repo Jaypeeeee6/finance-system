@@ -684,6 +684,11 @@ class Branch(db.Model):
     region = db.Column(db.String(50), nullable=True)  # e.g., "Muscat", "Al Dakhilia" (for branch code)
     branch_code = db.Column(db.String(20), nullable=True)  # e.g., "K-MU001", "B-DK002" (editable, auto-generated for new)
     branch_type = db.Column(db.String(20), nullable=True, default='branch')  # 'branch' or 'flat'
+    parent_branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True)  # when branch_type is 'flat', the branch this flat belongs to
+    accommodation_type = db.Column(db.String(20), nullable=True)  # when branch_type is 'flat': 'Flat' or 'Villa'
+    floor_number = db.Column(db.String(20), nullable=True)  # when accommodation_type is 'Flat'
+    flat_number = db.Column(db.String(20), nullable=True)   # when accommodation_type is 'Flat'
+    villa_number = db.Column(db.String(20), nullable=True)  # when accommodation_type is 'Villa'
     is_active = db.Column(db.Boolean, default=True)  # Whether this branch is currently active
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -691,6 +696,8 @@ class Branch(db.Model):
     
     # Relationship to User who created this branch
     created_by = db.relationship('User', backref='created_branches')
+    # When branch_type is 'flat', parent_branch points to the branch this flat belongs to
+    parent_branch = db.relationship('Branch', remote_side=[id], backref='child_flats', foreign_keys=[parent_branch_id])
     
     def to_dict(self):
         """Convert branch to dictionary"""
@@ -701,6 +708,11 @@ class Branch(db.Model):
             'region': self.region,
             'branch_code': self.branch_code,
             'branch_type': self.branch_type or 'branch',
+            'parent_branch_id': self.parent_branch_id,
+            'accommodation_type': self.accommodation_type,
+            'floor_number': self.floor_number,
+            'flat_number': self.flat_number,
+            'villa_number': self.villa_number,
             'is_active': self.is_active,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),

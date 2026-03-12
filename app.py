@@ -13197,6 +13197,18 @@ def add_branch():
         branch_type = (request.form.get('branch_type', 'branch') or 'branch').strip().lower()
         if branch_type not in ('branch', 'flat'):
             branch_type = 'branch'
+        parent_branch_id = request.form.get('parent_branch_id', '').strip() or None
+        if parent_branch_id:
+            try:
+                parent_branch_id = int(parent_branch_id)
+            except ValueError:
+                parent_branch_id = None
+        accommodation_type = request.form.get('accommodation_type', '').strip() or None
+        if accommodation_type and accommodation_type not in ('Flat', 'Villa'):
+            accommodation_type = None
+        floor_number = request.form.get('floor_number', '').strip() or None
+        flat_number = request.form.get('flat_number', '').strip() or None
+        villa_number = request.form.get('villa_number', '').strip() or None
         
         if not restaurant:
             flash('Location is required.', 'danger')
@@ -13205,6 +13217,24 @@ def add_branch():
         if not name:
             flash('Name is required.', 'danger')
             return redirect(url_for('add_branch'))
+        
+        if branch_type == 'flat' and not parent_branch_id:
+            flash('When adding a flat, please select the branch it belongs to.', 'danger')
+            return redirect(url_for('add_branch'))
+        if branch_type == 'flat' and (not accommodation_type or accommodation_type not in ('Flat', 'Villa')):
+            flash('When adding a flat, please select an accommodation type (Flat or Villa).', 'danger')
+            return redirect(url_for('add_branch'))
+        if branch_type == 'flat' and accommodation_type == 'Flat' and (not floor_number or not flat_number):
+            flash('When accommodation type is Flat, Floor Number and Flat Number are required.', 'danger')
+            return redirect(url_for('add_branch'))
+        if branch_type == 'flat' and accommodation_type == 'Villa' and not villa_number:
+            flash('When accommodation type is Villa, Villa Number is required.', 'danger')
+            return redirect(url_for('add_branch'))
+        if branch_type == 'flat' and parent_branch_id:
+            parent = Branch.query.get(parent_branch_id)
+            if not parent or (parent.branch_type or 'branch') != 'branch':
+                flash('Please select a valid branch.', 'danger')
+                return redirect(url_for('add_branch'))
         
         # Check if branch already exists
         existing = Branch.query.filter_by(name=name).first()
@@ -13223,6 +13253,11 @@ def add_branch():
                 region=region,
                 branch_code=branch_code,
                 branch_type=branch_type,
+                parent_branch_id=parent_branch_id if branch_type == 'flat' else None,
+                accommodation_type=accommodation_type if branch_type == 'flat' else None,
+                floor_number=floor_number if branch_type == 'flat' and accommodation_type == 'Flat' else None,
+                flat_number=flat_number if branch_type == 'flat' and accommodation_type == 'Flat' else None,
+                villa_number=villa_number if branch_type == 'flat' and accommodation_type == 'Villa' else None,
                 is_active=is_active,
                 created_by_user_id=current_user.user_id
             )
@@ -13249,7 +13284,9 @@ def add_branch():
     unprioritized_locations = [loc for loc in all_branch_locations if loc not in existing_location_names]
     
     regions = [r.name for r in Region.query.order_by(Region.name).all()]
-    return render_template('add_branch.html', user=current_user, available_locations=available_locations, unprioritized_locations=unprioritized_locations, regions=regions)
+    # Branches only (for flat's "parent branch" dropdown)
+    branches_for_flat = Branch.query.filter((Branch.branch_type == None) | (Branch.branch_type == 'branch')).order_by(Branch.restaurant, Branch.name).all()
+    return render_template('add_branch.html', user=current_user, available_locations=available_locations, unprioritized_locations=unprioritized_locations, regions=regions, branches_for_flat=branches_for_flat)
 
 
 @app.route('/it/branches/edit/<int:branch_id>', methods=['GET', 'POST'])
@@ -13273,6 +13310,12 @@ def edit_branch(branch_id):
         branch_type = (request.form.get('branch_type', 'branch') or 'branch').strip().lower()
         if branch_type not in ('branch', 'flat'):
             branch_type = 'branch'
+        parent_branch_id = request.form.get('parent_branch_id', '').strip() or None
+        if parent_branch_id:
+            try:
+                parent_branch_id = int(parent_branch_id)
+            except ValueError:
+                parent_branch_id = None
         
         if not restaurant:
             flash('Location is required.', 'danger')
@@ -13281,6 +13324,28 @@ def edit_branch(branch_id):
         if not name:
             flash('Name is required.', 'danger')
             return redirect(url_for('edit_branch', branch_id=branch_id))
+        
+        if branch_type == 'flat' and not parent_branch_id:
+            flash('When the type is flat, please select the branch it belongs to.', 'danger')
+            return redirect(url_for('edit_branch', branch_id=branch_id))
+        accommodation_type_edit = request.form.get('accommodation_type', '').strip() or None
+        if branch_type == 'flat' and (not accommodation_type_edit or accommodation_type_edit not in ('Flat', 'Villa')):
+            flash('When the type is flat, please select an accommodation type (Flat or Villa).', 'danger')
+            return redirect(url_for('edit_branch', branch_id=branch_id))
+        floor_number_edit = request.form.get('floor_number', '').strip() or None
+        flat_number_edit = request.form.get('flat_number', '').strip() or None
+        villa_number_edit = request.form.get('villa_number', '').strip() or None
+        if branch_type == 'flat' and accommodation_type_edit == 'Flat' and (not floor_number_edit or not flat_number_edit):
+            flash('When accommodation type is Flat, Floor Number and Flat Number are required.', 'danger')
+            return redirect(url_for('edit_branch', branch_id=branch_id))
+        if branch_type == 'flat' and accommodation_type_edit == 'Villa' and not villa_number_edit:
+            flash('When accommodation type is Villa, Villa Number is required.', 'danger')
+            return redirect(url_for('edit_branch', branch_id=branch_id))
+        if branch_type == 'flat' and parent_branch_id:
+            parent = Branch.query.get(parent_branch_id)
+            if not parent or (parent.branch_type or 'branch') != 'branch' or parent.id == branch_id:
+                flash('Please select a valid branch (cannot be the same as the flat being edited).', 'danger')
+                return redirect(url_for('edit_branch', branch_id=branch_id))
         
         # Check if another branch with same name exists
         existing = Branch.query.filter(Branch.name == name, Branch.id != branch_id).first()
@@ -13297,6 +13362,11 @@ def edit_branch(branch_id):
             branch.region = region
             branch.branch_code = branch_code
             branch.branch_type = branch_type
+            branch.parent_branch_id = parent_branch_id if branch_type == 'flat' else None
+            branch.accommodation_type = accommodation_type_edit if branch_type == 'flat' else None
+            branch.floor_number = floor_number_edit if branch_type == 'flat' and accommodation_type_edit == 'Flat' else None
+            branch.flat_number = flat_number_edit if branch_type == 'flat' and accommodation_type_edit == 'Flat' else None
+            branch.villa_number = villa_number_edit if branch_type == 'flat' and accommodation_type_edit == 'Villa' else None
             branch.is_active = is_active
             branch.updated_at = datetime.utcnow()
             
@@ -13321,7 +13391,8 @@ def edit_branch(branch_id):
     unprioritized_locations = [loc for loc in all_branch_locations if loc not in existing_location_names]
     
     regions = [r.name for r in Region.query.order_by(Region.name).all()]
-    return render_template('edit_branch.html', branch=branch, user=current_user, available_locations=available_locations, unprioritized_locations=unprioritized_locations, regions=regions)
+    branches_for_flat = Branch.query.filter((Branch.branch_type == None) | (Branch.branch_type == 'branch')).filter(Branch.id != branch_id).order_by(Branch.restaurant, Branch.name).all()
+    return render_template('edit_branch.html', branch=branch, user=current_user, available_locations=available_locations, unprioritized_locations=unprioritized_locations, regions=regions, branches_for_flat=branches_for_flat)
 
 
 @app.route('/it/branches/<int:branch_id>/aliases/add', methods=['POST'])

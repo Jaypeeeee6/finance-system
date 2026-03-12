@@ -8,6 +8,29 @@
 .form-check.type-option .form-check-input { margin-top: 0; margin-bottom: 0; vertical-align: middle; flex-shrink: 0; }
 .form-check.type-option .form-check-label { line-height: 1.2; }
 .form-check.type-option { gap: 0; }
+.parent-branch-select-container { position: relative; }
+.parent-branch-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ced4da;
+    border-top: none;
+    border-radius: 0 0 0.375rem 0.375rem;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.parent-branch-option {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f3f4;
+    transition: background-color 0.2s;
+}
+.parent-branch-option:hover { background-color: #e9ecef; }
+.parent-branch-option.hidden { display: none; }
 </style>
 <div class="dashboard-container">
     <div class="dashboard-header">
@@ -34,6 +57,51 @@
                     <small class="form-text text-muted">Choose whether this entry is a branch or a flat</small>
                 </div>
 
+                <div id="parent_branch_group" class="form-group" style="display: none;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="parent_branch_search">Branch <span class="required-star">*</span></label>
+                            <div class="parent-branch-select-container">
+                                <input type="hidden" name="parent_branch_id" id="parent_branch_id" value="">
+                                <input type="hidden" id="parent_branch_code" value="">
+                                <input type="text" id="parent_branch_search" class="form-control" placeholder="Search branches..." autocomplete="off">
+                                <select id="parent_branch_options" style="display: none;" aria-hidden="true">
+                                    {% if branches_for_flat %}
+                                        {% for b in branches_for_flat %}
+                                            <option value="{{ b.id }}" data-text="{% if b.branch_code %}{{ b.branch_code }} - {% endif %}{{ b.name }} ({{ b.restaurant }})" data-restaurant="{{ b.restaurant }}" data-branch-code="{{ b.branch_code or '' }}">{% if b.branch_code %}{{ b.branch_code }} - {% endif %}{{ b.name }} ({{ b.restaurant }})</option>
+                                        {% endfor %}
+                                    {% endif %}
+                                </select>
+                                <div id="parent_branch_dropdown" class="parent-branch-dropdown" style="display: none;"></div>
+                            </div>
+                            <small class="form-text text-muted">Search and select the branch this flat belongs to</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="accommodation_type">Accommodation Type <span class="required-star">*</span></label>
+                            <select name="accommodation_type" id="accommodation_type" class="form-control">
+                                <option value="">-- Select --</option>
+                                <option value="Flat">Flat</option>
+                                <option value="Villa">Villa</option>
+                            </select>
+                            <small class="form-text text-muted">Flat or Villa</small>
+                        </div>
+                    </div>
+                    <div id="flat_number_fields" class="form-row" style="display: none; margin-top: 0;">
+                        <div class="form-group">
+                            <label for="floor_number">Floor Number <span class="required-star">*</span></label>
+                            <input type="text" name="floor_number" id="floor_number" class="form-control" placeholder="e.g., 1, 2">
+                        </div>
+                        <div class="form-group">
+                            <label for="flat_number">Flat Number <span class="required-star">*</span></label>
+                            <input type="text" name="flat_number" id="flat_number" class="form-control" placeholder="e.g., 101, 2A">
+                        </div>
+                    </div>
+                    <div id="villa_number_field" class="form-group" style="display: none;">
+                        <label for="villa_number">Villa Number <span class="required-star">*</span></label>
+                        <input type="text" name="villa_number" id="villa_number" class="form-control" placeholder="e.g., 1, 5">
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label for="restaurant">Location <span class="required-star">*</span></label>
                     <select name="restaurant" id="restaurant" class="form-control" required>
@@ -52,7 +120,7 @@
                     <small class="form-text text-muted">Select the location for grouping branches. <a href="{{ url_for('manage_locations') }}" target="_blank">Manage locations</a></small>
                 </div>
 
-                <div class="form-group">
+                <div id="region_group" class="form-group">
                     <label for="region">Region</label>
                     <select name="region" id="region" class="form-control">
                         <option value="">-- Select Region (optional for code) --</option>
@@ -122,19 +190,177 @@ document.addEventListener('DOMContentLoaded', function() {
     const typeFlatCb = document.getElementById('type_flat');
     const branchTypeHidden = document.getElementById('branch_type');
 
+    function toggleParentBranchField() {
+        const parentGroup = document.getElementById('parent_branch_group');
+        const parentIdInput = document.getElementById('parent_branch_id');
+        const parentSearchInput = document.getElementById('parent_branch_search');
+        const parentDropdown = document.getElementById('parent_branch_dropdown');
+        const accommodationSelect = document.getElementById('accommodation_type');
+        if (!parentGroup || !parentIdInput) return;
+        const isFlat = branchTypeHidden && branchTypeHidden.value === 'flat';
+        parentGroup.style.display = isFlat ? 'block' : 'none';
+        parentIdInput.required = isFlat;
+        if (accommodationSelect) accommodationSelect.required = isFlat;
+        var regionGroup = document.getElementById('region_group');
+        if (regionGroup) regionGroup.style.display = isFlat ? 'none' : 'block';
+        if (isFlat && regionInput) regionInput.value = '';
+        if (!isFlat) {
+            parentIdInput.value = '';
+            var parentCodeEl = document.getElementById('parent_branch_code');
+            if (parentCodeEl) parentCodeEl.value = '';
+            if (parentSearchInput) parentSearchInput.value = '';
+            if (parentDropdown) parentDropdown.style.display = 'none';
+            if (accommodationSelect) accommodationSelect.value = '';
+            toggleAccommodationNumberFields('');
+        } else {
+            toggleAccommodationNumberFields(accommodationSelect ? accommodationSelect.value : '');
+        }
+    }
+    function toggleAccommodationNumberFields(accommodationType) {
+        const flatFields = document.getElementById('flat_number_fields');
+        const villaField = document.getElementById('villa_number_field');
+        const floorInput = document.getElementById('floor_number');
+        const flatNumberInput = document.getElementById('flat_number');
+        const villaInput = document.getElementById('villa_number');
+        if (flatFields) flatFields.style.display = (accommodationType === 'Flat') ? 'grid' : 'none';
+        if (villaField) villaField.style.display = (accommodationType === 'Villa') ? 'block' : 'none';
+        if (floorInput) floorInput.required = (accommodationType === 'Flat');
+        if (flatNumberInput) flatNumberInput.required = (accommodationType === 'Flat');
+        if (villaInput) villaInput.required = (accommodationType === 'Villa');
+        if (accommodationType !== 'Flat') {
+            if (floorInput) floorInput.value = '';
+            if (flatNumberInput) flatNumberInput.value = '';
+        }
+        if (accommodationType !== 'Villa' && villaInput) villaInput.value = '';
+        updateFlatCode();
+    }
+    function updateFlatCode() {
+        if (!branchTypeHidden || branchTypeHidden.value !== 'flat') return;
+        const accommodationSelect = document.getElementById('accommodation_type');
+        const parentCodeEl = document.getElementById('parent_branch_code');
+        const branchCodeInput = document.getElementById('branch_code');
+        if (!accommodationSelect || !parentCodeEl || !branchCodeInput) return;
+        const parentCode = (parentCodeEl.value || '').trim();
+        const accType = accommodationSelect.value;
+        if (accType === 'Flat') {
+            const floor = (document.getElementById('floor_number') && document.getElementById('floor_number').value) ? document.getElementById('floor_number').value.trim() : '';
+            const flat = (document.getElementById('flat_number') && document.getElementById('flat_number').value) ? document.getElementById('flat_number').value.trim() : '';
+            if (parentCode && floor && flat) {
+                branchCodeInput.value = parentCode + '-F' + floor + 'F' + flat;
+            } else {
+                if (!parentCode && !floor && !flat) branchCodeInput.value = '';
+            }
+        } else if (accType === 'Villa') {
+            const villa = (document.getElementById('villa_number') && document.getElementById('villa_number').value) ? document.getElementById('villa_number').value.trim() : '';
+            if (parentCode && villa) {
+                branchCodeInput.value = parentCode + '-V' + villa;
+            } else {
+                if (!parentCode && !villa) branchCodeInput.value = '';
+            }
+        } else {
+            branchCodeInput.value = '';
+        }
+    }
+    function initParentBranchSearch() {
+        const searchInput = document.getElementById('parent_branch_search');
+        const hiddenIdInput = document.getElementById('parent_branch_id');
+        const optionsSelect = document.getElementById('parent_branch_options');
+        const dropdown = document.getElementById('parent_branch_dropdown');
+        if (!searchInput || !hiddenIdInput || !optionsSelect || !dropdown) return;
+        function buildParentBranchDropdown() {
+            dropdown.innerHTML = '';
+            const options = optionsSelect.querySelectorAll('option');
+            options.forEach(function(opt) {
+                const id = opt.value;
+                const text = opt.getAttribute('data-text') || opt.textContent;
+                const restaurant = opt.getAttribute('data-restaurant') || '';
+                const branchCode = opt.getAttribute('data-branch-code') || '';
+                const div = document.createElement('div');
+                div.className = 'parent-branch-option';
+                div.setAttribute('data-value', id);
+                div.setAttribute('data-text', text);
+                div.setAttribute('data-restaurant', restaurant);
+                div.setAttribute('data-branch-code', branchCode);
+                div.textContent = text;
+                div.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    hiddenIdInput.value = id;
+                    searchInput.value = text;
+                    dropdown.style.display = 'none';
+                    const parentCodeEl = document.getElementById('parent_branch_code');
+                    if (parentCodeEl) parentCodeEl.value = this.getAttribute('data-branch-code') || '';
+                    if (restaurant && restaurantInput) {
+                        restaurantInput.value = restaurant;
+                        restaurantInput.dispatchEvent(new Event('change'));
+                    }
+                    updateFlatCode();
+                });
+                dropdown.appendChild(div);
+            });
+        }
+        function filterParentBranchOptions(term) {
+            const opts = dropdown.querySelectorAll('.parent-branch-option');
+            const t = (term || '').toLowerCase();
+            opts.forEach(function(o) {
+                const text = (o.getAttribute('data-text') || '').toLowerCase();
+                const rest = (o.getAttribute('data-restaurant') || '').toLowerCase();
+                const show = !t || text.indexOf(t) !== -1 || rest.indexOf(t) !== -1;
+                o.classList.toggle('hidden', !show);
+            });
+        }
+        searchInput.addEventListener('focus', function() {
+            if (dropdown.innerHTML === '') buildParentBranchDropdown();
+            filterParentBranchOptions(this.value.trim());
+            dropdown.style.display = 'block';
+        });
+        searchInput.addEventListener('input', function() {
+            filterParentBranchOptions(this.value.trim());
+            dropdown.style.display = 'block';
+        });
+        searchInput.addEventListener('blur', function() {
+            setTimeout(function() {
+                var active = document.activeElement;
+                if (dropdown.contains(active)) return;
+                dropdown.style.display = 'none';
+            }, 150);
+        });
+        dropdown.addEventListener('mousedown', function(e) { e.preventDefault(); });
+        document.addEventListener('click', function(e) {
+            if (searchInput.contains(e.target) || dropdown.contains(e.target)) return;
+            dropdown.style.display = 'none';
+        });
+    }
     function syncBranchTypeCheckboxes() {
         if (typeBranchCb && typeFlatCb && branchTypeHidden) {
             typeBranchCb.addEventListener('change', function() {
                 if (this.checked) { typeFlatCb.checked = false; branchTypeHidden.value = 'branch'; }
                 else { typeFlatCb.checked = true; branchTypeHidden.value = 'flat'; }
+                toggleParentBranchField();
             });
             typeFlatCb.addEventListener('change', function() {
                 if (this.checked) { typeBranchCb.checked = false; branchTypeHidden.value = 'flat'; }
                 else { typeBranchCb.checked = true; branchTypeHidden.value = 'branch'; }
+                toggleParentBranchField();
             });
+            toggleParentBranchField();
         }
     }
     syncBranchTypeCheckboxes();
+    initParentBranchSearch();
+    const accommodationSelect = document.getElementById('accommodation_type');
+    if (accommodationSelect) {
+        accommodationSelect.addEventListener('change', function() {
+            toggleAccommodationNumberFields(this.value);
+        });
+        if (branchTypeHidden && branchTypeHidden.value === 'flat') toggleAccommodationNumberFields(accommodationSelect.value);
+    }
+    ['floor_number', 'flat_number', 'villa_number'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', updateFlatCode);
+            el.addEventListener('change', updateFlatCode);
+        }
+    });
 
     function updateGenerateButton() {
         if (restaurantInput.value && regionInput.value) {
@@ -192,6 +418,48 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             alert('Please choose Branch or Flat.');
             return;
+        }
+        if (branchTypeHidden.value === 'flat') {
+            const parentIdInput = document.getElementById('parent_branch_id');
+            const parentSearchInput = document.getElementById('parent_branch_search');
+            const accommodationSelect = document.getElementById('accommodation_type');
+            if (parentIdInput && !parentIdInput.value) {
+                e.preventDefault();
+                alert('Please select the branch this flat belongs to.');
+                if (parentSearchInput) parentSearchInput.focus();
+                return;
+            }
+            if (accommodationSelect && !accommodationSelect.value) {
+                e.preventDefault();
+                alert('Please select an accommodation type (Flat or Villa).');
+                accommodationSelect.focus();
+                return;
+            }
+            if (accommodationSelect.value === 'Flat') {
+                const floorInput = document.getElementById('floor_number');
+                const flatNumberInput = document.getElementById('flat_number');
+                if (floorInput && !floorInput.value.trim()) {
+                    e.preventDefault();
+                    alert('Please enter the Floor Number.');
+                    floorInput.focus();
+                    return;
+                }
+                if (flatNumberInput && !flatNumberInput.value.trim()) {
+                    e.preventDefault();
+                    alert('Please enter the Flat Number.');
+                    flatNumberInput.focus();
+                    return;
+                }
+            }
+            if (accommodationSelect.value === 'Villa') {
+                const villaInput = document.getElementById('villa_number');
+                if (villaInput && !villaInput.value.trim()) {
+                    e.preventDefault();
+                    alert('Please enter the Villa Number.');
+                    villaInput.focus();
+                    return;
+                }
+            }
         }
         if (!name) {
             e.preventDefault();
