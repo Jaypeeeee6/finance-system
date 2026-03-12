@@ -1,21 +1,182 @@
 {% extends "base.html" %}
 
-{% block title %}Manage Branches{% endblock %}
+{% block title %}Manage Branches & Flats{% endblock %}
 
 {% block content %}
+<style>
+/* Branches page - same style as archives */
+.branches-filters .filters-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 8px 0;
+    padding: 4px 0;
+}
+.branches-filters .filters-left { flex: 0 0 auto; }
+.branches-filters .filters-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.branches-filters .filter-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 0;
+}
+.branches-filters .assign-search-field {
+    position: relative;
+    width: 300px;
+    min-width: 280px;
+}
+.branches-filters .assign-search-input {
+    border-radius: 999px !important;
+    border: 1px solid #ced4da !important;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+    height: 38px;
+    padding-left: 44px !important;
+    width: 100%;
+    background: #ffffff !important;
+    color: #212529 !important;
+}
+.branches-filters .assign-search-input:focus {
+    outline: none !important;
+    border-color: #D9BD7D !important;
+    box-shadow: 0 0 0 0.18rem rgba(217,189,125,0.15) !important;
+}
+.branches-filters .assign-search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px !important;
+    height: 20px !important;
+    cursor: pointer;
+}
+.branches-filters .form-select {
+    background-color: #ffffff !important;
+    color: #212529 !important;
+    border: 1px solid #ced4da !important;
+    border-radius: 8px !important;
+    padding: 8px 12px !important;
+    padding-right: 40px !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M7%2010l5%205%205-5'%20fill='none'%20stroke='currentColor'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+    background-position: right 12px center !important;
+    background-repeat: no-repeat !important;
+    background-size: 16px !important;
+}
+.dashboard-container .btn-edit-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent !important;
+    border: 1px solid #D9BD7D !important;
+    color: #D9BD7D !important;
+    border-radius: 6px;
+    font-size: 12px;
+    text-decoration: none;
+}
+.dashboard-container .btn-edit-outline:hover {
+    background: #D9BD7D !important;
+    color: #ffffff !important;
+}
+.dashboard-container .btn-toggle-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent !important;
+    border: 1px solid #28a745 !important;
+    color: #28a745 !important;
+    border-radius: 6px;
+    font-size: 12px;
+}
+.dashboard-container .btn-toggle-outline.inactive { border-color: #6c757d !important; color: #6c757d !important; }
+.dashboard-container .btn-toggle-outline:hover { background: #28a745 !important; color: #ffffff !important; }
+.dashboard-container .btn-toggle-outline.inactive:hover { background: #6c757d !important; color: #ffffff !important; }
+.dashboard-container .btn-danger-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent !important;
+    border: 1px solid #dc3545 !important;
+    color: #dc3545 !important;
+    border-radius: 6px;
+    font-size: 12px;
+}
+.dashboard-container .btn-danger-outline:hover {
+    background: #dc3545 !important;
+    color: #ffffff !important;
+}
+.dashboard-container .data-table td:last-child .action-buttons {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: nowrap;
+}
+.dashboard-container .data-table td:last-child form { display: inline; }
+.dashboard-container .dashboard-actions a[href*="it_dashboard"]:hover {
+    background: #c4a85a !important;
+    border-color: #c4a85a !important;
+    color: #fff !important;
+}
+@media (max-width: 768px) {
+    .branches-filters .filters-container { flex-direction: column; align-items: stretch; gap: 8px; }
+    .branches-filters .filters-right { margin-left: 0; justify-content: flex-start; flex-wrap: wrap; }
+    .branches-filters .filters-left { width: 100%; }
+    .branches-filters .assign-search-field { width: 100%; }
+}
+</style>
+
 <div class="dashboard-container">
     <div class="dashboard-header">
-        <h1><i class="fas fa-building"></i> Manage Branches</h1>
-        <p>Manage company branch locations</p>
+        <h2 class="dashboard-title" style="margin:0;"><i class="fas fa-building"></i> Manage Branches & Flats</h2>
+        <p>Manage company branch and flat locations</p>
     </div>
 
     <div class="dashboard-actions">
         <a href="{{ url_for('add_branch') }}" class="btn btn-primary">
-            <i class="fas fa-plus"></i> Add Branch
+            <i class="fas fa-plus"></i> Add Branch/Flat
         </a>
-        <a href="{{ url_for('it_dashboard') }}" class="btn btn-secondary">
+        <a href="{{ url_for('it_dashboard') }}" class="btn btn-secondary" style="background: #D9BD7D; border-color: #D9BD7D; color: #fff;">
             <i class="fas fa-arrow-left"></i> Back to IT Dashboard
         </a>
+    </div>
+
+    <!-- Filters - same structure as archives -->
+    <div class="branches-filters">
+        <div class="filters-container">
+            <div class="filters-left">
+                <div class="assign-search-field">
+                    <img src="{{ url_for('static', filename='css/icons/search.svg') }}" class="assign-search-icon" alt="Search" onclick="document.getElementById('searchInput').focus();">
+                    <input type="search" id="searchInput" class="form-control assign-search-input" placeholder="Search by name or code" aria-label="Search branches" value="{{ search_query or '' }}">
+                </div>
+            </div>
+            <div class="filters-right">
+                <div class="filter-controls">
+                    <select id="restaurantFilter" class="form-select" onchange="filterBranchesTable()">
+                        <option value="">All Locations</option>
+                        <option value="Kucu" {% if restaurant_filter == 'Kucu' %}selected{% endif %}>Kucu</option>
+                        <option value="Boom" {% if restaurant_filter == 'Boom' %}selected{% endif %}>Boom</option>
+                        <option value="Thoum" {% if restaurant_filter == 'Thoum' %}selected{% endif %}>Thoum</option>
+                        <option value="Kitchen" {% if restaurant_filter == 'Kitchen' %}selected{% endif %}>Kitchen</option>
+                        <option value="Office" {% if restaurant_filter == 'Office' %}selected{% endif %}>Office</option>
+                    </select>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Bulk Actions -->
@@ -39,24 +200,7 @@
     </div>
 
     <div class="card">
-        <div class="card-header">
-            <div class="header-top">
-                <div class="filter-controls">
-                    <input type="text" id="searchInput" placeholder="Search..." class="form-control" value="{{ search_query }}">
-                    <select id="restaurantFilter" class="form-select">
-                        <option value="">All Locations</option>
-                        <option value="Kucu" {% if restaurant_filter == 'Kucu' %}selected{% endif %}>Kucu</option>
-                        <option value="Boom" {% if restaurant_filter == 'Boom' %}selected{% endif %}>Boom</option>
-                        <option value="Thoum" {% if restaurant_filter == 'Thoum' %}selected{% endif %}>Thoum</option>
-                        <option value="Kitchen" {% if restaurant_filter == 'Kitchen' %}selected{% endif %}>Kitchen</option>
-                        <option value="Office" {% if restaurant_filter == 'Office' %}selected{% endif %}>Office</option>
-                    </select>
-                    <button type="button" class="btn btn-primary" onclick="filterBranchesTable()">
-                        <i class="fas fa-search"></i>
-                    </button>
-                </div>
-                <h2><i class="fas fa-building"></i> Branches</h2>
-            </div>
+        <div class="card-header" style="background: transparent !important; box-shadow: none !important; border-bottom: none !important;">
             <div class="card-header-actions">
                 {% if search_query or restaurant_filter %}
                 <div class="filter-indicator">
@@ -70,7 +214,7 @@
                         <i class="fas fa-map-marker-alt"></i> Location: {{ restaurant_filter }}
                     </span>
                     {% endif %}
-                    <a href="{{ url_for('manage_branches') }}" class="btn btn-sm btn-outline">
+                    <a href="{{ url_for('manage_branches', per_page=pagination.per_page) }}" class="btn btn-sm btn-outline">
                         <i class="fas fa-times"></i> Clear All
                     </a>
                 </div>
@@ -125,16 +269,16 @@
                                 <td>{{ branch.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                                 <td>
                                     <div class="action-buttons">
-                                        <a href="{{ url_for('edit_branch', branch_id=branch.id) }}" class="btn btn-sm btn-outline" title="Edit">
+                                        <a href="{{ url_for('edit_branch', branch_id=branch.id) }}" class="btn btn-sm btn-edit-outline" title="Edit">
                                             <i class="fas fa-edit"></i>
                                         </a>
                                         <form method="POST" action="{{ url_for('toggle_branch', branch_id=branch.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to {{ 'deactivate' if branch.is_active else 'activate' }} this branch?')">
-                                            <button type="submit" class="btn btn-sm btn-outline" title="{{ 'Deactivate' if branch.is_active else 'Activate' }}">
+                                            <button type="submit" class="btn btn-sm btn-toggle-outline {% if not branch.is_active %}inactive{% endif %}" title="{{ 'Deactivate' if branch.is_active else 'Activate' }}">
                                                 <i class="fas fa-{{ 'pause' if branch.is_active else 'play' }}"></i>
                                             </button>
                                         </form>
                                         <form method="POST" action="{{ url_for('delete_branch', branch_id=branch.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this branch? This action cannot be undone.')">
-                                            <button type="submit" class="btn btn-sm btn-danger" title="Delete">
+                                            <button type="submit" class="btn btn-sm btn-danger-outline" title="Delete">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                         </form>
@@ -146,48 +290,58 @@
                     </table>
                 </div>
 
-                <!-- Pagination -->
-                {% if pagination.pages > 1 %}
+                <!-- Pagination - same structure as archives -->
                 <div class="pagination-container">
-                    <div class="pagination-info">
-                        Showing {{ pagination.page * pagination.per_page - pagination.per_page + 1 }} to 
-                        {{ pagination.page * pagination.per_page if pagination.page * pagination.per_page < pagination.total else pagination.total }} 
-                        of {{ pagination.total }} branches
+                    <div class="pagination-left">
+                        <div class="pagination-info">
+                            Showing {{ (pagination.page - 1) * pagination.per_page + 1 }} to
+                            {{ (pagination.page - 1) * pagination.per_page + branches|length }}
+                            of {{ pagination.total }} branches
+                        </div>
+                        <div class="items-per-page">
+                            <label for="per_page_branches">Show:</label>
+                            <select id="per_page_branches" onchange="changeBranchesPerPage(this.value)">
+                                <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10</option>
+                                <option value="20" {% if pagination.per_page == 20 %}selected{% endif %}>20</option>
+                                <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50</option>
+                                <option value="100" {% if pagination.per_page == 100 %}selected{% endif %}>100</option>
+                            </select>
+                            <span>per page</span>
+                        </div>
                     </div>
+                    {% if pagination.pages > 1 %}
                     <div class="pagination">
                         {% if pagination.has_prev %}
-                            <a href="{{ url_for('manage_branches', page=pagination.prev_num, search=search_query, restaurant=restaurant_filter) }}" class="btn btn-outline">
+                            <a href="{{ url_for('manage_branches', page=pagination.prev_num, per_page=pagination.per_page, search=search_query, restaurant=restaurant_filter) }}" class="btn btn-sm btn-secondary">
                                 <i class="fas fa-chevron-left"></i> Previous
                             </a>
                         {% endif %}
-                        
                         {% for page_num in pagination.iter_pages() %}
                             {% if page_num %}
                                 {% if page_num != pagination.page %}
-                                    <a href="{{ url_for('manage_branches', page=page_num, search=search_query, restaurant=restaurant_filter) }}" class="btn btn-outline">{{ page_num }}</a>
+                                    <a href="{{ url_for('manage_branches', page=page_num, per_page=pagination.per_page, search=search_query, restaurant=restaurant_filter) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
                                 {% else %}
-                                    <span class="btn btn-primary">{{ page_num }}</span>
+                                    <span class="btn btn-sm btn-primary">{{ page_num }}</span>
                                 {% endif %}
                             {% else %}
-                                <span class="btn btn-outline disabled">...</span>
+                                <span class="pagination-ellipsis">...</span>
                             {% endif %}
                         {% endfor %}
-                        
                         {% if pagination.has_next %}
-                            <a href="{{ url_for('manage_branches', page=pagination.next_num, search=search_query, restaurant=restaurant_filter) }}" class="btn btn-outline">
+                            <a href="{{ url_for('manage_branches', page=pagination.next_num, per_page=pagination.per_page, search=search_query, restaurant=restaurant_filter) }}" class="btn btn-sm btn-secondary">
                                 Next <i class="fas fa-chevron-right"></i>
                             </a>
                         {% endif %}
                     </div>
+                    {% endif %}
                 </div>
-                {% endif %}
             {% else %}
                 <div class="empty-state">
                     <i class="fas fa-building"></i>
                     <h3>No Branches Found</h3>
                     <p>No branches match your current search criteria.</p>
-                    {% if search_query %}
-                        <a href="{{ url_for('manage_branches') }}" class="btn btn-outline">
+                    {% if search_query or restaurant_filter %}
+                        <a href="{{ url_for('manage_branches', per_page=pagination.per_page) }}" class="btn btn-sm btn-outline">
                             <i class="fas fa-times"></i> Clear Search
                         </a>
                     {% endif %}
@@ -295,83 +449,52 @@ function bulkDelete() {
     }
 }
 
-function filterBranchesTable() {
-    console.log('filterBranchesTable called'); // Debug log
-    const searchInput = document.getElementById('searchInput');
-    const restaurantFilter = document.getElementById('restaurantFilter');
-    
-    if (!searchInput || !restaurantFilter) {
-        console.error('Search input or restaurant filter not found');
-        return;
-    }
-    
-    const searchValue = searchInput.value.trim();
-    const restaurantValue = restaurantFilter.value;
-    
-    console.log('Search value:', searchValue, 'Restaurant value:', restaurantValue); // Debug log
-    
-    let url = '{{ url_for("manage_branches") }}?';
-    const params = [];
-    
-    if (searchValue) {
-        params.push(`search=${encodeURIComponent(searchValue)}`);
-    }
-    
-    if (restaurantValue) {
-        params.push(`restaurant=${encodeURIComponent(restaurantValue)}`);
-    }
-    
-    if (params.length > 0) {
-        url += params.join('&');
-    } else {
-        url = '{{ url_for("manage_branches") }}';
-    }
-    
-    console.log('Redirecting to:', url); // Debug log
-    window.location.href = url;
+function getBranchesPerPage() {
+    const sel = document.getElementById('per_page_branches');
+    return sel ? sel.value : {{ pagination.per_page }};
 }
 
-// Initialize when DOM is loaded
+function changeBranchesPerPage(perPage) {
+    const searchInput = document.getElementById('searchInput');
+    const restaurantFilter = document.getElementById('restaurantFilter');
+    const params = new URLSearchParams();
+    params.append('page', '1');
+    params.append('per_page', perPage);
+    if (searchInput && searchInput.value.trim()) params.append('search', searchInput.value.trim());
+    if (restaurantFilter && restaurantFilter.value) params.append('restaurant', restaurantFilter.value);
+    window.location.href = '{{ url_for("manage_branches") }}?' + params.toString();
+}
+
+function filterBranchesTable() {
+    const searchInput = document.getElementById('searchInput');
+    const restaurantFilter = document.getElementById('restaurantFilter');
+    if (!searchInput || !restaurantFilter) return;
+    const params = new URLSearchParams();
+    params.append('page', '1');
+    params.append('per_page', getBranchesPerPage());
+    const searchValue = searchInput.value.trim();
+    const restaurantValue = restaurantFilter.value;
+    if (searchValue) params.append('search', searchValue);
+    if (restaurantValue) params.append('restaurant', restaurantValue);
+    window.location.href = '{{ url_for("manage_branches") }}?' + params.toString();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, initializing manage branches page');
-    
-    // Handle search input - trigger on both Enter key and input change
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
-        console.log('Search input found');
         searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                console.log('Enter key pressed');
-                filterBranchesTable();
-            }
+            if (e.key === 'Enter') filterBranchesTable();
         });
-        
-        // Also trigger on input change with debounce
         let searchTimeout;
         searchInput.addEventListener('input', function() {
             clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                console.log('Search input changed');
-                filterBranchesTable();
-            }, 500); // 500ms delay
+            searchTimeout = setTimeout(filterBranchesTable, 500);
         });
-    } else {
-        console.error('Search input not found');
     }
-
-    // Handle restaurant filter change
     const restaurantFilter = document.getElementById('restaurantFilter');
     if (restaurantFilter) {
-        console.log('Restaurant filter found');
-        restaurantFilter.addEventListener('change', function() {
-            console.log('Restaurant filter changed');
-            filterBranchesTable();
-        });
-    } else {
-        console.error('Restaurant filter not found');
+        restaurantFilter.addEventListener('change', filterBranchesTable);
     }
-
-    // Initialize bulk actions state
     updateBulkActions();
 });
 </script>

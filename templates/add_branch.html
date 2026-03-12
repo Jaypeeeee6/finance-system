@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}Add Branch{% endblock %}
+{% block title %}Add Branch or Flat{% endblock %}
 
 {% block content %}
 <div class="dashboard-container">
     <div class="dashboard-header">
-        <h1><i class="fas fa-plus"></i> Add Branch</h1>
-        <p>Add a new company branch location</p>
+        <h1><i class="fas fa-plus"></i> Add Branch or Flat</h1>
+        <p>Add a new company branch or flat location</p>
     </div>
 
     <div class="card">
         <div class="card-body">
             <form method="POST" action="{{ url_for('add_branch') }}">
                 <div class="form-group">
-                    <label for="restaurant">Location *</label>
+                    <label for="restaurant">Location <span style="color: red;">*</span></label>
                     <select name="restaurant" id="restaurant" class="form-control" required>
                         <option value="">-- Select Location --</option>
                         {% if available_locations %}
@@ -54,10 +54,26 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="name">Branch Name *</label>
+                    <label for="name">Branch Name <span style="color: red;">*</span></label>
                     <input type="text" name="name" id="name" class="form-control" required 
                            placeholder="e.g., Main Branch, Muscat Branch, Salalah Branch">
-                    <small class="form-text text-muted">Enter a descriptive name for this branch</small>
+                    <small class="form-text text-muted">Enter a descriptive name for this branch or flat</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Type <span style="color: red;">*</span></label>
+                    <div style="display: flex; flex-direction: row; align-items: center; gap: 1.5rem;">
+                        <div class="form-check" style="display: inline-flex; align-items: center; margin-bottom: 0;">
+                            <input type="checkbox" name="type_branch" id="type_branch" class="form-check-input branch-type-cb" checked>
+                            <label for="type_branch" class="form-check-label" style="margin-left: 0.25rem;">Branch</label>
+                        </div>
+                        <div class="form-check" style="display: inline-flex; align-items: center; margin-bottom: 0;">
+                            <input type="checkbox" name="type_flat" id="type_flat" class="form-check-input branch-type-cb">
+                            <label for="type_flat" class="form-check-label" style="margin-left: 0.25rem;">Flat</label>
+                        </div>
+                    </div>
+                    <input type="hidden" name="branch_type" id="branch_type" value="branch">
+                    <small class="form-text text-muted">Choose whether this entry is a branch or a flat</small>
                 </div>
 
                 <div class="form-group">
@@ -72,7 +88,7 @@
 
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Add Branch
+                        <i class="fas fa-save"></i> Add Branch or Flat
                     </button>
                     <a href="{{ url_for('manage_branches') }}" class="btn btn-secondary">
                         <i class="fas fa-times"></i> Cancel
@@ -85,7 +101,7 @@
     <!-- Help Section -->
     <div class="card">
         <div class="card-header">
-            <h3><i class="fas fa-info-circle"></i> Branch Guidelines</h3>
+            <h3><i class="fas fa-info-circle"></i> Branch & Flat Guidelines</h3>
         </div>
         <div class="card-body">
             <div class="row">
@@ -128,6 +144,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const regionInput = document.getElementById('region');
     const branchCodeInput = document.getElementById('branch_code');
     const generateCodeBtn = document.getElementById('generateCodeBtn');
+    const typeBranchCb = document.getElementById('type_branch');
+    const typeFlatCb = document.getElementById('type_flat');
+    const branchTypeHidden = document.getElementById('branch_type');
+
+    function syncBranchTypeCheckboxes() {
+        if (typeBranchCb && typeFlatCb && branchTypeHidden) {
+            typeBranchCb.addEventListener('change', function() {
+                if (this.checked) { typeFlatCb.checked = false; branchTypeHidden.value = 'branch'; }
+                else { typeFlatCb.checked = true; branchTypeHidden.value = 'flat'; }
+            });
+            typeFlatCb.addEventListener('change', function() {
+                if (this.checked) { typeBranchCb.checked = false; branchTypeHidden.value = 'flat'; }
+                else { typeBranchCb.checked = true; branchTypeHidden.value = 'branch'; }
+            });
+        }
+    }
+    syncBranchTypeCheckboxes();
 
     function updateGenerateButton() {
         if (restaurantInput.value && regionInput.value) {
@@ -181,9 +214,14 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        if (!branchTypeHidden || (branchTypeHidden.value !== 'branch' && branchTypeHidden.value !== 'flat')) {
+            e.preventDefault();
+            alert('Please choose Branch or Flat.');
+            return;
+        }
         if (!name) {
             e.preventDefault();
-            alert('Please fill in the branch name.');
+            alert('Please fill in the branch or flat name.');
             nameInput.focus();
             return;
         }

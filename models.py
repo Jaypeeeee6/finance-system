@@ -683,6 +683,7 @@ class Branch(db.Model):
     restaurant = db.Column(db.String(100), nullable=False)  # Location name for grouping branches (brand)
     region = db.Column(db.String(50), nullable=True)  # e.g., "Muscat", "Al Dakhilia" (for branch code)
     branch_code = db.Column(db.String(20), nullable=True)  # e.g., "K-MU001", "B-DK002" (editable, auto-generated for new)
+    branch_type = db.Column(db.String(20), nullable=True, default='branch')  # 'branch' or 'flat'
     is_active = db.Column(db.Boolean, default=True)  # Whether this branch is currently active
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -699,6 +700,7 @@ class Branch(db.Model):
             'restaurant': self.restaurant,
             'region': self.region,
             'branch_code': self.branch_code,
+            'branch_type': self.branch_type or 'branch',
             'is_active': self.is_active,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),

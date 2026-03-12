@@ -13131,7 +13131,7 @@ def toggle_procurement_item(item_id):
 @login_required
 @role_required('IT Staff', 'Department Manager')
 def manage_branches():
-    """Manage branches - IT only"""
+    """Manage branches & flats - IT only"""
     # Restrict Department Managers to IT department only
     if current_user.role == 'Department Manager' and current_user.department != 'IT':
         flash('You do not have permission to access this page.', 'danger')
@@ -13194,6 +13194,9 @@ def add_branch():
         region = request.form.get('region', '').strip() or None
         branch_code = request.form.get('branch_code', '').strip() or None
         is_active = request.form.get('is_active') == 'on'
+        branch_type = (request.form.get('branch_type', 'branch') or 'branch').strip().lower()
+        if branch_type not in ('branch', 'flat'):
+            branch_type = 'branch'
         
         if not restaurant:
             flash('Location is required.', 'danger')
@@ -13219,6 +13222,7 @@ def add_branch():
                 restaurant=restaurant,
                 region=region,
                 branch_code=branch_code,
+                branch_type=branch_type,
                 is_active=is_active,
                 created_by_user_id=current_user.user_id
             )
@@ -13266,6 +13270,9 @@ def edit_branch(branch_id):
         region = request.form.get('region', '').strip() or None
         branch_code = request.form.get('branch_code', '').strip() or None
         is_active = request.form.get('is_active') == 'on'
+        branch_type = (request.form.get('branch_type', 'branch') or 'branch').strip().lower()
+        if branch_type not in ('branch', 'flat'):
+            branch_type = 'branch'
         
         if not restaurant:
             flash('Location is required.', 'danger')
@@ -13289,6 +13296,7 @@ def edit_branch(branch_id):
             branch.restaurant = restaurant
             branch.region = region
             branch.branch_code = branch_code
+            branch.branch_type = branch_type
             branch.is_active = is_active
             branch.updated_at = datetime.utcnow()
             
