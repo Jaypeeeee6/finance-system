@@ -13141,6 +13141,7 @@ def manage_branches():
     per_page = request.args.get('per_page', 20, type=int)
     search_query = request.args.get('search', '')
     restaurant_filter = request.args.get('restaurant', '')
+    type_filter = request.args.get('type', '')  # 'branch', 'flat', or '' for all
     
     # Validate per_page to prevent abuse
     if per_page not in [10, 20, 50, 100]:
@@ -13155,6 +13156,11 @@ def manage_branches():
     if restaurant_filter:
         query = query.filter(Branch.restaurant == restaurant_filter)
     
+    if type_filter == 'branch':
+        query = query.filter(db.or_(Branch.branch_type == None, Branch.branch_type == 'branch'))
+    elif type_filter == 'flat':
+        query = query.filter(Branch.branch_type == 'flat')
+    
     # Get paginated results
     branches_pagination = query.order_by(Branch.id).paginate(
         page=page, per_page=per_page, error_out=False
@@ -13165,6 +13171,7 @@ def manage_branches():
                          pagination=branches_pagination,
                          search_query=search_query,
                          restaurant_filter=restaurant_filter,
+                         type_filter=type_filter,
                          user=current_user)
 
 

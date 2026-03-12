@@ -166,6 +166,11 @@
             </div>
             <div class="filters-right">
                 <div class="filter-controls">
+                    <select id="typeFilter" class="form-select" onchange="filterBranchesTable()">
+                        <option value="">All (Branches & Flats)</option>
+                        <option value="branch" {% if type_filter == 'branch' %}selected{% endif %}>Branches only</option>
+                        <option value="flat" {% if type_filter == 'flat' %}selected{% endif %}>Flats only</option>
+                    </select>
                     <select id="restaurantFilter" class="form-select" onchange="filterBranchesTable()">
                         <option value="">All Locations</option>
                         <option value="Kucu" {% if restaurant_filter == 'Kucu' %}selected{% endif %}>Kucu</option>
@@ -202,11 +207,16 @@
     <div class="card">
         <div class="card-header" style="background: transparent !important; box-shadow: none !important; border-bottom: none !important;">
             <div class="card-header-actions">
-                {% if search_query or restaurant_filter %}
+                {% if search_query or restaurant_filter or type_filter %}
                 <div class="filter-indicator">
                     {% if search_query %}
                     <span class="badge" style="background: #f57c00; color: white;">
                         <i class="fas fa-search"></i> Search: {{ search_query }}
+                    </span>
+                    {% endif %}
+                    {% if type_filter %}
+                    <span class="badge" style="background: #6f42c1; color: white;">
+                        <i class="fas fa-{{ 'building' if type_filter == 'branch' else 'door-open' }}"></i> {{ 'Branches only' if type_filter == 'branch' else 'Flats only' }}
                     </span>
                     {% endif %}
                     {% if restaurant_filter %}
@@ -330,14 +340,14 @@
                     {% if pagination.pages > 1 %}
                     <div class="pagination">
                         {% if pagination.has_prev %}
-                            <a href="{{ url_for('manage_branches', page=pagination.prev_num, per_page=pagination.per_page, search=search_query, restaurant=restaurant_filter) }}" class="btn btn-sm btn-secondary">
+                            <a href="{{ url_for('manage_branches', page=pagination.prev_num, per_page=pagination.per_page, search=search_query, restaurant=restaurant_filter, type=type_filter) }}" class="btn btn-sm btn-secondary">
                                 <i class="fas fa-chevron-left"></i> Previous
                             </a>
                         {% endif %}
                         {% for page_num in pagination.iter_pages() %}
                             {% if page_num %}
                                 {% if page_num != pagination.page %}
-                                    <a href="{{ url_for('manage_branches', page=page_num, per_page=pagination.per_page, search=search_query, restaurant=restaurant_filter) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
+                                    <a href="{{ url_for('manage_branches', page=page_num, per_page=pagination.per_page, search=search_query, restaurant=restaurant_filter, type=type_filter) }}" class="btn btn-sm btn-outline">{{ page_num }}</a>
                                 {% else %}
                                     <span class="btn btn-sm btn-primary">{{ page_num }}</span>
                                 {% endif %}
@@ -346,7 +356,7 @@
                             {% endif %}
                         {% endfor %}
                         {% if pagination.has_next %}
-                            <a href="{{ url_for('manage_branches', page=pagination.next_num, per_page=pagination.per_page, search=search_query, restaurant=restaurant_filter) }}" class="btn btn-sm btn-secondary">
+                            <a href="{{ url_for('manage_branches', page=pagination.next_num, per_page=pagination.per_page, search=search_query, restaurant=restaurant_filter, type=type_filter) }}" class="btn btn-sm btn-secondary">
                                 Next <i class="fas fa-chevron-right"></i>
                             </a>
                         {% endif %}
@@ -358,7 +368,7 @@
                     <i class="fas fa-building"></i>
                     <h3>No Branches Found</h3>
                     <p>No branches match your current search criteria.</p>
-                    {% if search_query or restaurant_filter %}
+                    {% if search_query or restaurant_filter or type_filter %}
                         <a href="{{ url_for('manage_branches', per_page=pagination.per_page) }}" class="btn btn-sm btn-outline">
                             <i class="fas fa-times"></i> Clear Search
                         </a>
@@ -475,25 +485,30 @@ function getBranchesPerPage() {
 function changeBranchesPerPage(perPage) {
     const searchInput = document.getElementById('searchInput');
     const restaurantFilter = document.getElementById('restaurantFilter');
+    const typeFilter = document.getElementById('typeFilter');
     const params = new URLSearchParams();
     params.append('page', '1');
     params.append('per_page', perPage);
     if (searchInput && searchInput.value.trim()) params.append('search', searchInput.value.trim());
     if (restaurantFilter && restaurantFilter.value) params.append('restaurant', restaurantFilter.value);
+    if (typeFilter && typeFilter.value) params.append('type', typeFilter.value);
     window.location.href = '{{ url_for("manage_branches") }}?' + params.toString();
 }
 
 function filterBranchesTable() {
     const searchInput = document.getElementById('searchInput');
     const restaurantFilter = document.getElementById('restaurantFilter');
+    const typeFilter = document.getElementById('typeFilter');
     if (!searchInput || !restaurantFilter) return;
     const params = new URLSearchParams();
     params.append('page', '1');
     params.append('per_page', getBranchesPerPage());
     const searchValue = searchInput.value.trim();
     const restaurantValue = restaurantFilter.value;
+    const typeValue = typeFilter ? typeFilter.value : '';
     if (searchValue) params.append('search', searchValue);
     if (restaurantValue) params.append('restaurant', restaurantValue);
+    if (typeValue) params.append('type', typeValue);
     window.location.href = '{{ url_for("manage_branches") }}?' + params.toString();
 }
 
@@ -512,6 +527,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const restaurantFilter = document.getElementById('restaurantFilter');
     if (restaurantFilter) {
         restaurantFilter.addEventListener('change', filterBranchesTable);
+    }
+    const typeFilter = document.getElementById('typeFilter');
+    if (typeFilter) {
+        typeFilter.addEventListener('change', filterBranchesTable);
     }
     updateBulkActions();
 });

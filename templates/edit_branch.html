@@ -33,72 +33,25 @@
 </style>
 <div class="dashboard-container">
     <div class="dashboard-header">
-        <h1><i class="fas fa-edit"></i> Edit Branch or Flat</h1>
-        <p>Edit branch or flat: <strong>{{ branch.name }}</strong></p>
+        <h2 class="dashboard-title" style="margin:0; display:inline-flex; align-items:center; gap:8px; font-size:1.6rem; font-weight:700;"><i class="fas fa-edit"></i> Edit Branch or Flat</h2>
+        <p>Edit company branch or flat location</p>
     </div>
 
-    <div class="card">
+    <div class="card form-page-book-style">
         <div class="card-body">
             <form method="POST" action="{{ url_for('edit_branch', branch_id=branch.id) }}">
                 <div class="form-group">
-                    <label for="restaurant">Location <span style="color: red;">*</span></label>
-                    <select name="restaurant" id="restaurant" class="form-control" required>
-                        <option value="">-- Select Location --</option>
-                        {% if available_locations %}
-                            {% for location in available_locations %}
-                                <option value="{{ location.location_name }}" {% if branch.restaurant == location.location_name %}selected{% endif %}>{{ location.location_name }}</option>
-                            {% endfor %}
-                        {% endif %}
-                        {% if unprioritized_locations %}
-                            {% for location in unprioritized_locations %}
-                                <option value="{{ location }}" {% if branch.restaurant == location %}selected{% endif %}>{{ location }}</option>
-                            {% endfor %}
-                        {% endif %}
-                    </select>
-                    <small class="form-text text-muted">Select the location for grouping branches. <a href="{{ url_for('manage_locations') }}" target="_blank">Manage locations</a></small>
-                </div>
-
-                <div id="region_group" class="form-group" style="display: {% if (branch.branch_type or 'branch') == 'flat' %}none{% else %}block{% endif %};">
-                    <label for="region">Region</label>
-                    <select name="region" id="region" class="form-control">
-                        <option value="">-- Select Region (optional) --</option>
-                        {% if regions %}
-                            {% for r in regions %}
-                                <option value="{{ r }}" {% if branch.region == r %}selected{% endif %}>{{ r }}</option>
-                            {% endfor %}
-                        {% endif %}
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="branch_code">Branch / Flat Code</label>
-                    <input type="text" name="branch_code" id="branch_code" class="form-control" 
-                           value="{{ branch.branch_code or '' }}" placeholder="e.g., K-MU001, B-DK002">
-                    <small class="form-text text-muted">Editable. Format: Brand letter-Region code + 3-digit sequence.</small>
-                    <button type="button" class="btn btn-sm btn-outline mt-1" id="generateCodeBtn" style="display: none;">
-                        <i class="fas fa-magic"></i> Suggest code
-                    </button>
-                </div>
-
-                <div class="form-group">
-                    <label for="name">Branch Name <span style="color: red;">*</span></label>
-                    <input type="text" name="name" id="name" class="form-control" required 
-                           value="{{ branch.name }}" placeholder="e.g., Main Branch, Muscat Branch, Salalah Branch">
-                    <small class="form-text text-muted">Enter a descriptive name for this branch or flat</small>
-                </div>
-
-                <div class="form-group">
-                    <label>Type <span style="color: red;">*</span></label>
+                    <label>Type <span class="required-star">*</span></label>
                     <div style="display: flex; flex-direction: row; align-items: center; gap: 1.5rem;">
                         <div class="form-check type-option" style="display: inline-flex; align-items: center; margin-bottom: 0;">
                             <input type="checkbox" name="type_branch" id="type_branch" class="form-check-input branch-type-cb"
                                    {% if (branch.branch_type or 'branch') == 'branch' %}checked{% endif %}>
-                            <label for="type_branch" class="form-check-label" style="margin-left: 0.25rem;">Branch</label>
+                            <label for="type_branch" class="form-check-label" style="margin-left: 0.25rem; margin-bottom: 0; display: inline-flex; align-items: center;">Branch</label>
                         </div>
                         <div class="form-check type-option" style="display: inline-flex; align-items: center; margin-bottom: 0;">
                             <input type="checkbox" name="type_flat" id="type_flat" class="form-check-input branch-type-cb"
                                    {% if (branch.branch_type or 'branch') == 'flat' %}checked{% endif %}>
-                            <label for="type_flat" class="form-check-label" style="margin-left: 0.25rem;">Flat</label>
+                            <label for="type_flat" class="form-check-label" style="margin-left: 0.25rem; margin-bottom: 0; display: inline-flex; align-items: center;">Flat</label>
                         </div>
                     </div>
                     <input type="hidden" name="branch_type" id="branch_type" value="{{ branch.branch_type or 'branch' }}">
@@ -151,6 +104,55 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="restaurant">Location <span class="required-star">*</span></label>
+                    <select name="restaurant" id="restaurant" class="form-control" required>
+                        <option value="">-- Select Location --</option>
+                        {% if available_locations %}
+                            {% for location in available_locations %}
+                                <option value="{{ location.location_name }}" {% if branch.restaurant == location.location_name %}selected{% endif %}>{{ location.location_name }}</option>
+                            {% endfor %}
+                        {% endif %}
+                        {% if unprioritized_locations %}
+                            {% for location in unprioritized_locations %}
+                                <option value="{{ location }}" {% if branch.restaurant == location %}selected{% endif %}>{{ location }}</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                    <small class="form-text text-muted">Select the location for grouping branches. <a href="{{ url_for('manage_locations') }}" target="_blank">Manage locations</a></small>
+                </div>
+
+                <div id="region_group" class="form-group" style="display: {% if (branch.branch_type or 'branch') == 'flat' %}none{% else %}block{% endif %};">
+                    <label for="region">Region</label>
+                    <select name="region" id="region" class="form-control">
+                        <option value="">-- Select Region (optional for code) --</option>
+                        {% if regions %}
+                            {% for r in regions %}
+                                <option value="{{ r }}" {% if branch.region == r %}selected{% endif %}>{{ r }}</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                    <small class="form-text text-muted">Region is used to auto-generate the branch code (e.g. Muscat → MU, Al Dakhilia → DK)</small>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="branch_code">Branch / Flat Code</label>
+                        <input type="text" name="branch_code" id="branch_code" class="form-control" 
+                               value="{{ branch.branch_code or '' }}" placeholder="e.g., K-MU001, B-DK002 (auto-filled when Location + Region are selected)">
+                        <small class="form-text text-muted">Auto-generated from Location (brand) + Region + sequence. You can edit it if needed.</small>
+                        <button type="button" class="btn btn-sm btn-outline mt-1" id="generateCodeBtn" style="display: none;">
+                            <i class="fas fa-magic"></i> Generate code
+                        </button>
+                    </div>
+                    <div class="form-group">
+                        <label for="name">Branch / Flat Name <span class="required-star">*</span></label>
+                        <input type="text" name="name" id="name" class="form-control" required 
+                               value="{{ branch.name }}" placeholder="e.g., Main Branch, Muscat Branch, Salalah Branch">
+                        <small class="form-text text-muted">Enter a descriptive name for this branch or flat</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
                     <div class="form-check">
                         <input type="checkbox" name="is_active" id="is_active" class="form-check-input" 
                                {% if branch.is_active %}checked{% endif %}>
@@ -161,40 +163,21 @@
                     <small class="form-text text-muted">Active branches will be available for selection when creating new payment requests</small>
                 </div>
 
-                <!-- Display additional information -->
-                <div class="form-group">
-                    <div class="info-box">
-                        <h6><i class="fas fa-info-circle"></i> Branch / Flat Information</h6>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <p><strong>Created By:</strong> {{ branch.created_by.name if branch.created_by else 'System' }}</p>
-                                <p><strong>Created Date:</strong> {{ branch.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
-                            </div>
-                            <div class="col-md-6">
-                                <p><strong>Last Updated:</strong> {{ branch.updated_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
-                                <p><strong>Current Status:</strong> 
-                                    <span class="badge {% if branch.is_active %}badge-success{% else %}badge-secondary{% endif %}">
-                                        {% if branch.is_active %}Active{% else %}Inactive{% endif %}
-                                    </span>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Update Branch or Flat
-                    </button>
-                    <a href="{{ url_for('manage_branches') }}" class="btn btn-secondary">
-                        <i class="fas fa-times"></i> Cancel
-                    </a>
+                    <div class="form-actions-buttons">
+                        <button type="submit" class="btn btn-success" style="background:#28a745;border-color:#28a745;color:#ffffff;">
+                            <i class="fas fa-save"></i> Update Branch or Flat
+                        </button>
+                        <a href="{{ url_for('manage_branches') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </div>
                 </div>
             </form>
 
-            <hr>
-            <h3>Aliases</h3>
-            <p class="form-text text-muted">Add old names for this branch so reports include historical entries.</p>
+            <hr class="my-4">
+            <h5 class="mb-2"><i class="fas fa-tags"></i> Aliases</h5>
+            <p class="form-text text-muted mb-3">Add old names for this branch so reports include historical entries.</p>
 
             <div class="form-group">
                 <form method="POST" action="{{ url_for('add_branch_alias', branch_id=branch.id) }}" style="display: flex; gap: 8px; align-items: center;">
@@ -217,31 +200,10 @@
                 </ul>
             </div>
             {% endif %}
-        </div>
-    </div>
 
-    <!-- Warning Section -->
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-exclamation-triangle"></i> Important Notes</h3>
-        </div>
-        <div class="card-body">
-            <div class="alert alert-warning">
-                <i class="fas fa-warning"></i>
-                <strong>Warning:</strong> Changing the name or location of this branch or flat may affect existing payment requests that use it. 
-                Please ensure that the changes are appropriate and necessary.
-            </div>
-            
-            <div class="row">
-                <div class="col-md-6">
-                    <h5>Name Changes:</h5>
-                    <ul>
-                        <li>Existing payment requests will show the new name</li>
-                        <li>Reports and filters will use the new name</li>
-                        <li>Make sure the new name is clear and descriptive</li>
-                    </ul>
-                </div>
-            </div>
+            <p class="form-text text-muted mt-3 mb-0 small">
+                <i class="fas fa-info-circle"></i> Last updated {{ branch.updated_at.strftime('%Y-%m-%d %H:%M') }}{% if branch.created_by %} · Created by {{ branch.created_by.name }}{% endif %}. Changing name or location may affect existing payment requests.
+            </p>
         </div>
     </div>
 </div>
@@ -340,33 +302,33 @@ document.addEventListener('DOMContentLoaded', function() {
             dropdown.innerHTML = '';
             var options = optionsSelect.querySelectorAll('option');
             options.forEach(function(opt) {
-var id = opt.value;
-            var text = opt.getAttribute('data-text') || opt.textContent;
-            var restaurant = opt.getAttribute('data-restaurant') || '';
-            var branchCode = opt.getAttribute('data-branch-code') || '';
-            var div = document.createElement('div');
-            div.className = 'parent-branch-option';
-            div.setAttribute('data-value', id);
-            div.setAttribute('data-text', text);
-            div.setAttribute('data-restaurant', restaurant);
-            div.setAttribute('data-branch-code', branchCode);
-            div.textContent = text;
-            div.addEventListener('mousedown', function(e) {
-                e.preventDefault();
-                hiddenIdInput.value = id;
-                searchInput.value = text;
-                dropdown.style.display = 'none';
-                var parentCodeEl = document.getElementById('parent_branch_code');
-                if (parentCodeEl) {
-                    parentCodeEl.value = (restaurant === 'Office') ? 'O' : (branchCode || '');
-                }
-                if (restaurant && restaurantInput) {
-                    restaurantInput.value = restaurant;
-                    restaurantInput.dispatchEvent(new Event('change'));
-                }
-                updateFlatCode();
-            });
-                dropdown.appendChild(div);
+                var id = opt.value;
+                var text = opt.getAttribute('data-text') || opt.textContent;
+                var restaurant = opt.getAttribute('data-restaurant') || '';
+                var branchCode = opt.getAttribute('data-branch-code') || '';
+                var div = document.createElement('div');
+                div.className = 'parent-branch-option';
+                div.setAttribute('data-value', id);
+                div.setAttribute('data-text', text);
+                div.setAttribute('data-restaurant', restaurant);
+                div.setAttribute('data-branch-code', branchCode);
+                div.textContent = text;
+                div.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    hiddenIdInput.value = id;
+                    searchInput.value = text;
+                    dropdown.style.display = 'none';
+                    var parentCodeEl = document.getElementById('parent_branch_code');
+                    if (parentCodeEl) {
+                        parentCodeEl.value = (restaurant === 'Office') ? 'O' : (branchCode || '');
+                    }
+                    if (restaurant && restaurantInput) {
+                        restaurantInput.value = restaurant;
+                        restaurantInput.dispatchEvent(new Event('change'));
+                    }
+                    updateFlatCode();
+                });
+            dropdown.appendChild(div);
             });
         }
         function filterParentBranchOptions(term) {
@@ -538,25 +500,4 @@ var id = opt.value;
     });
 });
 </script>
-
-<style>
-.info-box {
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 5px;
-    padding: 15px;
-    margin-bottom: 20px;
-}
-
-.info-box h6 {
-    color: #495057;
-    margin-bottom: 10px;
-    font-weight: 600;
-}
-
-.info-box p {
-    margin-bottom: 5px;
-    color: #6c757d;
-}
-</style>
 {% endblock %}
