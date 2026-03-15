@@ -17136,7 +17136,9 @@ def edit_request(request_id):
         'account_number': req.account_number or '',
         'amount': norm_amount(req.amount),
         'department': req.department or '',
-        'payment_method': req.payment_method or ''
+        'payment_method': req.payment_method or '',
+        'branch_amounts': (getattr(req, 'branch_amounts', None) or '').strip(),
+        'different_amounts_per_branch': getattr(req, 'different_amounts_per_branch', False),
     }
 
     # If this is a manager/GM/Operation Manager/temporary manager editing while status is
@@ -17434,7 +17436,9 @@ def edit_request(request_id):
         'account_number': req.account_number or '',
         'amount': norm_amount(req.amount),  # Normalize amount for consistent comparison
         'department': req.department or '',
-        'payment_method': req.payment_method or ''
+        'payment_method': req.payment_method or '',
+        'branch_amounts': (req.branch_amounts or '').strip(),
+        'different_amounts_per_branch': getattr(req, 'different_amounts_per_branch', False),
     }
     submitted_keys = set(request.form.keys())
     # Map form field names to our keys
@@ -17451,7 +17455,9 @@ def edit_request(request_id):
         'amount': 'amount',
         'item_name': 'item_name',
         'department': 'department',
-        'payment_method': 'payment_method'
+        'payment_method': 'payment_method',
+        'branch_amounts': 'branch_amounts',
+        'different_amounts_per_branch': 'branch_amounts',
     }
     candidate_keys = set(form_to_key[k] for k in submitted_keys if k in form_to_key)
     # Use special normalization for amount field
@@ -17460,6 +17466,14 @@ def edit_request(request_id):
         if key == 'amount':
             # Use amount-specific normalization
             if norm_amount(original.get(key, '')) != norm_amount(updated.get(key, '')):
+                edited_fields.append(key)
+        elif key == 'branch_amounts':
+            # Amount per branch: compare both branch_amounts string and different_amounts_per_branch
+            orig_ba = (original.get('branch_amounts') or '').strip()
+            upd_ba = (updated.get('branch_amounts') or '').strip()
+            orig_diff = original.get('different_amounts_per_branch', False)
+            upd_diff = updated.get('different_amounts_per_branch', False)
+            if orig_ba != upd_ba or orig_diff != upd_diff:
                 edited_fields.append(key)
         else:
             # Use standard normalization for other fields

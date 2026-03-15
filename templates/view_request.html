@@ -1051,9 +1051,10 @@ div.dashboard-container div.card.finance-admin-decision div.card-header {
 
                 {% if branch_names_with_codes and branch_names_with_codes|length >= 2 %}
                 {% set branch_amounts_list = request.branch_amounts | from_json %}
-                {% set can_edit_amounts_per_branch = can_edit_request and request.status in ['Returned to Manager', 'Returned to Requestor'] %}
+                {# IT can edit when Pending Manager Approval; requestor when Returned to Requestor; manager when Returned to Manager #}
+                {% set can_edit_amounts_per_branch = (can_edit_request and request.status in ['Returned to Manager', 'Returned to Requestor']) or (user and user.department == 'IT' and user.role in ['IT Staff', 'Department Manager'] and request.status == 'Pending Manager Approval') %}
                 <div class="form-group">
-                    <label>Amount per branch</label>
+                    <label>Amount per branch {% if 'branch_amounts' in edited_fields %}<span class="edited-badge" data-field="branch_amounts" role="button" tabindex="0">Edited</span>{% endif %}</label>
                     {% if can_edit_amounts_per_branch %}
                     <input type="hidden" name="different_amounts_per_branch" value="1">
                     <input type="hidden" name="branch_amounts" id="view_request_branch_amounts" value="{{ request.branch_amounts or '[]' }}">
