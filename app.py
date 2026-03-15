@@ -734,6 +734,15 @@ def role_required(*roles):
     return decorator
 
 
+def _can_write_edit_cheque():
+    """True if current user may write/edit cheques. GM, CEO, Operation Manager, or (temporary) any Auditing department user."""
+    if current_user.role in ('GM', 'CEO', 'Operation Manager'):
+        return True
+    if getattr(current_user, 'department', None) == 'Auditing':
+        return True  # TEMPORARY: remove this block later to revoke Auditing write/edit
+    return False
+
+
 def can_access_archives():
     """True if current user is allowed to view and use the Archives page (GM, CEO, Operation Manager, Auditing, Abdalaziz, or IT)."""
     if current_user.role in ['GM', 'CEO', 'Operation Manager']:
@@ -15691,9 +15700,10 @@ def favicon():
 
 @app.route('/write-cheque', methods=['GET', 'POST'])
 @login_required
-@role_required('GM', 'CEO', 'Operation Manager')
 def write_cheque():
     """Write a cheque for approved payment requests. Supports multiple reserved serials via ?serial_ids=1,2,3."""
+    if not _can_write_edit_cheque():
+        abort(403)
     # Get approved payment requests that need cheques
     approved_requests = PaymentRequest.query.filter_by(status='Approved').all()
     selected_serials = []
@@ -15744,12 +15754,13 @@ def write_cheque():
 
 @app.route('/write-cheque/save', methods=['POST'])
 @login_required
-@role_required('GM', 'CEO', 'Operation Manager')
 def write_cheque_save():
     """Save write-cheque form details to the selected cheque serials (book's cheque records).
     Updates payee_name, cheque_date, amount on each serial and sets status to Used.
     Data is stored in cheque_serials (linked to cheque_books via book_id) and appears in the cheque register.
     """
+    if not _can_write_edit_cheque():
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
     try:
         data = request.get_json() or {}
         serial_ids = data.get('serial_ids')

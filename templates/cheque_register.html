@@ -548,6 +548,8 @@
 {% set show_select_it = current_user.department == 'IT' %}
 {% set show_select_ceo_gm_op = current_user.role in ['CEO', 'GM', 'Operation Manager'] %}
 {% set show_select_auditing = current_user.department == 'Auditing' %}
+{# TEMPORARY: allow Auditing to write/edit cheques; set show_write_cheque_actions = show_select_ceo_gm_op to remove later #}
+{% set show_write_cheque_actions = show_select_ceo_gm_op or show_select_auditing %}
 {% set show_cheque_select = show_select_it or show_select_ceo_gm_op or show_select_auditing %}
 {% set show_image_actions = current_user.role in ['GM', 'CEO', 'Operation Manager'] or current_user.department == 'Auditing' %}
 <div class="dashboard-container cheque-register-page" data-show-auditing-select="{{ 'true' if show_select_auditing else 'false' }}" data-show-it-select="{{ 'true' if show_select_it else 'false' }}" data-show-bulk-upload="{{ 'true' if show_image_actions else 'false' }}" data-filter-active="{{ 'true' if (book_filter_list or status_filter_list or book_holder_filter_list or bank_filter_list) else 'false' }}">
@@ -698,7 +700,7 @@
                         </button>
                     </div>
                     {% endif %}
-                    {% if show_select_ceo_gm_op %}
+                    {% if show_write_cheque_actions %}
                     <div class="cheque-book-toolbar cheque-toolbar-reserve" data-book-no="{{ group.grouper }}" style="display: none;">
                         <span class="toolbar-reserve-actions" style="display: none;">
                             <button type="button" class="btn btn-sm btn-reserve-only" data-book-no="{{ group.grouper }}">
@@ -782,7 +784,7 @@
                                 <tr id="cheque-row-{{ serial.id }}" data-book-no="{{ group.grouper }}" data-serial-id="{{ serial.id }}" data-status="{{ serial.status }}">
                                     {% if show_cheque_select %}
                                     <td class="cheque-td-select">
-                                        <input type="checkbox" class="cheque-row-select" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" aria-label="Select serial {{ serial.serial_no }}" {% if show_select_ceo_gm_op and serial.status == 'Cancelled' %}disabled{% endif %}{% if show_select_auditing and serial.status not in ['Used', 'Audited'] %} disabled{% endif %}>
+                                        <input type="checkbox" class="cheque-row-select" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" aria-label="Select serial {{ serial.serial_no }}" {% if show_select_ceo_gm_op and serial.status == 'Cancelled' %}disabled{% endif %}{% if show_select_auditing and serial.status == 'Cancelled' %} disabled{% endif %}>
                                     </td>
                                     {% endif %}
                                     <td>{{ serial.book.book_no }}</td>
@@ -804,7 +806,8 @@
                                     <td class="upload-cell-td" style="position: relative; text-align: center;">
                                         <div class="cheque-action-cell-wrap">
                                         <div class="cheque-action-menu-container" style="position: relative; display: inline-block;">
-                                            {% set auditing_no_actions = show_select_auditing and serial.status in ['Available', 'Reserved'] %}
+                                            {# When reverting Auditing write permission, set back to: show_select_auditing and serial.status not in ['Used', 'Audited'] #}
+{% set auditing_no_actions = show_select_auditing and serial.status == 'Cancelled' %}
                                             <button type="button" class="btn action-ellipsis-btn btn-view-outline cheque-action-ellipsis" aria-haspopup="true" aria-expanded="false" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" data-status="{{ serial.status }}" data-upload-path="{{ serial.upload_path or '' }}" title="{% if auditing_no_actions %}No actions for this status{% else %}Actions{% endif %}" {% if auditing_no_actions %}disabled{% endif %}>
                                                 <i class="fas fa-ellipsis-h"></i>
                                             </button>
@@ -815,8 +818,8 @@
                                                     <i class="fas fa-trash-alt" style="margin-right:8px;"></i> Delete
                                                 </button>
                                                 {% endif %}
-                                                {# CEO/GM/Operation Manager: status-based actions #}
-                                                {% if show_select_ceo_gm_op %}
+                                                {# CEO/GM/Operation Manager (and temporarily Auditing): status-based write/edit actions #}
+                                                {% if show_write_cheque_actions %}
                                                 {% if serial.status == 'Available' %}
                                                 <button type="button" class="cheque-dropdown-item cheque-action-reserve-only" data-serial-id="{{ serial.id }}" data-book-no="{{ group.grouper }}" role="menuitem" style="display:block; width:100%; padding:10px 12px; background:none; border:none; text-align:left; color:#212529; cursor:pointer;">
                                                     <i class="fas fa-bookmark" style="margin-right:8px;"></i> Reserve Only
